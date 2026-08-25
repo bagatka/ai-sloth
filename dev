@@ -6,4 +6,5 @@ if ! command -v nix >/dev/null 2>&1; then
   exit 127
 fi
 
-exec nix --extra-experimental-features 'nix-command flakes' develop --command nu "$@"
+exec nix --extra-experimental-features 'nix-command flakes' develop \
+  --command nu --execute '$env.config.show_banner = false' "$@"
