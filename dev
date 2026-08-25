@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+if ! command -v nix >/dev/null 2>&1; then
+  printf '%s\n' 'error: Nix is required: https://nixos.org/download/' >&2
+  exit 127
+fi
+
+exec nix --extra-experimental-features 'nix-command flakes' develop --command nu "$@"
