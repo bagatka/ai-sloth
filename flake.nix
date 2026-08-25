@@ -27,6 +27,7 @@
             packages = [
               pkgs.bun
               pkgs.nushell
+              pkgs.wrangler
             ];
           };
         }
