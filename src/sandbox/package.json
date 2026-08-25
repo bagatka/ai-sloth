@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "setup": "nu setup.nu",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "secret:openrouter": "wrangler secret put OPENROUTER_API_KEY",
+    "secret:trigger": "wrangler secret put SANDBOX_API_TOKEN"
+  },
+  "dependencies": {
+    "@cloudflare/sandbox": "0.13.0-next.751.1"
+  },
+  "devDependencies": {
+    "wrangler": "4.102.0"
+  }
+}

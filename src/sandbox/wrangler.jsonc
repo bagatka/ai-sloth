@@ -1,0 +1,28 @@
+{
+  "name": "ai-sloth-sandbox",
+  "main": "sandbox.ts",
+  "compatibility_date": "2025-05-06",
+  "compatibility_flags": ["nodejs_compat", "enable_ctx_exports"],
+  "containers": [
+    {
+      "class_name": "Sandbox",
+      "image": "./Dockerfile",
+      "instance_type": "lite",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "Sandbox",
+        "class_name": "Sandbox"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["Sandbox"]
+    }
+  ]
+}

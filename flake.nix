@@ -26,8 +26,8 @@
           default = pkgs.mkShell {
             packages = [
               pkgs.bun
+              pkgs.docker-client
               pkgs.nushell
-              pkgs.wrangler
             ];
           };
         }
