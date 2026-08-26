@@ -10,6 +10,6 @@
     "@cloudflare/sandbox": "0.13.0-next.751.1"
   },
   "devDependencies": {
-    "wrangler": "4.102.0"
+    "wrangler": "4.126.0"
   }
 }

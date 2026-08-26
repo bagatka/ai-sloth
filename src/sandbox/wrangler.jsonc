@@ -1,6 +1,6 @@
 {
   "name": "ai-sloth-sandbox",
-  "main": "sandbox.ts",
+  "main": "worker.ts",
   "compatibility_date": "2025-05-06",
   "compatibility_flags": ["nodejs_compat", "enable_ctx_exports"],
   "containers": [

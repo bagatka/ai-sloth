@@ -2,49 +2,68 @@
 
 On-demand, disposable cloud development environments for AI coding agents.
 
-## Development environment
+## Development
 
-With [Nix](https://nixos.org/download/) installed, enter the development environment after cloning:
+Enter the Nix development environment:
 
 ```sh
 ./dev
 ```
 
-## Cloudflare
+## Deploy the sandbox
 
-Create an [AI Sloth Sandbox Deploy API token](https://dash.cloudflare.com/?to=/:account/api-tokens&permissionGroupKeys=%5B%7B%22key%22%3A%22account_settings%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22containers%22%2C%22type%22%3A%22edit%22%7D%5D&name=AI%20Sloth%20Sandbox%20Deploy). Select the target account, confirm the prefilled permissions, create the token, and copy it. The permissions allow reading the account identity, deploying the Worker, and deploying its sandbox container—nothing else.
+Create a [Cloudflare deployment token][deploy-token] with these permissions:
 
-Then provide the [account ID](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/) and token when prompted:
+- Account Settings: Read
+- Workers Scripts: Edit
+- Containers: Edit
 
-```sh
-bun install --cwd src/sandbox
-bun run --cwd src/sandbox setup
-bun run --cwd src/sandbox deploy
-```
-
-The setup command validates the credentials and saves them in the ignored `src/sandbox/.env` file. Deployment requires a running Docker-compatible daemon.
-
-After the first deployment, store the OpenRouter key and a strong random trigger token as encrypted Worker secrets:
+Then run from the repository root:
 
 ```sh
-bun run --cwd src/sandbox secret:openrouter
-bun run --cwd src/sandbox secret:trigger
+cd src/sandbox
+bun install
+bun run setup
+bun run deploy
 ```
 
-Keep the trigger token: callers send it as a bearer token. Trigger an agent run with:
+`setup` validates the account ID and token, then writes them to the ignored `.env` file. Deployment requires a running Docker-compatible daemon.
+
+Configure the runtime secrets after the first deployment:
+
+```sh
+bun run secret:openrouter
+bun run secret:trigger
+```
+
+The first command stores the OpenRouter API key. The second stores the bearer token required to invoke the sandbox.
+
+## Run an agent
+
+Set `SANDBOX_API_TOKEN` to the trigger token, then run:
 
 ```nu
-http post \
-  --content-type application/json \
-  --headers {Authorization: $"Bearer ($env.SANDBOX_API_TOKEN)"} \
-  https://ai-sloth-sandbox.<subdomain>.workers.dev/run \
+(http post
+  --content-type "application/json"
+  --headers {Authorization: $"Bearer ($env.SANDBOX_API_TOKEN)"}
+  https://ai-sloth-sandbox.<subdomain>.workers.dev/run
   {
-    url: "https://github.com/owner/repository"
+    repositoryUrl: "https://github.com/owner/repository"
     branch: "main"
     prompt: "Review this repository and report the most important issue."
   }
+)
 ```
 
-Each request gets a fresh sandbox, shallow-clones the selected public GitHub branch, and runs Pi with OpenRouter's `openai/gpt-5.6-luna` model and low thinking. Runs are limited to ten minutes and 1 MiB of output. The container is destroyed afterward; a 30-second idle timeout is the fallback cleanup.
+A successful response contains `output` and `truncated`. Execution failures contain `error` and may include `details`.
 
-Each deployable service has its own Wrangler configuration and pinned Wrangler version, so these commands only affect the sandbox.
+Each request:
+
+1. Creates a fresh sandbox.
+2. Shallow-clones the requested branch.
+3. Runs Pi with OpenRouter's `openai/gpt-5.6-luna` model and low thinking.
+4. Destroys the sandbox.
+
+Clone and agent processes each have a five-minute timeout. Collected clone output is limited to 64 KiB and agent output to 1 MiB. A 30-second idle timeout provides fallback cleanup.
+
+[deploy-token]: https://dash.cloudflare.com/?to=/:account/api-tokens&permissionGroupKeys=%5B%7B%22key%22%3A%22account_settings%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22containers%22%2C%22type%22%3A%22edit%22%7D%5D&name=AI%20Sloth%20Sandbox%20Deploy
