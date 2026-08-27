@@ -6,6 +6,8 @@ import {
 export interface SandboxBindings extends SandboxEnv<Sandbox> {
   OPENROUTER_API_KEY: string;
   SANDBOX_API_TOKEN: string;
+  SESSION_DB: D1Database;
+  SESSION_SNAPSHOTS: R2Bucket;
 }
 
 declare global {

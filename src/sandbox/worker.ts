@@ -1,6 +1,13 @@
-import { runAgentInSandbox } from "./agent";
-import { parseAgentRunRequest, type AgentRunRequest } from "./contract";
-import { HttpStatusCode } from "./http-status";
+import { runSessionMessage } from "./agent";
+import {
+  isSessionId,
+  parseNewSessionRequest,
+  parseSessionMessageRequest,
+  readJsonBody,
+  RequestBodyTooLargeError,
+  type SessionMessageCommand,
+} from "./contract";
+import { errorResponse, HttpStatusCode } from "./http-status";
 import type { SandboxBindings } from "./sandbox";
 
 export { ContainerProxy } from "@cloudflare/sandbox";
@@ -9,38 +16,62 @@ export { Sandbox } from "./sandbox";
 export default {
   async fetch(request: Request, env: SandboxBindings): Promise<Response> {
     const path = new URL(request.url).pathname;
-    if (request.method !== "POST" || path !== "/run") {
-      return new Response("Not found", { status: HttpStatusCode.NotFound });
+    const continuation = path.match(/^\/sessions\/([^/]+)\/messages$/);
+    if (
+      request.method !== "POST"
+      || (path !== "/sessions" && !continuation)
+    ) {
+      return errorResponse("Not found", HttpStatusCode.NotFound);
     }
 
     if (!env.SANDBOX_API_TOKEN || !env.OPENROUTER_API_KEY) {
-      return new Response("Service is not configured", {
-        status: HttpStatusCode.ServiceUnavailable,
-      });
+      return errorResponse(
+        "Service is not configured",
+        HttpStatusCode.ServiceUnavailable,
+      );
     }
 
     if (
       request.headers.get("Authorization") !== `Bearer ${env.SANDBOX_API_TOKEN}`
     ) {
-      return new Response("Unauthorized", {
-        status: HttpStatusCode.Unauthorized,
-      });
+      return errorResponse("Unauthorized", HttpStatusCode.Unauthorized);
     }
 
-    let input: AgentRunRequest | null;
+    let body: unknown;
     try {
-      input = parseAgentRunRequest(await request.json());
-    } catch {
-      input = null;
-    }
-
-    if (!input) {
-      return new Response(
-        "Expected non-empty repositoryUrl, branch, and prompt strings",
-        { status: HttpStatusCode.BadRequest },
+      body = await readJsonBody(request);
+    } catch (error) {
+      return errorResponse(
+        error instanceof RequestBodyTooLargeError
+          ? "Request body is too large"
+          : "Invalid JSON body",
+        error instanceof RequestBodyTooLargeError
+          ? HttpStatusCode.ContentTooLarge
+          : HttpStatusCode.BadRequest,
       );
     }
 
-    return runAgentInSandbox(env.Sandbox, input);
+    let command: SessionMessageCommand | null;
+    if (path === "/sessions") {
+      const input = parseNewSessionRequest(body);
+      command = input ? { kind: "new", ...input } : null;
+    } else {
+      const sessionId = continuation?.[1] ?? "";
+      const input = parseSessionMessageRequest(body);
+      command = isSessionId(sessionId) && input
+        ? { kind: "continue", sessionId, ...input }
+        : null;
+    }
+
+    if (!command) {
+      return errorResponse(
+        path === "/sessions"
+          ? "Expected a public GitHub repositoryUrl, branch, and non-empty prompt"
+          : "Expected a valid session ID and non-empty prompt",
+        HttpStatusCode.BadRequest,
+      );
+    }
+
+    return runSessionMessage(env, command);
   },
 };

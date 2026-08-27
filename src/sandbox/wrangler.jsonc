@@ -3,6 +3,16 @@
   "main": "worker.ts",
   "compatibility_date": "2025-05-06",
   "compatibility_flags": ["nodejs_compat", "enable_ctx_exports"],
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  },
   "containers": [
     {
       "class_name": "Sandbox",
@@ -19,6 +29,19 @@
       }
     ]
   },
+  "d1_databases": [
+    {
+      "binding": "SESSION_DB",
+      "database_name": "ai-sloth-sandbox-sessions",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "SESSION_SNAPSHOTS",
+      "bucket_name": "ai-sloth-sandbox-session-snapshots"
+    }
+  ],
   "migrations": [
     {
       "tag": "v1",

@@ -1,65 +1,113 @@
-import { getSandbox } from "@cloudflare/sandbox";
-import type { AgentRunRequest, AgentRunResponse } from "../contract";
-import { HttpStatusCode } from "../http-status";
+import {
+  type SessionMessageCommand,
+  type SessionRunResponse,
+} from "../contract";
+import { errorResponse, HttpStatusCode } from "../http-status";
 import type { SandboxBindings } from "../sandbox";
-import { cloneRepository } from "./git";
-import { runPi } from "./pi";
+import { runSession, SessionRunError } from "./session-run";
+import { SessionStore, SessionStoreError } from "./session-store";
 
-export async function runAgentInSandbox(
-  namespace: SandboxBindings["Sandbox"],
-  input: AgentRunRequest,
+export async function runSessionMessage(
+  env: SandboxBindings,
+  command: SessionMessageCommand,
 ): Promise<Response> {
-  const sandbox = getSandbox(namespace, crypto.randomUUID(), {
-    sleepAfter: "30s",
-    keepAlive: false,
-  });
+  const sessions = new SessionStore(env.SESSION_DB, env.SESSION_SNAPSHOTS);
 
   try {
-    const clone = await cloneRepository(
-      sandbox,
-      input.repositoryUrl,
-      input.branch,
-    );
-    if (clone.timedOut) {
-      return Response.json(
-        { error: "Repository clone timed out" },
-        { status: HttpStatusCode.GatewayTimeout },
-      );
-    }
-    if (clone.exitCode !== 0) {
-      return Response.json(
-        { error: "Repository clone failed", details: clone.stderr },
-        { status: HttpStatusCode.UnprocessableContent },
-      );
-    }
+    const session = command.kind === "new"
+      ? sessions.start(command.repositoryUrl, command.branch)
+      : await sessions.resume(command.sessionId);
 
-    const result = await runPi(sandbox, input.prompt);
-    if (result.timedOut) {
-      return Response.json(
-        { error: "Agent timed out" },
-        { status: HttpStatusCode.GatewayTimeout },
-      );
-    }
-    if (result.exitCode !== 0) {
-      return Response.json(
-        { error: "Agent failed", details: result.stderr },
-        { status: HttpStatusCode.InternalServerError },
-      );
-    }
+    const result = await runSession(
+      env.Sandbox,
+      sessions,
+      session,
+      command.prompt,
+    );
 
     return Response.json(
       {
-        output: result.stdout,
-        truncated: result.truncated,
-      } satisfies AgentRunResponse,
-      { status: HttpStatusCode.Ok },
+        sessionId: session.id,
+        revision: session.revision,
+        ...result,
+      } satisfies SessionRunResponse,
+      {
+        status: command.kind === "new"
+          ? HttpStatusCode.Created
+          : HttpStatusCode.Ok,
+      },
     );
-  } catch {
-    return Response.json(
-      { error: "Sandbox run failed" },
-      { status: HttpStatusCode.InternalServerError },
+  } catch (error) {
+    if (error instanceof SessionStoreError) {
+      return sessionStoreErrorResponse(error);
+    }
+    if (error instanceof SessionRunError) {
+      return sessionRunErrorResponse(error);
+    }
+
+    console.error(
+      "Session run failed",
+      error instanceof Error ? error.message : "Unknown error",
     );
-  } finally {
-    await sandbox.destroy();
+    return errorResponse(
+      "Session run failed",
+      HttpStatusCode.InternalServerError,
+    );
+  }
+}
+
+function sessionStoreErrorResponse(error: SessionStoreError): Response {
+  switch (error.code) {
+    case "not_found":
+      return errorResponse("Session not found", HttpStatusCode.NotFound);
+    case "revision_limit":
+      return errorResponse(
+        "Session has reached its revision limit",
+        HttpStatusCode.Conflict,
+      );
+    case "snapshot_missing":
+      return errorResponse(
+        "Session snapshot is missing",
+        HttpStatusCode.InternalServerError,
+      );
+    case "stored_snapshot_too_large":
+      return errorResponse(
+        "Session snapshot exceeds the size limit",
+        HttpStatusCode.InternalServerError,
+      );
+    case "snapshot_too_large":
+      return errorResponse(
+        "Session snapshot exceeds the size limit",
+        HttpStatusCode.Conflict,
+      );
+    case "conflict":
+      return errorResponse(
+        "Another message advanced this session",
+        HttpStatusCode.Conflict,
+      );
+  }
+}
+
+function sessionRunErrorResponse(error: SessionRunError): Response {
+  switch (error.code) {
+    case "checkout_timeout":
+      return errorResponse(
+        "Repository checkout timed out",
+        HttpStatusCode.GatewayTimeout,
+      );
+    case "checkout_failed":
+      return errorResponse(
+        "Repository checkout failed",
+        HttpStatusCode.UnprocessableContent,
+        error.details,
+      );
+    case "agent_timeout":
+      return errorResponse("Agent timed out", HttpStatusCode.GatewayTimeout);
+    case "agent_failed":
+      return errorResponse(
+        "Agent failed",
+        HttpStatusCode.InternalServerError,
+        error.details,
+      );
   }
 }
