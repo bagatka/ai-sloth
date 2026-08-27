@@ -27,6 +27,7 @@
             packages = [
               pkgs.bun
               pkgs.docker-client
+              pkgs.git
               pkgs.nushell
             ];
           };
