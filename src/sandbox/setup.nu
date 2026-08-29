@@ -34,6 +34,10 @@ let r2 = with-env $credentials {
 } | complete
 if $r2.exit_code != 0 {
   print --stderr $r2.stderr
+  if ($r2.stderr | str contains "code: 10042") {
+    print --stderr $"R2 is not enabled for this Cloudflare account. Enable it here, then run setup again:\nhttps://dash.cloudflare.com/($account_id)/r2/overview"
+    error make { msg: "R2 is not enabled for this Cloudflare account" }
+  }
   error make { msg: "Cloudflare token does not have R2 access" }
 }
 
