@@ -1,4 +1,6 @@
 {
+  "name": "@ai-sloth/sandbox",
+  "private": true,
   "scripts": {
     "setup": "nu setup.nu",
     "dev": "wrangler d1 migrations apply SESSION_DB --local && wrangler dev",

@@ -1,0 +1,5 @@
+{
+  "name": "ai-sloth",
+  "private": true,
+  "workspaces": ["src/*"]
+}
