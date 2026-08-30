@@ -1,0 +1,24 @@
+{
+  "name": "@ai-sloth/sessions",
+  "private": true,
+  "exports": {
+    ".": "./index.ts",
+    "./coordinator": "./coordinator.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@ai-sloth/git": "workspace:*",
+    "@ai-sloth/github": "workspace:*",
+    "@ai-sloth/pi": "workspace:*",
+    "@ai-sloth/project-setup": "workspace:*",
+    "@ai-sloth/sandbox": "workspace:*",
+    "@cloudflare/sandbox": "0.13.0-next.751.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260825.1",
+    "bun-types": "1.3.13",
+    "typescript": "5.9.3"
+  }
+}

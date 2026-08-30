@@ -1,16 +1,35 @@
 {
   "name": "@ai-sloth/api",
   "private": true,
+  "exports": "./worker.ts",
   "scripts": {
+    "setup": "nu operations/setup.nu",
+    "dev": "wrangler d1 migrations apply ACCOUNTS_DB --local && wrangler d1 migrations apply WORKSPACES_DB --local && wrangler d1 migrations apply GITHUB_DB --local && wrangler d1 migrations apply SESSION_DB --local && wrangler dev",
     "test": "bun test",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "deploy": "nu operations/deploy.nu",
+    "secret:openrouter": "wrangler secret put OPENROUTER_API_KEY",
+    "secret:github-client-id": "wrangler secret put GITHUB_CLIENT_ID",
+    "secret:github-client": "wrangler secret put GITHUB_CLIENT_SECRET",
+    "secret:github-encryption": "wrangler secret put GITHUB_TOKEN_ENCRYPTION_KEY",
+    "secret:github-slug": "wrangler secret put GITHUB_APP_SLUG",
+    "secret:web-ui-origin": "wrangler secret put WEB_UI_ORIGIN",
+    "secret:r2-account-id": "wrangler secret put CLOUDFLARE_R2_ACCOUNT_ID",
+    "secret:r2-access-key-id": "wrangler secret put R2_ACCESS_KEY_ID",
+    "secret:r2-secret-access-key": "wrangler secret put R2_SECRET_ACCESS_KEY"
   },
   "dependencies": {
+    "@ai-sloth/accounts": "workspace:*",
+    "@ai-sloth/github": "workspace:*",
+    "@ai-sloth/workspaces": "workspace:*",
+    "@ai-sloth/sandbox": "workspace:*",
+    "@ai-sloth/sessions": "workspace:*",
     "hono": "4.13.5"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260825.1",
     "bun-types": "1.3.13",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "wrangler": "4.126.0"
   }
 }

@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "types": ["@cloudflare/workers-types", "bun-types"]
   },
-  "include": ["*.ts", "agent/*.ts"]
+  "include": ["**/*.ts"]
 }
