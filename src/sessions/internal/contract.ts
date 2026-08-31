@@ -38,6 +38,8 @@ export type GetSessionInput = {
   controllerUserId: string;
 };
 
+export type GetWorkingDiffInput = GetSessionInput & { turnId: string };
+
 export type DiscardSessionInput = GetSessionInput;
 export type PublishSessionInput = GetSessionInput;
 
@@ -63,6 +65,12 @@ export type SessionDetails = {
 
 export type SessionDiff = {
   revision: number;
+  size: number;
+  content: ReadableStream<Uint8Array>;
+};
+
+export type SessionWorkingDiff = {
+  turnId: string;
   size: number;
   content: ReadableStream<Uint8Array>;
 };
@@ -101,6 +109,7 @@ export type DiscardSessionOutcome = SessionOutcome<undefined>;
 export type PublishSessionOutcome = SessionOutcome<PublishSessionResult>;
 export type SessionDetailsOutcome = SessionOutcome<SessionDetails>;
 export type SessionDiffOutcome = SessionOutcome<SessionDiff>;
+export type SessionWorkingDiffOutcome = SessionOutcome<SessionWorkingDiff>;
 
 export type SessionFailure = {
   ok: false;
@@ -123,6 +132,7 @@ export type SessionFailureCode =
   | "checkpoint_too_large"
   | "transcript_too_large"
   | "diff_not_available"
+  | "working_diff_not_available"
   | "conflict"
   | "checkout_timeout"
   | "checkout_failed"

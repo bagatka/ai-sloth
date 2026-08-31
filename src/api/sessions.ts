@@ -12,6 +12,7 @@ import {
   discardSession,
   getSession,
   getSessionDiff,
+  getSessionWorkingDiff,
   publishSession,
   startSession,
 } from "./internal/sessions/handlers";
@@ -59,6 +60,15 @@ export function mapSessionEndpoints(app: ApiApp): void {
     requireWorkspaceMember,
     withSessions,
     getSessionDiff,
+  );
+  app.get(
+    "/workspaces/:workspaceId/sessions/:sessionId/turns/:turnId/working-diff",
+    withAccounts,
+    requireAccount,
+    withWorkspaces,
+    requireWorkspaceMember,
+    withSessions,
+    getSessionWorkingDiff,
   );
   app.delete(
     "/workspaces/:workspaceId/sessions/:sessionId",

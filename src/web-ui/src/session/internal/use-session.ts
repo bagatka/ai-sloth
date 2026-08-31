@@ -122,11 +122,18 @@ export function useSession(
     void getSessionDetails(request, workspaceId, sessionId, controller.signal)
       .then(async (value) => {
         if (controller.signal.aborted || !mounted.current) return
+        const turns = value.turns.slice(-RETAINED_TURNS)
+        const retainedTurnIds = new Set(turns.map((turn) => turn.id))
         setDetails(value)
-        setEvents(new Map())
+        // Event logs are append-only; keep overlap mounted while replay deduplicates it.
+        setEvents((current) => {
+          const retained = new Map(
+            [...current].filter(([turnId]) => retainedTurnIds.has(turnId))
+          )
+          return retained.size === current.size ? current : retained
+        })
         setStatus("ready")
 
-        const turns = value.turns.slice(-RETAINED_TURNS)
         const activeTurn = turns.at(-1)
         const completed =
           activeTurn &&

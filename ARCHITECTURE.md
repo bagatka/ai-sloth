@@ -113,11 +113,23 @@ D1 retains only turn status, bounds, and the object pointer. The previous
 completed journal is retained temporarily until the next turn so an in-flight
 reader can drain without an unbounded subscriber queue.
 
+Each `bash`, `edit`, or `write` tool invalidates the active aggregate. When an
+authenticated panel reads it after the tool completes, the Git module creates a
+bounded snapshot from the immutable session base to the Git-visible working
+tree. One final snapshot is ensured before checkpointing. Snapshot creation
+stages into an isolated temporary index and object directory, so untracked files
+and deletions are represented without changing the protected repository index. The coordinator owns only the latest patch for the current or
+most recent turn, bounds it by the final patch limit, and replaces or clears it
+at the next state-changing operation or object eviction. Authenticated clients
+fetch this provisional,
+non-durable state through the turn-scoped working-diff endpoint; tool patches are
+not composed into repository state.
+
 After Pi exits, the sandbox module stops every agent-owned process before Pi
 state is read or Git state changes. A trusted Git phase then creates one local
-checkpoint, its durable artifact, and a bounded aggregate patch comparing the
-session's immutable base commit with the new checkpoint. The patch is stored in
-R2 beside the Git artifact and loaded only through the controller-authorized
+checkpoint, its durable artifact, and a bounded authoritative patch comparing
+the session's immutable base commit with the new checkpoint. The patch is stored
+in R2 beside the Git artifact and loaded only through the controller-authorized
 session diff endpoint. It never compares against the moving GitHub branch. Pi
 never receives a GitHub credential.
 

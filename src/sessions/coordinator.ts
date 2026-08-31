@@ -14,6 +14,7 @@ import {
   type PreparedSessionTurn,
 } from "./internal/session";
 import { TurnEventLog } from "./internal/event-log";
+import type { WorkingDiffSource } from "./internal/working-diff";
 import {
   TRUSTED_EVENT_USER_HEADER,
   TRUSTED_EVENT_WORKSPACE_HEADER,
@@ -24,6 +25,7 @@ import type {
   DiscardSessionInput,
   DiscardSessionOutcome,
   GetSessionInput,
+  GetWorkingDiffInput,
   PublishSessionInput,
   PublishSessionOutcome,
   SessionAccepted,
@@ -32,6 +34,7 @@ import type {
   SessionFailure,
   SessionOutcome,
   SessionResources,
+  SessionWorkingDiffOutcome,
   StartSessionInput,
 } from "./internal/contract";
 
@@ -53,6 +56,7 @@ export class SessionCoordinator extends DurableObject<SessionBindings> {
     | { idempotencyKey: string; accepted: SessionAccepted }
     | undefined;
   private events: TurnEventLog | undefined;
+  private retainedWorkingDiff: WorkingDiffState | undefined;
   private eventFollowers = 0;
 
   async start(input: StartSessionInput): Promise<SessionOutcome> {
@@ -91,6 +95,58 @@ export class SessionCoordinator extends DurableObject<SessionBindings> {
 
   diff(input: GetSessionInput): Promise<SessionDiffOutcome> {
     return getSessionDiff(this.resources(), input);
+  }
+
+  async workingDiff(
+    input: GetWorkingDiffInput,
+  ): Promise<SessionWorkingDiffOutcome> {
+    try {
+      await new SessionStore(
+        this.env.SESSION_DB,
+        this.env.SESSION_ARTIFACTS,
+      ).getTurn(
+        input.sessionId,
+        input.turnId,
+        input.workspaceId,
+        input.controllerUserId,
+      );
+    } catch (error) {
+      return sessionFailure(error);
+    }
+
+    let current = this.retainedWorkingDiff;
+    if (
+      !current
+      || current.sessionId !== input.sessionId
+      || current.turnId !== input.turnId
+    ) {
+      return { ok: false, code: "working_diff_not_available" };
+    }
+    if (current.source) {
+      const source = current.source;
+      const update = await source.read();
+      const latest = this.retainedWorkingDiff;
+      if (!latest || latest.turnId !== input.turnId || latest.source !== source) {
+        return { ok: false, code: "working_diff_not_available" };
+      }
+      this.retainedWorkingDiff = update.status === "ready"
+        ? { ...latest, status: "ready", patch: update.patch }
+        : { ...latest, status: "unavailable" };
+      current = this.retainedWorkingDiff;
+    }
+    if (current.status !== "ready") {
+      return { ok: false, code: "working_diff_not_available" };
+    }
+
+    const content = new Blob([current.patch]);
+    return {
+      ok: true,
+      value: {
+        turnId: current.turnId,
+        size: content.size,
+        content: content.stream(),
+      },
+    };
   }
 
   discard(input: DiscardSessionInput): Promise<DiscardSessionOutcome> {
@@ -193,6 +249,11 @@ export class SessionCoordinator extends DurableObject<SessionBindings> {
       accepted: prepared.accepted,
     };
     this.events = events;
+    this.retainedWorkingDiff = {
+      sessionId: attempt.id,
+      turnId: attempt.turnId,
+      status: "pending",
+    };
     this.ctx.waitUntil(this.execute(prepared, events));
     return { ok: true, value: prepared.accepted };
   }
@@ -211,6 +272,11 @@ export class SessionCoordinator extends DurableObject<SessionBindings> {
           repository: prepared.repository,
         },
         events,
+        (source) => {
+          const current = this.retainedWorkingDiff;
+          if (current?.turnId !== attempt.turnId) return;
+          this.retainedWorkingDiff = { ...current, source };
+        },
       );
     } catch (error) {
       await failPreparedTurn(this.resources(), attempt, events, error);
@@ -232,6 +298,7 @@ export class SessionCoordinator extends DurableObject<SessionBindings> {
     if (this.active) return { ok: false, code: "conflict" };
 
     this.active = true;
+    this.retainedWorkingDiff = undefined;
     try {
       return await operation();
     } finally {
@@ -257,6 +324,15 @@ export class SessionCoordinator extends DurableObject<SessionBindings> {
     };
   }
 }
+
+type WorkingDiffState = {
+  sessionId: string;
+  turnId: string;
+  source?: WorkingDiffSource;
+} & (
+  | { status: "pending" | "unavailable" }
+  | { status: "ready"; patch: string }
+);
 
 function eventRequestIdentity(request: Request): {
   sessionId: string;

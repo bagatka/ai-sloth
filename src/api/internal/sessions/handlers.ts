@@ -13,6 +13,7 @@ import {
   sessionDetailsResponse,
   sessionDiffResponse,
   sessionResponse,
+  sessionWorkingDiffResponse,
 } from "./response";
 
 export const startSession: Handler<ApiEnvironment> = async (context) => {
@@ -79,6 +80,25 @@ export const getSessionDiff: Handler<ApiEnvironment> = async (context) => {
   }
   return sessionDiffResponse(await context.var.sessions.diff({
     sessionId,
+    workspaceId: context.var.workspace.id,
+    controllerUserId: context.var.account.actor.userId,
+  }));
+};
+
+export const getSessionWorkingDiff: Handler<ApiEnvironment> = async (
+  context,
+) => {
+  const sessionId = context.req.param("sessionId") ?? "";
+  const turnId = context.req.param("turnId") ?? "";
+  if (!isSessionId(sessionId) || !isSessionId(turnId)) {
+    return errorResponse(
+      "Expected valid session and turn IDs",
+      HttpStatusCode.BadRequest,
+    );
+  }
+  return sessionWorkingDiffResponse(await context.var.sessions.workingDiff({
+    sessionId,
+    turnId,
     workspaceId: context.var.workspace.id,
     controllerUserId: context.var.account.actor.userId,
   }));

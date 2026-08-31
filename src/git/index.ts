@@ -14,10 +14,12 @@ export {
   createRepositoryCheckpoint,
   makeRepositoryWritableByAgent,
   publishRepositoryCheckpoint,
+  snapshotWorkingTreeDiff,
 } from "./internal/checkpoint";
 export type {
   RepositoryCheckpointRequest,
   RepositoryCheckpointResult,
   RepositoryPublishRequest,
   RepositoryPublishResult,
+  WorkingTreeDiffResult,
 } from "./internal/checkpoint";

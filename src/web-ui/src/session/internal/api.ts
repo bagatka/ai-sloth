@@ -44,6 +44,27 @@ export async function getSessionDiff(
   return { revision, patch: await response.text() }
 }
 
+export async function getSessionWorkingDiff(
+  request: AuthenticatedRequest,
+  workspaceId: string,
+  sessionId: string,
+  turnId: string,
+  signal: AbortSignal
+): Promise<string> {
+  const response = await request(
+    `/workspaces/${workspaceId}/sessions/${sessionId}/turns/${turnId}/working-diff`,
+    { headers: { Accept: "text/x-diff" }, signal }
+  )
+  if (!response.ok) {
+    const body = await readJson(response)
+    throw new Error(readError(body) ?? "Could not load live working diff")
+  }
+  if (response.headers.get("X-Session-Turn") !== turnId) {
+    throw new Error("The server returned an invalid live working diff")
+  }
+  return response.text()
+}
+
 export async function continueSession(
   request: AuthenticatedRequest,
   workspaceId: string,

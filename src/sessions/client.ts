@@ -4,11 +4,13 @@ import type {
   DiscardSessionInput,
   DiscardSessionOutcome,
   GetSessionInput,
+  GetWorkingDiffInput,
   PublishSessionInput,
   PublishSessionOutcome,
   SessionDetailsOutcome,
   SessionDiffOutcome,
   SessionOutcome,
+  SessionWorkingDiffOutcome,
   StartSessionInput,
 } from "./internal/contract";
 import { trustedEventRequest } from "./internal/event-request";
@@ -18,6 +20,7 @@ export type SessionOperations = {
   continue(input: ContinueSessionInput): Promise<SessionOutcome>;
   get(input: GetSessionInput): Promise<SessionDetailsOutcome>;
   diff(input: GetSessionInput): Promise<SessionDiffOutcome>;
+  workingDiff(input: GetWorkingDiffInput): Promise<SessionWorkingDiffOutcome>;
   discard(input: DiscardSessionInput): Promise<DiscardSessionOutcome>;
   publish(input: PublishSessionInput): Promise<PublishSessionOutcome>;
   connectEvents(
@@ -34,6 +37,8 @@ export function bindSessions(
     continue: (input) => namespace.getByName(input.sessionId).continue(input),
     get: (input) => namespace.getByName(input.sessionId).get(input),
     diff: (input) => namespace.getByName(input.sessionId).diff(input),
+    workingDiff: (input) =>
+      namespace.getByName(input.sessionId).workingDiff(input),
     discard: (input) => namespace.getByName(input.sessionId).discard(input),
     publish: (input) => namespace.getByName(input.sessionId).publish(input),
     connectEvents: (input, request) =>

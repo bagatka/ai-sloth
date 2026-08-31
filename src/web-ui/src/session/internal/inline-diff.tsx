@@ -8,6 +8,12 @@ import {
 import { useTheme } from "@/hooks/use-theme"
 import { parseFiles } from "./parse-diff"
 
+const PANEL_SCROLL_CSS = `
+[data-code] {
+  overflow-x: visible;
+}
+`
+
 export function InlineDiff({
   patch,
   virtualized = false,
@@ -26,8 +32,11 @@ export function InlineDiff({
         diffIndicators: "classic",
         hunkSeparators: "metadata",
         lineDiffType: "word",
+        overflow: "scroll",
+        // The panel viewport owns scrolling so its horizontal bar stays reachable.
+        unsafeCSS: virtualized ? PANEL_SCROLL_CSS : undefined,
       }) satisfies FileDiffOptions<undefined>,
-    [theme]
+    [theme, virtualized]
   )
 
   const items = useMemo<CodeViewItem[]>(

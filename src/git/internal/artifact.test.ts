@@ -11,6 +11,7 @@ import type { SandboxInstance } from "@ai-sloth/sandbox";
 import {
   createRepositoryCheckpoint,
   restoreRepositoryCheckpoint,
+  snapshotWorkingTreeDiff,
 } from "../index";
 
 const SESSION_ID = "b47f6e35-b7f3-4c6f-91f6-93f0479ec15b";
@@ -21,6 +22,60 @@ afterEach(async () => {
     recursive: true,
     force: true,
   })));
+});
+
+test("working tree snapshots match the final aggregate without staging files", async () => {
+  const root = await mkdtemp(join(tmpdir(), "ai-sloth-working-diff-"));
+  roots.push(root);
+  const instance = localSandboxInstance(join(root, "working"));
+  await mkdir(instance.projectDirectory, { recursive: true });
+  await git([
+    "init",
+    "--quiet",
+    `--separate-git-dir=${instance.gitDirectory}`,
+    instance.projectDirectory,
+  ]);
+  await git([...repository(instance), "config", "user.name", "Test"]);
+  await git([...repository(instance), "config", "user.email", "test@example.com"]);
+  await Bun.write(join(instance.projectDirectory, ".gitignore"), "ignored.txt\n");
+  await Bun.write(join(instance.projectDirectory, "changed.txt"), "before\n");
+  await Bun.write(join(instance.projectDirectory, "deleted.txt"), "delete me\n");
+  await git([...repository(instance), "add", "--all"]);
+  await git([...repository(instance), "commit", "--quiet", "-m", "base"]);
+  const baseCommitSha = await gitText([
+    ...repository(instance),
+    "rev-parse",
+    "HEAD",
+  ]);
+
+  await Bun.write(join(instance.projectDirectory, "changed.txt"), "after\n");
+  await Bun.write(join(instance.projectDirectory, "added.txt"), "added\n");
+  await Bun.write(join(instance.projectDirectory, "ignored.txt"), "ignored\n");
+  await rm(join(instance.projectDirectory, "deleted.txt"));
+
+  const snapshot = await snapshotWorkingTreeDiff(instance, baseCommitSha);
+
+  expect(snapshot.ok).toBeTrue();
+  if (!snapshot.ok) return;
+  expect(snapshot.patch).toContain("diff --git a/changed.txt b/changed.txt");
+  expect(snapshot.patch).toContain("diff --git a/added.txt b/added.txt");
+  expect(snapshot.patch).toContain("diff --git a/deleted.txt b/deleted.txt");
+  expect(snapshot.patch).not.toContain("ignored.txt");
+  expect(await gitText([
+    ...repository(instance),
+    "diff",
+    "--cached",
+    "--name-only",
+  ])).toBe("");
+
+  const checkpoint = await createRepositoryCheckpoint(instance, {
+    sessionId: SESSION_ID,
+    revision: 1,
+    baseCommitSha,
+  });
+  expect(checkpoint.ok).toBeTrue();
+  if (!checkpoint.ok) return;
+  expect(await new Response(checkpoint.diff.content).text()).toBe(snapshot.patch);
 });
 
 test("restores a self-contained checkpoint from a shallow repository", async () => {

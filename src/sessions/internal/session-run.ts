@@ -3,6 +3,7 @@ import {
   createRepositoryCheckpoint,
   makeRepositoryWritableByAgent,
   restoreRepositoryCheckpoint,
+  snapshotWorkingTreeDiff,
   verifyRepositoryCommit,
   type RepositoryCheckoutResult,
   type RepositoryCheckpointResult,
@@ -31,6 +32,10 @@ import {
   type ProjectCacheKey,
   type SessionAttempt,
 } from "./session-store";
+import {
+  WorkingDiffTracker,
+  type WorkingDiffSource,
+} from "./working-diff";
 
 const HOT_BACKUP_TTL_SECONDS = 24 * 60 * 60;
 const PROJECT_BACKUP_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -42,11 +47,13 @@ export async function runSession(
   prompt: string,
   events: TurnEventLog,
   source?: GitHubRepositoryAccess,
+  onWorkingDiff?: (source: WorkingDiffSource) => void,
 ): Promise<SessionRunResult> {
   const startedAt = performance.now();
   const phaseDurationsMs: Partial<Record<SessionRunPhase, number>> = {};
   let failedPhase: SessionRunPhase | undefined;
   let instance: SandboxInstance | undefined;
+  let workingDiff: WorkingDiffTracker | undefined;
   let committed = false;
   let needsProjectBackup = false;
 
@@ -93,6 +100,24 @@ export async function runSession(
       );
     }
 
+    if (onWorkingDiff) {
+      workingDiff = new WorkingDiffTracker(async () => {
+        try {
+          const snapshot = await snapshotWorkingTreeDiff(
+            activeInstance,
+            attempt.baseCommitSha,
+          );
+          return snapshot.ok
+            ? { status: "ready", patch: snapshot.patch }
+            : { status: "unavailable" };
+        } catch {
+          console.error("Working diff snapshot failed");
+          return { status: "unavailable" };
+        }
+      });
+      onWorkingDiff(workingDiff);
+    }
+
     const previousRevision = attempt.previousRevision;
     const priorSession = previousRevision
       ? await measure(
@@ -106,13 +131,17 @@ export async function runSession(
         prompt,
         priorSession,
         projectInstructions: attempt.projectInstructions,
-        onEvent: (event) => events.acceptPiEvent(event),
+        onEvent: (event) => {
+          workingDiff?.accept(event);
+          events.acceptPiEvent(event);
+        },
       }),
     ));
     const transcript = await events.finish();
 
     const checkpoint = await measure("checkpoint", async () => {
       await stopAgentProcesses(activeInstance);
+      await workingDiff?.close();
       const piSession = await readPiSession(activeInstance);
       const repositoryCheckpoint = requireCheckpoint(
         await createRepositoryCheckpoint(activeInstance, {
@@ -153,6 +182,7 @@ export async function runSession(
       } catch {
         // Sandbox destruction remains the final process cleanup boundary.
       }
+      await workingDiff?.close();
       await destroySandboxInstance(instance);
     }
     phaseDurationsMs.cleanup = Math.round(performance.now() - cleanupStartedAt);

@@ -1,5 +1,14 @@
-import { lazy, Suspense, useMemo, useState } from "react"
 import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+import {
+  ArrowDownIcon,
   BotIcon,
   ExternalLinkIcon,
   FilesIcon,
@@ -10,8 +19,10 @@ import {
 import { Button } from "@/components/ui/button"
 import type { AuthenticatedRequest, SessionEvent, SessionTurn } from ".."
 import { isUnifiedPatch } from "./patch"
+import { repositoryActivity } from "./repository-activity"
 import { SessionDiffPanel } from "./session-diff-panel"
 import { useSession } from "./use-session"
+import { useWorkingDiff } from "./use-working-diff"
 
 const InlineDiff = lazy(() =>
   import("./inline-diff").then((module) => ({ default: module.InlineDiff }))
@@ -28,12 +39,59 @@ export function SessionWorkspace({
 }) {
   const session = useSession(request, workspaceId, sessionId)
   const [diffOpen, setDiffOpen] = useState(false)
-  const running =
-    session.details?.turns.at(-1)?.status === "running" ||
-    session.details?.turns.at(-1)?.status === "finalizing"
+  const autoOpenedTurn = useRef<string | null>(null)
+  const latestTurn = session.details?.turns.at(-1)
+  const activeTurn =
+    latestTurn?.status === "running" || latestTurn?.status === "finalizing"
+      ? latestTurn
+      : null
+  const repository = useMemo(
+    () =>
+      repositoryActivity(
+        activeTurn ? (session.events.get(activeTurn.id) ?? []) : []
+      ),
+    [activeTurn, session.events]
+  )
+  const workingDiff = useWorkingDiff(
+    request,
+    workspaceId,
+    sessionId,
+    activeTurn?.id ?? null,
+    repository.sequence,
+    diffOpen && !repository.updating
+  )
+  const running = activeTurn !== null
+  const workingSource =
+    activeTurn && (repository.updating || repository.sequence !== null)
+      ? {
+          type: "working" as const,
+          turnId: activeTurn.id,
+          sequence: repository.sequence,
+          updating: repository.updating,
+          state: workingDiff.state,
+          onRetry: workingDiff.retry,
+        }
+      : null
   const publication = session.details?.publication ?? null
   const publicationIsCurrent =
     publication !== null && publication.revision === session.details?.revision
+
+  useEffect(() => {
+    if (
+      !activeTurn ||
+      !repository.reveal ||
+      autoOpenedTurn.current === activeTurn.id
+    ) {
+      return
+    }
+    autoOpenedTurn.current = activeTurn.id
+    setDiffOpen(true)
+  }, [activeTurn, repository.reveal])
+
+  function closeDiff() {
+    if (activeTurn) autoOpenedTurn.current = activeTurn.id
+    setDiffOpen(false)
+  }
 
   if (session.status === "loading" && !session.details) {
     return <CenteredMessage>Loading session…</CenteredMessage>
@@ -69,13 +127,13 @@ export function SessionWorkspace({
             <span className="text-xs text-muted-foreground capitalize">
               {session.details.status}
             </span>
-            {session.details.revision !== null && (
+            {(session.details.revision !== null || workingSource) && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 aria-expanded={diffOpen}
-                onClick={() => setDiffOpen((open) => !open)}
+                onClick={() => (diffOpen ? closeDiff() : setDiffOpen(true))}
               >
                 <FilesIcon data-icon="inline-start" />
                 {diffOpen ? "Hide changes" : "Changes"}
@@ -114,25 +172,11 @@ export function SessionWorkspace({
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
-          <div className="mx-auto max-w-4xl space-y-8">
-            {session.details.turns.length > 10 && (
-              <p className="text-center text-xs text-muted-foreground">
-                Showing the latest 10 turns.
-              </p>
-            )}
-            {session.details.turns.slice(-10).map((turn) => (
-              <TurnTimeline
-                key={turn.id}
-                turn={turn}
-                events={session.events.get(turn.id) ?? []}
-              />
-            ))}
-            {session.error && (
-              <p className="text-sm text-destructive">{session.error}</p>
-            )}
-          </div>
-        </main>
+        <SessionTimeline
+          turns={session.details.turns}
+          events={session.events}
+          error={session.error}
+        />
 
         <PromptComposer
           disabled={running || session.pending || session.publishing}
@@ -140,15 +184,109 @@ export function SessionWorkspace({
           onSend={session.send}
         />
       </div>
-      {diffOpen && session.details.revision !== null && (
+      {diffOpen && (workingSource || session.details.revision !== null) && (
         <SessionDiffPanel
-          key={session.details.revision}
           request={request}
           workspaceId={workspaceId}
           sessionId={sessionId}
-          revision={session.details.revision}
-          onClose={() => setDiffOpen(false)}
+          source={
+            workingSource ?? {
+              type: "revision",
+              revision: session.details.revision!,
+            }
+          }
+          onClose={closeDiff}
         />
+      )}
+    </div>
+  )
+}
+
+const LATEST_POSITION_TOLERANCE = 2
+
+function SessionTimeline({
+  turns,
+  events,
+  error,
+}: {
+  turns: readonly SessionTurn[]
+  events: ReadonlyMap<string, readonly SessionEvent[]>
+  error: string | null
+}) {
+  const viewport = useRef<HTMLElement>(null)
+  const content = useRef<HTMLDivElement>(null)
+  const followingLatest = useRef(true)
+  const [isFollowingLatest, setIsFollowingLatest] = useState(true)
+
+  useLayoutEffect(() => {
+    const scrollViewport = viewport.current
+    const scrollContent = content.current
+    if (!scrollViewport || !scrollContent) return
+
+    const observer = new ResizeObserver(() => {
+      if (followingLatest.current) {
+        scrollViewport.scrollTop = scrollViewport.scrollHeight
+      }
+    })
+    observer.observe(scrollViewport)
+    observer.observe(scrollContent)
+    scrollViewport.scrollTop = scrollViewport.scrollHeight
+
+    return () => observer.disconnect()
+  }, [])
+
+  function handleScroll(event: React.UIEvent<HTMLElement>) {
+    const element = event.currentTarget
+    const isAtLatest =
+      element.scrollHeight - element.clientHeight - element.scrollTop <=
+      LATEST_POSITION_TOLERANCE
+    followingLatest.current = isAtLatest
+    setIsFollowingLatest(isAtLatest)
+  }
+
+  function scrollToLatest() {
+    const element = viewport.current
+    if (!element) return
+    followingLatest.current = true
+    setIsFollowingLatest(true)
+    element.scrollTop = element.scrollHeight
+  }
+
+  return (
+    <div className="relative min-h-0 flex-1">
+      <main
+        ref={viewport}
+        className="h-full overflow-y-auto px-4 py-6"
+        onScroll={handleScroll}
+      >
+        <div ref={content} className="mx-auto max-w-4xl space-y-8">
+          {turns.length > 10 && (
+            <p className="text-center text-xs text-muted-foreground">
+              Showing the latest 10 turns.
+            </p>
+          )}
+          {turns.slice(-10).map((turn) => (
+            <TurnTimeline
+              key={turn.id}
+              turn={turn}
+              events={events.get(turn.id) ?? []}
+            />
+          ))}
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+      </main>
+      {!isFollowingLatest && (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-background shadow-md"
+          aria-label="Scroll to latest message"
+          title="Scroll to latest message"
+          onClick={scrollToLatest}
+        >
+          <ArrowDownIcon />
+        </Button>
       )}
     </div>
   )

@@ -4,6 +4,7 @@ import type {
   SessionDetailsOutcome,
   SessionDiffOutcome,
   SessionFailure,
+  SessionWorkingDiffOutcome,
   SessionOutcome,
 } from "@ai-sloth/sessions";
 import {
@@ -39,6 +40,22 @@ export function sessionDiffResponse(outcome: SessionDiffOutcome): Response {
       },
     })
     : sessionFailureResponse(outcome);
+}
+
+export function sessionWorkingDiffResponse(
+  outcome: SessionWorkingDiffOutcome,
+): Response {
+  if (!outcome.ok) return sessionFailureResponse(outcome);
+  return new Response(outcome.value.content, {
+    status: HttpStatusCode.Ok,
+    headers: {
+      "Content-Type": "text/x-diff; charset=utf-8",
+      "Content-Length": String(outcome.value.size),
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+      "X-Session-Turn": outcome.value.turnId,
+    },
+  });
 }
 
 export function discardResponse(outcome: DiscardSessionOutcome): Response {
@@ -119,6 +136,11 @@ export function sessionFailureResponse(failure: SessionFailure): Response {
     case "diff_not_available":
       return errorResponse(
         "A complete diff is not available for this revision",
+        HttpStatusCode.Conflict,
+      );
+    case "working_diff_not_available":
+      return errorResponse(
+        "The live working diff is not available",
         HttpStatusCode.Conflict,
       );
     case "conflict":

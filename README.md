@@ -256,10 +256,23 @@ Each request uses one fresh sandbox. Pi has the `read`, `bash`, `edit`, and
 credentials. Successful `edit` and text `write` activity includes a bounded
 unified patch in its tool event; the web UI renders complete patches as lazy
 inline diffs and falls back to text for truncated or legacy diff payloads.
-Each completed revision also stores one aggregate patch from the session's
-immutable base commit to that revision. The collapsible **Changes** panel loads
-this patch on demand, so updates to the source branch after session creation do
-not alter the comparison. The authenticated patch endpoint is:
+While a turn is active, each `bash`, `edit`, or `write` tool invalidates the
+current live aggregate. The open **Changes** panel requests a bounded Git
+snapshot from the session's immutable base commit to the current Git-visible
+working tree after the tool completes, replaces the whole aggregate, and never
+composes tool patches. Active snapshots use a temporary index, include tracked changes,
+deletions, renames, and non-ignored untracked files, do not alter the repository
+index, and remain provisional and memory-only. Their controller-authorized,
+turn-scoped endpoint is:
+
+```text
+GET /workspaces/:workspaceId/sessions/:sessionId/turns/:turnId/working-diff
+```
+
+Each completed revision also stores one authoritative aggregate patch from the
+session's immutable base commit to that revision. The panel switches to this
+artifact after completion, so updates to the source branch after session
+creation do not alter the comparison. The authenticated revision endpoint is:
 
 ```text
 GET /workspaces/:workspaceId/sessions/:sessionId/diff

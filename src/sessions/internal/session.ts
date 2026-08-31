@@ -39,6 +39,7 @@ import {
   SessionStoreError,
   type SessionAttempt,
 } from "./session-store";
+import type { WorkingDiffSource } from "./working-diff";
 
 export type PreparedSessionTurn = {
   accepted: SessionAccepted;
@@ -187,6 +188,7 @@ export async function executePreparedTurn(
   prepared: Required<Pick<PreparedSessionTurn, "attempt" | "prompt">>
     & Pick<PreparedSessionTurn, "repository">,
   events: TurnEventLog,
+  onWorkingDiff?: (source: WorkingDiffSource) => void,
 ): Promise<void> {
   const sessions = new SessionStore(resources.database, resources.artifacts);
   await runSession(
@@ -196,6 +198,7 @@ export async function executePreparedTurn(
     prepared.prompt,
     events,
     prepared.repository,
+    onWorkingDiff,
   );
 }
 

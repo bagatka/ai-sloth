@@ -13,6 +13,8 @@ import {
 } from "./checkout";
 
 const CHECKPOINT_TIMEOUT_MS = 2 * 60 * 1000;
+const WORKING_DIFF_TIMEOUT_MS = 15 * 1000;
+const CLEANUP_TIMEOUT_MS = 5 * 1000;
 const GIT_OUTPUT_LIMIT = 64 * 1024;
 const AGENT_USER = "agent";
 const MAX_CHANGED_FILES = 1_000;
@@ -23,13 +25,21 @@ const CHECKPOINT_FILE = "/tmp/ai-sloth-checkpoint.bundle";
 const CHECKPOINT_REF = "refs/ai-sloth/checkpoint";
 const VALIDATE_CHECKPOINT_SCRIPT = `
 const { execFileSync } = require("node:child_process");
+const env = {
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_OPTIONAL_LOCKS: "0"
+};
+for (const key of [
+  "GIT_INDEX_FILE",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES"
+]) {
+  if (process.env[key]) env[key] = process.env[key];
+}
 const git = (args) => execFileSync("/usr/bin/git", args, {
   encoding: "buffer",
-  env: {
-    GIT_CONFIG_GLOBAL: "/dev/null",
-    GIT_CONFIG_NOSYSTEM: "1",
-    GIT_OPTIONAL_LOCKS: "0"
-  },
+  env,
   maxBuffer: 1024 * 1024
 });
 const repository = ["--git-dir=" + process.argv[1], "--work-tree=" + process.argv[2]];
@@ -71,6 +81,10 @@ export type RepositoryCheckpointResult =
     artifact: RepositoryArtifact;
     diff: RepositoryArtifact;
   }
+  | { ok: false; timedOut: boolean; tooLarge?: boolean; details: string };
+
+export type WorkingTreeDiffResult =
+  | { ok: true; patch: string }
   | { ok: false; timedOut: boolean; tooLarge?: boolean; details: string };
 
 export type RepositoryPublishResult =
@@ -142,17 +156,7 @@ export async function createRepositoryCheckpoint(
 
   const diff = await runGit(
     instance,
-    [
-      ...repository,
-      "diff",
-      "--no-ext-diff",
-      "--no-textconv",
-      "--no-color",
-      "--find-renames",
-      request.baseCommitSha,
-      commitSha,
-      "--",
-    ],
+    aggregateDiffArguments(repository, request.baseCommitSha, commitSha),
     deadline,
     undefined,
     MAX_DIFF_BYTES,
@@ -200,6 +204,80 @@ export async function createRepositoryCheckpoint(
   };
 }
 
+export async function snapshotWorkingTreeDiff(
+  instance: SandboxInstance,
+  baseCommitSha: string,
+): Promise<WorkingTreeDiffResult> {
+  if (!isCommit(baseCommitSha)) throw new Error("Invalid Git commit");
+
+  const temporaryDirectory = `/tmp/ai-sloth-working-diff-${crypto.randomUUID()}`;
+  const created = await instance.sandbox.mkdir(temporaryDirectory, {
+    recursive: true,
+  });
+  if (!created.success) throw new Error("Could not prepare working diff");
+
+  const deadline = Date.now() + WORKING_DIFF_TIMEOUT_MS;
+  const environment = {
+    GIT_INDEX_FILE: `${temporaryDirectory}/index`,
+    GIT_OBJECT_DIRECTORY: `${temporaryDirectory}/objects`,
+    GIT_ALTERNATE_OBJECT_DIRECTORIES: `${instance.gitDirectory}/objects`,
+  };
+  const objects = await instance.sandbox.mkdir(
+    environment.GIT_OBJECT_DIRECTORY,
+    { recursive: true },
+  );
+  if (!objects.success) {
+    await removeTemporaryDirectory(instance, temporaryDirectory);
+    throw new Error("Could not prepare working diff objects");
+  }
+
+  try {
+    const repository = repositoryArguments(instance);
+    const readTree = await runGit(
+      instance,
+      [...repository, "read-tree", "HEAD"],
+      deadline,
+      environment,
+    );
+    if (failed(readTree)) return failure(readTree);
+
+    const add = await runGit(
+      instance,
+      [...repository, "add", "--all"],
+      deadline,
+      environment,
+    );
+    if (failed(add)) return failure(add);
+
+    const validation = await runCheckpointValidation(
+      instance,
+      deadline,
+      environment,
+    );
+    if (failed(validation)) return failure(validation);
+
+    const diff = await runGit(
+      instance,
+      aggregateDiffArguments(repository, baseCommitSha),
+      deadline,
+      environment,
+      MAX_DIFF_BYTES,
+    );
+    if (failed(diff)) return failure(diff);
+    if (diff.truncated) {
+      return {
+        ok: false,
+        timedOut: false,
+        tooLarge: true,
+        details: "Repository working diff is too large",
+      };
+    }
+    return { ok: true, patch: diff.stdout };
+  } finally {
+    await removeTemporaryDirectory(instance, temporaryDirectory);
+  }
+}
+
 export async function publishRepositoryCheckpoint(
   instance: SandboxInstance,
   request: RepositoryPublishRequest,
@@ -232,9 +310,29 @@ export async function publishRepositoryCheckpoint(
   return failed(push) ? failure(push, request.credential) : { ok: true };
 }
 
+function aggregateDiffArguments(
+  repository: string[],
+  baseCommitSha: string,
+  targetCommitSha?: string,
+): string[] {
+  return [
+    ...repository,
+    "diff",
+    ...(targetCommitSha ? [] : ["--cached"]),
+    "--no-ext-diff",
+    "--no-textconv",
+    "--no-color",
+    "--find-renames",
+    baseCommitSha,
+    ...(targetCommitSha ? [targetCommitSha] : []),
+    "--",
+  ];
+}
+
 async function runCheckpointValidation(
   instance: SandboxInstance,
   deadline: number,
+  env?: Record<string, string>,
 ) {
   const process = await instance.sandbox.exec([
     "/usr/local/bin/node",
@@ -242,8 +340,25 @@ async function runCheckpointValidation(
     VALIDATE_CHECKPOINT_SCRIPT,
     instance.gitDirectory,
     instance.projectDirectory,
-  ], { timeout: Math.max(1, deadline - Date.now()) });
+  ], {
+    timeout: Math.max(1, deadline - Date.now()),
+    ...(env ? { env } : {}),
+  });
   return readSandboxProcessOutput(process, GIT_OUTPUT_LIMIT);
+}
+
+async function removeTemporaryDirectory(
+  instance: SandboxInstance,
+  path: string,
+): Promise<void> {
+  const cleanup = await instance.sandbox.exec(
+    ["rm", "-rf", "--", path],
+    { timeout: CLEANUP_TIMEOUT_MS },
+  );
+  const output = await readSandboxProcessOutput(cleanup, 4096);
+  if (output.exitCode !== 0) {
+    throw new Error("Could not clean up working diff");
+  }
 }
 
 function isCheckpointRequest(request: RepositoryCheckpointRequest): boolean {

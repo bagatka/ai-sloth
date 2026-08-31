@@ -24,6 +24,9 @@ const failingSessions: SessionOperations = {
   async diff() {
     throw new Error("Session diff should not be called");
   },
+  async workingDiff() {
+    throw new Error("Session working diff should not be called");
+  },
   async discard() {
     throw new Error("Discard should not be called");
   },
@@ -51,6 +54,7 @@ function configuredEnvironment(
         continue: sessions.continue,
         get: sessions.get,
         diff: sessions.diff,
+        workingDiff: sessions.workingDiff,
         discard: sessions.discard,
         publish: sessions.publish,
         fetch: (request: Request) => sessions.connectEvents({
@@ -371,6 +375,40 @@ test("session diff remains scoped to its workspace", async () => {
   expect(await response.text()).toBe(patch);
   expect(invocation).toEqual({
     sessionId: SESSION_ID,
+    workspaceId: WORKSPACE_ID,
+    controllerUserId: USER_ID,
+  });
+});
+
+test("live working diffs remain scoped to their turn and workspace", async () => {
+  let invocation: unknown;
+  const patch = "diff --git a/file.txt b/file.txt\n";
+  const environment = configuredEnvironment({
+    async workingDiff(input) {
+      invocation = input;
+      return {
+        ok: true,
+        value: {
+          turnId: input.turnId,
+          size: Buffer.byteLength(patch),
+          content: new Blob([patch]).stream(),
+        },
+      };
+    },
+  });
+
+  const response = await app.request(
+    sessionUrl(`/${SESSION_ID}/turns/${TURN_ID}/working-diff`),
+    { headers: { Authorization: `Bearer ${ACCOUNT_TOKEN}` } },
+    environment,
+  );
+
+  expect(response.status).toBe(200);
+  expect(response.headers.get("X-Session-Turn")).toBe(TURN_ID);
+  expect(await response.text()).toBe(patch);
+  expect(invocation).toEqual({
+    sessionId: SESSION_ID,
+    turnId: TURN_ID,
     workspaceId: WORKSPACE_ID,
     controllerUserId: USER_ID,
   });

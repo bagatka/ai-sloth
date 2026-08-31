@@ -28,6 +28,7 @@ export type {
   DiscardSessionInput,
   DiscardSessionOutcome,
   GetSessionInput,
+  GetWorkingDiffInput,
   PublishSessionInput,
   PublishSessionOutcome,
   PublishSessionResult,
@@ -43,5 +44,7 @@ export type {
   SessionStatus,
   SessionTurn,
   SessionTurnStatus,
+  SessionWorkingDiff,
+  SessionWorkingDiffOutcome,
   StartSessionInput,
 } from "./internal/contract";
