@@ -1,14 +1,12 @@
 {
   "name": "@ai-sloth/sandbox",
   "private": true,
+  "exports": {
+    ".": "./index.ts",
+    "./process": "./process.ts"
+  },
   "scripts": {
-    "setup": "nu setup.nu",
-    "dev": "wrangler d1 migrations apply SESSION_DB --local && wrangler dev",
-    "test": "bun test",
-    "typecheck": "tsc",
-    "deploy": "nu deploy.nu",
-    "secret:openrouter": "wrangler secret put OPENROUTER_API_KEY",
-    "secret:trigger": "wrangler secret put SANDBOX_API_TOKEN"
+    "typecheck": "tsc"
   },
   "dependencies": {
     "@cloudflare/sandbox": "0.13.0-next.751.1"
@@ -16,7 +14,6 @@
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260825.1",
     "bun-types": "1.3.13",
-    "typescript": "5.9.3",
-    "wrangler": "4.126.0"
+    "typescript": "5.9.3"
   }
 }

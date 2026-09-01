@@ -1,5 +1,9 @@
 {
   "name": "ai-sloth",
   "private": true,
-  "workspaces": ["src/*"]
+  "workspaces": ["src/*"],
+  "scripts": {
+    "test": "bun test src",
+    "typecheck": "bun run --workspaces --sequential typecheck"
+  }
 }

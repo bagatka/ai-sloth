@@ -1,7 +1,20 @@
-import { Hono } from "hono";
+import { ContainerProxy, Sandbox } from "@ai-sloth/sandbox";
+import type { SessionBindings } from "@ai-sloth/sessions";
+import { SessionCoordinator } from "@ai-sloth/sessions/coordinator";
+import { createApp } from "./app";
+import type { ApiBindings } from "./internal/environment";
 
-const app = new Hono();
+export { ContainerProxy, createApp, Sandbox, SessionCoordinator };
+export type { ApiBindings } from "./internal/environment";
+export type {
+  NewSessionRequest,
+  SessionMessageRequest,
+} from "./internal/sessions/request";
 
-app.notFound((context) => context.json({ error: "Not found" }, 404));
+declare global {
+  namespace Cloudflare {
+    interface Env extends ApiBindings, SessionBindings {}
+  }
+}
 
-export default app;
+export default createApp();

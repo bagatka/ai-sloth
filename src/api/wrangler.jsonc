@@ -1,0 +1,103 @@
+{
+  "name": "ai-sloth-sandbox",
+  "main": "worker.ts",
+  "compatibility_date": "2025-05-06",
+  "compatibility_flags": ["nodejs_compat", "enable_ctx_exports"],
+  "vars": {
+    "SANDBOX_IMAGE_VERSION": "2",
+    "BACKUP_BUCKET_NAME": "ai-sloth-sandbox-cache"
+  },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
+  "containers": [
+    {
+      "class_name": "Sandbox",
+      "image": "../image/Dockerfile",
+      "instance_type": "lite",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "Sandbox",
+        "class_name": "Sandbox"
+      },
+      {
+        "name": "SESSION_COORDINATORS",
+        "class_name": "SessionCoordinator"
+      }
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "ACCOUNTS_DB",
+      "database_name": "ai-sloth-accounts",
+      "migrations_dir": "../accounts/internal/migrations"
+    },
+    {
+      "binding": "WORKSPACES_DB",
+      "database_name": "ai-sloth-workspaces",
+      "migrations_dir": "../workspaces/internal/migrations"
+    },
+    {
+      "binding": "GITHUB_DB",
+      "database_name": "ai-sloth-github",
+      "migrations_dir": "../github/internal/migrations"
+    },
+    {
+      "binding": "SESSION_DB",
+      "database_name": "ai-sloth-sandbox-sessions",
+      "migrations_dir": "../sessions/internal/migrations"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    },
+    {
+      "name": "SESSION_RATE_LIMITER",
+      "namespace_id": "1002",
+      "simple": {
+        "limit": 5,
+        "period": 60
+      }
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "SESSION_ARTIFACTS",
+      "bucket_name": "ai-sloth-session-artifacts"
+    },
+    {
+      "binding": "BACKUP_BUCKET",
+      "bucket_name": "ai-sloth-sandbox-cache"
+    }
+  ],
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["Sandbox"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["SessionCoordinator"]
+    }
+  ]
+}

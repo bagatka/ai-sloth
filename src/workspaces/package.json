@@ -1,0 +1,16 @@
+{
+  "name": "@ai-sloth/workspaces",
+  "private": true,
+  "exports": "./index.ts",
+  "scripts": {
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@ai-sloth/accounts": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260825.1",
+    "bun-types": "1.3.13",
+    "typescript": "5.9.3"
+  }
+}

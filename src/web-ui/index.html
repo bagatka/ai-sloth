@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/src/assets/favicon.png"
+    />
+    <meta
+      name="description"
+      content="On-demand, disposable cloud development environments for AI coding agents."
+    />
+    <script>
+      ;(() => {
+        const storageKey = "ai-sloth-theme"
+        let theme = "dark"
+
+        try {
+          const storedTheme = localStorage.getItem(storageKey)
+          if (
+            storedTheme === "dark" ||
+            storedTheme === "light" ||
+            storedTheme === "system"
+          ) {
+            theme = storedTheme
+          }
+        } catch {
+          // Local storage can be unavailable; the default remains usable.
+        }
+
+        if (theme === "system") {
+          theme = matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light"
+        }
+
+        document.documentElement.classList.add(theme)
+      })()
+    </script>
+    <title>AI Sloth</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
