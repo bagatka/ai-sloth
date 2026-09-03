@@ -289,3 +289,50 @@ async function example(
 }
 
 void example;
+
+type Email = string;
+type Password = string;
+type TokenPair = {
+    accessToken: AccessToken;
+    refreshToken: RefreshToken;
+}
+type AccessToken = string;
+type RefreshToken = string;
+type TeamName = string;
+type TeamId = string;
+type TeamInvitationCode = string;
+type UserId = string;
+type GitHubAccountId = string;
+type SourceCodeId = string;
+enum Agent {
+    Pi = 'pi',
+    GitHubCopilot = 'github-copilot',
+    ClaudeCode = 'claude-code',
+    Codex = 'codex',
+    OpenCode = 'opencode'
+}
+
+interface AiSlothHttpServer {
+    createAccount(email: Email, password: Password): Promise<boolean>;
+
+    signIn(email: Email, password: Password): Promise<TokenPair>;
+    refreshToken(refreshToken: RefreshToken): Promise<TokenPair>;
+    signOut(refreshToken: RefreshToken): Promise<boolean>;
+
+    createTeam(name: TeamName, accessToken: string): Promise<TeamId>;
+    deleteTeam(teamId: TeamId, accessToken: AccessToken): Promise<boolean>;
+    joinTeam(invitationCode: TeamInvitationCode, accessToken: AccessToken): Promise<TeamId>;
+    leaveTeam(teamId: TeamId, accessToken: AccessToken): Promise<boolean>;
+    inviteToTeam(teamId: TeamId, invitationTargetEmail: Email): Promise<TeamInvitationCode>;
+    kickFromTeam(teamId: TeamId, targetUserId: UserId, accessToken: AccessToken): Promise<boolean>;
+    renameTeam(teamId: TeamId, newName: TeamName, accessToken: AccessToken): Promise<boolean>;
+
+    connectGitHubAccount(accessToken: AccessToken): Promise<void>;
+    disconnectGitHubAccount(GitHubAccoundId: GitHubAccountId, accessToken: AccessToken): Promise<boolean>;
+    // Other GitHub connection related endpoints
+
+    // Endpoints to upload repo as archive and use it as source code for sessions
+
+    createSession(sourceCodeId: SourceCodeId, agent: Agent, accessToken: AccessToken): Promise<SessionId>;
+
+}
