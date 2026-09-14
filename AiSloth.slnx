@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/Aspire/">
+    <Project Path="src/Aspire/AiSloth.Aspire.AppHost/AiSloth.Aspire.AppHost.csproj" />
+    <Project Path="src/Aspire/AiSloth.Aspire.ServiceDefaults/AiSloth.Aspire.ServiceDefaults.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,34 @@
+name: .NET solution / Validate
+run-name: >-
+  .NET solution / Validate /
+  ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.pull_request.number) || github.ref_name }}
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-dotnet-solution:
+    name: .NET solution / Build, audit & style
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install .NET SDK from global.json
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore locked NuGet packages and audit vulnerabilities
+        run: dotnet restore AiSloth.slnx --locked-mode
+
+      - name: Build Release with analyzers and warnings as errors
+        run: dotnet build AiSloth.slnx --configuration Release --no-restore -warnaserror
+
+      - name: Verify C# formatting and code style
+        run: dotnet format AiSloth.slnx --verify-no-changes --no-restore

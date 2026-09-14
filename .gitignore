@@ -1,0 +1,9 @@
+# .NET build output, test results, and binary logs
+bin/
+obj/
+TestResults/
+*.binlog
+
+# Nix build links
+/result
+/result-*
