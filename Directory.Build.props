@@ -8,7 +8,7 @@
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisLevel>11.0</AnalysisLevel>
     <AnalysisMode>Recommended</AnalysisMode>
     <!-- Keep style rules opt-in via .editorconfig instead of enabling every style preference. -->
     <AnalysisModeStyle>Default</AnalysisModeStyle>
