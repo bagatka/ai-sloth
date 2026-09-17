@@ -35,6 +35,12 @@
           "YamlDotNet": "16.3.0"
         }
       },
+      "Meziantou.Analyzer": {
+        "type": "Direct",
+        "requested": "[3.0.259, )",
+        "resolved": "3.0.259",
+        "contentHash": "WhnkpMzWWsUhdEEyPVXRVZx1maVnfymzJuzZn3bkDsgrgFd4WxKfCLzG1ZK7k0dmuJC8T9IAM72UwYaA1wmF/Q=="
+      },
       "Aspire.Hosting": {
         "type": "Transitive",
         "resolved": "13.5.3",
