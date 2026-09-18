@@ -40,6 +40,13 @@ dotnet_diagnostic.CA1310.severity = warning
 # Preserve structured logging by keeping message templates static.
 dotnet_diagnostic.CA2254.severity = warning
 
+# Require explicit ConfigureAwait only in reusable SDKs.
+dotnet_diagnostic.MA0004.severity = none
+
+[src/Sdk/**/*.cs]
+dotnet_diagnostic.MA0004.severity = warning
+MA0004.report = Always
+
 [src/Aspire/AiSloth.Aspire.AppHost/AppHost.cs]
 # Keep Aspire's entry-point filename despite the generated Program type.
 dotnet_diagnostic.MA0048.severity = none
