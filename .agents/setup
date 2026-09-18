@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+printf '\n==> Install Nix if missing\n'
+if [[ ! -x "$HOME/.nix-profile/bin/nix" ]]; then
+  installer="$(mktemp)"
+  trap 'rm -f "$installer"' EXIT
+  curl --fail --silent --show-error --location \
+    https://releases.nixos.org/nix/nix-2.28.5/install -o "$installer"
+  # Single-user Nix needs no daemon to survive snapshot activation.
+  time sh "$installer" --no-daemon --no-channel-add --no-modify-profile
+fi
+
+# The installer cannot change this process's environment.
+source "$HOME/.nix-profile/etc/profile.d/nix.sh"
+export NIX_CONFIG="${NIX_CONFIG:-}
+experimental-features = nix-command flakes"
+export DOTNET_CLI_TELEMETRY_OPTOUT=1
+export DOTNET_NOLOGO=1
+
+printf '\n==> Materialize the pinned development environment\n'
+time nix print-dev-env --no-write-lock-file "$repo_root" > /dev/null
+
+printf '\n==> Activate Nix in future repository login shells\n'
+profile_marker='# AI Sloth orb development environment'
+if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
+  cat >> "$HOME/.bash_profile" <<EOF
+
+$profile_marker
+if [[ -z "\${IN_NIX_SHELL:-}" && ( "\$PWD" == "$repo_root" || "\$PWD" == "$repo_root/"* ) ]]; then
+  source "\$HOME/.nix-profile/etc/profile.d/nix.sh"
+  export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
+  eval "\$("\$HOME/.nix-profile/bin/nix" --extra-experimental-features 'nix-command flakes' print-dev-env --no-write-lock-file "$repo_root")"
+fi
+EOF
+fi
+
+printf '\n==> Restore locked NuGet dependencies\n'
+time nix develop --no-write-lock-file --command \
+  dotnet restore AiSloth.slnx --locked-mode
