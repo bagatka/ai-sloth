@@ -20,10 +20,7 @@
       devShells = forEachSystem (
         system:
         let
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [ (import ./nix/dotnet-11-rc1.nix) ];
-          };
+          pkgs = nixpkgs.legacyPackages.${system};
         in
         {
           default = pkgs.mkShell {
