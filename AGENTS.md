@@ -1,155 +1,293 @@
-# Product and Software Design
+# How we build software
 
-## Purpose
+## The goal
 
-Build useful software that is easy to use, understand, and change.
+Build useful products whose entire structure one person can hold in their head.
 
-Simplicity means reducing what a person must know to accomplish a task safely. Optimize for the user, the caller, the maintainer, and the operator—not for fewer lines, more modules, smaller diffs, or architectural appearance.
+Not every line — every level. A system is made of a few parts, each understandable through its contract alone, and each part is built the same way. At any level, a person or agent should be able to understand, change, or fix that level by reading it plus the contracts directly beneath it, never by reading everything. Complexity may grow in depth. It may not grow in what must be understood at once.
 
-For substantial systems, aim for a small number of understandable capabilities, connected by explicit contracts. Each capability may contain its own well-bounded parts. Stop decomposing when another boundary would add more coordination than understanding.
+This also defines how humans and agents share work. Humans own the map and review every contract change. Implementation inside a contract can be delegated and is verified by that contract's tests.
 
+Correctness, security, privacy, data integrity, and required compatibility are constraints, not trade-offs. Reduce scope before weakening them.
 
-Correctness, security, privacy, data integrity, and required compatibility are constraints, not tradeable polish. Reduce scope before weakening them. Meet realistic performance and resource requirements without speculative machinery.
+## 1. Build systems out of systems
 
-Follow higher-priority instructions and applicable repository guidance. Keep repository commands, supported versions, architecture maps, and stack-specific rules local. These principles guide decisions; they do not prescribe one architecture for every problem.
+A system is a small number of parts composed through explicit contracts. Each part is itself a system built the same way. There is no separate "architecture level" and "code level"; there are only levels.
 
-## 1. Match the design effort to the change
+**Each level reads in its own vocabulary.** Code at one level describes *what happens* in terms of the capabilities directly beneath it, not *how* they work.
 
-Inspect before editing. Read the relevant instructions, product context, callers, contracts, implementation, and tests. Start with the affected area and follow its dependencies; do not inventory the entire repository by default. Distinguish existing guarantees from accidental behavior, and evidence from assumptions.
+```ts
+// Product level: reads as a description of the workflow.
+// (Dependencies are provided by the composition root; language is illustrative.)
+async function publishPost(author: UserId, draft: Draft): Promise<PublishResult> {
+  const media = await mediaLibrary.finalize(draft.mediaIds);
+  const post  = await posts.create({ author, caption: draft.caption, media });
+  await feed.distribute(post.id);
+  return { postId: post.id };
+}
+```
 
-**Local change within an established contract:** understand the contract, make the direct correction, and verify it. A small script or straightforward function may be the complete design. Do not manufacture modules or a design document.
+Understanding this function requires the contracts of `mediaLibrary`, `posts`, and `feed`, not their implementations. Inside `feed`, the same holds one level down: fan-out, ranking, and storage are each their own capability behind their own contract. This level still owns what only it can know. For example, it must decide what "published" means if distribution fails after the post exists. Failure semantics that span several capabilities belong to the level that composes them.
 
-**New capability, unclear behavior, or a changed boundary:** briefly state the intended outcome, scope, affected responsibilities, contract, and verification approach before implementation. A few paragraphs or a usage example in the task discussion are enough. Record durable decisions near the code only when future work will need them.
+Rules:
 
-**High-risk or hard-to-reverse change:** examine the relevant failure modes and compatibility implications. Compare meaningfully different approaches, including the simplest direct approach. Use a focused experiment when an important assumption can be tested more cheaply than debated.
+- **Don't mix levels in one unit of code.** A function that calls `feed.distribute()` and also builds SQL strings is doing two levels' work.
+- **Keep each level small.** If a level composes more than about seven direct parts, look for a real concept that groups some of them. A folder is not enough; the grouping needs its own contract.
+- **Every boundary must be deep.** It should hide substantially more than it exposes. A layer that only forwards calls, renames things, or wraps a stable platform type is not a level. It is noise that every reader must walk through. Recursive decomposition only works if every boundary earns its place.
+- **Split for real reasons.** Split when parts hide different decisions, change for different reasons, or can be understood and verified independently. Keep parts together when splitting would require shared internals, chatty back-and-forth, or an invariant spanning both sides. Never split by file size, execution step, or fashion.
+- **Dependencies point down.** A part depends on the contracts of what it uses. It never knows its parent and never reaches into a sibling's internals. Wiring happens in the parent, the composition root. There are no cycles; a cycle means ownership is wrong.
+- **One owner per rule and per piece of mutable state.** Others ask the owner. They do not re-implement its rules or mutate its state.
+- **Prefer in-process boundaries.** A network boundary is a contract boundary plus latency, partial failure, and operational cost. Create one only when scaling, deployment, isolation, or ownership by another team requires it. Good in-process contracts make that move possible later without redesign.
 
-Risk depends on consequences and coupling, not diff size. Increase design effort when a small edit changes permissions, persisted meaning, shared contracts, or irreversible behavior.
+**Holdability signals.** These detect a level that has outgrown a head. They are signals, not quotas.
 
-Ask when missing information materially changes the intended outcome or safety of the work. Otherwise state the simplest reasonable assumption and proceed. Do not turn routine work into an approval ceremony.
+- The level can be explained in about five sentences using only its own vocabulary.
+- Its contract fits on roughly one screen.
+- Changing it requires reading it plus the contracts of its direct dependencies, and nothing deeper.
+- Typical changes stay inside one part. If changes routinely ripple across several parts (visible in version history as repeated co-changes), a boundary is in the wrong place.
+- If you must read a dependency's implementation to use it correctly, that dependency's contract is defective. Fix or report the contract.
 
-## 2. Shape the product before the implementation
+## 2. Contracts are the design
 
-Start with the person or system trying to accomplish something. Establish what they need to finish, what makes that difficult today, and what observable result would make this change worthwhile. For internal work, the user may be another developer or an operator.
+Design is a conversation about data types and contracts. Implementations are replaceable details behind them.
 
-Describe the normal workflow and an important failure or recovery path before choosing the architecture. For a UI, sketch the interaction; for a CLI, an invocation and its output; for a library, a caller example. Make the intended experience concrete enough to question.
+**Data first.** For a new or changed boundary, define the data types and write a representative caller before writing the implementation. Show the normal case and one consequential failure. Redesign the contract, not the caller, if the caller has to do any of these:
 
-Identify what is required and what is deliberately out of scope. Consider whether an existing capability, better default, simpler workflow, or removal of behavior solves the problem without a new subsystem. Do not silently substitute a different outcome for the one requested; explain material trade-offs.
+- understand storage,
+- reconstruct policy,
+- coordinate hidden state,
+- perform a fragile sequence of calls.
 
-Prefer a coherent default path over a collection of configurable possibilities. Add a choice when distinct supported needs justify it, not because the design has avoided making a decision. Keep terminology and behavior consistent with the surrounding product and platform.
+**A contract is behavior, not a signature.** Where it matters at that boundary, state:
 
-Treat first use, discoverability, feedback, empty states, failure messages, and recovery as part of the behavior where relevant. User-facing interfaces must account for accessibility. Do not expose internal architecture as steps the user has to coordinate.
-
-Choose the smallest complete slice that delivers the intended value. Small scope should still produce an understandable experience, including its important failures. A prototype may explore less, but must not be presented as production-ready behavior.
-
-## 3. Find boundaries that make reasoning local
-
-Before distributing substantial work across files or agents, identify the important responsibilities and the knowledge each should own. Extend a suitable existing module before inventing another.
-
-A useful module owns a coherent capability, invariant, representation, resource lifecycle, or external integration. Its contract explains what it does; its implementation contains the knowledge callers should not need. A module can be a function, type, package, library, or service. A directory alone does not establish a boundary.
-
-Split responsibilities when they hide different decisions, change for different reasons, or can be understood and verified independently. Keep them together when separation would require shared internals, chatty coordination, or a fragile cross-module invariant. Do not split merely by execution step, file size, or architectural fashion.
-
-For each substantial boundary, be able to explain:
-
-- What it owns, and what it explicitly does not own.
-- What callers may rely on without reading its implementation.
-- Which dependencies it needs, and which details it hides.
-
-Apply the same reasoning inside a large module. Expose the parent's contract to the rest of the system; keep internal submodules private unless another caller has a real need. Do not impose a fixed number of layers or equal-sized components.
-
-When substantial work changes system structure, update the local architecture map—or add a short one if it is missing. Show major responsibilities, dependency direction, and contract locations; do not catalogue every file or duplicate the contracts.
-
-Prefer deep modules: a modest interface that hides substantial useful work. Count the concepts, sequencing rules, and obligations an interface imposes, not just its methods or parameters. One function taking an unstructured options bag is not necessarily simple.
-
-Give each important rule and mutable state one authoritative owner. Other modules ask that owner or consume its defined results; they do not reproduce its rules or mutate its internals. Similar-looking code need not be unified when it represents different knowledge.
-
-Keep dependency direction explicit. Avoid cycles and reaching through one module into another's private parts. When a cycle appears, reconsider ownership or composition before adding another indirection.
-
-Independence means local reasoning and change within a contract. It does not require separate deployment, repositories, processes, or a plugin system. Prefer in-process composition until a real operational constraint justifies distribution.
-
-## 4. Design contracts from the caller inward
-
-For a new or materially changed boundary, write a representative use before its implementation. Exercise the ordinary case and a consequential failure. Improve the interface if callers must understand storage layouts, reconstruct policy, coordinate hidden state, or perform a fragile sequence of calls.
-
-A contract is the behavior a caller may rely on, not merely a signature or an interface type. State the relevant parts of:
-
-- **Meaning:** the responsibility, inputs, outputs, and observable guarantees.
-- **Validity:** preconditions, invariants, and expected absence or rejection.
+- **Meaning:** what it does, its inputs and outputs, and its guarantees.
+- **Validity:** preconditions, invariants, and what absence or rejection looks like.
 - **Effects:** state changes, I/O, ownership, and lifetime.
-- **Failure:** error meaning, partial completion, and recovery obligations.
-- **Limits:** ordering, concurrency, cancellation, idempotency, and resource bounds when callers depend on them.
+- **Failure:** what each error means, whether partial completion is possible, and what the caller must do to recover.
+- **Limits:** ordering, concurrency, idempotency, cancellation, cost, and the performance characteristics callers depend on.
 
-Specify only what matters at that boundary. Do not turn every function into a specification exercise. Use the language's types and visibility, existing schemas, concise documentation, and executable examples or tests. Keep each contract authoritative and close to its implementation; do not create duplicate contract files for ceremony.
+**Hide implementation, never operational meaning.** A caller need not know the schema. It must know that an operation persists data, may partially succeed, or performs expensive I/O. Never promise atomicity, durability, or safe retries the implementation doesn't provide.
 
+**Plain data across boundaries.** Prefer immutable values and explicit identifiers over live objects that carry hidden state or callbacks into the caller's world. Plain data is easier to reason about, test, serialize, and later move across a process boundary. Make invalid states unrepresentable where the type system allows it.
 
-Make the normal use obvious. Prefer explicit values and dependencies over ambient context, global registries, or an entire application object. Use representations that eliminate invalid states and special cases when they make the design easier to understand.
+**One authoritative contract, enforced by the language.** The contract lives in one place, next to its implementation. It is expressed with the language's types, visibility, and concise docs. Everything not in the contract is private, enforced by the compiler or a dependency rule rather than by convention. Don't write duplicate contract documents for ceremony.
 
-Hide implementation choices without hiding operational meaning. A caller should not need the database schema, but may need to know that an operation persists data, can partially succeed, or performs expensive I/O. An interface must not promise atomicity, durability, or safe retries unless the implementation provides them.
+**Conformance tests make swapping real.** Some contracts have several implementations or may be replaced; write tests for those against the contract, not the implementation. Every implementation, including test fakes, must pass the same suite. These tests are what allow a module to be rewritten without its callers noticing.
 
-Existing contracts must be checked against actual behavior when they are uncertain. Do not treat stale documentation or a convenient test double as proof.
+**Anything observable will be depended on.** Callers rely on whatever behavior they can see, documented or not: ordering, timing, error text, defaults. Keep the observable surface small and deliberate. Treat changes to observable behavior as contract changes, even when signatures stay the same.
 
-## 5. Compose useful capabilities, not speculative frameworks
+**Contract changes are design changes.** Implementation changes inside a contract are local and cheap. Contract changes are expensive and must be explicit about:
 
-Make a capability useful on its own terms rather than entangled with one screen, command, or workflow. Prefer inputs and results that a different caller could understand without recreating the original application's environment.
+- what changes and why,
+- every affected caller,
+- every affected persisted or external representation,
+- the migration.
 
-Separate product-specific coordination from mechanisms when that separation removes knowledge from the mechanism. Keep an invariant with the module that can enforce it reliably. Do not push every difficult decision into callers in the name of flexibility.
+Prefer additive changes. Never change a contract silently as a side effect of other work.
 
-For example, report formatting can accept a report snapshot and a supported format, then return a document or a defined error. It need not also select database records, interpret HTTP requests, and send email. A web handler or scheduled job can compose those responsibilities. A one-off export script may still perform the whole workflow directly when reusable boundaries would provide no benefit.
+## 3. General-purpose capabilities, thin product glue
 
-A meaningful boundary can justify a module with one caller or one implementation. Multiple callers are not a prerequisite for information hiding. But do not add interfaces, adapters, extension hooks, or configuration solely for hypothetical future uses.
+Build subsystems as if they will serve a product you haven't written yet. The product-specific part of the system should be a thin layer of composition on top of general capabilities.
 
-A thin adapter is worthwhile when it translates a real boundary or prevents external details from spreading. A forwarding layer that adds no isolation, policy, or useful vocabulary is not. Do not wrap stable platform types or duplicate models solely for architectural purity.
+- **A capability doesn't know which product it lives in.** Product names, screens, campaigns, and business flows stay out of its vocabulary: `MediaLibrary`, not `StoryPhotoUploadManager`.
+- **Product decisions live in the composition layer.** That covers which capabilities run, in what order, and under which policies. Glue code is expected; it is the cheapest code to understand and change.
+- **Keep each invariant with the module that can enforce it.** Generality must not push hard decisions onto every caller.
+- **Use the extraction litmus test.** Could this module move into its own package and serve a different app with only new glue? Would its contract still make sense there? Don't actually extract or publish it until a real need exists. Internal reuse is not a public compatibility promise.
 
+**General is not the same as configurable.** The right generalization finds a more fundamental concept, and the contract usually gets *smaller*. For example, one "media item" replaces photo, photo-with-song, and photo-with-voiceover. The wrong generalization adds flags, modes, option bags, plugin hooks, and extension points for imagined callers. The contract grows, and every caller must understand more. If generalizing increases the number of concepts a caller must learn, it is the wrong generalization.
 
-Prefer mature repository, platform, and standard-library capabilities where suitable. Add dependencies for clear net value after considering maintenance, security, compatibility, and operational cost. Isolate external details where changing them would otherwise affect unrelated code.
+Be general in concept and minimal in surface: model the general concept, and implement only the parts of it needed now.
 
+## 4. One problem, one solution
 
-Keep internal reuse distinct from a public compatibility commitment. Do not publish an API or extract a package merely because a component might eventually be reusable. Leave room to evolve by hiding decisions, not by prebuilding extension points.
+Similar problems are solved the same way everywhere. Two ways of doing the same thing is worse than one imperfect way. Everyone has to learn both, and every reader has to work out whether the difference matters.
 
-## 6. Learn through working slices
+- **Recurring problems have one established solution,** recorded in the pattern registry. Typical entries:
+  - errors, validation, and IDs
+  - time and time zones, and money
+  - configuration, and logging and telemetry
+  - authentication and authorization
+  - persistence access, retries and timeouts, pagination, and cancellation
+  - UI state, forms, and navigation
+  - naming and test structure
+- **Registry entries are short.** Each states the problem, the chosen solution, and the path to a canonical example in the code. The example is the specification.
+- **Follow what exists.** Before solving a recurring problem, find the established solution and follow the shape of its canonical example.
+- **Fill gaps once.** If no solution exists, choose deliberately, implement it once and well, and add it to the registry in the same change.
+- **Change patterns, don't fork them.** If the established solution is wrong for a case, propose changing the pattern, with a migration path for existing uses. Never introduce a second way "just here."
+- **One vocabulary.** Each domain concept has one name, listed in the glossary and used identically in code, APIs, storage, UI, and conversation. Don't introduce synonyms or reuse a name for a different concept.
+- **Uniform shape.** Every subsystem looks the same from the outside: the same place for its contract, its README, and its tests. People know where to look before they've seen it.
+- **Across stacks, keep concepts consistent and expression idiomatic.** The same error taxonomy, contract style, and domain vocabulary apply in every language, using each platform's native mechanisms. Don't fight the platform to make code look identical.
 
-For non-trivial design decisions, test the strongest alternative against the proposed design. Would a direct implementation, an existing capability, a different data model, or fewer boundaries do better? Compare caller burden, hidden knowledge, failure behavior, and the spread of likely changes—not aesthetic preference.
+## 5. Keep the map
 
-Sketch enough of the system to choose the next useful piece. Do not design every internal layer before learning from implementation. When feasibility is uncertain, run a focused spike, identify what it established, and revisit the contract before building on it.
+The map is what lets one person hold the system.
 
+- Every repository has a system map. It lists the top-level subsystems, a one-line purpose for each, the dependency direction, and where each contract lives. It fits on one page.
+- Every substantial subsystem has its own short map, a README at its boundary, with the same shape. Maps nest the way systems nest.
+- Any change that adds, removes, splits, merges, or re-wires a subsystem updates the affected map in the same change.
+- Maps describe structure and purpose. They don't catalogue files or duplicate contracts.
 
-Build in increments with observable results. A component-level test or small harness can be the first demonstration; connect the pieces into a real workflow early. Do not finish a collection of isolated subsystems before testing whether they compose into something useful.
+## 6. Simple for the user
 
-Keep contracts provisional while exploring, explicit while integrating, and intentionally managed once callers depend on them. Revise an awkward boundary rather than accumulating workarounds around it. Keep unfinished or simulated behavior out of the production path.
+The product is the outermost system, and its contract is with the user. The same rule applies: the user should be able to hold the product in their head.
 
-When delegating, divide work along understood responsibilities. Give each task its contract, permitted scope, and acceptance checks. Do not let parallel implementations independently invent a shared contract. Integrate and verify the whole behavior; locally passing pieces are not sufficient.
+- **Prefer a few powerful concepts that compose over many narrow features.** Every new product concept must coexist with every existing one, so its cost to users grows with the product, not with the diff.
+- **Prefer a coherent default over configuration.** Add a choice when distinct real needs require it, not to avoid making a decision.
+- **Never expose internal structure** as steps the user must coordinate.
+- **Treat the edges as behavior, not polish.** That includes first use, feedback, empty states, errors, recovery, and accessibility.
+- **Make the experience concrete before choosing an architecture.** Describe the normal workflow and one important failure path: a UI sketch, a CLI invocation with its output, or a caller example for a library.
 
-Make the smallest coherent change, including the narrow boundary repair needed for correctness and clarity. Do not use this standard as permission for unrelated refactors, speculative infrastructure, or formatting churn. Preserve others' work and remove paths made obsolete by the change.
+## 7. Solve the problem, not the ticket
 
-## 7. Preserve the engineering floor
+Act as a technical partner, not an order taker. Requests often describe a narrow solution, or a pre-cut version of one, without knowing what it costs or what a slightly different shape would make possible. Find the version that delivers the most value for the least lasting complexity.
 
-**Failure and security.** Validate untrusted input at the relevant trust boundary. Use least privilege and safe defaults. Represent expected absence honestly; preserve useful error context. Never conceal failure with invented data, silent fallback, or weakened checks. Recovery, retries, and compensation must be explicit and semantically safe. Do not expose secrets or sensitive data through diagnostics or fixtures.
+For any new feature or significant behavior change:
 
-**State and resources.** Give mutable state and resource-consuming work an obvious owner and lifetime. Make persistence, transactions, partial completion, and cleanup deliberate. Propagate cancellation and deadlines where applicable. Bound work, memory, queues, retries, and concurrency. Do not add unowned background work. Irreversible operations require appropriate authorization and a considered recovery strategy.
+1. **Restate the underlying problem.** Who is trying to do what, and what makes it hard today? What observable result would make this worth doing?
+2. **Check what exists.** Could an existing capability, a better default, or removing friction solve it without new machinery?
+3. **Look for the general case.** Is this a special case of a more fundamental capability? Would building that capability cost about the same or less, remove special cases, or clearly serve where the product is going?
+4. **Price the integration, not just the feature.** Count:
+   - new concepts, for users and for code,
+   - contracts that must change,
+   - interactions with existing features,
+   - special cases added,
+   - ongoing operational cost.
 
-**Performance.** Choose suitable algorithms and representations for expected scale. Avoid obvious repeated work and unnecessary I/O. Measure relevant workloads before adding optimization complexity. A cache, queue, or concurrent path must have a demonstrated purpose and defined consistency, failure, and resource semantics. Do not transfer accidental implementation complexity into a harder user workflow.
+   A feature that is cheap to build but touches everything is expensive.
+5. **Watch for cuts that add code.** Restrictions like "only for these users", "only on this screen", "max three", or "not in this mode" are each a condition that must be implemented, tested, explained, and eventually removed. A restricted version is often more code and more concepts than the unrestricted one. Say so.
+6. **Recommend.** Present the meaningful options: as requested, the general version, a smaller version, or not building it. Give each one's cost, risk, and what it enables. Recommend one and explain why.
 
-**Code and automation.** Use precise names, visible control flow, and established local conventions. Explain intent, invariants, and non-obvious trade-offs rather than narrating syntax. Generate mechanical artifacts from an authoritative, reviewable source when that reduces maintenance; do not hand-edit generated output. Add tooling to protect meaningful contracts or eliminate repeated mistakes, not to enforce ceremony.
+Example: a photo-sharing product asks for background music on photo posts. The underlying need is expressive posts with sound.
 
-## 8. Verify the product and its boundaries
+- Photo-plus-audio adds a hybrid content type, audio sync, and likely licensing and streaming integrations.
+- First-class video may cover the same need, since users can post a photo set to music as a video. It adds one general concept instead of a special case, and it enables far more.
+- Video has real costs of its own (encoding, storage, bandwidth), so the recommendation depends on actual numbers. Analyze; don't pattern-match.
 
-Check the actual requested outcome, not just the implementation's internal consistency. Use the changed workflow where the environment permits. Inspect the real UI, command output, or caller experience, including an important failure. Automated checks cannot establish every aspect of usability; report what was not exercised.
+Guardrails:
 
-Test module guarantees through their boundaries, and test the composed path for mismatched assumptions. Include the regression being fixed and risk-relevant failures, limits, and state transitions. Prefer deterministic tests, realistic values, and focused fakes at external seams. Do not couple tests to private structure without a specific reason.
+- **The human decides product outcomes.** Never silently build something different from what was asked. If a different shape seems better, say so before building.
+- **Generalization is not scope creep.** Propose the bigger capability only when it removes special cases or costs about the same. Name the smallest first slice of it that delivers the requested value.
+- **"Don't build this" is a legitimate recommendation** when cost clearly exceeds value or the feature would make the product incoherent. Make the case with specifics.
+- **Keep it proportional.** A clear, small, local request gets done, not debated.
 
-Run the relevant repository checks. Use existing visibility, dependency rules, and architecture checks to preserve boundaries; add a focused check when a consequential boundary needs protection. Do not replace executable evidence with a claim that the design follows these principles.
+## 8. How to work here
 
-A compatible implementation change should remain mostly within its owner. A contract change is different: inspect affected callers and persisted or external representations. Changes to defaults, errors, ordering, side effects, and performance guarantees can break consumers even when signatures stay unchanged. Provide migration, rollout, or recovery measures when needed.
+**Read by level.** When changing a module, read:
+
+- its map and its contract,
+- its implementation,
+- the contracts (not implementations) of its direct dependencies,
+- its direct callers, when the contract is involved.
+
+Descend into a dependency's implementation only when evidence points there, and then treat it as working in that module. Don't inventory the whole repository.
+
+**Scale design effort to risk, not diff size.**
+
+- **Change within an established contract:** understand the contract, make the change, verify it. No design document.
+- **New capability, unclear behavior, or a changed boundary:** before implementing, state the problem, the scope, a contract sketch with a caller example, and how you will verify it. A few paragraphs are enough.
+- **High-risk or hard-to-reverse changes,** even with small diffs: this covers permissions, persisted meaning, shared contracts, and irreversible operations.
+  - Compare meaningfully different approaches, including the simplest direct one.
+  - Examine failure modes and compatibility.
+  - Run a focused spike when an assumption is cheaper to test than to debate.
+
+**Ask only when it matters.** Ask when missing information would materially change the outcome or its safety. Otherwise, state the simplest reasonable assumption and proceed.
+
+**Rewrite inside a boundary when that is simpler.** Implementations are swappable, so rewriting a module's internals against its contract and conformance tests is legitimate when it is in scope and clearly simpler than patching. This is not permission to rewrite unrelated code.
+
+**Build in working slices.** Connect pieces into a real end-to-end workflow early, rather than finishing isolated subsystems before learning whether they compose.
+
+- Keep contracts provisional while exploring, explicit while integrating, and managed once callers depend on them.
+- Revise an awkward boundary instead of accumulating workarounds around it.
+- Keep unfinished or simulated behavior out of production paths.
+
+**Delegate along boundaries.** Agree on shared contracts before parallel work starts. Give each worker:
+
+- the contract it implements,
+- the contracts it may use,
+- its permitted scope,
+- its acceptance checks.
+
+Never let parallel workers each invent a shared contract. Integrate and verify the composed behavior yourself; locally passing parts are not enough.
+
+**Stay in scope.** Make the smallest coherent change, including the narrow boundary repair needed for correctness.
+
+- No unrelated refactors, speculative infrastructure, or formatting churn.
+- Preserve others' work.
+- Remove paths your change made obsolete.
+
+## 9. The engineering floor
+
+These hold at every level, whatever the scope.
+
+- **Failure honesty.** Validate untrusted input at trust boundaries, and represent expected absence explicitly. Preserve error context. Never hide failure behind invented data, silent fallbacks, or weakened checks. Retries and compensation must be explicit and semantically safe.
+- **Security and privacy.** Use least privilege and safe defaults. Keep secrets and sensitive data out of logs, errors, and fixtures. Irreversible operations require appropriate authorization and a recovery strategy.
+- **State and resources.** Every piece of mutable state and every resource has an obvious owner and lifetime.
+  - Persistence, transactions, partial completion, and cleanup are deliberate.
+  - Propagate cancellation and deadlines.
+  - Bound work, memory, queues, retries, and concurrency.
+  - No unowned background work.
+- **Performance is decided at contracts.** Choose algorithms and data representations for expected scale.
+  - On hot paths, design contracts around batches and plain data ("process these 10,000 items") rather than chatty per-item calls. A boundary must not impose a cost its implementation can't remove.
+  - Measure real workloads before adding caches, queues, or concurrency. Each one needs a demonstrated purpose and defined consistency, failure, and resource semantics.
+- **Dependencies.** Prefer mature platform and standard-library capabilities. Add a third-party dependency only for clear net value after weighing maintenance, security, and compatibility. Isolate it behind a boundary when its details would otherwise spread.
+- **Code.** Use precise names, visible control flow, and local conventions. Comments explain intent, invariants, and non-obvious trade-offs, not syntax. Generate mechanical artifacts from a reviewable source, and never hand-edit generated output.
+- **Explicit over implicit.** Code says what it does where it does it: visible registration instead of scanning, named conversions instead of implicit ones, types written where they aren't obvious, defaults stated instead of inherited from the framework. A contributor who doesn't know the platform's conventions should still read any file correctly. An implicit mechanism is allowed only where forgetting the explicit version would be a correctness or security bug, and each one is recorded in the pattern registry.
+- **Same behavior on every machine.** Never depend on the machine's culture, time zone, line endings, path separators, or file-name casing. Machine-readable text uses invariant formats; human-readable text uses a culture passed explicitly. Tests run under a deliberately unfriendly culture so these bugs fail everywhere, not only on a colleague's machine.
+
+## 10. Verify and report
+
+- **Test guarantees through boundaries.** Cover:
+  - conformance tests for contracts,
+  - a test of the composed path to catch mismatched assumptions,
+  - the regression being fixed,
+  - risk-relevant failures, limits, and state transitions.
+
+  Prefer deterministic tests with realistic values and focused fakes at external seams. Don't couple tests to private structure.
+- **Exercise the real outcome** where the environment allows: the actual UI, command output, or caller experience, including an important failure. State what you could not exercise.
+- **Run the repository's checks.** Use visibility rules, dependency rules, and architecture tests to protect boundaries. Add a focused check when a consequential boundary needs protection.
 
 Before finishing, ask:
 
-- Does this solve the intended problem with an understandable normal and failure path?
-- Can a caller use each changed boundary without learning its implementation?
-- Is important knowledge owned once, with internal changes kept local?
-
-- Did any new layer, option, dependency, or state add more burden than it removed?
+- Does each level I touched still read in its own vocabulary and fit in a head?
+- Can a caller use every changed contract without reading its implementation?
+- Is each rule and piece of state owned once? Did I solve recurring problems the established way?
+- Did I add a concept, layer, option, dependency, or special case? Does it remove more burden than it adds?
+- Are the maps, pattern registry, and glossary current?
 - What evidence supports the result, and what remains unverified?
 
-Report the outcome, material design or contract changes, checks actually run and their results, and remaining risks or limits. Keep the report proportional to the work. Do not claim checks passed when they were not run.
+Report the outcome, any contract changes (called out explicitly), the checks actually run and their results, and remaining risks. Keep the report proportional. Never claim a check passed that wasn't run.
 
-The desired result is not an impressive architecture. It is a useful product whose parts can be understood, trusted, and changed without holding the whole system in your head.
+## Translating to stacks
+
+| Concept | .NET | React / TypeScript | SwiftUI | Zig |
+|---|---|---|---|---|
+| Boundary | Project / assembly | Feature package with one entry point | Swift package / SPM target | Module (`@import`, `build.zig`) |
+| Contract | `public` interfaces, records, error types | Exports of the entry `index.ts`: types, hooks, props | `public` protocols and value types | `pub` declarations, their types and error sets |
+| Hidden | `internal` | Unexported files; deep imports banned | `internal` / `package` / `private` | Non-`pub` declarations |
+| Composition root | `Program.cs`, DI registration | App shell, routes, providers | `App` entry, root views | `main.zig`, build graph |
+| Enforcement | Project references, architecture tests | Import-path lint rules, package `exports` | Target dependencies, access control | Module graph in `build.zig` |
+
+For network services, the contract is a machine-readable schema (e.g. OpenAPI or protobuf). It is the single source, and client and server types are generated from it.
+
+## Repository specifics
+
+Local rules refine this document. Where they conflict, follow the local rule and mention the
+conflict.
+
+- **Stack:** .NET 11 RC1, ASP.NET Core minimal APIs, EF Core, PostgreSQL 18, OTEL, xUnit v3 with MTP v2.
+- **Commands:**
+  - Build: `dotnet build`
+  - Test: `dotnet test`
+  - Format check: `dotnet format --verify-no-changes`
+  - New migration (verify once the first module exists):
+    `dotnet ef migrations add <Name> --project src/Modules/<Module>/Company.Product.<Module> --startup-project src/Company.Product.WebApi --context <Module>DbContext --output-dir Data/Migrations`
+- **System map:** `ARCHITECTURE.md`
+- **Pattern registry:** `PATTERNS.md`
+- **Glossary:** `GLOSSARY.md`
+- **Module maps:** `src/Modules/<Module>/README.md`, from the template `docs/templates/module-readme.md`
+- **Contracts and enforcement:**
+  - Each module's contract is `I<Module>Api` in `Company.Product.<Module>.Contracts`.
+  - Everything else in a module is `internal`.
+  - Boundaries are enforced by project references, `internal`, banned APIs, and
+    `tests/Company.Product.ArchitectureTests`.
+- **Known exceptions:** none yet.
