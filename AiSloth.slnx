@@ -7,4 +7,10 @@
   <Folder Name="/src/ControlPlane/">
     <Project Path="src/ControlPlane/Bagatka.AiSloth.WebApi/Bagatka.AiSloth.WebApi.csproj" />
   </Folder>
+  <Folder Name="/src/Foundation/">
+    <Project Path="src/Foundation/Bagatka.Foundation/Bagatka.Foundation.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Bagatka.Foundation.Tests/Bagatka.Foundation.Tests.csproj" />
+  </Folder>
 </Solution>

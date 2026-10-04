@@ -1,0 +1,17 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!-- Every test project is an xUnit v3 executable on Microsoft Testing Platform. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.mtp-v2" />
+  </ItemGroup>
+
+  <!-- Runs every test under tr-TR (comma decimals, dotless i) so culture bugs fail on every machine. -->
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)xunit.runner.json" Link="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

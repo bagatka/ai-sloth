@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   validate-dotnet-solution:
-    name: .NET solution / Build, audit & style
+    name: .NET solution / Build, audit, style & test
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -32,3 +32,6 @@ jobs:
 
       - name: Verify C# formatting and code style
         run: dotnet format AiSloth.slnx --verify-no-changes --no-restore
+
+      - name: Run tests
+        run: dotnet test --solution AiSloth.slnx --configuration Release --no-build
