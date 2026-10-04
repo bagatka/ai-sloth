@@ -170,6 +170,6 @@ internal sealed class NookReconciler(
                 ["SLOTHD_NOOK_ID"] = nook.Id.Value.ToString("D", CultureInfo.InvariantCulture),
                 ["SLOTHD_TOKEN"] = token,
             },
-            Location: null);
+            nook.Location);
     }
 }

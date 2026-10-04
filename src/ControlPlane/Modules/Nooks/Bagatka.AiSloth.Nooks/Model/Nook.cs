@@ -11,13 +11,15 @@ namespace Bagatka.AiSloth.Nooks.Model;
 internal sealed class Nook
 {
     public const int MaxProviderLength = 40;
+    public const int MaxLocationLength = 64;
 
     // Used by Create and by EF: parameter names match property names.
-    private Nook(NookId id, WorkspaceId workspaceId, string provider, NookStatus status, DateTimeOffset createdAt)
+    private Nook(NookId id, WorkspaceId workspaceId, string provider, string? location, NookStatus status, DateTimeOffset createdAt)
     {
         Id = id;
         WorkspaceId = workspaceId;
         Provider = provider;
+        Location = location;
         Status = status;
         CreatedAt = createdAt;
     }
@@ -26,7 +28,10 @@ internal sealed class Nook
 
     public WorkspaceId WorkspaceId { get; private set; }
 
+    // The provider's name, and where within the provider the nook runs, such as a machine.
     public string Provider { get; private set; }
+
+    public string? Location { get; private set; }
 
     public NookStatus Status { get; private set; }
 
@@ -42,9 +47,9 @@ internal sealed class Nook
     // PostgreSQL's xmin: concurrent changes to one nook conflict instead of overwriting each other.
     public uint Version { get; private set; }
 
-    public static Nook Create(WorkspaceId workspaceId, string provider, TimeProvider time)
+    public static Nook Create(WorkspaceId workspaceId, ProviderId provider, TimeProvider time)
     {
-        return new Nook(NookId.New(), workspaceId, provider, NookStatus.Creating, time.GetUtcNow());
+        return new Nook(NookId.New(), workspaceId, provider.Name, provider.Location, NookStatus.Creating, time.GetUtcNow());
     }
 
     // A new token for the daemon of a sandbox about to be created. It replaces any earlier one, which
@@ -99,7 +104,7 @@ internal sealed class Nook
     public NookSummary ToSummary()
     {
         DiskUsage? disk = DiskTotalBytes is long total && DiskAvailableBytes is long available ? new DiskUsage(total, available) : null;
-        return new NookSummary(Id, WorkspaceId, Provider, Status, CreatedAt, disk);
+        return new NookSummary(Id, WorkspaceId, new ProviderId(Provider, Location).ToString(), Status, CreatedAt, disk);
     }
 
     private static byte[] Hash(string token)

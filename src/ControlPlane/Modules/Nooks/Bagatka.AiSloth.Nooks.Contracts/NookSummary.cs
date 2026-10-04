@@ -8,7 +8,7 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// </summary>
 /// <param name="Id">The nook.</param>
 /// <param name="WorkspaceId">The workspace that owns it.</param>
-/// <param name="Provider">The sandbox provider it runs on.</param>
+/// <param name="Provider">The ID of the provider it runs on, as in <see cref="ProviderSummary.Id"/>.</param>
 /// <param name="Status">Where it is in its lifecycle.</param>
 /// <param name="CreatedAt">When it was recorded.</param>
 /// <param name="Disk">How full its disk was at the daemon's last report, or <see langword="null"/> before the first.</param>

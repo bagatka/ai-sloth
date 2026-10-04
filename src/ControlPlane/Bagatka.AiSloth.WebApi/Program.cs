@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Threading;
+using Bagatka.AiSloth.Machines;
 using Bagatka.AiSloth.Nooks;
 using Bagatka.AiSloth.Users;
 using Bagatka.AiSloth.WebApi;
@@ -40,6 +41,7 @@ AuthenticationSettings authentication = builder.Configuration.GetRequired<Authen
 DockerSandboxSettings docker = builder.Configuration.GetRequired<DockerSandboxSettings>("Sandboxing:Docker");
 UsersSettings users = builder.Configuration.GetRequired<UsersSettings>("Modules:Users");
 WorkspacesSettings workspaces = builder.Configuration.GetRequired<WorkspacesSettings>("Modules:Workspaces");
+MachinesSettings machines = builder.Configuration.GetRequired<MachinesSettings>("Modules:Machines");
 NooksSettings nooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
 
 builder.Services.AddSingleton(TimeProvider.System);
@@ -69,6 +71,7 @@ builder.Services
     .AddDockerSandboxProvider(docker)
     .AddUsersModule(users)
     .AddWorkspacesModule(workspaces)
+    .AddMachinesModule(machines)
     .AddNooksModule(nooks);
 
 await using WebApplication app = builder.Build();
@@ -90,10 +93,12 @@ app.MapDefaultEndpoints();
 app.MapOpenApi().AllowAnonymous();
 app.MapUsersEndpoints();
 app.MapWorkspacesEndpoints();
+app.MapMachinesEndpoints();
 app.MapNooksEndpoints();
 
-// Daemons dial Kestrel's HTTP/2-only "Daemon" endpoint (appsettings.json) and prove themselves with
-// their nook's token instead of a user's.
+// Daemons and machines dial Kestrel's HTTP/2-only "Daemon" endpoint (appsettings.json) and prove
+// themselves with their own token instead of a user's.
 app.MapGrpcService<DaemonEndpoint>().AllowAnonymous();
+app.MapGrpcService<MachineEndpoint>().AllowAnonymous();
 
 await app.RunAsync();

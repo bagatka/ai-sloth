@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Used by the sloth CLI, a Native AOT binary. -->
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <!-- C# for both sides is generated from machine.proto at build time; never hand-edit it. The
+       sandbox call messages it carries come from Bagatka.Sandboxing.Remote. -->
+  <ItemGroup>
+    <Protobuf Include="machine.proto" GrpcServices="Both" AdditionalImportDirs="..\..\Sandboxing\Bagatka.Sandboxing.Remote" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.Core.Api" />
+    <PackageReference Include="Grpc.Tools" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Sandboxing\Bagatka.Sandboxing.Remote\Bagatka.Sandboxing.Remote.csproj" />
+  </ItemGroup>
+
+</Project>

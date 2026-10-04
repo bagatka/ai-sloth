@@ -13,6 +13,8 @@
   </Folder>
   <Folder Name="/src/ControlPlane/Modules/Machines/">
     <File Path="src/ControlPlane/Modules/Machines/README.md" />
+    <Project Path="src/ControlPlane/Modules/Machines/Bagatka.AiSloth.Machines.Contracts/Bagatka.AiSloth.Machines.Contracts.csproj" />
+    <Project Path="src/ControlPlane/Modules/Machines/Bagatka.AiSloth.Machines/Bagatka.AiSloth.Machines.csproj" />
   </Folder>
   <Folder Name="/src/ControlPlane/Modules/Nooks/">
     <File Path="src/ControlPlane/Modules/Nooks/README.md" />
@@ -34,6 +36,9 @@
     <File Path="src/ControlPlane/Modules/Workspaces/README.md" />
     <Project Path="src/ControlPlane/Modules/Workspaces/Bagatka.AiSloth.Workspaces.Contracts/Bagatka.AiSloth.Workspaces.Contracts.csproj" />
     <Project Path="src/ControlPlane/Modules/Workspaces/Bagatka.AiSloth.Workspaces/Bagatka.AiSloth.Workspaces.csproj" />
+  </Folder>
+  <Folder Name="/src/Cli/">
+    <Project Path="src/Cli/Bagatka.AiSloth.MachineProtocol/Bagatka.AiSloth.MachineProtocol.csproj" />
   </Folder>
   <Folder Name="/src/Daemon/">
     <File Path="src/Daemon/README.md" />

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Bagatka.AiSloth.Machines.Contracts;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Daemons;
 using Bagatka.AiSloth.Nooks.Data;
@@ -21,6 +22,7 @@ internal sealed partial class NooksApi(
     NooksDbContext db,
     IDbContextFactory<NooksDbContext> databases,
     IWorkspacesApi workspaces,
+    IMachinesApi machines,
     IEnumerable<ISandboxProvider> providers,
     DaemonConnections daemons,
     NookReconciler reconciler,

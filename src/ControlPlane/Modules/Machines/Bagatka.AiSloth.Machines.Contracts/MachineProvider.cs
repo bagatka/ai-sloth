@@ -1,0 +1,27 @@
+using System;
+using System.Globalization;
+
+namespace Bagatka.AiSloth.Machines.Contracts;
+
+/// <summary>
+/// Machines run nooks as one sandbox provider; a sandbox's location is the ID of the machine it runs on.
+/// </summary>
+public static class MachineProvider
+{
+    /// <summary>The provider's name.</summary>
+    public const string Name = "machine";
+
+    /// <summary>The location of sandboxes on the machine.</summary>
+    public static string LocationOf(MachineId machine)
+    {
+        return machine.Value.ToString("D", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>The machine a location names; false when it names none.</summary>
+    public static bool TryParseLocation(string? location, out MachineId machine)
+    {
+        bool parsed = Guid.TryParseExact(location, "D", out Guid id);
+        machine = MachineId.From(id);
+        return parsed;
+    }
+}

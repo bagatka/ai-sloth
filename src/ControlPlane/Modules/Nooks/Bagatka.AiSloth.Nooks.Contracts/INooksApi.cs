@@ -20,11 +20,21 @@ public interface INooksApi
     /// Records a nook in the workspace, then asks the chosen sandbox provider to create it. Returns
     /// as soon as it is recorded; a failed provider call is retried by reconciliation, not by the caller.
     /// </summary>
+    /// <remarks>
+    /// A nook may be created on a provider that isn't available, such as a machine that is offline;
+    /// it stays <see cref="NookStatus.Creating"/> until the provider is back.
+    /// </remarks>
     /// <returns>
     /// The nook in <see cref="NookStatus.Creating"/>; not found when the actor isn't a member of the
-    /// workspace; or a validation error for an unknown provider.
+    /// workspace; or a validation error for a provider the workspace doesn't have.
     /// </returns>
     public Task<Result<NookSummary>> CreateAsync(Actor actor, CreateNook command, CancellationToken ct);
+
+    /// <summary>
+    /// The providers the workspace's nooks can run on: the deployment's own, then the workspace's
+    /// machines, oldest first. Not found when the actor isn't a member.
+    /// </summary>
+    public Task<Result<IReadOnlyList<ProviderSummary>>> ListProvidersAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct);
 
     /// <summary>
     /// The nook. Not found when it doesn't exist or the actor isn't a member of its workspace.

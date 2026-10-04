@@ -63,6 +63,14 @@
         "resolved": "10.0.3",
         "contentHash": "7nb5YzXuvWWJxB0J8DiyL3we+X4FOctZrt0fIBnucOIaIevFEEwGQVZKtiu9olXdlNAK1eNgqSral6r/jlhI4w=="
       },
+      "bagatka.aisloth.machines.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation": "[1.0.0, )",
+          "Bagatka.Sandboxing.Remote": "[1.0.0, )"
+        }
+      },
       "bagatka.aisloth.nooks.contracts": {
         "type": "Project",
         "dependencies": {
@@ -93,6 +101,13 @@
           "Bagatka.Foundation": "[1.0.0, )"
         }
       },
+      "bagatka.sandboxing.remote": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Sandboxing": "[1.0.0, )",
+          "Google.Protobuf": "[3.36.2, )"
+        }
+      },
       "EFCore.NamingConventions": {
         "type": "CentralTransitive",
         "requested": "[10.0.1, )",
@@ -102,6 +117,12 @@
           "Microsoft.EntityFrameworkCore": "[10.0.1, 11.0.0)",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.1, 11.0.0)"
         }
+      },
+      "Google.Protobuf": {
+        "type": "CentralTransitive",
+        "requested": "[3.36.2, )",
+        "resolved": "3.36.2",
+        "contentHash": "Ci1q1iJg74qAE5riTA2FbMS0wPbpruPQI/JQ9DrAsRo2VsSxgt1e/pmxGxgrci+pXJEgrSYg2vPl8rrStZkclQ=="
       },
       "Microsoft.Extensions.DependencyInjection": {
         "type": "CentralTransitive",

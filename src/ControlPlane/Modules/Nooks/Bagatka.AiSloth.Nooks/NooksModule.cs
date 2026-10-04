@@ -15,7 +15,8 @@ public static class NooksModule
 {
     /// <summary>
     /// Registers the module. The host also registers a <see cref="System.TimeProvider"/>, the
-    /// Workspaces module, and every <see cref="Bagatka.Sandboxing.ISandboxProvider"/> nooks may run on.
+    /// Workspaces and Machines modules, and every <see cref="Bagatka.Sandboxing.ISandboxProvider"/>
+    /// nooks may run on.
     /// </summary>
     public static IServiceCollection AddNooksModule(this IServiceCollection services, NooksSettings settings)
     {

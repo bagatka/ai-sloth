@@ -1,0 +1,53 @@
+// The protocol between the control plane and `sloth machine run`, the machine mode of the sloth CLI
+// on a computer a workspace added to run its nooks. This file is the single source: the control
+// plane's endpoint and sloth's client are both generated from it. Change it additively; a breaking change is a new
+// package version (v2).
+
+syntax = "proto3";
+
+package bagatka.aisloth.machine.v1;
+
+option csharp_namespace = "Bagatka.AiSloth.MachineProtocol.V1";
+
+import "sandbox_calls.proto";
+
+// The endpoint sloth dials, on the same HTTP/2 port as daemons. The control plane never connects
+// to a machine, so a machine needs no inbound networking.
+service Machines {
+  // Trades the one-time code an owner got when adding the machine for the machine's credential. A
+  // code works once, within its hour; anything else is UNAUTHENTICATED.
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+
+  // The machine's connection, authenticated with the metadata "authorization: Bearer <token>". Sloth
+  // sends Hello first. The control plane then sends sandbox provider calls; sloth runs each on the
+  // machine's Docker Engine and answers with a result, in any order. Sloth reconnects with backoff
+  // when the stream drops; a newer stream for the same machine replaces an older one.
+  // UNAUTHENTICATED means the machine was removed: sloth stops.
+  rpc Connect(stream MachineMessage) returns (stream bagatka.sandboxing.remote.v1.SandboxCall);
+}
+
+message RegisterRequest {
+  string code = 1;
+  string sloth_version = 2;
+}
+
+message RegisterResponse {
+  // A UUID string.
+  string machine_id = 1;
+  // The machine's secret; the control plane keeps only its hash.
+  string token = 2;
+}
+
+// Sent by sloth on the connection.
+message MachineMessage {
+  oneof message {
+    Hello hello = 1;
+    bagatka.sandboxing.remote.v1.SandboxCallResult result = 2;
+  }
+}
+
+// The first message on every connection.
+message Hello {
+  string machine_id = 1;
+  string sloth_version = 2;
+}

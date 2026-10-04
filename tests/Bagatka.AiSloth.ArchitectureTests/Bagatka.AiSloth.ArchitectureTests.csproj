@@ -8,6 +8,9 @@
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Users\Bagatka.AiSloth.Users\Bagatka.AiSloth.Users.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Workspaces\Bagatka.AiSloth.Workspaces\Bagatka.AiSloth.Workspaces.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Nooks\Bagatka.AiSloth.Nooks\Bagatka.AiSloth.Nooks.csproj" />
+    <ProjectReference Include="..\..\src\Cli\Bagatka.AiSloth.MachineProtocol\Bagatka.AiSloth.MachineProtocol.csproj" />
+    <ProjectReference Include="..\..\src\ControlPlane\Modules\Machines\Bagatka.AiSloth.Machines.Contracts\Bagatka.AiSloth.Machines.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\ControlPlane\Modules\Machines\Bagatka.AiSloth.Machines\Bagatka.AiSloth.Machines.csproj" />
     <ProjectReference Include="..\..\src\Aspire\Bagatka.ServiceDefaults\Bagatka.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Bagatka.AiSloth.WebApi\Bagatka.AiSloth.WebApi.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Nooks\Bagatka.AiSloth.Nooks.Contracts\Bagatka.AiSloth.Nooks.Contracts.csproj" />

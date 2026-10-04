@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -29,14 +28,14 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
         }
 
         ConnectDaemon command = new ConnectDaemon(
-            NookId.From(ParseId(hello.NookId)),
-            Token(context),
+            NookId.From(GrpcCalls.ParseId(hello.NookId)),
+            GrpcCalls.BearerToken(context),
             hello.DaemonVersion,
-            hello.RunningProcesses.Select(running => new RunningProcess(ProcessId.From(ParseId(running.ProcessId)), running.OutputLength)).ToList());
+            hello.RunningProcesses.Select(running => new RunningProcess(ProcessId.From(GrpcCalls.ParseId(running.ProcessId)), running.OutputLength)).ToList());
         Result<IAsyncEnumerable<DaemonInstruction>> connected = await nooks.ConnectAsync(Actor.Anonymous, command, ReportsAsync(requestStream, ct), ct);
         if (!connected.TryGetValue(out IAsyncEnumerable<DaemonInstruction>? instructions, out Error? rejected))
         {
-            throw Rejection(rejected);
+            throw GrpcCalls.Rejection(rejected);
         }
 
         try
@@ -60,11 +59,11 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
             throw new RpcException(new Status(StatusCode.InvalidArgument, "The first message must be the header."));
         }
 
-        OutputUpload upload = new OutputUpload(NookId.From(ParseId(header.NookId)), Token(context), WatchId.From(ParseId(header.WatchId)));
+        OutputUpload upload = new OutputUpload(NookId.From(GrpcCalls.ParseId(header.NookId)), GrpcCalls.BearerToken(context), WatchId.From(GrpcCalls.ParseId(header.WatchId)));
         Result accepted = await nooks.AcceptOutputAsync(Actor.Anonymous, upload, OutputAsync(requestStream, ct), ct);
         if (accepted.IsError(out Error? rejected))
         {
-            throw Rejection(rejected);
+            throw GrpcCalls.Rejection(rejected);
         }
 
         return new Wire.OutputUploadResult();
@@ -95,7 +94,7 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
             {
                 case Wire.DaemonEvent.EventOneofCase.ProcessExited:
                     Wire.ProcessExited exited = events.Current.ProcessExited;
-                    yield return new DaemonReport(new ProcessExited(ProcessId.From(ParseId(exited.ProcessId)), exited.ExitCode));
+                    yield return new DaemonReport(new ProcessExited(ProcessId.From(GrpcCalls.ParseId(exited.ProcessId)), exited.ExitCode));
                     break;
                 case Wire.DaemonEvent.EventOneofCase.DiskUsage:
                     yield return new DaemonReport(new DiskUsage(events.Current.DiskUsage.TotalBytes, events.Current.DiskUsage.AvailableBytes));
@@ -120,7 +119,7 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
                 Wire.OutputChannel.StandardError => OutputChannel.StandardError,
                 Wire.OutputChannel.StandardOutput or Wire.OutputChannel.Unspecified => OutputChannel.StandardOutput,
             };
-            yield return new ProcessOutput(ProcessId.From(ParseId(output.ProcessId)), output.Offset, channel, output.Data.Memory);
+            yield return new ProcessOutput(ProcessId.From(GrpcCalls.ParseId(output.ProcessId)), output.Offset, channel, output.Data.Memory);
         }
     }
 
@@ -132,7 +131,7 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
             {
                 StartProcess = new Wire.StartProcess
                 {
-                    ProcessId = FormatId(start.ProcessId.Value),
+                    ProcessId = GrpcCalls.FormatId(start.ProcessId.Value),
                     Command = start.Command,
                     Arguments = { start.Arguments },
                     WorkingDirectory = start.WorkingDirectory ?? string.Empty,
@@ -145,52 +144,17 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
             },
             StopProcessInstruction stop => new Wire.DaemonInstruction
             {
-                StopProcess = new Wire.StopProcess { ProcessId = FormatId(stop.ProcessId.Value) },
+                StopProcess = new Wire.StopProcess { ProcessId = GrpcCalls.FormatId(stop.ProcessId.Value) },
             },
             SendInputInstruction input => new Wire.DaemonInstruction
             {
-                SendInput = new Wire.SendInput { ProcessId = FormatId(input.ProcessId.Value), Data = ByteString.CopyFrom(input.Data.Span) },
+                SendInput = new Wire.SendInput { ProcessId = GrpcCalls.FormatId(input.ProcessId.Value), Data = ByteString.CopyFrom(input.Data.Span) },
             },
             WatchOutputInstruction watch => new Wire.DaemonInstruction
             {
-                WatchOutput = new Wire.WatchOutput { WatchId = FormatId(watch.WatchId.Value), ProcessId = FormatId(watch.ProcessId.Value), FromOffset = watch.FromOffset },
+                WatchOutput = new Wire.WatchOutput { WatchId = GrpcCalls.FormatId(watch.WatchId.Value), ProcessId = GrpcCalls.FormatId(watch.ProcessId.Value), FromOffset = watch.FromOffset },
             },
             ReconnectInstruction => new Wire.DaemonInstruction { Reconnect = new Wire.Reconnect() },
         };
-    }
-
-    // The daemon's token, from the authorization metadata every call carries.
-    private static string Token(ServerCallContext context)
-    {
-        const string Scheme = "Bearer ";
-        string? authorization = context.RequestHeaders.GetValue("authorization");
-        return authorization is not null && authorization.StartsWith(Scheme, StringComparison.Ordinal)
-            ? authorization[Scheme.Length..]
-            : throw new RpcException(new Status(StatusCode.Unauthenticated, "Calls carry the nook's token as a bearer token."));
-    }
-
-    private static Guid ParseId(string value)
-    {
-        return Guid.TryParse(value, CultureInfo.InvariantCulture, out Guid id)
-            ? id
-            : throw new RpcException(new Status(StatusCode.InvalidArgument, "IDs are UUIDs."));
-    }
-
-    private static string FormatId(Guid value)
-    {
-        return value.ToString("D", CultureInfo.InvariantCulture);
-    }
-
-    private static RpcException Rejection(Error error)
-    {
-        StatusCode status = error.Kind switch
-        {
-            ErrorKind.Validation => StatusCode.InvalidArgument,
-            ErrorKind.Unauthorized => StatusCode.Unauthenticated,
-            ErrorKind.Forbidden => StatusCode.PermissionDenied,
-            ErrorKind.NotFound => StatusCode.NotFound,
-            ErrorKind.Conflict => StatusCode.FailedPrecondition,
-        };
-        return new RpcException(new Status(status, error.Message));
     }
 }

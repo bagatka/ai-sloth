@@ -328,9 +328,33 @@
           "Grpc.Core.Api": "[2.84.0, )"
         }
       },
+      "bagatka.aisloth.machineprotocol": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Sandboxing.Remote": "[1.0.0, )",
+          "Google.Protobuf": "[3.36.2, )",
+          "Grpc.Core.Api": "[2.84.0, )"
+        }
+      },
+      "bagatka.aisloth.machines": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Machines.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation.Modules": "[1.0.0, )"
+        }
+      },
+      "bagatka.aisloth.machines.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation": "[1.0.0, )",
+          "Bagatka.Sandboxing.Remote": "[1.0.0, )"
+        }
+      },
       "bagatka.aisloth.nooks": {
         "type": "Project",
         "dependencies": {
+          "Bagatka.AiSloth.Machines.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Nooks.Contracts": "[1.0.0, )",
           "Bagatka.Foundation.Modules": "[1.0.0, )",
           "Bagatka.Sandboxing": "[1.0.0, )"
@@ -397,6 +421,13 @@
         "dependencies": {
           "Bagatka.Sandboxing": "[1.0.0, )",
           "Bagatka.Sdk.Docker": "[1.0.0, )"
+        }
+      },
+      "bagatka.sandboxing.remote": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Sandboxing": "[1.0.0, )",
+          "Google.Protobuf": "[3.36.2, )"
         }
       },
       "bagatka.sdk.docker": {

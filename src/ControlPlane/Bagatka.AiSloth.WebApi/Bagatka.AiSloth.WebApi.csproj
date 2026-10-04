@@ -10,9 +10,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Aspire\Bagatka.ServiceDefaults\Bagatka.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\Cli\Bagatka.AiSloth.MachineProtocol\Bagatka.AiSloth.MachineProtocol.csproj" />
     <ProjectReference Include="..\..\Daemon\Bagatka.AiSloth.DaemonProtocol\Bagatka.AiSloth.DaemonProtocol.csproj" />
     <ProjectReference Include="..\..\Foundation\Bagatka.Foundation.Web\Bagatka.Foundation.Web.csproj" />
     <ProjectReference Include="..\..\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
+    <ProjectReference Include="..\Modules\Machines\Bagatka.AiSloth.Machines\Bagatka.AiSloth.Machines.csproj" />
     <ProjectReference Include="..\Modules\Nooks\Bagatka.AiSloth.Nooks\Bagatka.AiSloth.Nooks.csproj" />
     <ProjectReference Include="..\Modules\Users\Bagatka.AiSloth.Users\Bagatka.AiSloth.Users.csproj" />
     <ProjectReference Include="..\Modules\Workspaces\Bagatka.AiSloth.Workspaces\Bagatka.AiSloth.Workspaces.csproj" />

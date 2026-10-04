@@ -35,6 +35,7 @@ internal static class NooksEndpoints
         RouteGroupBuilder workspaceNooks = app.MapGroup("/workspaces/{workspaceId:guid}/nooks").WithTags("Nooks");
         workspaceNooks.MapPost("/", Create);
         workspaceNooks.MapGet("/", List);
+        app.MapGet("/workspaces/{workspaceId:guid}/providers", ListProviders).WithTags("Nooks");
 
         RouteGroupBuilder nooks = app.MapGroup("/nooks").WithTags("Nooks");
         nooks.MapGet("/{id:guid}", Get);
@@ -47,7 +48,7 @@ internal static class NooksEndpoints
         return nooks;
     }
 
-    /// <summary>Creates a nook in the workspace on the named provider, such as <c>docker</c>; it starts in the background.</summary>
+    /// <summary>Creates a nook in the workspace on one of its providers, such as <c>docker</c>; it starts in the background.</summary>
     private static async Task<Results<Created<NookSummary>, ProblemHttpResult>> Create(
         [FromRoute] Guid workspaceId,
         [FromBody] CreateNookRequest request,
@@ -57,6 +58,17 @@ internal static class NooksEndpoints
     {
         Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider), ct);
         return result.ToCreated(nook => string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Id.Value}"));
+    }
+
+    /// <summary>The providers the workspace's nooks can run on, with the ID <c>provider</c> takes when creating one.</summary>
+    private static async Task<Results<Ok<IReadOnlyList<ProviderSummary>>, ProblemHttpResult>> ListProviders(
+        [FromRoute] Guid workspaceId,
+        ClaimsPrincipal principal,
+        [FromServices] INooksApi api,
+        CancellationToken ct)
+    {
+        Result<IReadOnlyList<ProviderSummary>> result = await api.ListProvidersAsync(principal.ToActor(), WorkspaceId.From(workspaceId), ct);
+        return result.ToOk();
     }
 
     /// <summary>The workspace's nooks, newest first.</summary>
