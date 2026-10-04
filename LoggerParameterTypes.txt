@@ -1,0 +1,4 @@
+# Every log message placeholder name, with the only types it may carry (Meziantou MA0124, MA0135).
+# One name means one thing across all modules, so log fields line up in telemetry.
+# Format: Name;Type1;Type2   (CLR metadata names, e.g. System.Guid or System.Nullable{System.Int32})
+# Add a line in the same change that introduces a new placeholder.

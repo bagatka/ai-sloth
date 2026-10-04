@@ -4,19 +4,28 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
-namespace Microsoft.Extensions.Hosting;
+namespace Bagatka.ServiceDefaults;
 
-public static class Extensions
+/// <summary>
+/// Defaults every service host shares: OpenTelemetry, health checks, and service discovery.
+/// </summary>
+public static class ServiceDefaultsExtensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
 
+    /// <summary>
+    /// Registers OpenTelemetry (exported over OTLP when <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> is set),
+    /// the default health checks, and HTTPS-only service discovery for HTTP clients.
+    /// HTTP resilience is not added here: retries are configured per integration.
+    /// </summary>
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
@@ -139,6 +148,10 @@ public static class Extensions
         return builder;
     }
 
+    /// <summary>
+    /// Maps <c>/health</c> (every check) and <c>/alive</c> (liveness checks only).
+    /// Both are anonymous, so they belong on a port that is not exposed to the internet.
+    /// </summary>
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
         RouteGroupBuilder healthChecks = app.MapGroup("");

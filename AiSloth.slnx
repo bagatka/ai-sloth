@@ -1,19 +1,10 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/Aspire/">
-    <Project Path="src/Aspire/AiSloth.Aspire.AppHost/AiSloth.Aspire.AppHost.csproj" />
-    <Project Path="src/Aspire/AiSloth.Aspire.ServiceDefaults/AiSloth.Aspire.ServiceDefaults.csproj" />
+    <Project Path="src/Aspire/Bagatka.AiSloth.AppHost/Bagatka.AiSloth.AppHost.csproj" />
+    <Project Path="src/Aspire/Bagatka.ServiceDefaults/Bagatka.ServiceDefaults.csproj" />
   </Folder>
-  <Folder Name="/src/Platform/">
-    <Project Path="src/Platform/AiSloth.Platform.WebApi/AiSloth.Platform.WebApi.csproj" />
+  <Folder Name="/src/ControlPlane/">
+    <Project Path="src/ControlPlane/Bagatka.AiSloth.WebApi/Bagatka.AiSloth.WebApi.csproj" />
   </Folder>
-  <Folder Name="/src/Platform/Modules/" />
-  <Folder Name="/src/Platform/Modules/Workspaces/">
-    <Project Path="src/Platform/Modules/Workspaces/AiSloth.Platform.Workspaces.Application/AiSloth.Platform.Workspaces.Application.csproj" />
-    <Project Path="src/Platform/Modules/Workspaces/AiSloth.Platform.Workspaces.Contracts/AiSloth.Platform.Workspaces.Contracts.csproj" />
-    <Project Path="src/Platform/Modules/Workspaces/AiSloth.Platform.Workspaces.Domain/AiSloth.Platform.Workspaces.Domain.csproj" />
-    <Project Path="src/Platform/Modules/Workspaces/AiSloth.Platform.Workspaces.Endpoints/AiSloth.Platform.Workspaces.Endpoints.csproj" />
-    <Project Path="src/Platform/Modules/Workspaces/AiSloth.Platform.Workspaces.Infrastructure/AiSloth.Platform.Workspaces.Infrastructure.csproj" />
-  </Folder>
-  <Folder Name="/src/Sdk/" />
 </Solution>

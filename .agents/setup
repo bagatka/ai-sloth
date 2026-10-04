@@ -41,3 +41,7 @@ fi
 printf '\n==> Restore locked NuGet dependencies\n'
 time nix develop --no-write-lock-file --command \
   dotnet restore AiSloth.slnx --locked-mode
+
+printf '\n==> Restore pinned .NET tools (Aspire CLI)\n'
+time nix develop --no-write-lock-file --command \
+  dotnet tool restore

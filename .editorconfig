@@ -21,32 +21,58 @@ csharp_prefer_braces = true
 dotnet_style_readonly_field = true
 
 # Build warnings become errors via Directory.Build.props.
+dotnet_diagnostic.IDE0005.severity = warning
 dotnet_diagnostic.IDE0008.severity = warning
 dotnet_diagnostic.IDE0040.severity = warning
 dotnet_diagnostic.IDE0011.severity = warning
 dotnet_diagnostic.IDE0044.severity = warning
 
-# Forward cancellation to downstream operations.
-dotnet_diagnostic.CA2016.severity = warning
+# Culture-sensitive formatting must be explicit, including inside interpolated strings.
+dotnet_diagnostic.MA0075.severity = warning
+dotnet_diagnostic.MA0076.severity = warning
 
-# Dispose resources owned by the current scope or object.
-dotnet_diagnostic.CA2000.severity = warning
-dotnet_diagnostic.CA2213.severity = warning
+# Every log placeholder must be registered in LoggerParameterTypes.txt.
+dotnet_diagnostic.MA0135.severity = warning
 
-# Choose string comparison semantics explicitly.
-dotnet_diagnostic.CA1307.severity = warning
-dotnet_diagnostic.CA1310.severity = warning
+# Switches over enums are exhaustive: naming every member is enough, and a missing member fails
+# the build (CS8509). CS8524 would otherwise force a discard arm that hides new members.
+dotnet_diagnostic.CS8524.severity = none
+# Enums start at 1, so default(T) is never a valid member.
+dotnet_diagnostic.CA1008.severity = none
 
-# Preserve structured logging by keeping message templates static.
-dotnet_diagnostic.CA2254.severity = warning
+# CA2000: passing a disposable to a constructor that takes ownership (HttpClient with
+# disposeHandler: true, NetworkStream with ownsSocket: true) transfers disposal to the new object.
+dotnet_code_quality.CA2000.dispose_ownership_transfer_at_constructor = true
 
-# Require explicit ConfigureAwait only in reusable SDKs.
+# Rules turned off because they conflict with this codebase's design.
+# CA1062: nullable reference types already reject null arguments at compile time.
+dotnet_diagnostic.CA1062.severity = none
+# CA1716: guards Visual Basic callers, which this code never has.
+dotnet_diagnostic.CA1716.severity = none
+# CA1812: internal classes are created by DI registrations it cannot see.
+dotnet_diagnostic.CA1812.severity = none
+# CA1815: fires on union types; MA0065 still flags real use of default struct equality.
+dotnet_diagnostic.CA1815.severity = none
+# CA2007, MA0004: ConfigureAwait is required only in reusable SDKs (see below).
+dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.MA0004.severity = none
 
-[src/Sdk/**/*.cs]
+[src/Sdk/**.cs]
 dotnet_diagnostic.MA0004.severity = warning
 MA0004.report = Always
 
-[src/Aspire/AiSloth.Aspire.AppHost/AppHost.cs]
+[src/Aspire/Bagatka.AiSloth.AppHost/AppHost.cs]
 # Keep Aspire's entry-point filename despite the generated Program type.
 dotnet_diagnostic.MA0048.severity = none
+
+[tests/**.cs]
+# Test methods are sentences (Rename_fails_for_deactivated_user) and are never called by code.
+dotnet_diagnostic.CA1707.severity = none
+# xUnit requires public test classes, and test projects are executables.
+dotnet_diagnostic.CA1515.severity = none
+# Tests are not public API.
+dotnet_diagnostic.CS1591.severity = none
+
+[tests/Bagatka.AiSloth.ArchitectureTests/TestCultureTests.cs]
+# The canary must read the current culture to prove tests run under tr-TR.
+dotnet_diagnostic.RS0030.severity = none

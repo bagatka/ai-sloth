@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.5.3">
+<Project Sdk="Aspire.AppHost.Sdk/13.6.0">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -6,5 +6,9 @@
     <AspireCliInvocationMode>DnxPinned</AspireCliInvocationMode>
     <UserSecretsId>6452ea93-1e88-429f-8b6f-aa4e523d6387</UserSecretsId>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\ControlPlane\Bagatka.AiSloth.WebApi\Bagatka.AiSloth.WebApi.csproj" />
+  </ItemGroup>
 
 </Project>

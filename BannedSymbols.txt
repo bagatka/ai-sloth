@@ -1,0 +1,13 @@
+P:System.DateTime.Now;Use TimeProvider
+P:System.DateTime.UtcNow;Use TimeProvider
+P:System.DateTime.Today;Use TimeProvider and an explicit time zone
+P:System.DateTimeOffset.Now;Use TimeProvider
+P:System.DateTimeOffset.UtcNow;Use TimeProvider
+P:System.TimeZoneInfo.Local;Use an explicit time zone
+M:System.DateTime.ToLocalTime;Use an explicit time zone
+M:System.DateTimeOffset.ToLocalTime;Use an explicit time zone
+P:System.Globalization.CultureInfo.CurrentCulture;Pass a CultureInfo explicitly
+P:System.Globalization.CultureInfo.CurrentUICulture;Pass a CultureInfo explicitly
+P:System.Threading.Thread.CurrentCulture;Pass a CultureInfo explicitly
+P:System.Threading.Thread.CurrentUICulture;Pass a CultureInfo explicitly
+M:System.Guid.NewGuid;Use <TypedId>.New()

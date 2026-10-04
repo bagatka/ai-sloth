@@ -7,12 +7,17 @@
 
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- MSBuild and NuGet warnings fail local builds the same way they fail CI. -->
+    <MSBuildTreatWarningsAsErrors>true</MSBuildTreatWarningsAsErrors>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>11.0</AnalysisLevel>
-    <AnalysisMode>Recommended</AnalysisMode>
+    <!-- Every rule is on; the few that conflict with this codebase are turned off in .editorconfig with a reason. -->
+    <AnalysisMode>All</AnalysisMode>
     <!-- Keep style rules opt-in via .editorconfig instead of enabling every style preference. -->
     <AnalysisModeStyle>Default</AnalysisModeStyle>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- Required for IDE0005 (unnecessary usings) in builds; also makes CS1591 demand docs on public API. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -20,4 +25,9 @@
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)LoggerParameterTypes.txt" />
+  </ItemGroup>
 </Project>
