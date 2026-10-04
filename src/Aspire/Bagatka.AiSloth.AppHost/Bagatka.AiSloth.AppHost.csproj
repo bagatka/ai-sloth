@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\ControlPlane\Bagatka.AiSloth.WebApi\Bagatka.AiSloth.WebApi.csproj" />
   </ItemGroup>
 

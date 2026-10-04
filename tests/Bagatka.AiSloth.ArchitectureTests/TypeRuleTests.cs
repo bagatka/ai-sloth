@@ -49,8 +49,9 @@ public sealed class TypeRuleTests
     [Fact]
     public void No_class_derives_from_another_project_class()
     {
+        // gRPC requires a service to derive from the base generated from its .proto file.
         List<string> offenders = CheckedTypes()
-            .Where(type => type.IsClass && type.BaseType is not null && IsProjectAssembly(type.BaseType.Assembly))
+            .Where(type => type.IsClass && type.BaseType is not null && IsProjectAssembly(type.BaseType.Assembly) && !IsGrpcServiceBase(type.BaseType))
             .Select(type => (type.FullName ?? type.Name) + " : " + type.BaseType!.FullName)
             .ToList();
 
@@ -62,6 +63,11 @@ public sealed class TypeRuleTests
         return ThisProject.ProjectReferences
             .Select(name => Assembly.Load(new AssemblyName(name)))
             .SelectMany(assembly => assembly.GetTypes());
+    }
+
+    private static bool IsGrpcServiceBase(Type type)
+    {
+        return type.GetCustomAttributesData().Any(attribute => string.Equals(attribute.AttributeType.FullName, "Grpc.Core.BindServiceMethodAttribute", StringComparison.Ordinal));
     }
 
     private static bool IsProjectAssembly(Assembly assembly)

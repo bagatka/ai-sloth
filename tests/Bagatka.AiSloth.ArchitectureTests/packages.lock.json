@@ -318,7 +318,12 @@
       "bagatka.aisloth.webapi": {
         "type": "Project",
         "dependencies": {
-          "Bagatka.ServiceDefaults": "[1.0.0, )"
+          "Bagatka.AiSloth.DaemonProtocol": "[1.0.0, )",
+          "Bagatka.AiSloth.Nooks": "[1.0.0, )",
+          "Bagatka.AiSloth.Workspaces": "[1.0.0, )",
+          "Bagatka.Sandboxing.Docker": "[1.0.0, )",
+          "Bagatka.ServiceDefaults": "[1.0.0, )",
+          "Grpc.AspNetCore.Server": "[2.84.0, )"
         }
       },
       "bagatka.aisloth.workspaces": {
@@ -390,6 +395,15 @@
         "requested": "[3.36.2, )",
         "resolved": "3.36.2",
         "contentHash": "Ci1q1iJg74qAE5riTA2FbMS0wPbpruPQI/JQ9DrAsRo2VsSxgt1e/pmxGxgrci+pXJEgrSYg2vPl8rrStZkclQ=="
+      },
+      "Grpc.AspNetCore.Server": {
+        "type": "CentralTransitive",
+        "requested": "[2.84.0, )",
+        "resolved": "2.84.0",
+        "contentHash": "RXUkMjU+Hu5tvf5EXNoJlKX+ADvR2HERkNRznMFpsQQiHFsaQ+OYyhgomuLxAaiNuPUmCUGPxyiCdqq//lrQdg==",
+        "dependencies": {
+          "Grpc.Net.Common": "2.84.0"
+        }
       },
       "Grpc.Core.Api": {
         "type": "CentralTransitive",

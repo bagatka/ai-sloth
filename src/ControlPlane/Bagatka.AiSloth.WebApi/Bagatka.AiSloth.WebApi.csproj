@@ -1,7 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore.Server" />
+    <!-- For `dotnet ef migrations add`; never part of the published app. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\Aspire\Bagatka.ServiceDefaults\Bagatka.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\Daemon\Bagatka.AiSloth.DaemonProtocol\Bagatka.AiSloth.DaemonProtocol.csproj" />
+    <ProjectReference Include="..\..\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
+    <ProjectReference Include="..\Modules\Nooks\Bagatka.AiSloth.Nooks\Bagatka.AiSloth.Nooks.csproj" />
+    <ProjectReference Include="..\Modules\Workspaces\Bagatka.AiSloth.Workspaces\Bagatka.AiSloth.Workspaces.csproj" />
   </ItemGroup>
 
 </Project>

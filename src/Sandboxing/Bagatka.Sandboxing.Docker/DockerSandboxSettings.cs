@@ -34,6 +34,9 @@ public sealed record DockerSandboxSettings
     /// <summary>Where the Docker Engine listens.</summary>
     public DockerClientSettings Client { get; }
 
+    /// <summary>The Docker Engine's Unix socket; configuration binds it by this name.</summary>
+    public Uri Endpoint => Client.Endpoint;
+
     /// <summary>The deployment this provider serves.</summary>
     public string Scope { get; }
 }
