@@ -12,20 +12,26 @@ and record why in the client's README.
 ## Rules
 
 - **Naming and dependencies.**
-  - Name the project `Company.Sdk.<Vendor>`.
-  - It references only .NET, approved packages, and `Company.Platform`. Never `Company.Product.*`.
+  - Name the project `Bagatka.Sdk.<Vendor>`.
+  - It references only .NET, approved packages, and `Bagatka.Foundation`. Never `Bagatka.AiSloth.*`.
 - **Vendor-shaped.**
   - Types and methods mirror the vendor's API and vocabulary.
   - Product concepts never appear here. The module that uses the client does the translation.
 - **Minimal surface.** Cover only the endpoints a product actually uses. Add more when needed.
 - **Registration.** Expose one client class (or a few, one per vendor API area), registered with
-  one extension: `services.Add<Vendor>Client(...)`.
+  one extension that takes the client's settings: `services.Add<Vendor>Client(settings)`, in a
+  static class named `<Vendor>ClientRegistration`.
 - **HTTP and resilience.**
-  - Use a typed `HttpClient` through `IHttpClientFactory`, with the standard resilience handler.
+  - For a remote service, use a typed `HttpClient` through `IHttpClientFactory`, with the standard
+    resilience handler.
+  - For a local socket, such as the Docker Engine's, the client may own one `HttpClient` and skip
+    retries.
   - Nothing outside the client retries vendor calls.
   - Retry only idempotent requests, or requests carrying a vendor idempotency key.
-- **Options.** An options class, bound by the caller and validated at startup. Secrets come from
-  options, never from code.
+- **Settings.** One immutable settings record that validates itself in its constructor, passed by
+  the host (`PATTERNS.md`, entry 20). The client never reads `IConfiguration`, section names, or
+  environment variables, so it works in any app and could be published to NuGet unchanged. Secrets
+  come from settings, never from code.
 - **Calls.**
   - `CancellationToken` on every method.
   - No static state, and no singletons holding per-request data.
@@ -42,9 +48,9 @@ and record why in the client's README.
 
 ## Tests
 
-- Test against recorded vendor responses, using a fake `HttpMessageHandler`.
-- Live smoke tests are optional. They are opt-in through an environment variable and never run
-  in CI by default.
+- When the real service is free and local, such as the Docker Engine, test against it.
+- Otherwise, test against recorded vendor responses, using a fake `HttpMessageHandler`. Live smoke
+  tests are opt-in and never run in CI by default.
 
 ## Each client's README
 
