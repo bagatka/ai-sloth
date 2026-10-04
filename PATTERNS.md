@@ -527,10 +527,11 @@ Canonical example: `src/Foundation/Bagatka.Foundation/Actor.cs`.
 - **Rules switch over the actor's cases exhaustively.** A new kind of actor then fails the build
   in every rule that doesn't handle it.
 - **Identity, not permissions.** The actor carries who is calling, never what they may do.
-- **Agents.** An `AgentActor`, added with chats, acts for the user who sent the current message,
-  within that chat's workspace. Rules decide what agents may do like any other case; sensitive
-  operations an agent attempts (inviting members, deleting, billing, permissions) need a human's
-  confirmation.
+- **Agents.** Inside its nook, a chat's agent is a process Chats runs as `system:chats.harness`.
+  An `AgentActor` comes with MCP, when agents reach the public API: rules decide what agents may do
+  like any other case, and sensitive operations an agent attempts (inviting members, deleting,
+  billing, permissions) need a human's confirmation. Whose rights it carries is decided then: with
+  several people steering one turn, "whoever sent the current message" is not one person.
 - **Passing actors along.**
   - Calls between modules on behalf of a user pass that user's actor along.
   - Reactions and jobs use a named system actor. Grep `ForSystem` to find every one of them.
@@ -789,7 +790,9 @@ Canonical example: `src/ControlPlane/Bagatka.AiSloth.WebApi/Endpoints/Workspaces
   `FoundationJson.Options`: camelCase, enums as strings, numbers only as numbers, and required
   constructor arguments and non-nullable values enforced.
 - **Streams.** A contract stream becomes server-sent events (`TypedResults.ServerSentEvents`), one
-  event type per union case, such as `output` and `exit` when watching a process.
+  event type per union case, such as `output` and `exit` when watching a process. The stream
+  flushes the response headers before its first item, so a client watching something quiet knows
+  it is connected. Canonical example: `Watch` in `src/ControlPlane/Bagatka.AiSloth.WebApi/Endpoints/ChatsEndpoints.cs`.
 - **Screens.** A response that combines several modules lives in `Composition/`. Inbound
   webhooks verify their signature with the Sdk client, then call the owning module with a
   system actor.

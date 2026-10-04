@@ -81,7 +81,9 @@ restoring; restoring during a publish for a runtime would rewrite the protocol p
     dotnet publish src/Daemon/Bagatka.AiSloth.Daemon -c Release -r linux-x64 --no-restore
 
 The nook image (`Dockerfile`) does the same inside the SDK image that `global.json` pins, and
-installs the binary as `/usr/local/bin/slothd` under tini, on Ubuntu with git. Build it from the
+installs the binary as `/usr/local/bin/slothd` under tini, on Ubuntu with git. It also carries the
+harnesses agents run in, with Node.js: Claude Code's ACP adapter, `claude-agent-acp`, whose version
+is pinned there; Claude Code's own binary makes most of the image's size. Build it from the
 repository root with `docker build -f src/Daemon/Dockerfile -t aisloth-nook .`; the AppHost builds
 it as `aisloth-nook:dev`.
 

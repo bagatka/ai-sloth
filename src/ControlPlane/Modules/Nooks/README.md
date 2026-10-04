@@ -9,8 +9,9 @@ templates, runs processes in them through their daemons, and checkpoints and for
 
 - **Data:** nook records (workspace, provider, sources, status, latest disk usage), the hash of
   each nook's daemon token, the processes started in each nook, templates, and checkpoints.
-- **Rules:** who may use a nook (members of its workspace), the lifecycle below, when an idle nook
-  is suspended, and which providers a workspace's nooks may run on.
+- **Rules:** who may use a nook (members of its workspace, and the control plane's own processes,
+  such as Chats running an agent), the lifecycle below, when an idle nook is suspended, and which
+  providers a workspace's nooks may run on.
 - **Integrations:** sandbox providers (`src/Sandboxing`), registered by the host.
 - **Runtime state:** each running nook's daemon connection and active watches, in the memory of
   the instance the daemon dialed.
@@ -121,6 +122,8 @@ and memory. The idle period before suspension comes with suspension.
   sandbox at a provider has a record. Reconciliation finishes what a failed call left undone.
 - **Suspension is invisible.** Every operation on a paused or stopped nook resumes it first and
   waits for its daemon, so callers only notice latency.
+- **A process's environment is never stored.** Variables passed to a process may hold secrets, such
+  as an agent's token: they reach the daemon and nothing keeps them.
 - **Processes are detached.** A process runs until it exits or is stopped. Watches come and go, and
   a control-plane deploy only makes the daemon reconnect; nothing it started stops.
 - **Output is never silently lost where it matters.** A process started with `Complete` retention

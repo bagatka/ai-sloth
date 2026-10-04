@@ -42,8 +42,11 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Workspace | Where people work together and what owns nooks, like a Slack workspace: a personal one, a company one | Workspaces | organization, team, tenant |
 | Member | A user's membership in a workspace, with a role | Workspaces | participant, seat |
 | Nook | Where agents work: an isolated machine with its files and processes, owned by a workspace. With its chats, the basic unit. A provider's sandbox underneath. | Nooks | sandbox, orb, VM, container, environment, workspace |
-| Chat | A conversation between people and a coding agent working in one nook | Chats (planned) | thread, session, conversation |
-| Turn | One message in a chat and everything the agent did in reply | Chats (planned) | step, exchange |
+| Chat | A conversation between people and a coding agent working in one nook | Chats | thread, session, conversation |
+| Turn | One message in a chat and everything the agent did in reply, ending with a stop reason | Chats | step, exchange |
+| Steering | A message sent during a turn going into that turn, so the agent reads it while it works | Chats | interrupt, injection |
+| Stop | Ending the running turn at once; messages the agent hasn't received are cancelled | Chats | cancel (in the product), abort, interrupt |
+| Model gateway | The WebApi endpoint agents call the model provider through; it adds the deployment's key, so no nook holds one | WebApi, Chats | LLM proxy, API proxy |
 | Checkpoint | A nook's source files saved at one moment, such as after a turn | Nooks (planned) | snapshot, backup |
 | Fork | A new nook started from a checkpoint, with the chat resumed up to that point | Nooks, Chats (planned) | clone, copy, branch |
 | Source | Where some of a nook's files come from, mounted at `/work/<name>`: a repository or a folder | Sources (planned) | repo (for both kinds), mount |
@@ -53,7 +56,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Recipe | A source's setup script, safe to run again, owned by AiSloth and versioned | Sources (planned) | setup script, bootstrap, skill |
 | Template | A snapshot of a nook right after its recipes ran, used to start new nooks fast | Nooks (planned) | image, cache, warm pool |
 | Project | An optional group of nooks, chats, and sources for a team working toward one goal | Projects (planned) | space, board, workspace |
-| Harness | The program that runs a coding agent, such as Claude Code or Codex | Chats (planned) | agent (that's what it runs), CLI, client |
+| Harness | The program that runs a coding agent, such as Claude Code or Codex; in a nook, through its ACP adapter | Chats | agent (that's what it runs), CLI, client |
 | Harness profile | Where one harness keeps state between sessions, and which parts AiSloth saves | Chats (planned) | adapter, plugin |
 | Harness state | The files a harness keeps between sessions, such as its memory, saved and restored by AiSloth | Chats (planned) | memory (ours), context |
 | Paused | A nook whose compute is released with memory and files kept; it resumes in about a second and processes continue | Nooks | hibernated, sleeping, hot |

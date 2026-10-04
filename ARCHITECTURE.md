@@ -69,8 +69,8 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 
 | Part | Projects | Purpose | Status |
 |---|---|---|---|
-| WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Sign-in, public API for users, workspaces, machines, and nooks, the gRPC endpoint daemons and machines dial, `migrate` |
-| Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, Machines, and Nooks built |
+| WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Sign-in, public API for users, workspaces, machines, nooks, and chats, the gRPC endpoint daemons and machines dial, the model gateway, `migrate` |
+| Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, Machines, Nooks, and Chats built |
 | Sandboxing | `Bagatka.Sandboxing` + `.<Provider>`, `.Remote` | Provider contract, conformance tests, one project per compute backend, remote calls | Contract, Docker provider, remote calls |
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |
 | CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API; its machine mode runs nooks on people's own computers | Machine mode built; the rest planned |
@@ -164,8 +164,9 @@ The HTTP host of the control plane and its composition root. It has four jobs:
 
 It owns no business rules and touches no database. It references module projects only to call
 their registration in `Program.cs`. Everything else in a module is `internal` and unreachable.
-It also hosts an HTTP/2-only gRPC endpoint that every nook's daemon and every machine dial, and will
-host the MCP endpoint, which exposes the same public operations as HTTP. Run with the single argument
+It also hosts an HTTP/2-only gRPC endpoint that every nook's daemon and every machine dial, the
+model gateway agents in nooks call the model provider through (on its own plain HTTP endpoint,
+adding the deployment's key, so no nook holds one), and will host the MCP endpoint, which exposes the same public operations as HTTP. Run with the single argument
 `migrate`, it applies every module's migrations and exits. Canonical example:
 `src/ControlPlane/Bagatka.AiSloth.WebApi/Program.cs`.
 
@@ -432,6 +433,6 @@ this table in the same change.
 | Workspaces (contract only) | Workspaces, their members and roles | — | — | `workspaces` |
 | Nooks (contract only) | Nooks, where each runs, their lifecycle, processes, templates, checkpoints, daemon connections | Workspaces, Sources, Machines | — | `nooks` |
 | Sources (planned) | Repositories and folders, their recipes, delivery, push policy | Workspaces | — | `sources` |
-| Chats (planned) | ACP conversations in nooks, turns, harness profiles and state | Nooks, Workspaces | — | `chats` |
+| Chats | ACP conversations in nooks, their messages and events, the agents' runners; harness profiles and state (planned) | Nooks, Workspaces | — | `chats` |
 | Machines | Computers workspaces add to run nooks, their credentials and connections, the `machine` provider | Workspaces | — | `machines` |
 | Projects (planned, extension) | Groups of nooks, chats, and sources, shared context, project chat | Nooks, Chats, Sources, Workspaces | Nooks, Chats | `projects` |
