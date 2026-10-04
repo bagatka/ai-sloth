@@ -251,11 +251,6 @@
           "Microsoft.Extensions.FileProviders.Physical": "10.0.12"
         }
       },
-      "Microsoft.Extensions.DependencyInjection": {
-        "type": "Transitive",
-        "resolved": "10.0.12",
-        "contentHash": "lXyK2O5GoYvfxW8eCFcD16JFbcoSTM1sJkAM0UHS1jZyl9NYMW64Tqm6OQFT0IDBjZi+xHt95/Zg+nxZhGFhZg=="
-      },
       "Microsoft.Extensions.Diagnostics": {
         "type": "Transitive",
         "resolved": "10.0.12",
@@ -528,6 +523,12 @@
         "type": "Transitive",
         "resolved": "18.1.0",
         "contentHash": "5K+9KFg2TdTl7VXv88Qzi/0lqK6JFoNP3lRuImPYGRV7K/QYklDyTrj4+A+KAki1JsQi6qKY+hDyY7d6WRqjrw=="
+      },
+      "Microsoft.Extensions.DependencyInjection": {
+        "type": "CentralTransitive",
+        "requested": "[11.0.0-rc.1.26425.128, )",
+        "resolved": "10.0.12",
+        "contentHash": "lXyK2O5GoYvfxW8eCFcD16JFbcoSTM1sJkAM0UHS1jZyl9NYMW64Tqm6OQFT0IDBjZi+xHt95/Zg+nxZhGFhZg=="
       },
       "OpenTelemetry.Exporter.OpenTelemetryProtocol": {
         "type": "CentralTransitive",

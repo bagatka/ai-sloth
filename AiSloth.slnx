@@ -10,11 +10,17 @@
   <Folder Name="/src/Foundation/">
     <Project Path="src/Foundation/Bagatka.Foundation/Bagatka.Foundation.csproj" />
   </Folder>
+  <Folder Name="/src/Sandboxing/">
+    <File Path="src/Sandboxing/README.md" />
+    <Project Path="src/Sandboxing/Bagatka.Sandboxing.Docker/Bagatka.Sandboxing.Docker.csproj" />
+    <Project Path="src/Sandboxing/Bagatka.Sandboxing/Bagatka.Sandboxing.csproj" />
+  </Folder>
   <Folder Name="/src/Sdk/">
     <File Path="src/Sdk/README.md" />
     <Project Path="src/Sdk/Bagatka.Sdk.Docker/Bagatka.Sdk.Docker.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Bagatka.Foundation.Tests/Bagatka.Foundation.Tests.csproj" />
+    <Project Path="tests/Bagatka.Sandboxing.ConformanceTests/Bagatka.Sandboxing.ConformanceTests.csproj" />
   </Folder>
 </Solution>

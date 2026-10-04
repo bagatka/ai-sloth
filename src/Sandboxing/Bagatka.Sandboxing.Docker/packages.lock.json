@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net11.0": {
+      "Meziantou.Analyzer": {
+        "type": "Direct",
+        "requested": "[3.0.294, )",
+        "resolved": "3.0.294",
+        "contentHash": "j78ENG75OozcuL0OPSIjvgLaYI4F5nS8mpK02PlXCCCXj8A4CAIfpKw27ZPvG4k8TweGqParV8Dwm2VAwBBmgg=="
+      },
+      "Microsoft.CodeAnalysis.BannedApiAnalyzers": {
+        "type": "Direct",
+        "requested": "[5.6.0, )",
+        "resolved": "5.6.0",
+        "contentHash": "Kcobt3pnOdO0A+6CKiMHZdTEluJpsfxiV20axtZdmfBQnDmiWTKPJADlgAfdTuKNAnVarrkJa0UEGwuOo91muw=="
+      },
+      "bagatka.foundation": {
+        "type": "Project"
+      },
+      "bagatka.sandboxing": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
+      "bagatka.sdk.docker": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      }
+    }
+  }
+}
