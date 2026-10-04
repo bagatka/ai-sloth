@@ -28,6 +28,11 @@
     <File Path="src/ControlPlane/Modules/Workspaces/README.md" />
     <Project Path="src/ControlPlane/Modules/Workspaces/Bagatka.AiSloth.Workspaces.Contracts/Bagatka.AiSloth.Workspaces.Contracts.csproj" />
   </Folder>
+  <Folder Name="/src/Daemon/">
+    <File Path="src/Daemon/README.md" />
+    <Project Path="src/Daemon/Bagatka.AiSloth.Daemon/Bagatka.AiSloth.Daemon.csproj" />
+    <Project Path="src/Daemon/Bagatka.AiSloth.DaemonProtocol/Bagatka.AiSloth.DaemonProtocol.csproj" />
+  </Folder>
   <Folder Name="/src/Foundation/">
     <Project Path="src/Foundation/Bagatka.Foundation/Bagatka.Foundation.csproj" />
   </Folder>
@@ -41,6 +46,7 @@
     <Project Path="src/Sdk/Bagatka.Sdk.Docker/Bagatka.Sdk.Docker.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Bagatka.AiSloth.Daemon.Tests/Bagatka.AiSloth.Daemon.Tests.csproj" />
     <Project Path="tests/Bagatka.Foundation.Tests/Bagatka.Foundation.Tests.csproj" />
     <Project Path="tests/Bagatka.Sandboxing.ConformanceTests/Bagatka.Sandboxing.ConformanceTests.csproj" />
   </Folder>

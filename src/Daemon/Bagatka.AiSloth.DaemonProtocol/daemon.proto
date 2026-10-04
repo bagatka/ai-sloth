@@ -1,0 +1,143 @@
+// The protocol between the control plane and slothd, the daemon in every nook.
+// This file is the single source: the control plane's endpoint and the daemon's client are both
+// generated from it. Change it additively; a breaking change is a new package version (v2).
+
+syntax = "proto3";
+
+package bagatka.aisloth.daemon.v1;
+
+option csharp_namespace = "Bagatka.AiSloth.DaemonProtocol.V1";
+
+// The endpoint the daemon dials. The control plane never connects to a nook, so no nook needs
+// inbound networking. Every call authenticates with the metadata "authorization: Bearer <token>",
+// where the token comes from the SLOTHD_TOKEN environment variable.
+//
+// Processes are detached: they run until they exit or are stopped, whatever happens to these calls.
+// A deploy or a network blip only makes the daemon reconnect.
+service ControlPlane {
+  // The control stream: one per nook, small messages only. The daemon opens it at startup, sends
+  // Hello first, and reconnects with backoff when it drops. A newer stream for the same nook
+  // replaces an older one.
+  rpc Connect(stream DaemonEvent) returns (stream DaemonInstruction);
+
+  // One call per WatchOutput instruction, carrying bulk output on its own HTTP/2 stream, so a busy
+  // process never delays instructions. The first message is the header; the call ends when the
+  // process has exited and its output is delivered, or when the control plane cancels it.
+  rpc UploadOutput(stream OutputUploadMessage) returns (OutputUploadResult);
+}
+
+// Sent by the daemon on the control stream.
+message DaemonEvent {
+  oneof event {
+    Hello hello = 1;
+    ProcessExited process_exited = 2;
+  }
+}
+
+// The first event on every control stream.
+message Hello {
+  // The nook ID from the SLOTHD_NOOK_ID environment variable, as a UUID string.
+  string nook_id = 1;
+  string daemon_version = 2;
+  // Processes still running, so the control plane picks them up again after a reconnect. Processes
+  // that exited while disconnected are reported as ProcessExited right after Hello.
+  repeated RunningProcess running_processes = 3;
+}
+
+message RunningProcess {
+  string process_id = 1;
+  // How many bytes of output the process has written so far.
+  int64 output_length = 2;
+}
+
+// Always the last thing reported about a process. A program that couldn't start exits with 127
+// and says why on standard error.
+message ProcessExited {
+  string process_id = 1;
+  int32 exit_code = 2;
+}
+
+// Sent by the control plane on the control stream.
+message DaemonInstruction {
+  oneof instruction {
+    StartProcess start_process = 1;
+    StopProcess stop_process = 2;
+    SendInput send_input = 3;
+    WatchOutput watch_output = 4;
+    Reconnect reconnect = 5;
+  }
+}
+
+// Start a program directly, without a shell, and keep its output as the retention says.
+message StartProcess {
+  string process_id = 1;
+  string command = 2;
+  repeated string arguments = 3;
+  // Empty means the daemon's default directory.
+  string working_directory = 4;
+  OutputRetention retention = 5;
+}
+
+// How a process's output is kept. Files are never affected: this is only what the process prints.
+enum OutputRetention {
+  OUTPUT_RETENTION_UNSPECIFIED = 0;
+  // Keep at least the last 16 MiB; older output may be dropped, like a terminal's scrollback.
+  OUTPUT_RETENTION_RECENT = 1;
+  // Drop nothing: keep output until it is delivered, plus the last 16 MiB delivered. When 64 MiB is
+  // waiting undelivered, stop reading the process so it blocks until something reads.
+  OUTPUT_RETENTION_COMPLETE = 2;
+}
+
+// Stop a process: first politely, then forcibly. Its ProcessExited still follows.
+message StopProcess {
+  string process_id = 1;
+}
+
+// Write to a running process's standard input, at most 64 KiB.
+message SendInput {
+  string process_id = 1;
+  bytes data = 2;
+}
+
+// Open an UploadOutput call for this watch and send the process's output from the offset: first
+// what was kept, then live. An offset that is no longer kept starts at the earliest byte kept.
+message WatchOutput {
+  string watch_id = 1;
+  string process_id = 2;
+  int64 from_offset = 3;
+}
+
+// This control-plane instance is shutting down: reconnect now, and the next connection reaches
+// another instance. Running processes are unaffected.
+message Reconnect {
+}
+
+message OutputUploadMessage {
+  oneof part {
+    OutputUploadHeader header = 1;
+    ProcessOutput output = 2;
+  }
+}
+
+message OutputUploadHeader {
+  string nook_id = 1;
+  string watch_id = 2;
+}
+
+// A chunk of a process's output, at most 64 KiB. Standard output and standard error share one
+// sequence of offsets.
+message ProcessOutput {
+  string process_id = 1;
+  int64 offset = 2;
+  OutputChannel channel = 3;
+  bytes data = 4;
+}
+
+enum OutputChannel {
+  OUTPUT_CHANNEL_UNSPECIFIED = 0;
+  OUTPUT_CHANNEL_STANDARD_OUTPUT = 1;
+  OUTPUT_CHANNEL_STANDARD_ERROR = 2;
+}
+
+message OutputUploadResult {
+}

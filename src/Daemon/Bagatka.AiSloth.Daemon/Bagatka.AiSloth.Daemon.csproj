@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Published as a single Native AOT binary, which the nook image installs as slothd; the
+         trimming and AOT analyzers run on every build. -->
+    <PublishAot>true</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+    <!-- Every restore includes these, so a publish for either one can skip restoring and the lock
+         file stays the same. -->
+    <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
+    <!-- Required by the LibraryImport source generator that sends SIGTERM. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Bagatka.AiSloth.Daemon.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Bagatka.AiSloth.DaemonProtocol\Bagatka.AiSloth.DaemonProtocol.csproj" />
+  </ItemGroup>
+
+</Project>
