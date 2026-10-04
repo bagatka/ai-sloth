@@ -14,7 +14,7 @@ Things a reader might expect here that live elsewhere, and where they live.
 
 ## Contract
 
-`I<Module>Api` in `Company.Product.<Module>.Contracts`. In two or three sentences, describe
+`I<Module>Api` in `Bagatka.AiSloth.<Module>.Contracts`. In two or three sentences, describe
 what callers use it for. Don't list the methods; the interface does that.
 
 ## Asks

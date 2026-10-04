@@ -7,6 +7,27 @@
   <Folder Name="/src/ControlPlane/">
     <Project Path="src/ControlPlane/Bagatka.AiSloth.WebApi/Bagatka.AiSloth.WebApi.csproj" />
   </Folder>
+  <Folder Name="/src/ControlPlane/Modules/" />
+  <Folder Name="/src/ControlPlane/Modules/Chats/">
+    <File Path="src/ControlPlane/Modules/Chats/README.md" />
+  </Folder>
+  <Folder Name="/src/ControlPlane/Modules/Machines/">
+    <File Path="src/ControlPlane/Modules/Machines/README.md" />
+  </Folder>
+  <Folder Name="/src/ControlPlane/Modules/Nooks/">
+    <File Path="src/ControlPlane/Modules/Nooks/README.md" />
+    <Project Path="src/ControlPlane/Modules/Nooks/Bagatka.AiSloth.Nooks.Contracts/Bagatka.AiSloth.Nooks.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/src/ControlPlane/Modules/Projects/">
+    <File Path="src/ControlPlane/Modules/Projects/README.md" />
+  </Folder>
+  <Folder Name="/src/ControlPlane/Modules/Sources/">
+    <File Path="src/ControlPlane/Modules/Sources/README.md" />
+  </Folder>
+  <Folder Name="/src/ControlPlane/Modules/Workspaces/">
+    <File Path="src/ControlPlane/Modules/Workspaces/README.md" />
+    <Project Path="src/ControlPlane/Modules/Workspaces/Bagatka.AiSloth.Workspaces.Contracts/Bagatka.AiSloth.Workspaces.Contracts.csproj" />
+  </Folder>
   <Folder Name="/src/Foundation/">
     <Project Path="src/Foundation/Bagatka.Foundation/Bagatka.Foundation.csproj" />
   </Folder>
