@@ -8,11 +8,13 @@ One problem, one solution. This file lists the established way to solve each rec
   implement it once, and add an entry in the same change.
 - **Change an entry, don't fork it.** If an entry is wrong for a case, propose changing it, with
   a migration path for existing code. Never add a second way "just here."
-- **Snippets are the spec for now.** Until real code exists, snippets are the specification.
-  Then add the path of the first real implementation as the canonical example.
+- **Real code beats snippets.** Where an entry names a canonical example, that file is the
+  specification. Elsewhere the snippet is, until the first real implementation exists; then add
+  its path here.
 
-Examples use a `Users` module because nearly every product has one. Snippets omit `using`
-lines for brevity; real files list them (implicit usings are off).
+Examples use `Users` and `Workspaces` modules. Snippets omit `using` lines and put several types
+together for brevity; real files list their usings (implicit usings are off) and hold one
+top-level type each (entry 28).
 
 ---
 
@@ -21,24 +23,27 @@ lines for brevity; real files list them (implicit usings are off).
 Code says what it does where it does it. A contributor who doesn't know .NET's conventions
 should be able to read any file and see every conversion, registration, and default.
 
-- **No implicit conversion operators.**
-  - Results are created with `Result.Ok(...)` and `Result.Fail(...)`.
+- **No implicit conversions.**
+  - Results and other union values are created with `new`: `new Result<UserProfile>(profile)`,
+    `new Result(error)`. Unions allow an implicit conversion from each case; don't use it.
   - Typed IDs are created with `New()` and `From(...)`.
-  - No type in this solution declares an `implicit operator`.
+  - No type declares an `implicit operator`.
 - **No assembly scanning.** Every DI registration, EF configuration, type conversion, reaction,
   and endpoint group is a visible line in the code.
 - **Types are written out.**
   - No `var`.
   - Object creation names its type: `new RenameUser(...)`, not `new(...)`.
-- **Implicit usings are off.** Each file lists its own `using` directives.
+- **Accessibility is always written,** including `public` on interface members.
+- **Implicit usings are off.** Each file lists its own `using` directives, and unused ones fail
+  the build.
 - **Endpoint parameters state their source:** `[FromRoute]`, `[FromQuery]`, `[FromBody]`,
   `[FromServices]`. Only `ClaimsPrincipal` and `CancellationToken` are bound without an
   attribute.
 - **Never rely on `ToString()` of a complex type.** Convert with a named method or property
   (`actor.ToLogValue()`, `id.Value`).
 - **Never rely on defaults that differ between contexts.**
-  - JSON always uses `PlatformJson.Options`.
-  - Culture and time zone are always explicit (entries 2 and 18).
+  - JSON always uses `FoundationJson.Options`.
+  - Culture and time zone are always explicit (entries 2 and 19).
 - **No hidden runtime behavior.** No `dynamic`, and no reflection-driven behavior in production
   code beyond what the framework itself requires.
 - **One deliberate exception: global query filters** for tenant isolation and soft delete,
@@ -64,8 +69,8 @@ everywhere.
   - No number literals like `"1,5"` parsed at runtime.
   - No `Replace(",", ".")`, and no `Split('.')` on numbers.
   - Numbers cross the API as JSON numbers, and dates as ISO 8601.
-- **Interpolation and `ToString()` format with the current culture.** For machine text, use
-  `string.Create(CultureInfo.InvariantCulture, $"...")` instead.
+- **Interpolation, concatenation, and `ToString()` format with the current culture.** For machine
+  text, use `string.Create(CultureInfo.InvariantCulture, $"...")` instead.
 - **Culture-sensitive string methods always get an explicit argument.** `StartsWith`,
   `EndsWith`, `IndexOf`, `Compare`, `ToUpper`, and `ToLower` take an explicit comparison or
   culture, or use the `Invariant` variants.
@@ -78,28 +83,27 @@ bool isSame = string.Equals(left, right, StringComparison.Ordinal);
 string forRecipient = invoice.Total.ToString("N2", recipientCulture);
 ```
 
-- **The host pins its culture to invariant.** `Program.cs` does this, so anything that slips
-  through behaves the same on every server:
-```csharp
-  CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
-  CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
-```
+- **The host pins its culture to invariant,** so anything that slips through behaves the same on
+  every server. Canonical example: `src/ControlPlane/Bagatka.AiSloth.WebApi/Program.cs`.
 - **`InvariantGlobalization` stays off.** Human-facing output needs real cultures, passed
   explicitly.
 - **Enforcement.**
-  - Analyzers CA1304, CA1305, CA1307, CA1309, CA1310, and CA1311 are errors.
-  - Reading `CultureInfo.CurrentCulture` or `CurrentUICulture` is banned.
-  - Test projects run under `tr-TR`, which has comma decimals and the dotless `ı`, so culture
-    bugs fail on every machine.
-  - Analyzers don't reliably catch string interpolation, so these tests are the backstop.
+  - CA1304, CA1305, CA1307, CA1309, CA1310, CA1311, MA0011, and MA0074 make culture and
+    comparison arguments mandatory; MA0075 and MA0076 do the same for concatenation and
+    interpolation. All are build errors.
+  - Reading `CultureInfo.CurrentCulture`, `CurrentUICulture`, or `Thread.CurrentCulture` is banned.
+  - Tests run under `tr-TR`, which has comma decimals and the dotless `ı` (entry 26). They are the
+    backstop for culture-dependent behavior inside libraries the analyzers can't see.
 
 ### Files and environment
 
-- **Text files.** UTF-8 everywhere. `.gitattributes` normalizes line endings to LF.
+- **Text files.** UTF-8 without a byte order mark. `.gitattributes` normalizes line endings to LF.
 - **Paths.** Build them with `Path.Combine`. Never hardcode `\` or `/` as separators.
 - **Casing.** Reference files and folders with their exact casing. Linux is case-sensitive,
   while Windows and macOS usually aren't.
-- **Time zones.** See entry 18.
+- **Time zones.** See entry 19.
+- **Toolchain.** `./dev` (or the `.agents/setup` hook) provides the pinned SDK and sets
+  `DOTNET_ROOT`, so a host .NET install never leaks in.
 
 ## 3. Interfaces and base classes
 
@@ -107,28 +111,45 @@ An interface earns its place when at least one of these holds:
 
 - **It is a module contract** (`I<Module>Api`). That's a boundary, even with one implementation
   today.
-- **Two real implementations exist now.** For example, `IOutbox` has a database implementation
-  and a test recorder.
+- **Several real implementations exist or are committed to.** For example, `ISandboxProvider` has
+  one implementation per compute backend, all passing the same conformance suite.
 - **A generic mechanism needs a compile-time contract instead of reflection.** Examples are
   `ITypedId<T>` and `IReaction<TEvent>`.
 
 Never as a marker, never "for future swapping," and never one interface per class.
 
 Base classes are used only where the framework requires them: `DbContext`, `BackgroundService`,
-`ValueConverter`. Share behavior through composition or static helpers, not inheritance. There
-is no `Entity`, `BaseService`, `BaseEndpoint`, or `BaseTest`.
+`ValueConverter`, `JsonConverter<T>`. Share behavior through composition or static helpers, not
+inheritance. There is no `Entity`, `BaseService`, `BaseEndpoint`, or `BaseTest`, and an
+architecture test fails if a class derives from another class in this solution.
 
-## 4. Module contract
+## 4. Closed sets: unions and enums
+
+- **A union when the cases carry different data.** `Result<T>` is a value or an `Error`; `Actor`
+  is a user, a system process, or anonymous.
+- **An enum when the cases are labels.** `ErrorKind`, or the status of a sandbox.
+- **Switch exhaustively, without a discard arm.** A new case or member then fails the build
+  wherever it is ignored (CS8509). For enums, naming every member is enough: CS8524, which would
+  demand a discard for undefined values, is off.
+- **Enums start at 1,** so `default` is never a valid member. They are stored and serialized as
+  strings.
+- **Unions are structs,** so `default(Result<T>)` exists. Reading one throws, because creating it
+  was a bug.
+- **Create union values with `new`** (entry 1).
+
+Canonical examples: `src/Foundation/Bagatka.Foundation/Actor.cs` and `ErrorKind.cs`.
+
+## 5. Module contract
 
 ```csharp
-namespace Company.Product.Users.Contracts;
+namespace Bagatka.AiSloth.Users.Contracts;
 
 public interface IUsersApi
 {
-    Task<UserSummary?> FindAsync(Actor actor, UserId id, CancellationToken ct);
-    Task<IReadOnlyList<UserSummary>> GetManyAsync(Actor actor, IReadOnlyCollection<UserId> ids, CancellationToken ct);
-    Task<Result<UserProfile>> GetProfileAsync(Actor actor, UserId id, CancellationToken ct);
-    Task<Result> RenameAsync(Actor actor, RenameUser command, CancellationToken ct);
+    public Task<UserSummary?> FindAsync(Actor actor, UserId id, CancellationToken ct);
+    public Task<IReadOnlyList<UserSummary>> GetManyAsync(Actor actor, IReadOnlyCollection<UserId> ids, CancellationToken ct);
+    public Task<Result<UserProfile>> GetProfileAsync(Actor actor, UserId id, CancellationToken ct);
+    public Task<Result> RenameAsync(Actor actor, RenameUser command, CancellationToken ct);
 }
 
 public sealed record RenameUser(UserId UserId, string DisplayName);
@@ -143,36 +164,42 @@ public sealed record UserProfile(UserId Id, string DisplayName, DateTimeOffset C
   - Commands carry raw input. Parsing into value types happens inside the module.
 - **Outputs.**
   - Anything that can fail in an expected way returns `Result` or `Result<T>`.
-  - Anything shown in lists gets a batch read.
-- **Contracts are plain data.** They hold interfaces, records, enums, typed IDs, events, and
-  errors. No `IQueryable`, no entities, no EF or ASP.NET types, no logic.
+  - Anything shown in lists gets a batch read or a `Page<T>`.
+  - A stream returns `Task<Result<IAsyncEnumerable<T>>>`: the feature authorizes and validates
+    first, then streams. Cancelling the token ends the stream.
+- **Contracts are plain data.** They hold interfaces, records, unions, enums, typed IDs, events,
+  and errors. No `IQueryable`, no entities, no EF or ASP.NET types, no logic.
+- **References.** A Contracts project references `Bagatka.Foundation`, plus the Contracts of
+  modules its own module asks, for their typed IDs. Nothing else.
+- **Contracts are documented.** Every public member has an XML doc comment; the build fails
+  without one.
 - **Size is a signal.** If the interface no longer fits on one screen, either the module is too
-  big or the contract should split into a few cohesive interfaces implemented by the same class.
+  big or the contract should split into a few cohesive interfaces implemented by the same class,
+  for example by caller: `INooksApi` for people and agents, `INookDaemonsApi` for the daemon
+  endpoint only.
 
-## 5. Module registration
+## 6. Module registration
 
 ```csharp
 public static class UsersModule
 {
-    public static IServiceCollection AddUsersModule(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddUsersModule(this IServiceCollection services, UsersSettings settings)
     {
-        services.AddModuleDbContext<UsersDbContext>(configuration, schema: "users");
+        services.AddSingleton(settings);
+        services.AddModuleDbContext<UsersDbContext>(settings.ConnectionString, schema: "users");
         services.AddScoped<IUsersApi, UsersApi>();
-        services.AddReaction<OrganizationDeleted, OnOrganizationDeleted>();
-        services.AddOptions<UsersOptions>()
-            .BindConfiguration("Modules:Users")
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
+        services.AddReaction<WorkspaceDeleted, OnWorkspaceDeleted>();
         return services;
     }
 }
 ```
 
-- **One public type.** `<Module>Module` is the only public type in a module project.
+- **One public type.** `<Module>Module` is the only public type in a module project; its settings
+  record lives next to it and is public too, because the host constructs it (entry 20).
 - **The table of contents.** Every registration is a visible line here, so this file shows
   everything the module wires up.
 
-## 6. Features
+## 7. Features
 
 One feature = one contract method = one file in `Features/`. Each file contributes one method
 to the module's partial `<Module>Api` class.
@@ -185,29 +212,36 @@ internal sealed partial class UsersApi(UsersDbContext db, TimeProvider time, ILo
 ```
 
 ```csharp
-// Features/RenameUser.cs
+// Features/UsersApi.RenameUser.cs
 internal sealed partial class UsersApi
 {
     public async Task<Result> RenameAsync(Actor actor, RenameUser command, CancellationToken ct)
     {
         // 1. Authorize
         if (!actor.Is(command.UserId))
-            return Result.Fail(Error.Forbidden);
+        {
+            return new Result(Error.Forbidden);
+        }
 
-        // 2. Parse input
-        Result<DisplayName> name = DisplayName.Parse(command.DisplayName);
-        if (name.IsError)
-            return Result.Fail(name.Error);
+        // 2. Parse input: after this check the compiler knows `name` is set
+        if (!DisplayName.Parse(command.DisplayName).TryGetValue(out DisplayName? name, out Error? invalid))
+        {
+            return new Result(invalid);
+        }
 
         // 3. Load
         User? user = await db.Users.SingleOrDefaultAsync(u => u.Id == command.UserId, ct);
         if (user is null)
-            return Result.Fail(UsersErrors.NotFound);
+        {
+            return new Result(UsersErrors.NotFound);
+        }
 
         // 4. Decide: the entity owns the rule and adds its event to the outbox
-        Result renamed = user.Rename(name.Value, db.Outbox);
-        if (renamed.IsError)
+        Result renamed = user.Rename(name, db.Outbox);
+        if (renamed.IsError(out _))
+        {
             return renamed;
+        }
 
         // 5. Commit once: the change and its events are saved in one transaction
         return await db.SaveAsync(ct);
@@ -216,8 +250,9 @@ internal sealed partial class UsersApi
 ```
 
 - **Shape.** State-changing features follow five steps: authorize, parse, load, decide, commit.
-  Reads authorize, then project (entry 12).
-- **Naming.** The file is named after the feature: `RenameUser.cs` implements `RenameAsync`.
+  Reads authorize, then project (entry 13).
+- **Naming.** The file is named `<Module>Api.<Feature>.cs`: `Features/UsersApi.RenameUser.cs`
+  implements `RenameAsync`. The type name comes first because each file holds part of that type.
 - **No rules in features.** A feature that needs an `if` about business meaning is holding a
   rule that belongs in an entity or value type.
 - **Helpers.**
@@ -228,33 +263,44 @@ internal sealed partial class UsersApi
 - **No HTTP.** Features never touch `HttpContext`, `IResult`, or status codes. Modules don't
   reference ASP.NET Core, so the compiler enforces this.
 
-## 7. Typed IDs
+## 8. Typed IDs
+
+Canonical example: `src/Foundation/Bagatka.Foundation/UserId.cs`.
 
 ```csharp
 [JsonConverter(typeof(TypedIdJsonConverter<OrderId>))]
-public readonly record struct OrderId(Guid Value) : ITypedId<OrderId>
+public readonly record struct OrderId : ITypedId<OrderId>
 {
+    private OrderId(Guid value)
+    {
+        Value = value;
+    }
+
+    public Guid Value { get; }
+
     public static OrderId New() => new OrderId(Guid.CreateVersion7());
+
     public static OrderId From(Guid value) => new OrderId(value);
 }
 ```
 
 - **Where they live.** Every entity has a typed ID declared in its module's Contracts. `UserId`
-  is the exception: it lives in `Company.Platform`, because `Actor` needs it.
-- **Why the interface exists.** `ITypedId<T>` exists so that one generic EF converter
-  (`TypedIdConverter<T>`) and one generic JSON converter (`TypedIdJsonConverter<T>`) work for
-  every ID type, checked by the compiler rather than discovered by reflection.
+  is the exception: it lives in `Bagatka.Foundation`, because `Actor` needs it.
+- **Why the interface exists.** `ITypedId<T>` declares `static abstract T From(Guid)`, so one
+  generic EF converter (`TypedIdConverter<T>`) and one generic JSON converter
+  (`TypedIdJsonConverter<T>`) work for every ID type, checked by the compiler rather than
+  discovered by reflection.
 - **Registration is explicit and local.**
   - JSON: the attribute on the type.
-  - EF: one line per ID type in the DbContext (entry 12).
+  - EF: one line per ID type in the DbContext (entry 13).
 - **Creating IDs.** New IDs come only from `New()`, which produces UUIDv7: time-ordered and
-  index-friendly. `Guid.NewGuid()` is banned.
+  index-friendly. The constructor is private, and `Guid.NewGuid()` is banned.
 - **Rebuilding IDs.** `From(Guid)` is used only at the edges: route values and storage.
 - **Raw values.** Use `.Value` wherever a raw value is needed. Never rely on `ToString()`.
 - **Cross-module references.** Other modules store foreign IDs as typed values, never as
   foreign keys.
 
-## 8. Value types and validation
+## 9. Value types and validation
 
 Parse, don't validate. Raw input becomes a value type once, at the start of a feature. After
 that, the type guarantees validity.
@@ -263,23 +309,24 @@ that, the type guarantees validity.
 internal sealed record DisplayName
 {
     public const int MaxLength = 100;
-    public string Value { get; }
 
     private DisplayName(string value)
     {
         Value = value;
     }
 
+    public string Value { get; }
+
     public static Result<DisplayName> Parse(string? input)
     {
         string trimmed = (input ?? string.Empty).Trim();
-        if (trimmed.Length == 0 || trimmed.Length > MaxLength)
+        if (trimmed.Length is 0 or > MaxLength)
         {
             string message = string.Create(CultureInfo.InvariantCulture, $"Must be 1 to {MaxLength} characters.");
-            return Result<DisplayName>.Fail(Error.Validation("displayName", message));
+            return new Result<DisplayName>(Error.Validation("displayName", message));
         }
 
-        return Result<DisplayName>.Ok(new DisplayName(trimmed));
+        return new Result<DisplayName>(new DisplayName(trimmed));
     }
 }
 ```
@@ -288,38 +335,42 @@ internal sealed record DisplayName
 // Data/DisplayNameConverter.cs: stored values go back through Parse, so invalid data fails loudly
 internal sealed class DisplayNameConverter() : ValueConverter<DisplayName, string>(
     displayName => displayName.Value,
-    value => DisplayName.Parse(value).Value);
+    value => FromStored(value))
+{
+    private static DisplayName FromStored(string value)
+    {
+        return DisplayName.Parse(value).TryGetValue(out DisplayName? name, out Error? invalid)
+            ? name
+            : throw new InvalidOperationException("Stored display name is invalid: " + invalid.Message);
+    }
+}
 ```
 
 - **When to create one.** A value gets a type when it has a rule: format, length, range, or
   normalization. Values without rules stay primitives.
 - **Limits are written once.** The type's constants are reused by the EF registration. Never
   repeat a limit as a literal.
-- **Several inputs.** Parse all of them, then combine into one validation error with every
-  field:
-```csharp
-  Result<DisplayName> name = DisplayName.Parse(command.DisplayName);
-  Result<EmailAddress> email = EmailAddress.Parse(command.Email);
-  Result inputs = Result.Combine(name, email);
-  if (inputs.IsError)
-      return inputs;
-```
+- **Several inputs.** Parse all of them, then combine them into one validation error with every
+  field. `Result.Combine` isn't implemented yet; add it to Foundation with the first feature
+  that parses several inputs, in this shape:
+  ```csharp
+  if (!Result.Combine(DisplayName.Parse(command.DisplayName), EmailAddress.Parse(command.Email))
+          .TryGetValue(out (DisplayName Name, EmailAddress Email) inputs, out Error? invalid))
+  {
+      return new Result(invalid);
+  }
+  ```
 - **Never silently truncate or "fix" input.** Reject it with a clear message. If shortening is a
   product rule, make it a named operation on its own type.
 - **Field names.** Validation errors use the camelCase name of the input field.
 - **Visibility.** Value types are `internal` unless another module must construct them; then
   they move to Contracts.
 
-## 9. Entities
+## 10. Entities
 
 ```csharp
 internal sealed class User
 {
-    public UserId Id { get; private set; }
-    public DisplayName DisplayName { get; private set; }
-    public DateTimeOffset CreatedAt { get; private set; }
-    public DateTimeOffset? DeactivatedAt { get; private set; }
-
     // Used by Register and by EF: parameter names match property names.
     private User(UserId id, DisplayName displayName, DateTimeOffset createdAt)
     {
@@ -327,6 +378,11 @@ internal sealed class User
         DisplayName = displayName;
         CreatedAt = createdAt;
     }
+
+    public UserId Id { get; private set; }
+    public DisplayName DisplayName { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset? DeactivatedAt { get; private set; }
 
     public static User Register(DisplayName displayName, TimeProvider time, IOutbox outbox)
     {
@@ -338,11 +394,13 @@ internal sealed class User
     public Result Rename(DisplayName displayName, IOutbox outbox)
     {
         if (DeactivatedAt is not null)
-            return Result.Fail(UsersErrors.Deactivated);
+        {
+            return new Result(UsersErrors.Deactivated);
+        }
 
         DisplayName = displayName;
         outbox.Add(new UserRenamed(Id, displayName.Value));
-        return Result.Ok();
+        return new Result(new Success());
     }
 }
 ```
@@ -365,7 +423,9 @@ internal sealed class User
 - **References.** Entities in other modules are referenced by typed ID only. Children always
   changed with their parent are loaded with it.
 
-## 10. Errors and results
+## 11. Errors and results
+
+Canonical examples: `src/Foundation/Bagatka.Foundation/Result{T}.cs`, `Result.cs`, `Error.cs`.
 
 ```csharp
 public static class UsersErrors
@@ -376,26 +436,41 @@ public static class UsersErrors
 ```
 
 ```csharp
-Result success = Result.Ok();
-Result failure = Result.Fail(UsersErrors.NotFound);
-Result<UserProfile> found = Result<UserProfile>.Ok(profile);
-Result<UserProfile> missing = Result<UserProfile>.Fail(UsersErrors.NotFound);
+Result done = new Result(new Success());
+Result failed = new Result(UsersErrors.NotFound);
+Result<UserProfile> found = new Result<UserProfile>(profile);
+Result<UserProfile> missing = new Result<UserProfile>(UsersErrors.NotFound);
 
-if (found.IsError)
-    return Result.Fail(found.Error);
-UserProfile value = found.Value; // throws if found is an error: always check IsError first
+// Inside a module: continue only on success. The compiler knows which out value is set.
+if (!found.TryGetValue(out UserProfile? value, out Error? error))
+{
+    return new Result(error);
+}
+
+// At an edge: switch over both cases. Forgetting one fails the build.
+Results<Ok<UserProfile>, ProblemHttpResult> response = found switch
+{
+    UserProfile profile => TypedResults.Ok(profile),
+    Error failure => failure.ToProblem(),
+};
 ```
 
-- **Named factories only.** Results are created only through `Ok` and `Fail`. There are no
-  implicit conversions.
+- **Created with `new`.** `new Result(new Success())`, `new Result(error)`,
+  `new Result<T>(value)`. No factories, no implicit conversions.
+- **Read through the compiler.** Use `TryGetValue` (or `IsError` for `Result`) inside modules
+  and an exhaustive `switch` at edges. There is no `.Value` that throws when you forget to check.
 - **Values vs exceptions.** Expected outcomes (invalid input, not found, conflict, forbidden)
   are `Error` values. Exceptions are for bugs and infrastructure failures.
-- **What an `Error` carries.** A stable `Code`, a developer-facing English `Message`, a `Kind`,
-  and field errors for validation. Clients localize by `Code`, never by `Message`.
+- **What an `Error` carries.** A `Kind`, a stable `Code`, a developer-facing English `Message`,
+  and, for validation only, field errors. Clients localize by `Code`, never by `Message`.
+- **Creating errors.** Only through `Error`'s factories: `Error.Validation(field, message)`,
+  `Error.NotFound(code, message)`, `Error.Conflict(code, message)`, `Error.Forbidden`, and
+  `Error.Unauthorized`.
 - **Where errors are declared.**
   - Errors callers may branch on are declared once, in Contracts, as `<Module>Errors`.
-  - Generic errors (`Error.Forbidden`, `Error.Validation(...)`) come from Platform.
-- **HTTP mapping.** The gateway maps kinds to HTTP in one place (`Company.Platform.Web`):
+  - Generic errors come from Foundation.
+- **HTTP mapping.** The WebApi maps kinds to HTTP in one place (`Bagatka.Foundation.Web`), as an
+  exhaustive switch over `ErrorKind`:
 
   | Kind | HTTP |
   |---|---|
@@ -412,24 +487,43 @@ UserProfile value = found.Value; // throws if found is an error: always check Is
   by the global handler.
 - **Catching.** Catch exceptions to turn them into errors only at known boundaries:
   concurrency conflicts in `SaveAsync`, and Sdk clients.
+- **Rare cases.** A case too rare to earn its own handling (AGENTS.md, "Proportional handling")
+  throws `InvalidOperationException` with a message saying what is off, under a
+  `// Not handled: <case>; <what handling it would take>.` comment, and reaches the general handler
+  like any bug. Example: `InspectRequiredAsync` in
+  `src/Sandboxing/Bagatka.Sandboxing.Docker/DockerSandboxProvider.cs`.
 
-## 11. Actor and authorization
+## 12. Actor and authorization
 
-- **Every contract method takes an `Actor`.** It is one of `Actor.ForUser(userId)`,
-  `Actor.ForSystem("<module>.<process>")`, or `Actor.Anonymous`.
-- **The gateway authenticates; modules authorize.**
-  - The gateway creates the actor (`principal.ToActor()`) and requires authentication by default.
+Canonical example: `src/Foundation/Bagatka.Foundation/Actor.cs`.
+
+- **Every contract method takes an `Actor`.** It is a union of `UserActor`, `SystemActor`, and
+  `AnonymousActor`, created with `Actor.ForUser(userId)`, `Actor.ForSystem("<module>.<process>")`,
+  or `Actor.Anonymous`.
+- **The WebApi authenticates; modules authorize.**
+  - The WebApi validates OpenID Connect tokens from the issuer in its settings, creates the actor
+    (`principal.ToActor()`), and requires authentication by default.
+  - A user is identified by the token's issuer and subject; the Users module maps them to a
+    `UserId` on first sign-in. No code depends on which provider issued the token.
+  - End-to-end tests run a small fake issuer at the HTTP boundary; the WebApi's validation is the
+    real one.
   - It decides no other permissions.
 - **The owner of the data owns the permission rule.** That module checks the rule first. Other
   modules ask it.
+- **Rules switch over the actor's cases exhaustively.** A new kind of actor then fails the build
+  in every rule that doesn't handle it.
 - **Identity, not permissions.** The actor carries who is calling, never what they may do.
+- **Agents.** An `AgentActor`, added with chats, acts for the user who sent the current message,
+  within that chat's workspace. Rules decide what agents may do like any other case; sensitive
+  operations an agent attempts (inviting members, deleting, billing, permissions) need a human's
+  confirmation.
 - **Passing actors along.**
   - Calls between modules on behalf of a user pass that user's actor along.
   - Reactions and jobs use a named system actor. Grep `ForSystem` to find every one of them.
 - **Logging an actor.** `actor.ToLogValue()` returns `user:<id>`, `system:<name>`, or
   `anonymous`. It is the only way an actor appears in logs.
 
-## 12. Persistence
+## 13. Persistence
 
 ```csharp
 internal sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) : DbContext(options)
@@ -460,14 +554,17 @@ internal sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) :
   line in the DbContext. No scanning.
 - **Writes.**
   - Load the entity, call its method, then `await db.SaveAsync(ct)` once per feature.
-  - `SaveAsync` (Platform) returns `Result` and turns concurrency conflicts into `Conflict`.
+  - `SaveAsync` (`Bagatka.Foundation.Modules`) returns `Result` and turns concurrency conflicts
+    into `Conflict`.
   - Outbox rows live in the same DbContext, so the change and its events commit together.
 - **Reads.** Project straight to contract DTOs:
-```csharp
+  ```csharp
   public async Task<Result<UserProfile>> GetProfileAsync(Actor actor, UserId id, CancellationToken ct)
   {
       if (!actor.Is(id))
-          return Result<UserProfile>.Fail(UsersErrors.NotFound); // don't reveal that other profiles exist
+      {
+          return new Result<UserProfile>(UsersErrors.NotFound); // don't reveal that other profiles exist
+      }
 
       UserProfile? profile = await db.Users
           .Where(u => u.Id == id)
@@ -475,11 +572,13 @@ internal sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) :
           .SingleOrDefaultAsync(ct);
 
       if (profile is null)
-          return Result<UserProfile>.Fail(UsersErrors.NotFound);
+      {
+          return new Result<UserProfile>(UsersErrors.NotFound);
+      }
 
-      return Result<UserProfile>.Ok(profile);
+      return new Result<UserProfile>(profile);
   }
-```
+  ```
 - **Loading rules.** When loading an entity has rules, a named method on the DbContext owns
   them: `db.LoadOrderAsync(id, ct)`.
 - **Global query filters** are the one sanctioned implicit mechanism (entry 1).
@@ -492,7 +591,7 @@ internal sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) :
 - **Concurrency.** Entities that can be edited concurrently get a concurrency token in their
   configuration.
 
-## 13. Migrations
+## 14. Migrations
 
 - **One migration set per module.** Each module keeps its migrations in `Data/Migrations`,
   created against its own DbContext.
@@ -507,7 +606,7 @@ internal sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) :
 - **Destructive changes use expand–contract across releases.** Add the new shape, migrate the
   data, switch the code, and remove the old shape in a later release.
 
-## 14. Integration events and reactions
+## 15. Integration events and reactions
 
 ```csharp
 // Users.Contracts: a fact, named in the past tense
@@ -518,13 +617,15 @@ public sealed record UserRegistered(UserId UserId, DateTimeOffset OccurredAt);
 // Billing module: Reactions/OnUserRegistered.cs
 internal sealed class OnUserRegistered(BillingDbContext db) : IReaction<UserRegistered>
 {
-    public async Task<Result> HandleAsync(UserRegistered @event, CancellationToken ct)
+    public async Task<Result> HandleAsync(UserRegistered integrationEvent, CancellationToken ct)
     {
-        bool alreadyHandled = await db.Customers.AnyAsync(existing => existing.UserId == @event.UserId, ct);
+        bool alreadyHandled = await db.Customers.AnyAsync(existing => existing.UserId == integrationEvent.UserId, ct);
         if (alreadyHandled)
-            return Result.Ok(); // delivery is at-least-once
+        {
+            return new Result(new Success()); // delivery is at-least-once
+        }
 
-        Customer customer = Customer.CreateFor(@event.UserId);
+        Customer customer = Customer.CreateFor(integrationEvent.UserId);
         db.Customers.Add(customer);
         return await db.SaveAsync(ct);
     }
@@ -536,41 +637,47 @@ internal sealed class OnUserRegistered(BillingDbContext db) : IReaction<UserRegi
   - They carry IDs plus the facts consumers commonly need.
 - **Who emits.** Only entities add events, through the `IOutbox` they receive as a parameter.
   The rows commit with the change.
-- **Delivery and idempotency.** After commit, Platform's dispatcher delivers events at least
+- **Delivery and idempotency.** After commit, Foundation's dispatcher delivers events at least
   once. Every reaction is idempotent, preferably check-then-act on a key protected by a unique
   index.
 - **Failures.** A reaction that fails is retried with backoff. After repeated failures it is
   parked and logged for an operator.
 - **Reaction shape.**
   - One reaction per file in `Reactions/`, named `On<Event>`, registered explicitly in
-    `<Module>Module`.
+    `<Module>Module`. Its parameter is named `integrationEvent`.
   - A reaction commits only its own module's data.
 - **Changing events.** Changes are additive. A breaking change is a new event type, and the old
   one keeps being published until no reaction uses it.
 - **Events are announcements, not requests.** Use them for "something happened." To get an
   answer, call a contract.
 
-## 15. Calling other modules
+## 16. Calling other modules
 
 ```csharp
-// Organizations module: Features/AddMember.cs
-internal sealed partial class OrganizationsApi
+// Workspaces module: Features/WorkspacesApi.AddMember.cs
+internal sealed partial class WorkspacesApi
 {
     public async Task<Result> AddMemberAsync(Actor actor, AddMember command, CancellationToken ct)
     {
         // Ask: awaited, read-only
         UserSummary? user = await users.FindAsync(actor, command.UserId, ct);
         if (user is null)
-            return Result.Fail(OrganizationsErrors.UnknownUser);
+        {
+            return new Result(WorkspacesErrors.UnknownUser);
+        }
 
-        Organization? organization = await db.LoadOrganizationAsync(command.OrganizationId, ct);
-        if (organization is null)
-            return Result.Fail(OrganizationsErrors.NotFound);
+        Workspace? workspace = await db.LoadWorkspaceAsync(command.WorkspaceId, ct);
+        if (workspace is null)
+        {
+            return new Result(WorkspacesErrors.NotFound);
+        }
 
         // Decide on our own data only; the entity checks the actor's role
-        Result added = organization.AddMember(user.Id, actor, db.Outbox);
-        if (added.IsError)
+        Result added = workspace.AddMember(user.Id, actor, db.Outbox);
+        if (added.IsError(out _))
+        {
             return added;
+        }
 
         // Commit once; other modules react to MemberAdded
         return await db.SaveAsync(ct);
@@ -590,10 +697,10 @@ internal sealed partial class OrganizationsApi
 - **One hop deep.** A method other modules call should not itself call further modules to answer.
 - **No cycles.** The asks graph is acyclic; the reverse direction is an event.
 
-## 16. Gateway endpoints
+## 17. WebApi endpoints
 
 ```csharp
-// Company.Product.WebApi/Endpoints/UsersEndpoints.cs
+// Bagatka.AiSloth.WebApi/Endpoints/UsersEndpoints.cs
 internal static class UsersEndpoints
 {
     public sealed record RenameRequest(string DisplayName);
@@ -636,14 +743,21 @@ internal static class UsersEndpoints
   contract, and map the `Result` to HTTP. No logic, no DbContext, no direct Sdk calls.
 - **Request records** live in the endpoints file and use the same field names as the command
   they map to.
-- **Responses.** Return contract DTOs directly. Add a gateway response record only when the
+- **Responses.** Return contract DTOs directly. Add a WebApi response record only when the
   client needs a different shape.
 - **Curate.** Not every contract method gets a route.
+- **Every public route is a tool.** Agents and MCP clients use exactly the public API, so its
+  documentation, which flows from the XML docs into OpenAPI and MCP, is written for both people and
+  models: what the operation does, when to use it, and what its errors mean. Prefer batch
+  operations and filterable queries to one-at-a-time calls.
+- **Public surface.** Today every route is public. Once modules run as separate services, routes
+  for other services stay on the private network, and only the Gateway exposes public ones
+  (`ARCHITECTURE.md`).
 - **Routes.** Use plural kebab-case resources with IDs as segments. State changes that aren't
   plain updates become sub-resources (`POST /orders/{id}/cancel`).
 - **Authentication is required by default** through the fallback policy. Anonymous endpoints
   say `AllowAnonymous()` explicitly.
-- **JSON.** The gateway configures JSON from `PlatformJson.Options`: camelCase, enums as
+- **JSON.** The WebApi configures JSON from `FoundationJson.Options`: camelCase, enums as
   strings, strict number handling.
 - **Screens.** A response that combines several modules lives in `Composition/`. Inbound
   webhooks verify their signature with the Sdk client, then call the owning module with a
@@ -651,7 +765,7 @@ internal static class UsersEndpoints
 - **OpenAPI.** The document is generated by ASP.NET Core's built-in OpenAPI support from the
   typed results.
 
-## 17. Pagination
+## 18. Pagination
 
 ```csharp
 public sealed record PageRequest(string? Cursor, int Limit);
@@ -660,11 +774,11 @@ public sealed record Page<T>(IReadOnlyList<T> Items, string? NextCursor);
 
 - **Keyset pagination with an opaque cursor.** Order by a unique, stable key; UUIDv7 IDs already
   order by creation.
-- **Bounded size.** Platform clamps `Limit` to a maximum of 200. The gateway supplies the
+- **Bounded size.** Foundation clamps `Limit` to a maximum of 200. The WebApi supplies the
   default page size explicitly.
 - **No offset pagination,** and no total counts unless the product needs them.
 
-## 18. Time
+## 19. Time
 
 - **One clock.** Inject `TimeProvider`. Every API that reads the machine clock or the machine
   time zone is banned: `DateTime.Now`, `UtcNow`, and `Today`; `DateTimeOffset.Now` and `UtcNow`;
@@ -678,19 +792,58 @@ public sealed record Page<T>(IReadOnlyList<T> Items, string? NextCursor);
   - For humans: an explicit culture and an explicit time zone.
 - **Tests** use `FakeTimeProvider`.
 
-## 19. Configuration
+## 20. Configuration
+
+Owners declare what they need; hosts decide where it comes from.
 
 ```csharp
-services.AddOptions<UsersOptions>()
-    .BindConfiguration("Modules:Users")
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
+// The owner, for example a sandbox provider: an immutable record that validates itself.
+public sealed record DockerSandboxSettings
+{
+    public DockerSandboxSettings(Uri endpoint, string scope)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(scope);
+        Endpoint = endpoint;
+        Scope = scope;
+    }
+
+    public Uri Endpoint { get; }
+    public string Scope { get; }
+}
 ```
 
-- **One options class per owner.** Modules bind `Modules:<Module>`; Sdk clients bind
-  `Sdk:<Vendor>`. Options are bound and validated at startup.
-- **Options only.** Read configuration only through options. Never inject `IConfiguration` into
-  features.
+```csharp
+// The host's Program.cs: the only code that reads configuration, one visible line per owner.
+DockerSandboxSettings docker = builder.Configuration.GetRequired<DockerSandboxSettings>("Sandboxing:Docker");
+NooksSettings nooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
+
+builder.Services
+    .AddDockerSandboxProvider(docker)
+    .AddNooksModule(nooks, limits => limits.BindConfiguration("Modules:Nooks:Limits"));
+```
+
+- **Hosts read configuration; owners receive values.** Sdk clients, sandbox providers, and
+  modules never see `IConfiguration`, section names, or environment variables. Each declares one
+  settings record and takes it as a registration argument, so it can move to another product or
+  to NuGet unchanged, and tests simply construct it.
+- **Settings validate themselves.** The record's constructor rejects missing and invalid values.
+  Configuration binding passes `null` for missing values instead of failing, so the constructor is
+  what protects you. An invalid setting is a deployment bug, so it throws at startup.
+- **`GetRequired<T>(section)`** (in `Bagatka.ServiceDefaults`, added with the first settings)
+  binds a section with the source-generated binder and fails startup, naming the section, when the
+  section is missing, a value is invalid, or a key is unknown, which catches typos.
+- **Values that change while running are rare, and only in product code.** The owner declares them
+  as a separate options class and reads `IOptionsMonitor<T>.CurrentValue` at each decision,
+  without caching it. Its registration takes `Action<OptionsBuilder<T>>`, so the host must choose
+  the source, and can bind a reloading provider such as Azure App Configuration or AWS AppConfig.
+  The owner registers the validation. Anything wired at startup (connection pools, HTTP base
+  addresses) is never live; changing it takes a restart.
+- **Credentials that rotate are objects, not strings.** Pass a credential that refreshes itself,
+  such as Azure's `TokenCredential`. A vendor with only static API keys rotates them by restarting
+  the service, until a real need for live rotation appears.
+- **Sections.** Hosts use `Modules:<Module>`, `Sandboxing:<Backend>`, and `Sdk:<Vendor>`, so a
+  reader can find any owner's settings.
 - **Number format.** Configuration binds with the invariant culture, so decimal values in
   configuration always use `.` as the separator.
 - **Secrets never go in committed files.** Use user-secrets locally, and environment variables
@@ -698,7 +851,7 @@ services.AddOptions<UsersOptions>()
 - **Prefer a sensible default to a setting.** Add a setting only for values that genuinely
   differ between environments.
 
-## 20. Logging and telemetry
+## 21. Logging and telemetry
 
 ```csharp
 // Log.cs in each module
@@ -712,22 +865,30 @@ internal static partial class Log
 Log.UserDeactivated(logger, user.Id.Value, actor.ToLogValue());
 ```
 
+```text
+# LoggerParameterTypes.txt
+Actor;System.String
+UserId;System.Guid
+```
+
 - **One catalog per module.** Each module declares its log messages in `Log.cs` as
   source-generated `[LoggerMessage]` methods.
-- **Primitive parameters only.**
-  - Allowed types: `string`, `bool`, integer types, `decimal`, `Guid`, `DateTimeOffset`,
-    `TimeSpan`.
-  - Complex types and enums are converted at the call site with a call you can see.
-  - An architecture test enforces this.
+- **One vocabulary of log fields.** Every placeholder name is registered once in
+  `LoggerParameterTypes.txt` with the types it may carry; an unregistered name or a wrong type
+  fails the build (MA0124, MA0135). `UserId` is the same field, with the same type, in every
+  module.
+- **Primitive types only.** Register `string`, `bool`, integer types, `decimal`, `Guid`,
+  `DateTimeOffset`, or `TimeSpan`. Complex types and enums are converted at the call site with a
+  call you can see.
 - **What never goes in logs.** Log IDs only: never personal data, secrets, or tokens.
 - **What to log.** Log what operators need. Expected errors aren't logged as errors, and
   unhandled exceptions are logged once.
 - **Traces and metrics.**
-  - OpenTelemetry is configured in the gateway.
-  - A module adds an `ActivitySource` or `Meter` named `Company.Product.<Module>` only when it
+  - OpenTelemetry is configured by `Bagatka.ServiceDefaults` in every host.
+  - A module adds an `ActivitySource` or `Meter` named `Bagatka.AiSloth.<Module>` only when it
     has something specific to measure.
 
-## 21. External APIs
+## 22. External APIs
 
 - **Official first.** Prefer the vendor's official .NET SDK. Otherwise, write a client in
   `src/Sdk` following `src/Sdk/README.md`.
@@ -735,7 +896,7 @@ Log.UserDeactivated(logger, user.Id.Value, actor.ToLogValue());
 - **Widely used vendors get one owner.** Prefer a module that reacts to existing events over one
   that everyone has to call.
 
-## 22. Background work
+## 23. Background work
 
 - **Ownership.** Background work is owned by a module, lives in `Jobs/`, and is registered
   explicitly in `<Module>Module`.
@@ -749,7 +910,7 @@ Log.UserDeactivated(logger, user.Id.Value, actor.ToLogValue());
 - **Schedulers.** If you need cron schedules or durable job queues, choose one library, record
   it here, and use it everywhere.
 
-## 23. Caching
+## 24. Caching
 
 - **No cache without a measured need.**
 - **When there is one,** use `HybridCache`, only inside the module that owns the data. That
@@ -758,9 +919,9 @@ Log.UserDeactivated(logger, user.Id.Value, actor.ToLogValue());
   `string.Create(CultureInfo.InvariantCulture, ...)`.
 - **Permission-dependent results** are never cached under a key that doesn't include the actor.
 
-## 24. Money (if the product handles money)
+## 25. Money
 
-- **One type.** A single `Money` value type in `Company.Platform`: a `decimal` amount plus an
+- **One type.** A single `Money` value type in `Bagatka.Foundation`: a `decimal` amount plus an
   ISO 4217 currency. Never `double` or `float`.
 - **Rules live on `Money`.** Arithmetic across currencies fails, and rounding rules are defined
   on the type.
@@ -768,161 +929,104 @@ Log.UserDeactivated(logger, user.Id.Value, actor.ToLogValue());
 - **Formatting for humans uses an explicit culture.** Symbol placement and separators are
   culture data, never code.
 
-## 25. Testing
+## 26. Testing
 
-- **Module tests** (`Company.Product.<Module>.Tests`):
-  - They test features only through `I<Module>Api`.
-  - They run against a real database (Testcontainers), reset between tests with Respawn.
-  - When a module asks other modules, register those real modules too.
-- **Coverage per feature.** The normal path, the consequential failure, and authorization.
-- **Unit tests.** Value types and entities with real rules get unit tests. Entities receive a
-  `RecordingOutbox`, and tests assert the events they added.
-- **Gateway tests** use `WebApplicationFactory`. They cover routing, authentication,
-  error-to-HTTP mapping, serialization, and a few end-to-end flows.
-- **Architecture tests** enforce `ARCHITECTURE.md`.
-- **Culture.** Every test project runs under `tr-TR` through one shared file, so culture bugs
-  fail on every machine:
-```csharp
-  // tests/Shared/TestCulture.cs, linked into every test project by tests/Directory.Build.props
-  internal static class TestCulture
-  {
-      [ModuleInitializer]
-      internal static void UseUnfriendlyCulture()
-      {
-          CultureInfo culture = CultureInfo.GetCultureInfo("tr-TR");
-          CultureInfo.DefaultThreadCurrentCulture = culture;
-          CultureInfo.DefaultThreadCurrentUICulture = culture;
-      }
-  }
-```
-- **Fakes.**
-  - Use `FakeTimeProvider` for time.
-  - Fake only external seams; Sdk clients get a fake `HttpMessageHandler`.
-  - Never mock the DbContext.
-- **Test names state behavior,** for example `Rename_fails_for_deactivated_user`.
-- **One framework.** xUnit, with one assertion style.
+Test what people and agents rely on, through the surface they use: the public API.
 
-## 26. Build, analyzers, banned APIs
+- **End to end first** (`tests/Bagatka.AiSloth.EndToEndTests`, planned). Aspire's test builder
+  starts the real app: PostgreSQL, the WebApi, and the Docker sandbox provider creating real nooks
+  that run a real daemon. Tests call the public API as a client would, so what is tested is what
+  agents can do.
+- **Every feature** gets an end-to-end test of its normal path, its consequential failure, and its
+  authorization.
+- **Isolation without resets.** Each test creates its own workspace and works only inside it, so
+  tests run in parallel against one running app, with no database cleanup.
+- **Fakes only for paid or external services,** at the HTTP boundary: the test host gives the
+  client settings that point at a local fake. Everything we run ourselves, such as PostgreSQL, the
+  daemon, and Docker, is real.
+- **Smoke tests.** The same tests run against a deployed environment or real cloud providers, after
+  every deploy and on demand before a release.
+- **Lower-level tests only where they pay:**
+  - the conformance suite every sandbox provider passes (`Bagatka.Sandboxing.ConformanceTests`);
+  - the architecture tests (`tests/Bagatka.AiSloth.ArchitectureTests`), which enforce
+    `ARCHITECTURE.md`;
+  - dense logic with many edge cases, such as git push policy or protocol parsing.
 
-`Directory.Build.props`:
+  Don't unit-test what end-to-end tests already cover.
+- **Time.** Time-dependent behavior, such as idle suspension and timeouts, takes its durations from
+  settings, which tests make short. Lower-level tests use `FakeTimeProvider`.
+- **One framework.** xUnit v3 on Microsoft Testing Platform, with xUnit's own assertions. Run
+  everything with `dotnet test --solution AiSloth.slnx`.
+- **Test project shape.** `tests/Directory.Build.props` makes every test project an xUnit
+  executable running under `tr-TR`; a test project's `.csproj` only references what it tests.
+- **Culture.** `tests/xunit.runner.json` sets `"culture": "tr-TR"` for every test process, and a
+  canary test (`TestCultureTests`) fails if that setting stops applying.
+- **Never mock** the DbContext or our own modules.
+- **Test names state behavior,** for example `Rename_fails_for_deactivated_user`. Underscores are
+  allowed in test projects only.
 
-```xml
-<Project>
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <AnalysisLevel>latest-recommended</AnalysisLevel>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
-    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
-  </ItemGroup>
-</Project>
-```
+## 27. Build, analyzers, banned APIs
 
-`tests/Directory.Build.props`:
+The build files are the specification; this entry says what each one owns.
 
-```xml
-<Project>
-  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
-  <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)Shared/TestCulture.cs" Link="TestCulture.cs" />
-  </ItemGroup>
-</Project>
-```
+| File | Owns |
+|---|---|
+| `Directory.Build.props` | Target framework, nullable, warnings as errors (compiler, MSBuild, NuGet), `AnalysisMode` `All`, documentation file, lock files |
+| `Directory.Packages.props` | The single version of every package, and the analyzers every project gets |
+| `.editorconfig` | Code style, and every analyzer rule that is turned off, each with its reason |
+| `BannedSymbols.txt` | APIs nobody may call, each with what to use instead |
+| `LoggerParameterTypes.txt` | Log placeholder names and their types (entry 21) |
+| `global.json` | SDK version and test runner |
+| `dotnet-tools.json` | The pinned Aspire CLI; `dotnet aspire update` upgrades it with the AppHost |
+| `NuGet.Config` | The only package source, with every package mapped to it |
+| `tests/Directory.Build.props` | The shape of every test project |
 
-`Directory.Packages.props` sets `<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>`,
-so every package has exactly one version across the solution.
-
-`.editorconfig`:
-
-```ini
-root = true
-
-[*]
-charset = utf-8
-end_of_line = lf
-insert_final_newline = true
-
-[*.cs]
-# Types are written out: no var, no target-typed new
-csharp_style_var_for_built_in_types = false
-csharp_style_var_when_type_is_apparent = false
-csharp_style_var_elsewhere = false
-csharp_style_implicit_object_creation_when_type_is_apparent = false
-dotnet_diagnostic.IDE0008.severity = error
-
-# Culture and string comparison must be explicit
-dotnet_diagnostic.CA1304.severity = error
-dotnet_diagnostic.CA1305.severity = error
-dotnet_diagnostic.CA1307.severity = error
-dotnet_diagnostic.CA1309.severity = error
-dotnet_diagnostic.CA1310.severity = error
-dotnet_diagnostic.CA1311.severity = error
-
-[tests/**/*.cs]
-# TestCulture.cs uses a module initializer on purpose
-dotnet_diagnostic.CA2255.severity = none
-```
-
-`.gitattributes`:
-
-```
-* text=auto eol=lf
-```
-
-`BannedSymbols.txt`:
-
-```
-P:System.DateTime.Now;Use TimeProvider
-P:System.DateTime.UtcNow;Use TimeProvider
-P:System.DateTime.Today;Use TimeProvider and an explicit time zone
-P:System.DateTimeOffset.Now;Use TimeProvider
-P:System.DateTimeOffset.UtcNow;Use TimeProvider
-P:System.TimeZoneInfo.Local;Use an explicit time zone
-M:System.DateTime.ToLocalTime;Use an explicit time zone
-M:System.DateTimeOffset.ToLocalTime;Use an explicit time zone
-P:System.Globalization.CultureInfo.CurrentCulture;Pass a CultureInfo explicitly
-P:System.Globalization.CultureInfo.CurrentUICulture;Pass a CultureInfo explicitly
-M:System.Guid.NewGuid;Use <TypedId>.New()
-```
-
-- **Noisy analyzer rules** are tuned in `.editorconfig`, never with `#pragma` scattered through
-  the code.
+- **Rules are turned off only in `.editorconfig`,** with a one-line reason, scoped to a path when
+  only some files need it. Never `#pragma` or `[SuppressMessage]`.
+- **Not caught by the compiler yet:** target-typed `new(...)` and implicit union conversions. No
+  off-the-shelf analyzer covers them; reviews do. If they keep slipping through, write a small
+  analyzer in this repository.
 - **New packages need clear net value.** Call them out in the change summary.
 - **Repeated mistakes become bans.** When a mistake repeats, ban the API or raise an analyzer
   rule rather than adding another paragraph here.
 
-## 27. Recipes
+## 28. Files and naming
+
+- **One top-level type per file,** and the file is named after it: `UserId.cs`. Generic types use
+  braces: `Result{T}.cs`. Partial types add a suffix: `UsersApi.RenameUser.cs`. MA0048 enforces
+  this.
+- **Nested types stay nested** only when they belong to their parent alone, such as an endpoint's
+  request record.
+
+## 29. Recipes
 
 ### Add a feature
 
 1. Add the method, with its command and DTO records, to `I<Module>Api`.
-2. Implement it in `Features/<FeatureName>.cs`, following the five-step shape.
+2. Implement it in `Features/<Module>Api.<Feature>.cs`, following the five-step shape.
 3. Put any new rule in a value type or entity. Methods that emit events take `IOutbox`. Add
    errors callers may branch on to `<Module>Errors`.
 4. If clients need it, add a named handler in `Endpoints/<Module>Endpoints.cs`.
-5. Test it through the contract: normal path, consequential failure, authorization.
+5. Test it end to end through the public API: normal path, consequential failure, authorization.
 6. Update the module README if the contract's purpose, events, or dependencies changed.
 
 ### Add a module
 
 0. **Check first.** Should an existing module own this capability?
-1. **Create the two projects.**
-   - `Company.Product.<Module>.Contracts` references `Company.Platform`.
-   - `Company.Product.<Module>` references its Contracts and `Company.Platform.Modules`, and
+1. **Create the two projects** under `src/ControlPlane/Modules/<Module>/`.
+   - `Bagatka.AiSloth.<Module>.Contracts` references `Bagatka.Foundation`.
+   - `Bagatka.AiSloth.<Module>` references its Contracts and `Bagatka.Foundation.Modules`, and
      declares `InternalsVisibleTo` for its test project.
 2. **Add the standard files:**
-   - `<Module>Module`.
+   - `<Module>Module`, and `<Module>Settings` if the module needs settings.
    - `<Module>Api` (the partial root).
    - `<Module>DbContext`, with its schema, its outbox, and every configuration and conversion
      listed.
    - `Log.cs`.
 3. **Write its map.** Copy `docs/templates/module-readme.md` into the module folder and fill it in.
-4. **Wire it up.** Register it in `Program.cs`, and add an endpoints file if clients need one.
+4. **Wire it up.** Add both projects to `AiSloth.slnx` and reference them from
+   `tests/Bagatka.AiSloth.ArchitectureTests` (a test fails until you do). Register the module in
+   `Program.cs`, and add an endpoints file if clients need one.
 5. **Update the shared docs.** Add the module to the Module map in `ARCHITECTURE.md`, and its
    terms to `GLOSSARY.md`.
 6. **Create the initial migration.**

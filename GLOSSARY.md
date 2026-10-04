@@ -8,34 +8,66 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 
 ## Architecture terms
 
-These are the same in every product built from this template.
-
 | Term | Meaning | Lives in | Don't call it |
 |---|---|---|---|
-| Module | A capability with one contract, its own data, and an internal implementation | `src/Modules/<Module>` | service (until extracted), component, domain |
+| Module | A capability with one contract, its own data, and an internal implementation | `src/ControlPlane/Modules/<Module>` | service (until extracted), component, domain |
 | Contract | A module's public interface `I<Module>Api` and its records | `<Module>.Contracts` | facade, client, port |
-| Feature | One contract method, implemented in one file | `Features/` | use case, handler, command handler |
+| Feature | One contract method, implemented in one file | `Features/<Module>Api.<Feature>.cs` | use case, handler, command handler |
 | Command | Record carrying input to a state-changing feature | Contracts | request, DTO |
 | DTO | Record a contract returns | Contracts | model, view model, response |
-| Request | HTTP input record in the gateway | `Endpoints/` | command |
-| Gateway | The HTTP edge and composition root | `Company.Product.WebApi` | API layer, BFF, controllers |
-| Composition | A gateway response assembled from several modules | `Composition/` | aggregator, orchestrator |
-| Actor | Who performs a call: a user, a named system process, or anonymous | `Company.Platform` | current user, principal, caller |
+| Request | HTTP input record in the WebApi | `Endpoints/` | command |
+| WebApi | The HTTP host and composition root of the control plane | `Bagatka.AiSloth.WebApi` | gateway, API layer, BFF, controllers |
+| Gateway | The future public edge in front of several services; routes public endpoints and hides internal ones. It doesn't exist yet. | — | the WebApi |
+| Composition | A WebApi response assembled from several modules | `Composition/` | aggregator, orchestrator |
+| Actor | Who performs a call: a user, a named system process, or anonymous | `Bagatka.Foundation` | current user, principal, caller |
 | Entity | Persisted object that owns its state changes and rules | `Model/` | model, aggregate |
 | Value type | Small immutable type that owns a validation rule | `Model/` | value object, wrapper |
 | Typed ID | Strongly typed identifier of an entity | Contracts | key, raw Guid |
-| Result / Error | Returned value for expected outcomes; an error has a code and a kind | `Company.Platform` | exception |
+| Result / Error | Returned value for expected outcomes; an error has a kind and a code | `Bagatka.Foundation` | exception |
 | Integration event | A fact a module publishes after commit | Contracts | domain event, message, notification |
 | Reaction | A module's handler for another module's event | `Reactions/` | consumer, subscriber, listener |
 | Outbox | Where a module's events go: entity methods receive `IOutbox` and add events, which commit in the same transaction as the change | module schema | queue, event bus |
 | Job | Background work owned by a module | `Jobs/` | worker, cron, task |
-| Platform | General-purpose plumbing shared by all modules | `src/Platform` | shared kernel, common, core, utils |
+| Foundation | General-purpose plumbing shared by every project | `src/Foundation` | platform, shared kernel, common, core, utils |
 | Sdk client | General-purpose client for a third-party API | `src/Sdk` | integration, adapter, wrapper |
+| Settings | Fixed values an owner needs: an immutable record the host builds from configuration and passes at registration | next to the owner's registration | options, config |
+| Live options | Values that may change while running, read through `IOptionsMonitor<T>` at each decision | the owner's project | settings, dynamic config |
 
 ## Product terms
 
-Fill in per product.
-
-| Term | Meaning | Owner module | Don't call it |
+| Term | Meaning | Owner | Don't call it |
 |---|---|---|---|
-| _Member (example)_ | _A user's membership in an organization, with a role_ | _Organizations_ | _participant, seat_ |
+| Control plane | The system that owns all state and decisions: the WebApi and its modules, later several services | `src/ControlPlane` | platform, backend, engine |
+| User | A person who signs in. One user can be a member of many workspaces. | Users (planned) | account, customer |
+| Workspace | Where people work together and what owns nooks, like a Slack workspace: a personal one, a company one | Workspaces | organization, team, tenant |
+| Member | A user's membership in a workspace, with a role | Workspaces | participant, seat |
+| Nook | Where agents work: an isolated machine with its files and processes, owned by a workspace. With its chats, the basic unit. A provider's sandbox underneath. | Nooks | sandbox, orb, VM, container, environment, workspace |
+| Chat | A conversation between people and a coding agent working in one nook | Chats (planned) | thread, session, conversation |
+| Turn | One message in a chat and everything the agent did in reply | Chats (planned) | step, exchange |
+| Checkpoint | A nook's source files saved at one moment, such as after a turn | Nooks (planned) | snapshot, backup |
+| Fork | A new nook started from a checkpoint, with the chat resumed up to that point | Nooks, Chats (planned) | clone, copy, branch |
+| Source | Where some of a nook's files come from, mounted at `/work/<name>`: a repository or a folder | Sources (planned) | repo (for both kinds), mount |
+| Repository | A source from a git remote such as GitHub or GitLab | Sources (planned) | repo link, git source |
+| Folder | A source whose files AiSloth keeps, starting empty or from an upload, with versions | Sources (planned) | upload, directory, bucket |
+| Changes | What differs in a nook's copy of a source from what it started with | Nooks, Sources (planned) | diff, patch (except as a download format) |
+| Recipe | A source's setup script, safe to run again, owned by AiSloth and versioned | Sources (planned) | setup script, bootstrap, skill |
+| Template | A snapshot of a nook right after its recipes ran, used to start new nooks fast | Nooks (planned) | image, cache, warm pool |
+| Project | An optional group of nooks, chats, and sources for a team working toward one goal | Projects (planned) | space, board, workspace |
+| Harness | The program that runs a coding agent, such as Claude Code or Codex | Chats (planned) | agent (that's what it runs), CLI, client |
+| Harness profile | Where one harness keeps state between sessions, and which parts AiSloth saves | Chats (planned) | adapter, plugin |
+| Harness state | The files a harness keeps between sessions, such as its memory, saved and restored by AiSloth | Chats (planned) | memory (ours), context |
+| Paused | A nook whose compute is released with memory and files kept; it resumes in about a second and processes continue | Nooks | hibernated, sleeping, hot |
+| Stopped | A nook whose compute is released with files kept; it resumes in seconds and processes start again | Nooks | archived, cold, shut down |
+| Process | A program the daemon runs in a nook until it exits or is stopped, independent of the control plane. Agents, setup scripts, and one-off commands are all processes. | Nooks | job, task, command |
+| Watch | Streaming a process's output from an offset, first what was kept and then live; any number per process | Nooks | subscription, tail |
+| Preview | A web server running in a nook, opened in a browser through the control plane | Nooks (planned) | port forward, tunnel |
+| Daemon | `slothd`, the process in every nook that dials the control plane and runs processes for it | `src/Daemon` | agent, sidecar, runner |
+| Daemon token | The secret a daemon proves its nook with; issued by Nooks, stored only as a hash | Nooks | API key, password |
+| Instruction | A message from the control plane telling a daemon what to do | Nooks, `daemon.proto` | command, request |
+| Agent | A coding agent, such as Claude Code, Codex, or Amp, working inside a nook | — | bot, assistant, the daemon |
+| Agent actor | An agent acting for the user who sent the current message | `Bagatka.Foundation` (planned) | bot user, service account |
+| Machine | A computer someone registers to a workspace to run nooks on, such as a VPS or a Mac mini; its nooks still run isolated, in containers or virtual machines | Machines (planned) | runner, worker, node, host |
+| Sandbox | A provider's isolated machine: the technical term beneath a nook, used only in `src/Sandboxing` | `Bagatka.Sandboxing` | nook (in provider code) |
+| Sandbox provider | The implementation of the provider contract for one compute backend, such as Docker or Azure Container Apps Sandboxes | `src/Sandboxing` | driver, adapter, backend |
+| Sandbox key | The caller's identifier for a sandbox at a provider; AiSloth uses the nook's ID | `Bagatka.Sandboxing` | resource name |
+| Snapshot | A saved copy of a sandbox's files that new sandboxes can start from | `Bagatka.Sandboxing` | image, backup |

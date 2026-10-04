@@ -220,6 +220,12 @@ Never let parallel workers each invent a shared contract. Integrate and verify t
 These hold at every level, whatever the scope.
 
 - **Failure honesty.** Validate untrusted input at trust boundaries, and represent expected absence explicitly. Preserve error context. Never hide failure behind invented data, silent fallbacks, or weakened checks. Retries and compensation must be explicit and semantically safe.
+- **Proportional handling.** Effort follows how often a case happens and what it costs when it
+  does. Anything users will plausibly hit, about one operation in a hundred or more often, is
+  handled properly. A rarer case gets its own handling only when that takes a few lines; otherwise
+  it fails through the general path, with an error that says what is off and a `// Not handled:`
+  comment naming the case and what handling it would take. A small share of the code should cover
+  nearly all cases. Rarity never excuses silent failure, corrupted data, or a security hole.
 - **Security and privacy.** Use least privilege and safe defaults. Keep secrets and sensitive data out of logs, errors, and fixtures. Irreversible operations require appropriate authorization and a recovery strategy.
 - **State and resources.** Every piece of mutable state and every resource has an obvious owner and lifetime.
   - Persistence, transactions, partial completion, and cleanup are deliberate.
@@ -231,6 +237,11 @@ These hold at every level, whatever the scope.
   - Measure real workloads before adding caches, queues, or concurrency. Each one needs a demonstrated purpose and defined consistency, failure, and resource semantics.
 - **Dependencies.** Prefer mature platform and standard-library capabilities. Add a third-party dependency only for clear net value after weighing maintenance, security, and compatibility. Isolate it behind a boundary when its details would otherwise spread.
 - **Code.** Use precise names, visible control flow, and local conventions. Comments explain intent, invariants, and non-obvious trade-offs, not syntax. Generate mechanical artifacts from a reviewable source, and never hand-edit generated output.
+- **Direct calls, owned state.** Call an object's methods where the decision is made,
+  `process.Kill()`, and handle failures at that call site. Don't wrap a single call in a helper that
+  takes the object and returns nothing. A helper earns its place by computing a value or hiding real
+  knowledge. Inside a module, objects own their state and change it through their own methods;
+  immutable plain data is for boundaries and for sharing between threads.
 - **Explicit over implicit.** Code says what it does where it does it: visible registration instead of scanning, named conversions instead of implicit ones, types written where they aren't obvious, defaults stated instead of inherited from the framework. A contributor who doesn't know the platform's conventions should still read any file correctly. An implicit mechanism is allowed only where forgetting the explicit version would be a correctness or security bug, and each one is recorded in the pattern registry.
 - **Same behavior on every machine.** Never depend on the machine's culture, time zone, line endings, path separators, or file-name casing. Machine-readable text uses invariant formats; human-readable text uses a culture passed explicitly. Tests run under a deliberately unfriendly culture so these bugs fail everywhere, not only on a colleague's machine.
 
@@ -274,20 +285,25 @@ For network services, the contract is a machine-readable schema (e.g. OpenAPI or
 Local rules refine this document. Where they conflict, follow the local rule and mention the
 conflict.
 
-- **Stack:** .NET 11 RC1, ASP.NET Core minimal APIs, EF Core, PostgreSQL 18, OTEL, xUnit v3 with MTP v2.
+- **Stack:** .NET 11 RC1 (C# 15), ASP.NET Core minimal APIs, EF Core, PostgreSQL 18,
+  OpenTelemetry, Aspire, xUnit v3 on Microsoft Testing Platform v2.
+- **Environment:** run `./dev` (Nix) for the pinned SDK; the shell also pins `DOTNET_ROOT`.
 - **Commands:**
-  - Build: `dotnet build`
-  - Test: `dotnet test`
-  - Format check: `dotnet format --verify-no-changes`
+  - Build: `dotnet build AiSloth.slnx`
+  - Test: `dotnet test --solution AiSloth.slnx`
+  - Format check: `dotnet format AiSloth.slnx --verify-no-changes`
+  - Aspire CLI (pinned in `dotnet-tools.json`): `dotnet tool restore` once, then
+    `dotnet aspire run` to run locally and `dotnet aspire update` to upgrade Aspire
   - New migration (verify once the first module exists):
-    `dotnet ef migrations add <Name> --project src/Modules/<Module>/Company.Product.<Module> --startup-project src/Company.Product.WebApi --context <Module>DbContext --output-dir Data/Migrations`
+    `dotnet ef migrations add <Name> --project src/ControlPlane/Modules/<Module>/Bagatka.AiSloth.<Module> --startup-project src/ControlPlane/Bagatka.AiSloth.WebApi --context <Module>DbContext --output-dir Data/Migrations`
 - **System map:** `ARCHITECTURE.md`
 - **Pattern registry:** `PATTERNS.md`
 - **Glossary:** `GLOSSARY.md`
-- **Module maps:** `src/Modules/<Module>/README.md`, from the template `docs/templates/module-readme.md`
+- **Module maps:** `src/ControlPlane/Modules/<Module>/README.md`, from the template
+  `docs/templates/module-readme.md`
 - **Contracts and enforcement:**
-  - Each module's contract is `I<Module>Api` in `Company.Product.<Module>.Contracts`.
+  - Each module's contract is `I<Module>Api` in `Bagatka.AiSloth.<Module>.Contracts`.
   - Everything else in a module is `internal`.
-  - Boundaries are enforced by project references, `internal`, banned APIs, and
-    `tests/Company.Product.ArchitectureTests`.
+  - Boundaries are enforced by project references, `internal`, analyzers (`AnalysisMode` `All`,
+    Meziantou, banned APIs), and `tests/Bagatka.AiSloth.ArchitectureTests`.
 - **Known exceptions:** none yet.

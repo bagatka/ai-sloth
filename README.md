@@ -5,7 +5,17 @@ On-demand, disposable cloud development environments for AI coding agents.
 ## Development
 
 Install [Nix](https://nixos.org/download/), then run `./dev` to enter Nushell with
-.NET 11 RC1, Docker CLI, and Git.
+.NET 11 RC1, the Docker CLI, Git, and clang for Native AOT. Run `dotnet tool restore` once for the
+pinned Aspire CLI, then `dotnet aspire run` starts the app locally. Anything that runs containers,
+including the tests, needs a Docker engine, which Nix can't provide: use Docker Desktop (with WSL
+integration on Windows), OrbStack, Colima, or a system `dockerd`.
+
+Personal coding tools (Claude Code, Codex, etc.) are not managed by the flake.
+Install and update them using their own installers. `./dev` includes
+`$HOME/.local/bin` in PATH and retains the inherited PATH, so user-installed tools
+remain available across shell sessions and WSL restarts without Nix updates.
+For access outside `./dev`, include `$HOME/.local/bin` in your shell's startup PATH
+as well.
 
 ### Amp orbs
 
