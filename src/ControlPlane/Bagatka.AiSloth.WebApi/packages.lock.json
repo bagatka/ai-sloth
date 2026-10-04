@@ -321,6 +321,21 @@
           "Microsoft.IdentityModel.Tokens": "8.19.2"
         }
       },
+      "bagatka.aisloth.chats": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Chats.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation.Modules": "[1.0.0, )"
+        }
+      },
+      "bagatka.aisloth.chats.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Nooks.Contracts": "[1.0.0, )",
+          "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
       "bagatka.aisloth.daemonprotocol": {
         "type": "Project",
         "dependencies": {

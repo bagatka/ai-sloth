@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\src\Aspire\Bagatka.AiSloth.AppHost\Bagatka.AiSloth.AppHost.csproj" />
     <!-- Machine agents run in the test process. -->
     <ProjectReference Include="..\..\src\Cli\Bagatka.AiSloth.Cli\Bagatka.AiSloth.Cli.csproj" />
+    <ProjectReference Include="..\..\src\ControlPlane\Modules\Chats\Bagatka.AiSloth.Chats.Contracts\Bagatka.AiSloth.Chats.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Machines\Bagatka.AiSloth.Machines.Contracts\Bagatka.AiSloth.Machines.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Nooks\Bagatka.AiSloth.Nooks.Contracts\Bagatka.AiSloth.Nooks.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Users\Bagatka.AiSloth.Users.Contracts\Bagatka.AiSloth.Users.Contracts.csproj" />

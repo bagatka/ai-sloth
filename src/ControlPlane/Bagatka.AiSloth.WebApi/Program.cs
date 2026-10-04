@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Threading;
+using Bagatka.AiSloth.Chats;
 using Bagatka.AiSloth.Machines;
 using Bagatka.AiSloth.Nooks;
 using Bagatka.AiSloth.Users;
@@ -43,12 +44,18 @@ UsersSettings users = builder.Configuration.GetRequired<UsersSettings>("Modules:
 WorkspacesSettings workspaces = builder.Configuration.GetRequired<WorkspacesSettings>("Modules:Workspaces");
 MachinesSettings machines = builder.Configuration.GetRequired<MachinesSettings>("Modules:Machines");
 NooksSettings nooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
+ChatsSettings chats = builder.Configuration.GetRequired<ChatsSettings>("Modules:Chats");
+ModelGatewaySettings modelGateway = builder.Configuration.GetRequired<ModelGatewaySettings>("ModelGateway");
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.ConfigureHttpJsonOptions(json => FoundationJson.Configure(json.SerializerOptions));
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddGrpc();
+builder.Services.AddSingleton(modelGateway);
+
+// Model calls stream for as long as the agent's turn needs; the agent cancels, never a timeout here.
+builder.Services.AddHttpClient(ModelGatewayEndpoints.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan);
 
 // Tokens from the configured OpenID Connect provider; who the token's subject is, Users decides.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -72,7 +79,8 @@ builder.Services
     .AddUsersModule(users)
     .AddWorkspacesModule(workspaces)
     .AddMachinesModule(machines)
-    .AddNooksModule(nooks);
+    .AddNooksModule(nooks)
+    .AddChatsModule(chats);
 
 await using WebApplication app = builder.Build();
 
@@ -95,6 +103,11 @@ app.MapUsersEndpoints();
 app.MapWorkspacesEndpoints();
 app.MapMachinesEndpoints();
 app.MapNooksEndpoints();
+app.MapChatsEndpoints();
+
+// Agents in nooks reach the model gateway on Kestrel's "Models" endpoint (appsettings.json); a call
+// carries its chat's token instead of a user's.
+app.MapModelGateway();
 
 // Daemons and machines dial Kestrel's HTTP/2-only "Daemon" endpoint (appsettings.json) and prove
 // themselves with their own token instead of a user's.

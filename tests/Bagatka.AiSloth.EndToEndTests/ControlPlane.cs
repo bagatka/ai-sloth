@@ -27,7 +27,9 @@ namespace Bagatka.AiSloth.EndToEndTests;
 public sealed class ControlPlane : IAsyncLifetime
 {
     private readonly int _daemonPort = FreePort();
+    private readonly int _modelsPort = FreePort();
     private FakeIssuer? _issuer;
+    private FakeModel? _model;
     private DistributedApplication? _app;
 
     /// <summary>What <c>sloth machine connect</c> takes: the endpoint daemons and machines dial.</summary>
@@ -39,6 +41,12 @@ public sealed class ControlPlane : IAsyncLifetime
 
     private string MachineScope => Scope + "-m";
 
+    /// <summary>The model agents talk to through the gateway.</summary>
+    internal FakeModel Model => _model ?? throw new InvalidOperationException("The model hasn't started.");
+
+    /// <summary>The model gateway on the endpoint agents in nooks reach.</summary>
+    public Uri ModelGatewayUrl => new Uri(string.Create(CultureInfo.InvariantCulture, $"http://localhost:{_modelsPort}/models/"));
+
     private DistributedApplication App => _app ?? throw new InvalidOperationException("The app hasn't started.");
 
     private FakeIssuer Issuer => _issuer ?? throw new InvalidOperationException("The issuer hasn't started.");
@@ -47,12 +55,16 @@ public sealed class ControlPlane : IAsyncLifetime
     {
         CancellationToken ct = TestContext.Current.CancellationToken;
         _issuer = await FakeIssuer.StartAsync();
+        _model = await FakeModel.StartAsync();
         IDistributedApplicationTestingBuilder appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Bagatka_AiSloth_AppHost>(
             [
                 "Parameters:authentication-issuer=" + _issuer.Issuer,
                 "Parameters:authentication-audience=" + FakeIssuer.Audience,
                 "Parameters:sandbox-scope=" + Scope,
+                "Parameters:model-upstream=" + _model.Url,
+                "Parameters:anthropic-api-key=" + FakeModel.ApiKey,
                 "DaemonPort=" + _daemonPort.ToString(CultureInfo.InvariantCulture),
+                "ModelsPort=" + _modelsPort.ToString(CultureInfo.InvariantCulture),
             ],
             ct);
         _app = await appHost.BuildAsync(ct);
@@ -100,6 +112,11 @@ public sealed class ControlPlane : IAsyncLifetime
         if (_issuer is not null)
         {
             await _issuer.DisposeAsync();
+        }
+
+        if (_model is not null)
+        {
+            await _model.DisposeAsync();
         }
     }
 

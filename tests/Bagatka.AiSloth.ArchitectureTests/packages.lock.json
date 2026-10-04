@@ -458,6 +458,21 @@
           "xunit.v3.runner.common": "[4.0.1]"
         }
       },
+      "bagatka.aisloth.chats": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Chats.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation.Modules": "[1.0.0, )"
+        }
+      },
+      "bagatka.aisloth.chats.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Nooks.Contracts": "[1.0.0, )",
+          "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
       "bagatka.aisloth.cli": {
         "type": "Project",
         "dependencies": {
@@ -538,6 +553,7 @@
       "bagatka.aisloth.webapi": {
         "type": "Project",
         "dependencies": {
+          "Bagatka.AiSloth.Chats": "[1.0.0, )",
           "Bagatka.AiSloth.DaemonProtocol": "[1.0.0, )",
           "Bagatka.AiSloth.MachineProtocol": "[1.0.0, )",
           "Bagatka.AiSloth.Machines": "[1.0.0, )",

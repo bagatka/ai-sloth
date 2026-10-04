@@ -10,6 +10,8 @@
   <Folder Name="/src/ControlPlane/Modules/" />
   <Folder Name="/src/ControlPlane/Modules/Chats/">
     <File Path="src/ControlPlane/Modules/Chats/README.md" />
+    <Project Path="src/ControlPlane/Modules/Chats/Bagatka.AiSloth.Chats.Contracts/Bagatka.AiSloth.Chats.Contracts.csproj" />
+    <Project Path="src/ControlPlane/Modules/Chats/Bagatka.AiSloth.Chats/Bagatka.AiSloth.Chats.csproj" />
   </Folder>
   <Folder Name="/src/ControlPlane/Modules/Machines/">
     <File Path="src/ControlPlane/Modules/Machines/README.md" />

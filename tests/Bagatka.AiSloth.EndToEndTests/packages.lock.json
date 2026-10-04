@@ -569,6 +569,14 @@
           "Aspire.Hosting.PostgreSQL": "[13.6.0, )"
         }
       },
+      "bagatka.aisloth.chats.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Nooks.Contracts": "[1.0.0, )",
+          "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
       "bagatka.aisloth.cli": {
         "type": "Project",
         "dependencies": {

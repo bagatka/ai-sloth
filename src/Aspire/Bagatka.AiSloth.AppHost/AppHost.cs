@@ -12,6 +12,11 @@ const string NookImage = "aisloth-nook:dev";
 IResourceBuilder<ParameterResource> issuer = builder.AddParameter("authentication-issuer");
 IResourceBuilder<ParameterResource> audience = builder.AddParameter("authentication-audience");
 
+// The model provider agents call through the WebApi's model gateway, and the deployment's key for it,
+// which never enters a nook. Set the key as a user secret of this project, or when the dashboard asks.
+IResourceBuilder<ParameterResource> modelUpstream = builder.AddParameter("model-upstream", builder.Configuration["Parameters:model-upstream"] ?? "https://api.anthropic.com");
+IResourceBuilder<ParameterResource> modelKey = builder.AddParameter("anthropic-api-key", secret: true);
+
 // The Docker scope nooks run in, so test runs never touch a developer's nooks. A parameter given a
 // value can't be overridden, so the default is applied here.
 IResourceBuilder<ParameterResource> sandboxScope = builder.AddParameter("sandbox-scope", builder.Configuration["Parameters:sandbox-scope"] ?? "dev");
@@ -24,24 +29,10 @@ IResourceBuilder<PostgresDatabaseResource> database = builder.AddPostgres("postg
 IResourceBuilder<ExecutableResource> nookImage = builder.AddExecutable(
     "nook-image", "docker", repositoryRoot, "build", "--file", "src/Daemon/Dockerfile", "--tag", NookImage, ".");
 
-// Nooks are containers that reach the daemon endpoint through the Docker host's gateway. On Linux the
-// gateway isn't localhost, where Aspire's proxy and Kestrel would listen, so the WebApi listens on
-// every IPv4 interface itself; Docker Desktop on WSL doesn't forward to dual-stack (`*`) listeners.
-// Without the proxy the port is fixed (5171, appsettings.json), so tests pass a free one as DaemonPort.
-string? daemonPort = builder.Configuration["DaemonPort"];
 IResourceBuilder<ProjectResource> webApi = builder.AddProject<Projects.Bagatka_AiSloth_WebApi>("webapi")
-    .WithHttpHealthCheck("/health", endpointName: "Http")
-    .WithEndpoint("Daemon", daemon =>
-    {
-        daemon.IsProxied = false;
-        if (daemonPort is not null)
-        {
-            daemon.Port = int.Parse(daemonPort, CultureInfo.InvariantCulture);
-            daemon.TargetPort = daemon.Port;
-        }
-    });
-EndpointReference daemonEndpoint = webApi.GetEndpoint("Daemon");
-webApi.WithEnvironment("Kestrel__Endpoints__Daemon__Url", ReferenceExpression.Create($"http://0.0.0.0:{daemonEndpoint.Property(EndpointProperty.TargetPort)}"));
+    .WithHttpHealthCheck("/health", endpointName: "Http");
+EndpointReference daemonEndpoint = NookFacing("Daemon", builder.Configuration["DaemonPort"]);
+EndpointReference modelsEndpoint = NookFacing("Models", builder.Configuration["ModelsPort"]);
 
 // The WebApi in migration mode: applies every module's migrations, then exits.
 IResourceBuilder<ProjectResource> migrations = builder.AddProject<Projects.Bagatka_AiSloth_WebApi>("migrations", options => options.ExcludeKestrelEndpoints = true)
@@ -58,6 +49,10 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         .WithEnvironment("Modules__Workspaces__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Machines__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Nooks__ConnectionString", database.Resource.ConnectionStringExpression)
+        .WithEnvironment("Modules__Chats__ConnectionString", database.Resource.ConnectionStringExpression)
+        .WithEnvironment("Modules__Chats__ModelGatewayUrl", ReferenceExpression.Create($"http://host.docker.internal:{modelsEndpoint.Property(EndpointProperty.Port)}/models"))
+        .WithEnvironment("ModelGateway__Upstream", modelUpstream)
+        .WithEnvironment("ModelGateway__ApiKey", modelKey)
         .WithEnvironment("Modules__Nooks__DaemonUrl", ReferenceExpression.Create($"http://host.docker.internal:{daemonEndpoint.Property(EndpointProperty.Port)}"))
         .WithEnvironment("Modules__Nooks__Image", NookImage)
         .WithEnvironment("Modules__Nooks__CpuMillicores", "2000")
@@ -70,3 +65,23 @@ webApi.WaitForCompletion(migrations).WaitForCompletion(nookImage);
 
 using DistributedApplication app = builder.Build();
 app.Run();
+
+// Nooks are containers that reach these endpoints through the Docker host's gateway. On Linux the
+// gateway isn't localhost, where Aspire's proxy and Kestrel would listen, so the WebApi listens on
+// every IPv4 interface itself; Docker Desktop on WSL doesn't forward to dual-stack (`*`) listeners.
+// Without the proxy a port is fixed (appsettings.json), so tests pass free ones.
+EndpointReference NookFacing(string name, string? port)
+{
+    webApi.WithEndpoint(name, endpoint =>
+    {
+        endpoint.IsProxied = false;
+        if (port is not null)
+        {
+            endpoint.Port = int.Parse(port, CultureInfo.InvariantCulture);
+            endpoint.TargetPort = endpoint.Port;
+        }
+    });
+    EndpointReference reference = webApi.GetEndpoint(name);
+    webApi.WithEnvironment("Kestrel__Endpoints__" + name + "__Url", ReferenceExpression.Create($"http://0.0.0.0:{reference.Property(EndpointProperty.TargetPort)}"));
+    return reference;
+}
