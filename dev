@@ -6,6 +6,9 @@ if ! command -v nix >/dev/null 2>&1; then
   exit 127
 fi
 
+# Keep user-installed tools available without making them Nix dependencies.
+export PATH="$HOME/.local/bin:$PATH"
+
 exec nix --extra-experimental-features 'nix-command flakes' develop \
   --command nu --execute '$env.config.show_banner = false' "$@"
 
