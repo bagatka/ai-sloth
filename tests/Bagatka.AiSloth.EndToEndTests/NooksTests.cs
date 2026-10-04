@@ -23,10 +23,6 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// </summary>
 public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
 {
-    // Background work such as the reconciler and the daemon's reports takes seconds; this bounds
-    // waiting for it, so a broken test fails instead of hanging.
-    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
-
     private readonly HttpClient _alice = controlPlane.ClientFor("alice-" + Guid.CreateVersion7());
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -52,7 +48,7 @@ public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
         NookSummary nook = await CreateNookAsync();
         await StartAsync(nook, "true");
 
-        DiskUsage disk = await EventuallyAsync(async () => (await GetAsync(nook)).Disk);
+        DiskUsage disk = await Api.EventuallyAsync(async () => (await GetAsync(nook)).Disk);
 
         Assert.InRange(disk.AvailableBytes, 0, disk.TotalBytes);
     }
@@ -137,7 +133,7 @@ public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
         HttpResponseMessage deleted = await _alice.DeleteAsync(new Uri(PathOf(nook), UriKind.Relative), Ct);
 
         await Api.ExpectAsync(deleted, HttpStatusCode.NoContent);
-        await EventuallyAsync(async () => (await _alice.SendGetAsync(PathOf(nook))).StatusCode == HttpStatusCode.NotFound ? "gone" : null);
+        await Api.EventuallyAsync(async () => (await _alice.SendGetAsync(PathOf(nook))).StatusCode == HttpStatusCode.NotFound ? "gone" : null);
     }
 
     public void Dispose()
@@ -158,24 +154,6 @@ public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
     private static string WorkspaceNooksPath(WorkspaceId workspace)
     {
         return string.Create(CultureInfo.InvariantCulture, $"/workspaces/{workspace.Value}/nooks");
-    }
-
-    // Polls until the value appears.
-    private static async Task<T> EventuallyAsync<T>(Func<Task<T?>> read)
-        where T : class
-    {
-        long started = TimeProvider.System.GetTimestamp();
-        while (TimeProvider.System.GetElapsedTime(started) < Patience)
-        {
-            if (await read() is T value)
-            {
-                return value;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(200), Ct);
-        }
-
-        throw new TimeoutException(string.Create(CultureInfo.InvariantCulture, $"The value didn't appear within {Patience}."));
     }
 
     private async Task<NookSummary> CreateNookAsync()

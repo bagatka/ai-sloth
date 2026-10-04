@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Aspire.Hosting;
 using Aspire.Hosting.Testing;
+using Bagatka.AiSloth.Cli;
 using Bagatka.Sandboxing;
 using Bagatka.Sandboxing.Docker;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,11 +26,18 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// </summary>
 public sealed class ControlPlane : IAsyncLifetime
 {
+    private readonly int _daemonPort = FreePort();
     private FakeIssuer? _issuer;
     private DistributedApplication? _app;
 
-    // This run's nooks live in a Docker scope of their own, away from a developer's.
+    /// <summary>What <c>sloth machine connect</c> takes: the endpoint daemons and machines dial.</summary>
+    public Uri MachinesUrl => new Uri(string.Create(CultureInfo.InvariantCulture, $"http://localhost:{_daemonPort}"));
+
+    // This run's nooks live in Docker scopes of their own, away from a developer's: one for the
+    // docker provider, one for every machine the tests run.
     private string Scope { get; } = "e2e-" + RandomNumberGenerator.GetHexString(12, lowercase: true);
+
+    private string MachineScope => Scope + "-m";
 
     private DistributedApplication App => _app ?? throw new InvalidOperationException("The app hasn't started.");
 
@@ -44,7 +52,7 @@ public sealed class ControlPlane : IAsyncLifetime
                 "Parameters:authentication-issuer=" + _issuer.Issuer,
                 "Parameters:authentication-audience=" + FakeIssuer.Audience,
                 "Parameters:sandbox-scope=" + Scope,
-                "DaemonPort=" + FreePort().ToString(CultureInfo.InvariantCulture),
+                "DaemonPort=" + _daemonPort.ToString(CultureInfo.InvariantCulture),
             ],
             ct);
         _app = await appHost.BuildAsync(ct);
@@ -73,13 +81,20 @@ public sealed class ControlPlane : IAsyncLifetime
         return client;
     }
 
+    /// <summary>Runs machine mode in this process, as <c>sloth machine run</c> would.</summary>
+    internal RunningMachine StartMachine(MachineCredential credential)
+    {
+        return new RunningMachine(credential, new DockerSandboxSettings(new Uri("unix:///var/run/docker.sock"), MachineScope));
+    }
+
     public async ValueTask DisposeAsync()
     {
         // The app goes first: while it runs, its reconciler would recreate the sandbox of any nook still being created.
         if (_app is not null)
         {
             await _app.DisposeAsync();
-            await DeleteSandboxesAsync();
+            await DeleteSandboxesAsync(Scope);
+            await DeleteSandboxesAsync(MachineScope);
         }
 
         if (_issuer is not null)
@@ -97,10 +112,10 @@ public sealed class ControlPlane : IAsyncLifetime
     }
 
     // Whatever tests left behind, including after a failure.
-    private async Task DeleteSandboxesAsync()
+    private static async Task DeleteSandboxesAsync(string scope)
     {
         ServiceCollection services = new ServiceCollection();
-        services.AddDockerSandboxProvider(new DockerSandboxSettings(new Uri("unix:///var/run/docker.sock"), Scope));
+        services.AddDockerSandboxProvider(new DockerSandboxSettings(new Uri("unix:///var/run/docker.sock"), scope));
         await using ServiceProvider provider = services.BuildServiceProvider();
         ISandboxProvider docker = provider.GetRequiredService<ISandboxProvider>();
         await foreach (SandboxObservation sandbox in docker.ListAsync(CancellationToken.None))

@@ -458,6 +458,16 @@
           "xunit.v3.runner.common": "[4.0.1]"
         }
       },
+      "bagatka.aisloth.cli": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.MachineProtocol": "[1.0.0, )",
+          "Bagatka.Sandboxing.Docker": "[1.0.0, )",
+          "Grpc.Net.Client": "[2.84.0, )",
+          "Microsoft.Extensions.DependencyInjection": "[11.0.0-rc.1.26425.128, )",
+          "Microsoft.Extensions.Logging.Console": "[11.0.0-rc.1.26425.128, )"
+        }
+      },
       "bagatka.aisloth.daemon": {
         "type": "Project",
         "dependencies": {

@@ -1,6 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <!-- The suite reaches Docker through a Unix socket and runs sloth, which doesn't run on Windows. -->
+    <AssemblyAttribute Include="System.Runtime.Versioning.UnsupportedOSPlatformAttribute">
+      <_Parameter1>windows</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The fake OpenID Connect provider is a small ASP.NET Core app. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
@@ -12,6 +19,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Aspire\Bagatka.AiSloth.AppHost\Bagatka.AiSloth.AppHost.csproj" />
+    <!-- Machine agents run in the test process. -->
+    <ProjectReference Include="..\..\src\Cli\Bagatka.AiSloth.Cli\Bagatka.AiSloth.Cli.csproj" />
+    <ProjectReference Include="..\..\src\ControlPlane\Modules\Machines\Bagatka.AiSloth.Machines.Contracts\Bagatka.AiSloth.Machines.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Nooks\Bagatka.AiSloth.Nooks.Contracts\Bagatka.AiSloth.Nooks.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Users\Bagatka.AiSloth.Users.Contracts\Bagatka.AiSloth.Users.Contracts.csproj" />
     <!-- Deletes whatever nooks a failed run left in its Docker scope. -->

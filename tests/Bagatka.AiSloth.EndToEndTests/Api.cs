@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -14,6 +15,10 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// </summary>
 internal static class Api
 {
+    // Background work such as the reconciler and the daemon's reports takes seconds; this bounds
+    // waiting for it, so a broken test fails instead of hanging.
+    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     public static async Task<T> ReadAsync<T>(HttpResponseMessage response, HttpStatusCode expected)
@@ -47,5 +52,23 @@ internal static class Api
     public static Task<HttpResponseMessage> SendGetAsync(this HttpClient client, string path)
     {
         return client.GetAsync(new Uri(path, UriKind.Relative), Ct);
+    }
+
+    // Polls until the value appears.
+    public static async Task<T> EventuallyAsync<T>(Func<Task<T?>> read)
+        where T : class
+    {
+        long started = TimeProvider.System.GetTimestamp();
+        while (TimeProvider.System.GetElapsedTime(started) < Patience)
+        {
+            if (await read() is T value)
+            {
+                return value;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(200), Ct);
+        }
+
+        throw new TimeoutException(string.Create(CultureInfo.InvariantCulture, $"The value didn't appear within {Patience}."));
     }
 }

@@ -38,6 +38,7 @@
     <Project Path="src/ControlPlane/Modules/Workspaces/Bagatka.AiSloth.Workspaces/Bagatka.AiSloth.Workspaces.csproj" />
   </Folder>
   <Folder Name="/src/Cli/">
+    <Project Path="src/Cli/Bagatka.AiSloth.Cli/Bagatka.AiSloth.Cli.csproj" />
     <Project Path="src/Cli/Bagatka.AiSloth.MachineProtocol/Bagatka.AiSloth.MachineProtocol.csproj" />
   </Folder>
   <Folder Name="/src/Daemon/">
