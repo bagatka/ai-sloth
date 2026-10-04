@@ -7,8 +7,8 @@ templates, runs processes in them through their daemons, and checkpoints and for
 
 ## Owns
 
-- **Data:** nook records (workspace, provider, sources, status), the hash of each nook's daemon
-  token, the processes started in each nook, templates, and checkpoints.
+- **Data:** nook records (workspace, provider, sources, status, latest disk usage), the hash of
+  each nook's daemon token, the processes started in each nook, templates, and checkpoints.
 - **Rules:** who may use a nook (members of its workspace), the lifecycle below, when an idle nook
   is suspended, and which providers exist.
 - **Integrations:** sandbox providers (`src/Sandboxing`), registered by the host.
@@ -112,6 +112,10 @@ default resources, and the idle period before suspension.
 - **Output is never silently lost where it matters.** A process started with `Complete` retention
   (agent conversations) never loses output; it blocks instead when far too much waits unread.
   `Recent` processes keep a scrollback. Files are never affected by either.
+- **Disk usage is reported, not enforced here.** The daemon reports how full the nook's disk is,
+  and the nook record keeps the latest report; Chats decides what a nearly full disk means for a
+  new message. On the Docker provider the figure is the host's disk, because Docker can't cap a
+  container's disk on most setups.
 - **Daemon tokens.** Each nook gets a random token when it is created. It reaches the daemon
   through the provider's environment (`SLOTHD_TOKEN`, with `SLOTHD_NOOK_ID` and
   `SLOTHD_CONTROL_PLANE_URL`), and only its hash is stored. This module verifies it, which is why

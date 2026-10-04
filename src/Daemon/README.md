@@ -44,6 +44,19 @@ feeds, watches, and stops processes on its instructions. It is a single .NET Nat
 - **Handover.** On `Reconnect`, the daemon reconnects at once and reaches another control-plane
   instance; running processes are unaffected.
 
+## Full disk (planned)
+
+A full disk must never cost output or leave a nook unrecoverable (`ARCHITECTURE.md`, "Nothing
+delivered is lost").
+
+- **Reported.** The daemon reports how full the working directory's disk is, so the control plane
+  can ask for confirmation before it fills up.
+- **A reserve.** The daemon keeps a 256 MiB reserve file in its state directory. When output can't
+  be written because the disk is full, it deletes the reserve and says so, so watchers still get
+  output and people can still start the commands that free space.
+- **Waiting, not dropping.** While output can't be written, the daemon stops reading the process's
+  output, so the process waits instead of losing it.
+
 ## Environment
 
 Set by the Nooks module through the provider: `SLOTHD_CONTROL_PLANE_URL`, `SLOTHD_NOOK_ID`, and

@@ -53,6 +53,12 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
   branches.
 - **Running work never stops for us.** Deploys, restarts, and network blips never stop a process in
   a nook; agents may run for days. Suspension is invisible to callers.
+- **Nothing delivered is lost.** A nook is disposable, so what people can't afford to lose lives
+  outside it: the control plane saves every chat event as it arrives, and every turn ends with a
+  checkpoint of the nook's files and the harness's session state in object storage. Losing a nook,
+  through a full disk, a crash, or a deletion, costs at most the turn in progress. Risks we can see
+  coming, such as a nearly full disk, pause new work until a person confirms, with the risk
+  explained.
 - **Small units, optional groups.** A nook and its chats work on their own; a project groups them
   without anything else knowing about projects. Every capability is general-purpose: removing a
   grouping leaves the units working.

@@ -70,3 +70,11 @@ The harness profiles and the MCP endpoint URL handed to agents, as settings.
   same sources, newest file wins) and session files (saved with each checkpoint). Credentials and
   caches are never saved. We never read or change the contents, and people can inspect and reset
   them, because a hostile repository could plant instructions there.
+- **Checkpoints ship with the first chats.** They are what keeps a lost nook from costing more than
+  the turn in progress (`ARCHITECTURE.md`, "Nothing delivered is lost"), so they are not a later
+  feature that forks bring.
+- **A nearly full disk needs confirmation.** When a nook's disk is 90% used, a new message needs a
+  person's explicit confirmation, which says why: the agent may stop mid-task and files it is
+  writing can be cut short, while everything up to the last turn is saved. People free space by
+  confirming and asking the agent, or through a terminal, which is never blocked. This reuses the
+  confirmation people already give to sensitive agent operations.
