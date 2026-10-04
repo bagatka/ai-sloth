@@ -32,37 +32,49 @@ internal sealed partial class NooksApi(
     // How long a call waits for a nook's daemon, such as a new nook's first connection.
     private static readonly TimeSpan ReadyTimeout = TimeSpan.FromSeconds(60);
 
-    // The nook, if the actor may use it: every member of its workspace may, and so may the control
-    // plane's own processes, such as Chats running a harness.
-    private async Task<Nook?> FindNookAsync(Actor actor, NookId id, CancellationToken ct)
+    // The nook, if the actor may do at least `needed` with it: a person as their access to it allows,
+    // through its workspace or given to them directly, and the control plane's own processes, such as
+    // Chats running a harness, anything. Not found when they may not see it, so nobody learns that it
+    // exists; forbidden when they may see it but not do this.
+    private async Task<Result<Nook>> FindNookAsync(Actor actor, NookId id, AccessLevel needed, CancellationToken ct)
     {
         Nook? nook = await db.Nooks.SingleOrDefaultAsync(found => found.Id == id, ct);
         if (nook is null)
         {
-            return null;
+            return new Result<Nook>(NooksErrors.NotFound);
         }
 
         switch (actor)
         {
             case UserActor:
-                WorkspaceRole? role = await workspaces.GetRoleAsync(actor, nook.WorkspaceId, ct);
-                return role is null ? null : nook;
+                AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Nook(id.Value), ct);
+                if (access is null)
+                {
+                    return new Result<Nook>(NooksErrors.NotFound);
+                }
+
+                if (access < needed)
+                {
+                    return new Result<Nook>(Error.Forbidden);
+                }
+
+                return new Result<Nook>(nook);
             case SystemActor:
-                return nook;
+                return new Result<Nook>(nook);
             case AnonymousActor:
-                return null;
+                return new Result<Nook>(NooksErrors.NotFound);
         }
 
         throw new InvalidOperationException("The actor has no kind.");
     }
 
-    // The process, if the actor may use its nook.
-    private async Task<Result<Process>> FindProcessAsync(Actor actor, NookId nookId, ProcessId processId, CancellationToken ct)
+    // The process, if the actor may do at least `needed` with its nook.
+    private async Task<Result<Process>> FindProcessAsync(Actor actor, NookId nookId, ProcessId processId, AccessLevel needed, CancellationToken ct)
     {
-        Nook? nook = await FindNookAsync(actor, nookId, ct);
-        if (nook is null)
+        Result<Nook> nook = await FindNookAsync(actor, nookId, needed, ct);
+        if (nook.Failed)
         {
-            return new Result<Process>(NooksErrors.NotFound);
+            return new Result<Process>(nook.Error);
         }
 
         Process? process = await db.Processes.SingleOrDefaultAsync(found => found.Id == processId && found.NookId == nookId, ct);

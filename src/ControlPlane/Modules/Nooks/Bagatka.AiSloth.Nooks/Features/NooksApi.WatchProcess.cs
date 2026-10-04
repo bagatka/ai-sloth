@@ -1,11 +1,12 @@
-using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Daemons;
 using Bagatka.AiSloth.Nooks.Model;
+using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Nooks;
@@ -14,7 +15,7 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<IAsyncEnumerable<ProcessEvent>>> WatchProcessAsync(Actor actor, WatchProcess command, CancellationToken ct)
     {
-        Result<Process> found = await FindProcessAsync(actor, command.NookId, command.ProcessId, ct);
+        Result<Process> found = await FindProcessAsync(actor, command.NookId, command.ProcessId, AccessLevel.Read, ct);
         if (found.Failed)
         {
             return new Result<IAsyncEnumerable<ProcessEvent>>(found.Error);

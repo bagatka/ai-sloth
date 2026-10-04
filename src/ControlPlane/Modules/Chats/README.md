@@ -1,16 +1,18 @@
 # Chats
 
 A chat is a conversation with a coding agent working in one nook, run by the harness the nook
-carries on an agent account that pays for its work. Everyone in the nook's workspace can read it; on the workspace's
-account every member can message the agent, and on a personal account its owner and whoever they
-let in. Each message shows who sent it. The agent works only inside its nook. Any harness that speaks
+carries on an agent account that pays for its work. A chat is as open as its nook: whoever may read
+the nook reads it, and whoever may write writes in it. A message reaches the agent when its sender
+may use the chat's account; anyone else's is a proposal, which someone who may use it sends on, as is
+or edited.
+Each message shows who sent it. The agent works only inside its nook. Any harness that speaks
 the Agent Client Protocol (ACP) can run a chat (`src/Harnesses`); today Claude Code and GitHub Copilot.
 
 ## Owns
 
-- **Data:** chats, the messages people send, the senders a personal account's owner let in, and
-  every event of every chat.
-- **Rules:** who may read (members of the nook's workspace) and send (see above), which harness and
+- **Data:** chats, the messages and proposals people send, and every event of every chat.
+- **Rules:** who may read and write (the nook's access levels), whose messages reach the agent and
+  whose are proposals (see above), which harness and
   account a chat may run on, how a message reaches the agent (a new turn, steered into the running
   one, or cancelled by a stop), and what the agent may do without asking (anything inside its nook).
 - **Runtime state:** each busy chat's runner, which talks to the agent, and the signals that wake
@@ -29,8 +31,8 @@ the Agent Client Protocol (ACP) can run a chat (`src/Harnesses`); today Claude C
 ## Contract
 
 `IChatsApi` in `Bagatka.AiSloth.Chats.Contracts`: members list the harnesses, start chats in a nook
-on its harness and an agent account, send messages, stop the agent, let others send to a chat on their
-own account (when it is shareable), and watch a chat's events from any sequence number.
+on its harness and an agent account, send messages (or send a proposal on), stop the agent, and watch
+a chat's events from any sequence number.
 `IChatHarnessesApi` is the model gateway's side, never a public route or a tool.
 
 ```csharp
@@ -50,14 +52,16 @@ if (watch.Failed)
 
 await foreach (ChatEvent e in watch.Output)
 {
-    // MessageSent, TurnStarted, AgentUpdate (ACP session/update), ..., TurnEnded("end_turn")
+    // MessageSent, TurnStarted, AgentUpdate (ACP session/update), ..., TurnEnded("end_turn");
+    // MessageProposed when someone who may not use the account writes
 }
 ```
 
 ## Asks
 
-Workspaces (`GetRoleAsync`), on every call made for a user; Nooks, to check a nook and to start,
-feed, watch, and stop the agent's process; AgentAccounts, for the account a chat runs on.
+Workspaces (`GetAccessAsync`, on the chat's nook), on every call made for a user; Nooks, to check a
+nook and to start, feed, watch, and stop the agent's process; AgentAccounts, for the account a chat
+runs on and who may use it (`MayUseAsync`).
 
 ## Publishes
 
@@ -72,10 +76,9 @@ Nothing yet. Once nooks publish `NookDeleted`, their chats go with them.
 Schema `chats`. Tables `chats` (nook, workspace, who started it, the harness, the agent account and
 its owner when personal; the agent's process, token hash,
 session, and how far its output is read; the turn in progress; the last sequence number; `xmin`
-as concurrency token), `messages` (text, sender, and where each is on its way to the agent), and
-`events` (chat and sequence number as key, kind, and the body as `jsonb`; an agent update is the
-ACP update as the agent sent it), and `senders` (whom a personal account's owner let send to a chat;
-apart from `chats`, whose only writer is its runner).
+as concurrency token), `messages` (text, sender, the proposal it sends on, and where each is on its
+way to the agent, or that it is a proposal), and `events` (chat and sequence number as key, kind, and
+the body as `jsonb`; an agent update is the ACP update as the agent sent it).
 
 ## Background work
 
@@ -110,9 +113,12 @@ gateway's URL as an agent in a nook reaches it.
   random token for this chat (only its hash is kept), and the gateway adds the account's key. A
   plan's token, such as Copilot's, goes to the harness itself: Copilot calls GitHub directly, and the
   token's only permission is Copilot requests.
-- **Senders follow the account.** A workspace's account serves every member; a personal account its
-  owner, who may let others in only when AgentAccounts says the account is shareable (off by default:
-  plans are for one person).
+- **Proposals instead of shared accounts.** Writing in a chat follows the nook; spending an account
+  doesn't. Everyone who may write proposes, and only someone who may use the account sends to the
+  agent: a workspace's account serves people with Write on the workspace, so a nook's guest proposes
+  there, and a personal plan, such as a Claude subscription, is only ever used by its owner. Sending
+  decides it once, by AgentAccounts' `MayUseAsync`, and the message keeps it. A removed account isn't
+  anyone's to propose to: messages go through, and their turn fails with the reason.
 - **Events in ACP's own shape.** An agent update is stored and served unchanged, so a new harness
   or update kind needs no code here. The cost: ACP v1's shape is part of the stored data and the API.
 - **Every event is saved here.** A chat's history outlives its agent and its nook's suspension.
@@ -127,9 +133,10 @@ gateway's URL as an agent in a nook reaches it.
 - **MCP.** Agents can't use AiSloth's public API yet.
 - **Harness state per person.** A harness's memory, skills, and other files it keeps between
   sessions will be saved per person, from each chat's nook, and restored into their new nooks; it
-  comes with object storage. Whose state a chat with several senders updates is decided then.
+  comes with object storage. Whose state a chat several people write in updates is decided then.
 - **Codex,** once OpenAI grants plan access for hosted apps.
 - **Deleted nooks.** A chat whose nook is gone stays; its next message fails with the reason.
+- **Dismissing a proposal.** It simply stays.
 - **Event volume.** Every streamed text chunk is a row; nothing merges them yet.
 - **One active instance.** Runners and watch signals live in the instance's memory, as daemon
   connections do.

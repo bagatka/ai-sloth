@@ -15,8 +15,9 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<Page<NookSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, PageRequest page, CancellationToken ct)
     {
-        WorkspaceRole? role = await workspaces.GetRoleAsync(actor, workspaceId, ct);
-        if (role is null)
+        // A nook's guest doesn't see the workspace's other nooks.
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(workspaceId), ct);
+        if (access is null)
         {
             return new Result<Page<NookSummary>>(WorkspacesErrors.NotFound);
         }

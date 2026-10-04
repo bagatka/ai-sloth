@@ -19,15 +19,12 @@ internal sealed class ChatsDbContext(DbContextOptions<ChatsDbContext> options) :
 
     public DbSet<StoredEvent> Events => Set<StoredEvent>();
 
-    public DbSet<ChatSender> Senders => Set<ChatSender>();
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfiguration(new ChatConfiguration());
         modelBuilder.ApplyConfiguration(new MessageConfiguration());
         modelBuilder.ApplyConfiguration(new StoredEventConfiguration());
-        modelBuilder.Entity<ChatSender>().HasKey(sender => new { sender.ChatId, sender.UserId });
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

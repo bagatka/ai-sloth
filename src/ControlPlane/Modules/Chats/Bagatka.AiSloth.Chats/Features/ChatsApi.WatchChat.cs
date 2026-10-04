@@ -1,11 +1,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Chats.Data;
 using Bagatka.AiSloth.Chats.Model;
+using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,10 +18,10 @@ internal sealed partial class ChatsApi
 
     public async Task<Result<IAsyncEnumerable<ChatEvent>>> WatchAsync(Actor actor, WatchChat command, CancellationToken ct)
     {
-        Chat? chat = await FindChatAsync(actor, command.ChatId, ct);
-        if (chat is null)
+        Result<Chat> chat = await FindChatAsync(actor, command.ChatId, AccessLevel.Read, ct);
+        if (chat.Failed)
         {
-            return new Result<IAsyncEnumerable<ChatEvent>>(ChatsErrors.NotFound);
+            return new Result<IAsyncEnumerable<ChatEvent>>(chat.Error);
         }
 
         return new Result<IAsyncEnumerable<ChatEvent>>(WatchEventsAsync(command.ChatId, command.AfterSequence, ct));

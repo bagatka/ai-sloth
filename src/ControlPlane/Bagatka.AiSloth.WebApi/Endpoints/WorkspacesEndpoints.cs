@@ -27,7 +27,7 @@ internal static class WorkspacesEndpoints
         return workspaces;
     }
 
-    /// <summary>Creates a workspace; the caller becomes its owner.</summary>
+    /// <summary>Creates a workspace; the caller manages it.</summary>
     private static async Task<Results<Created<WorkspaceSummary>, ProblemHttpResult>> Create(
         [FromBody] CreateWorkspaceRequest request,
         ClaimsPrincipal principal,
@@ -50,7 +50,7 @@ internal static class WorkspacesEndpoints
         return result.ToOk();
     }
 
-    /// <summary>A workspace the caller is a member of; others get 404.</summary>
+    /// <summary>A workspace the caller has access to; others get 404.</summary>
     private static async Task<Results<Ok<WorkspaceSummary>, ProblemHttpResult>> Get(
         [FromRoute] Guid id,
         ClaimsPrincipal principal,

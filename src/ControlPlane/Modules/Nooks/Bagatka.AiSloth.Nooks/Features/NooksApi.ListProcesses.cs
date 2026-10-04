@@ -1,11 +1,12 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Model;
-using Bagatka.Foundation;
+using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation.Modules;
+using Bagatka.Foundation;
 using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Nooks;
@@ -14,10 +15,10 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<Page<ProcessSummary>>> ListProcessesAsync(Actor actor, NookId nookId, PageRequest page, CancellationToken ct)
     {
-        Nook? nook = await FindNookAsync(actor, nookId, ct);
-        if (nook is null)
+        Result<Nook> nook = await FindNookAsync(actor, nookId, AccessLevel.Read, ct);
+        if (nook.Failed)
         {
-            return new Result<Page<ProcessSummary>>(NooksErrors.NotFound);
+            return new Result<Page<ProcessSummary>>(nook.Error);
         }
 
         Result<IQueryable<Process>> paged = db.Processes.AsNoTracking()

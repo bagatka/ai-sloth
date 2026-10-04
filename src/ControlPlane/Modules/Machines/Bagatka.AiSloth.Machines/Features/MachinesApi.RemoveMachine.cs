@@ -20,15 +20,15 @@ internal sealed partial class MachinesApi
             return new Result(MachinesErrors.NotFound);
         }
 
-        WorkspaceRole? role = await workspaces.GetRoleAsync(actor, machine.WorkspaceId, ct);
-        switch (role)
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(machine.WorkspaceId), ct);
+        if (access is null)
         {
-            case null:
-                return new Result(MachinesErrors.NotFound);
-            case WorkspaceRole.Member:
-                return new Result(Error.Forbidden);
-            case WorkspaceRole.Owner:
-                break;
+            return new Result(MachinesErrors.NotFound);
+        }
+
+        if (access < AccessLevel.Manage)
+        {
+            return new Result(Error.Forbidden);
         }
 
         // A removed machine's sandboxes live nowhere AiSloth can reach, so their placements go with it.

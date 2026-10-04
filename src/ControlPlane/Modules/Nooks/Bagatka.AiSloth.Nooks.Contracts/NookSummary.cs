@@ -4,7 +4,7 @@ using Bagatka.AiSloth.Workspaces.Contracts;
 namespace Bagatka.AiSloth.Nooks.Contracts;
 
 /// <summary>
-/// A nook as its workspace members see it.
+/// A nook as the people with access to it see it.
 /// </summary>
 /// <param name="Id">The nook.</param>
 /// <param name="WorkspaceId">The workspace that owns it.</param>

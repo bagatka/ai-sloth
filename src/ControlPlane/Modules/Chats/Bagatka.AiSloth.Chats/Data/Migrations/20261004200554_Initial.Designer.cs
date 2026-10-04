@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Bagatka.AiSloth.Chats.Data.Migrations;
 
 [DbContext(typeof(ChatsDbContext))]
-[Migration("20261004163156_Initial")]
-partial class _20261004163156_Initial
+[Migration("20261004200554_Initial")]
+partial class _20261004200554_Initial
 {
     /// <inheritdoc />
     protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -110,22 +110,6 @@ partial class _20261004163156_Initial
                 b.ToTable("chats", "chats");
             });
 
-        modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.ChatSender", b =>
-            {
-                b.Property<Guid>("ChatId")
-                    .HasColumnType("uuid")
-                    .HasColumnName("chat_id");
-
-                b.Property<Guid>("UserId")
-                    .HasColumnType("uuid")
-                    .HasColumnName("user_id");
-
-                b.HasKey("ChatId", "UserId")
-                    .HasName("pk_senders");
-
-                b.ToTable("senders", "chats");
-            });
-
         modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.Message", b =>
             {
                 b.Property<Guid>("Id")
@@ -135,6 +119,14 @@ partial class _20261004163156_Initial
                 b.Property<Guid>("ChatId")
                     .HasColumnType("uuid")
                     .HasColumnName("chat_id");
+
+                b.Property<bool>("IsProposal")
+                    .HasColumnType("boolean")
+                    .HasColumnName("is_proposal");
+
+                b.Property<Guid?>("ProposalId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("proposal_id");
 
                 b.Property<DateTimeOffset>("SentAt")
                     .HasColumnType("timestamp with time zone")

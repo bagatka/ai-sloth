@@ -47,6 +47,12 @@ public sealed class ExplicitCreationAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        // An expression that doesn't compile already has an error; this rule would only add noise.
+        if (source.TypeKind == TypeKind.Error)
+        {
+            return;
+        }
+
         bool unionFromCase = IsUnion(target) && !IsUnion(source);
         if (unionFromCase)
         {

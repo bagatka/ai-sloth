@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
@@ -8,7 +7,7 @@ using Bagatka.Foundation;
 namespace Bagatka.AiSloth.Chats.Contracts;
 
 /// <summary>
-/// A chat as the members of its workspace see it.
+/// A chat as the people with access to its nook see it.
 /// </summary>
 /// <param name="Id">The chat.</param>
 /// <param name="NookId">The nook its agent works in.</param>
@@ -18,9 +17,10 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <param name="Working">Whether the agent is working on a turn, or messages wait for it.</param>
 /// <param name="Harness">The harness that runs its agent.</param>
 /// <param name="Account">The agent account that pays for its work.</param>
-/// <param name="Senders">
-/// Who may send messages: <see langword="null"/> for every member, when it runs on the workspace's
-/// account; otherwise the personal account's owner and whoever they let in.
+/// <param name="AccountOwner">
+/// The owner of the personal account it runs on, whose messages alone reach the agent: everyone
+/// else's are proposals. <see langword="null"/> on the workspace's account, which people with Write
+/// on the workspace use.
 /// </param>
 public sealed record ChatSummary(
     ChatId Id,
@@ -31,4 +31,4 @@ public sealed record ChatSummary(
     bool Working,
     string Harness,
     AgentAccountId Account,
-    IReadOnlyList<UserId>? Senders);
+    UserId? AccountOwner);

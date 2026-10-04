@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Bagatka.AiSloth.Chats.Data.Migrations;
 
 /// <inheritdoc />
-public partial class _20261004163156_Initial : Migration
+public partial class _20261004200554_Initial : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -67,24 +67,13 @@ public partial class _20261004163156_Initial : Migration
                 sent_by = table.Column<Guid>(type: "uuid", nullable: false),
                 text = table.Column<string>(type: "character varying(100000)", maxLength: 100000, nullable: false),
                 sent_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                state = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false)
+                state = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                is_proposal = table.Column<bool>(type: "boolean", nullable: false),
+                proposal_id = table.Column<Guid>(type: "uuid", nullable: true)
             },
             constraints: table =>
             {
                 table.PrimaryKey("pk_messages", x => x.id);
-            });
-
-        migrationBuilder.CreateTable(
-            name: "senders",
-            schema: "chats",
-            columns: table => new
-            {
-                chat_id = table.Column<Guid>(type: "uuid", nullable: false),
-                user_id = table.Column<Guid>(type: "uuid", nullable: false)
-            },
-            constraints: table =>
-            {
-                table.PrimaryKey("pk_senders", x => new { x.chat_id, x.user_id });
             });
 
         migrationBuilder.CreateIndex(
@@ -120,10 +109,6 @@ public partial class _20261004163156_Initial : Migration
 
         migrationBuilder.DropTable(
             name: "messages",
-            schema: "chats");
-
-        migrationBuilder.DropTable(
-            name: "senders",
             schema: "chats");
     }
 }

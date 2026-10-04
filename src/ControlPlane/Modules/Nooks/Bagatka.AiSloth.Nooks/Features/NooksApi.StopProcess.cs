@@ -1,8 +1,9 @@
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Daemons;
 using Bagatka.AiSloth.Nooks.Model;
+using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Nooks;
@@ -11,7 +12,7 @@ internal sealed partial class NooksApi
 {
     public async Task<Result> StopProcessAsync(Actor actor, StopProcess command, CancellationToken ct)
     {
-        Result<Process> found = await FindProcessAsync(actor, command.NookId, command.ProcessId, ct);
+        Result<Process> found = await FindProcessAsync(actor, command.NookId, command.ProcessId, AccessLevel.Write, ct);
         if (found.Failed)
         {
             return new Result(found.Error);

@@ -1,12 +1,13 @@
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Chats.Harness;
 using Bagatka.AiSloth.Chats.Model;
 using Bagatka.AiSloth.Nooks.Contracts;
-using Bagatka.Foundation;
+using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation.Modules;
+using Bagatka.Foundation;
 using Bagatka.Harnesses;
 
 namespace Bagatka.AiSloth.Chats;
@@ -23,8 +24,14 @@ internal sealed partial class ChatsApi
 
         NookSummary nook = found.Output;
 
-        // Only people start chats.
+        // Only people start chats, and only where they may write.
         if (actor is not UserActor user)
+        {
+            return new Result<ChatSummary>(Error.Forbidden);
+        }
+
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Nook(nook.Id.Value), ct);
+        if (access is null || access < AccessLevel.Write)
         {
             return new Result<ChatSummary>(Error.Forbidden);
         }
@@ -56,6 +63,6 @@ internal sealed partial class ChatsApi
             return new Result<ChatSummary>(saved.Error);
         }
 
-        return new Result<ChatSummary>(chat.ToSummary(messagesWaiting: false, letIn: []));
+        return new Result<ChatSummary>(chat.ToSummary(messagesWaiting: false));
     }
 }

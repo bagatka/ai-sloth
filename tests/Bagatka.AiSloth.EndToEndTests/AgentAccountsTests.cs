@@ -53,7 +53,6 @@ public sealed class AgentAccountsTests(ControlPlane controlPlane) : IDisposable
         Assert.Contains(inAcme, found => found.Id == own.Id);
         Assert.Contains(inPersonal, found => found.Id == own.Id);
         Assert.DoesNotContain(inBobs, found => found.Id == own.Id);
-        Assert.False(own.Shareable);
         await Api.ProblemAsync(bob.DeleteAsync(new Uri(PathOf(own), UriKind.Relative), TestContext.Current.CancellationToken), HttpStatusCode.NotFound);
     }
 
@@ -72,20 +71,20 @@ public sealed class AgentAccountsTests(ControlPlane controlPlane) : IDisposable
     }
 
     [Fact]
-    public async Task Removing_an_account_takes_it_off_the_list_and_non_members_see_nothing()
+    public async Task Removing_an_account_takes_it_off_the_list_and_others_see_only_their_own()
     {
         WorkspaceSummary workspace = await CreateWorkspaceAsync(_alice);
         AgentAccountSummary account = await Api.ReadAsync<AgentAccountSummary>(
             _alice.SendPostAsync(AccountsPath(workspace), new { kind = "AnthropicApiKey", name = "Team key", secret = "sk-ant-example" }), HttpStatusCode.Created);
         using HttpClient bob = controlPlane.ClientFor("bob-" + Guid.CreateVersion7());
 
-        Problem list = await Api.ProblemAsync(bob.SendGetAsync(AccountsPath(workspace)), HttpStatusCode.NotFound);
+        IReadOnlyList<AgentAccountSummary> bobSees = await ListAsync(bob, workspace);
         Problem add = await Api.ProblemAsync(bob.SendPostAsync(AccountsPath(workspace), new { kind = "AnthropicApiKey", name = "Mine", secret = "sk" }), HttpStatusCode.NotFound);
         await Api.ExpectAsync(_alice.DeleteAsync(new Uri(PathOf(account), UriKind.Relative), TestContext.Current.CancellationToken), HttpStatusCode.NoContent);
 
         IReadOnlyList<AgentAccountSummary> remaining = await ListAsync(_alice, workspace);
 
-        Assert.Equal(WorkspacesErrors.NotFound.Code, list.Code);
+        Assert.Empty(bobSees);
         Assert.Equal(WorkspacesErrors.NotFound.Code, add.Code);
         Assert.Empty(remaining);
     }

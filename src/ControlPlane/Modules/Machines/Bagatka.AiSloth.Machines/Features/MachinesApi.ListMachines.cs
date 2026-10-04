@@ -14,8 +14,8 @@ internal sealed partial class MachinesApi
 {
     public async Task<Result<IReadOnlyList<MachineSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct)
     {
-        WorkspaceRole? role = await workspaces.GetRoleAsync(actor, workspaceId, ct);
-        if (role is null)
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(workspaceId), ct);
+        if (access is null)
         {
             return new Result<IReadOnlyList<MachineSummary>>(WorkspacesErrors.NotFound);
         }

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Bagatka.AiSloth.Machines.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Machines.Model;
 
@@ -11,10 +12,6 @@ namespace Bagatka.AiSloth.Machines.Model;
 internal sealed class Machine
 {
     public static readonly TimeSpan CodeLifetime = TimeSpan.FromHours(1);
-
-    // Codes are typed by people: 16 characters without look-alikes such as 0 and O, about 80 bits.
-    private const string CodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    private const int CodeLength = 16;
 
     // Used by Add and by EF: parameter names match property names.
     private Machine(MachineId id, WorkspaceId workspaceId, MachineName name, DateTimeOffset addedAt)
@@ -49,16 +46,10 @@ internal sealed class Machine
         return new Machine(MachineId.New(), workspaceId, name, time.GetUtcNow());
     }
 
-    // Codes are compared case-insensitively, as people type them.
-    public static byte[] HashCode(string code)
-    {
-        return Hash(code.Trim().ToUpperInvariant());
-    }
-
     public string IssueRegistrationCode(TimeProvider time)
     {
-        string code = RandomNumberGenerator.GetString(CodeAlphabet, CodeLength);
-        CodeHash = HashCode(code);
+        string code = OneTimeCode.Create();
+        CodeHash = OneTimeCode.Hash(code);
         CodeExpiresAt = time.GetUtcNow() + CodeLifetime;
         return code;
     }

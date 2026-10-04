@@ -27,15 +27,15 @@ internal sealed partial class AgentAccountsApi
 
         if (account.WorkspaceId is not null)
         {
-            WorkspaceRole? role = await workspaces.GetRoleAsync(actor, account.WorkspaceId.Value, ct);
-            switch (role)
+            AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(account.WorkspaceId.Value), ct);
+            if (access is null)
             {
-                case null:
-                    return new Result(AgentAccountsErrors.NotFound);
-                case WorkspaceRole.Member:
-                    return new Result(Error.Forbidden);
-                case WorkspaceRole.Owner:
-                    break;
+                return new Result(AgentAccountsErrors.NotFound);
+            }
+
+            if (access < AccessLevel.Manage)
+            {
+                return new Result(Error.Forbidden);
             }
         }
 

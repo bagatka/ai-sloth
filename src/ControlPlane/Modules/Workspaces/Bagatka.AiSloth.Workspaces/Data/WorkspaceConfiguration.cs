@@ -9,6 +9,5 @@ internal sealed class WorkspaceConfiguration : IEntityTypeConfiguration<Workspac
     public void Configure(EntityTypeBuilder<Workspace> builder)
     {
         builder.HasKey(workspace => workspace.Id);
-        builder.HasMany(workspace => workspace.Members).WithOne().HasForeignKey(member => member.WorkspaceId);
     }
 }

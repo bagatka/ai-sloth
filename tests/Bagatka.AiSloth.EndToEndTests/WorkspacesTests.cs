@@ -22,7 +22,7 @@ public sealed class WorkspacesTests(ControlPlane controlPlane)
         WorkspaceSummary fetched = await Api.ReadAsync<WorkspaceSummary>(alice.SendGetAsync(PathOf(created)), HttpStatusCode.OK);
 
         Assert.Equal("Acme", created.Name);
-        Assert.Equal(WorkspaceRole.Owner, created.Role);
+        Assert.Equal(AccessLevel.Manage, created.Access);
         Assert.Equal(PathOf(created), response.Headers.Location?.OriginalString);
         Assert.Equal(created, fetched);
     }

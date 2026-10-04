@@ -560,6 +560,13 @@ Canonical example: `src/Foundation/Bagatka.Foundation/Actor.cs`.
   - It decides no other permissions.
 - **The owner of the data owns the permission rule.** That module checks the rule first. Other
   modules ask it.
+- **Access levels come from Workspaces.** A feature asks
+  `workspaces.GetAccessAsync(actor, Resource.Nook(id.Value))` (or `Resource.Workspace(id)`) and
+  compares the answer with the level it needs: null is the module's not-found error, so nobody
+  learns that something exists, and a lower level is `Error.Forbidden`. Read sees, Write works,
+  Manage decides who else has access. A module that lets the control plane's own processes in
+  handles `SystemActor` itself, because access is given to people. Canonical example:
+  `FindNookAsync` in `src/ControlPlane/Modules/Nooks/Bagatka.AiSloth.Nooks/NooksApi.cs`.
 - **Rules switch over the actor's cases exhaustively.** A new kind of actor then fails the build
   in every rule that doesn't handle it.
 - **Identity, not permissions.** The actor carries who is calling, never what they may do.
@@ -654,6 +661,8 @@ arrives with the first integration event.
   form leaves it out, and never logged. A secret the module only checks, such as a daemon's or a
   machine's token, is stored as its SHA-256 hash instead. Canonical example:
   `src/ControlPlane/Modules/AgentAccounts/Bagatka.AiSloth.AgentAccounts/Model/SecretBox.cs`.
+  Codes people pass on once, such as a machine's registration code or an invite, come from
+  `OneTimeCode` (Foundation) and are kept only as its hash.
 - **Concurrency.** Entities that can be edited concurrently get a concurrency token in their
   configuration.
 

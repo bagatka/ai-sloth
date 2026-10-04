@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
@@ -12,8 +11,7 @@ namespace Bagatka.AiSloth.Chats.Model;
 
 // A conversation with a coding agent in one nook, run by a harness on an agent account. After it
 // starts, its runner is the only writer: the agent's process and session, the turn in progress, how
-// far the agent's output is read, and the sequence number of the last event. Who else may send to a
-// chat on a personal account is kept apart, as ChatSenders.
+// far the agent's output is read, and the sequence number of the last event.
 internal sealed class Chat
 {
     public const int MaxHarnessLength = 32;
@@ -45,8 +43,7 @@ internal sealed class Chat
 
     public AgentAccountId AgentAccountId { get; private set; }
 
-    // The personal account's owner, who decides who else may send; null for the workspace's account,
-    // which every member may use.
+    // The personal account's owner; null for the workspace's account.
     public UserId? AccountOwnerId { get; private set; }
 
     // The agent's process, while it runs, and the SHA-256 of the token its model calls carry.
@@ -73,12 +70,6 @@ internal sealed class Chat
     public static Chat Start(NookId nookId, WorkspaceId workspaceId, UserId startedBy, string harness, AgentAccountCredential account, TimeProvider time)
     {
         return new Chat(ChatId.New(), nookId, workspaceId, startedBy, time.GetUtcNow(), harness, account.Id, account.OwnerId);
-    }
-
-    // Whether the user may send without being let in: on the workspace's account, every member may.
-    public bool OpenTo(UserId user)
-    {
-        return AccountOwnerId is not UserId owner || owner == user;
     }
 
     public static byte[] HashToken(string token)
@@ -144,10 +135,8 @@ internal sealed class Chat
         return StoredEvent.From(Id, LastSequence, time.GetUtcNow(), body);
     }
 
-    // The let-in senders matter only for a personal account's chat.
-    public ChatSummary ToSummary(bool messagesWaiting, IEnumerable<UserId> letIn)
+    public ChatSummary ToSummary(bool messagesWaiting)
     {
-        List<UserId>? senders = AccountOwnerId is UserId owner ? [owner, .. letIn] : null;
-        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, AgentAccountId, senders);
+        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, AgentAccountId, AccountOwnerId);
     }
 }

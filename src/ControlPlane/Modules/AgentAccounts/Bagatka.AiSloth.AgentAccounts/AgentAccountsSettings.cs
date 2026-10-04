@@ -17,11 +17,7 @@ public sealed record AgentAccountsSettings
     /// Whether people may add Claude subscriptions. Off unless Anthropic has given this deployment
     /// written permission: its terms forbid storing Claude sign-in tokens otherwise.
     /// </param>
-    /// <param name="sharePersonalAccounts">
-    /// Whether a personal account's owner may let other people message chats running on it. Off,
-    /// because vendors' plans are for one person; turn it on only where a vendor's terms allow it.
-    /// </param>
-    public AgentAccountsSettings(string connectionString, string encryptionKey, bool allowClaudeSubscriptions = false, bool sharePersonalAccounts = false)
+    public AgentAccountsSettings(string connectionString, string encryptionKey, bool allowClaudeSubscriptions = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         ArgumentNullException.ThrowIfNull(encryptionKey);
@@ -33,7 +29,6 @@ public sealed record AgentAccountsSettings
         ConnectionString = connectionString;
         EncryptionKey = encryptionKey;
         AllowClaudeSubscriptions = allowClaudeSubscriptions;
-        SharePersonalAccounts = sharePersonalAccounts;
     }
 
     /// <summary>The PostgreSQL database that holds the <c>agent_accounts</c> schema.</summary>
@@ -44,9 +39,6 @@ public sealed record AgentAccountsSettings
 
     /// <summary>Whether people may add Claude subscriptions.</summary>
     public bool AllowClaudeSubscriptions { get; }
-
-    /// <summary>Whether a personal account's owner may let other people message chats running on it.</summary>
-    public bool SharePersonalAccounts { get; }
 
     /// <inheritdoc />
     public override string ToString()

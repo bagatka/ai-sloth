@@ -1,15 +1,11 @@
 using System;
-using System.Collections.Generic;
 using Bagatka.AiSloth.Workspaces.Contracts;
-using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Workspaces.Model;
 
-// Where people work together; it owns its members.
+// Where people work together. Who may do what in it are grants on it (Grant).
 internal sealed class Workspace
 {
-    private readonly List<Member> _members = [];
-
     // Used by Create and by EF: parameter names match property names.
     private Workspace(WorkspaceId id, WorkspaceName name, DateTimeOffset createdAt)
     {
@@ -24,13 +20,8 @@ internal sealed class Workspace
 
     public DateTimeOffset CreatedAt { get; private set; }
 
-    public IReadOnlyList<Member> Members => _members;
-
-    // The creator owns the new workspace.
-    public static Workspace Create(WorkspaceName name, UserId owner, TimeProvider time)
+    public static Workspace Create(WorkspaceName name, TimeProvider time)
     {
-        Workspace workspace = new Workspace(WorkspaceId.New(), name, time.GetUtcNow());
-        workspace._members.Add(new Member(workspace.Id, owner, WorkspaceRole.Owner));
-        return workspace;
+        return new Workspace(WorkspaceId.New(), name, time.GetUtcNow());
     }
 }

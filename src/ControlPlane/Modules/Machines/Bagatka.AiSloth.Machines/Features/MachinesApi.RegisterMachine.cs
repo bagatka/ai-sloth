@@ -13,7 +13,7 @@ internal sealed partial class MachinesApi
     public async Task<Result<MachineCredential>> RegisterAsync(Actor actor, RegisterMachine command, CancellationToken ct)
     {
         // The code is the credential; the actor is always anonymous.
-        byte[] codeHash = Machine.HashCode(command.Code);
+        byte[] codeHash = OneTimeCode.Hash(command.Code);
         Machine? machine = await db.Machines.SingleOrDefaultAsync(found => found.CodeHash == codeHash, ct);
         string? token = machine?.Register(time);
         if (machine is null || token is null)

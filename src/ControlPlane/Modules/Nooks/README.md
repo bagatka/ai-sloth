@@ -1,7 +1,7 @@
 # Nooks
 
 Nooks are where agents work: isolated machines with their files and processes, created on the
-provider a workspace member chooses. A nook and its chats are AiSloth's basic unit; a project may
+provider someone who works in a workspace chooses. A nook and its chats are AiSloth's basic unit; a project may
 group nooks, but a nook never needs one. This module tracks nooks' lifecycle, starts them fast from
 templates, runs processes in them through their daemons, and checkpoints and forks them.
 
@@ -9,8 +9,9 @@ templates, runs processes in them through their daemons, and checkpoints and for
 
 - **Data:** nook records (workspace, provider, harness, sources, status, latest disk usage), the hash of
   each nook's daemon token, the processes started in each nook, templates, and checkpoints.
-- **Rules:** who may use a nook (members of its workspace, and the control plane's own processes,
-  such as Chats running an agent), the lifecycle below, when an idle nook is suspended, and which
+- **Rules:** what each access level allows with a nook (Read sees it and watches its processes; Write
+  starts, feeds, and stops processes and deletes it; the control plane's own processes, such as Chats
+  running an agent, may do anything), the lifecycle below, when an idle nook is suspended, and which
   providers a workspace's nooks may run on.
 - **Integrations:** sandbox providers (`src/Sandboxing`), registered by the host.
 - **Runtime state:** each running nook's daemon connection and active watches, in the memory of
@@ -18,7 +19,8 @@ templates, runs processes in them through their daemons, and checkpoints and for
 
 ## Does not own
 
-- Workspaces and membership: Workspaces.
+- Who has which access level to a nook: Workspaces. Creating a nook registers it there, in its
+  workspace, so the workspace's people reach it; a nook can also be shared alone.
 - The wire protocol and its gRPC endpoint: `src/Daemon` and the WebApi. This module sees only the
   records in its contract.
 - What runs in a nook, such as agent chats: other modules start and watch processes through
@@ -30,7 +32,7 @@ templates, runs processes in them through their daemons, and checkpoints and for
 
 ## Contract
 
-`INooksApi` in `Bagatka.AiSloth.Nooks.Contracts`: workspace members and their agents list the
+`INooksApi` in `Bagatka.AiSloth.Nooks.Contracts`: people with access and their agents list the
 providers they can use, create, list, and delete nooks, and start, watch, feed, and stop processes
 in them. `INookDaemonsApi` is the daemon endpoint's side, never a public route or a tool.
 
@@ -40,7 +42,8 @@ A provider ID names where a nook runs: a provider the deployment runs for every 
 
 ## Asks
 
-Workspaces (`GetRoleAsync`), on every call made for a user; Machines (`ListAsync`, `GetAsync`), for
+Workspaces (`GetAccessAsync`), on every call made for a user, and `AddResourceAsync` when creating a
+nook; Machines (`ListAsync`, `GetAsync`), for
 the workspace's machines when listing providers and creating a nook on one; Sources (planned), for
 what to mount and how to set it up.
 

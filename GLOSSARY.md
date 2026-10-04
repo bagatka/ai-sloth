@@ -38,9 +38,14 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Term | Meaning | Owner | Don't call it |
 |---|---|---|---|
 | Control plane | The system that owns all state and decisions: the WebApi and its modules, later several services | `src/ControlPlane` | platform, backend, engine |
-| User | A person who signs in. One user can be a member of many workspaces. | Users | account, customer |
+| User | A person who signs in. One user can have access to many workspaces and nooks. | Users | account, customer |
 | Workspace | Where people work together and what owns nooks, like a Slack workspace: a personal one, a company one | Workspaces | organization, team, tenant |
-| Member | A user's membership in a workspace, with a role | Workspaces | participant, seat |
+| Member | Someone given access to a workspace | Workspaces | participant, seat |
+| Access level | How much a person may do with a resource: Read (see), Write (work), or Manage (decide who else has access). Each includes the ones below it. | Workspaces | role, permission |
+| Resource | Something people are given access to: a workspace or a nook, later a project. Access to it reaches everything in it. | Workspaces | place, scope, space |
+| Grant | One person's access level on one resource, given directly | Workspaces | membership, ACL entry |
+| Invite | A one-time code that gives whoever accepts it first an access level on a resource, for 7 days | Workspaces | invitation, link |
+| Guest | Someone with access to a nook but not to its workspace | Workspaces | external user |
 | Nook | Where agents work: an isolated machine with its files and processes, owned by a workspace. With its chats, the basic unit. A provider's sandbox underneath. | Nooks | sandbox, orb, VM, container, environment, workspace |
 | Chat | A conversation between people and a coding agent working in one nook | Chats | thread, session, conversation |
 | Turn | One message in a chat and everything the agent did in reply, ending with a stop reason | Chats | step, exchange |
@@ -60,7 +65,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Harness profile | What AiSloth knows about one harness: how to start it, which credentials it takes and how, and later where it keeps state | `Bagatka.Harnesses` | adapter, plugin |
 | Harness state | The files a harness keeps between sessions, such as its memory and skills, saved per person and restored into their new nooks | Chats (planned) | memory (ours), context |
 | Agent account | An account at an agent vendor that pays for agents' work, such as an Anthropic API key or a Copilot plan: a workspace's, which every member uses, or a person's own | AgentAccounts | subscription (for API keys), credential, account (alone) |
-| Sender | Someone who may message a chat: every member on a workspace's account; on a personal one, its owner and whoever they let in | Chats | participant |
+| Proposal | A message in a chat from someone who may not use its account; it never reaches the agent until the account's owner sends it on, as is or edited | Chats | suggestion, draft |
 | Paused | A nook whose compute is released with memory and files kept; it resumes in about a second and processes continue | Nooks | hibernated, sleeping, hot |
 | Stopped | A nook whose compute is released with files kept; it resumes in seconds and processes start again | Nooks | archived, cold, shut down |
 | Process | A program the daemon runs in a nook until it exits or is stopped, independent of the control plane. Agents, setup scripts, and one-off commands are all processes. | Nooks | job, task, command |

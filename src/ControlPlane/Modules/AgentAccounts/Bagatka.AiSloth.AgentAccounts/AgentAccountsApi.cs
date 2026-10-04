@@ -14,8 +14,4 @@ internal sealed partial class AgentAccountsApi(
     AgentAccountsSettings settings,
     TimeProvider time) : IAgentAccountsApi
 {
-    private AgentAccountSummary Summary(AgentAccount account)
-    {
-        return account.ToSummary(settings.SharePersonalAccounts);
-    }
 }

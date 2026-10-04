@@ -18,8 +18,8 @@ internal sealed partial class MachinesApi
             return new Result<MachineSummary>(MachinesErrors.NotFound);
         }
 
-        WorkspaceRole? role = await workspaces.GetRoleAsync(actor, machine.WorkspaceId, ct);
-        if (role is null)
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(machine.WorkspaceId), ct);
+        if (access is null)
         {
             return new Result<MachineSummary>(MachinesErrors.NotFound);
         }

@@ -16,7 +16,7 @@ partial class WorkspacesDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261004105401_Initial";
+    public override string LastMigrationId => "20261004200028_Initial";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -28,29 +28,123 @@ partial class WorkspacesDbContextModelSnapshot : ModelSnapshot
 
         NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-        modelBuilder.Entity("Bagatka.AiSloth.Workspaces.Model.Member", b =>
+        modelBuilder.Entity("Bagatka.AiSloth.Workspaces.Model.Grant", b =>
             {
-                b.Property<Guid>("WorkspaceId")
+                b.Property<Guid>("ResourceId")
                     .HasColumnType("uuid")
-                    .HasColumnName("workspace_id");
+                    .HasColumnName("resource_id");
 
                 b.Property<Guid>("UserId")
                     .HasColumnType("uuid")
                     .HasColumnName("user_id");
 
-                b.Property<string>("Role")
+                b.Property<string>("Access")
                     .IsRequired()
                     .HasMaxLength(32)
                     .HasColumnType("character varying(32)")
-                    .HasColumnName("role");
+                    .HasColumnName("access");
 
-                b.HasKey("WorkspaceId", "UserId")
-                    .HasName("pk_members");
+                b.Property<string>("ResourceKind")
+                    .IsRequired()
+                    .HasMaxLength(32)
+                    .HasColumnType("character varying(32)")
+                    .HasColumnName("resource_kind");
 
-                b.HasIndex("UserId", "WorkspaceId")
-                    .HasDatabaseName("ix_members_user_id_workspace_id");
+                b.HasKey("ResourceId", "UserId")
+                    .HasName("pk_grants");
 
-                b.ToTable("members", "workspaces");
+                b.HasIndex("UserId", "ResourceId")
+                    .HasDatabaseName("ix_grants_user_id_resource_id");
+
+                b.ToTable("grants", "workspaces");
+            });
+
+        modelBuilder.Entity("Bagatka.AiSloth.Workspaces.Model.ResourceLink", b =>
+            {
+                b.Property<Guid>("ChildId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("child_id");
+
+                b.Property<Guid>("ParentId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("parent_id");
+
+                b.Property<string>("ChildKind")
+                    .IsRequired()
+                    .HasMaxLength(32)
+                    .HasColumnType("character varying(32)")
+                    .HasColumnName("child_kind");
+
+                b.Property<string>("ParentKind")
+                    .IsRequired()
+                    .HasMaxLength(32)
+                    .HasColumnType("character varying(32)")
+                    .HasColumnName("parent_kind");
+
+                b.HasKey("ChildId", "ParentId")
+                    .HasName("pk_links");
+
+                b.ToTable("links", "workspaces");
+            });
+
+        modelBuilder.Entity("Bagatka.AiSloth.Workspaces.Model.StoredInvite", b =>
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid")
+                    .HasColumnName("id");
+
+                b.Property<DateTimeOffset?>("AcceptedAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("accepted_at");
+
+                b.Property<Guid?>("AcceptedBy")
+                    .HasColumnType("uuid")
+                    .HasColumnName("accepted_by");
+
+                b.Property<string>("Access")
+                    .IsRequired()
+                    .HasMaxLength(32)
+                    .HasColumnType("character varying(32)")
+                    .HasColumnName("access");
+
+                b.Property<byte[]>("CodeHash")
+                    .IsRequired()
+                    .HasColumnType("bytea")
+                    .HasColumnName("code_hash");
+
+                b.Property<Guid>("CreatedBy")
+                    .HasColumnType("uuid")
+                    .HasColumnName("created_by");
+
+                b.Property<DateTimeOffset>("ExpiresAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("expires_at");
+
+                b.Property<Guid>("ResourceId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("resource_id");
+
+                b.Property<string>("ResourceKind")
+                    .IsRequired()
+                    .HasMaxLength(32)
+                    .HasColumnType("character varying(32)")
+                    .HasColumnName("resource_kind");
+
+                b.Property<uint>("Version")
+                    .IsConcurrencyToken()
+                    .ValueGeneratedOnAddOrUpdate()
+                    .HasColumnType("xid")
+                    .HasColumnName("xmin");
+
+                b.HasKey("Id")
+                    .HasName("pk_invites");
+
+                b.HasIndex("CodeHash")
+                    .IsUnique()
+                    .HasDatabaseName("ix_invites_code_hash");
+
+                b.ToTable("invites", "workspaces");
             });
 
         modelBuilder.Entity("Bagatka.AiSloth.Workspaces.Model.Workspace", b =>
@@ -73,21 +167,6 @@ partial class WorkspacesDbContextModelSnapshot : ModelSnapshot
                     .HasName("pk_workspaces");
 
                 b.ToTable("workspaces", "workspaces");
-            });
-
-        modelBuilder.Entity("Bagatka.AiSloth.Workspaces.Model.Member", b =>
-            {
-                b.HasOne("Bagatka.AiSloth.Workspaces.Model.Workspace", null)
-                    .WithMany("Members")
-                    .HasForeignKey("WorkspaceId")
-                    .OnDelete(DeleteBehavior.Cascade)
-                    .IsRequired()
-                    .HasConstraintName("fk_members_workspaces_workspace_id");
-            });
-
-        modelBuilder.Entity("Bagatka.AiSloth.Workspaces.Model.Workspace", b =>
-            {
-                b.Navigation("Members");
             });
 #pragma warning restore 612, 618
     }

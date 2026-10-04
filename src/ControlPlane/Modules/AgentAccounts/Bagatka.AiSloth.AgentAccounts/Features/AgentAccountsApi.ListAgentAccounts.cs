@@ -19,19 +19,15 @@ internal sealed partial class AgentAccountsApi
             return new Result<IReadOnlyList<AgentAccountSummary>>(WorkspacesErrors.NotFound);
         }
 
-        WorkspaceRole? role = await workspaces.GetRoleAsync(actor, workspaceId, ct);
-        if (role is null)
-        {
-            return new Result<IReadOnlyList<AgentAccountSummary>>(WorkspacesErrors.NotFound);
-        }
-
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(workspaceId), ct);
+        bool usesWorkspaceAccounts = access >= AccessLevel.Write;
         List<AgentAccount> accounts = await db.Accounts.AsNoTracking()
-            .Where(account => account.WorkspaceId == workspaceId || account.OwnerId == user.UserId)
+            .Where(account => (usesWorkspaceAccounts && account.WorkspaceId == workspaceId) || account.OwnerId == user.UserId)
             .ToListAsync(ct);
         return new Result<IReadOnlyList<AgentAccountSummary>>(accounts
             .OrderBy(account => account.OwnerId is null ? 0 : 1)
             .ThenBy(account => account.Id.Value)
-            .Select(Summary)
+            .Select(account => account.ToSummary())
             .ToList());
     }
 }

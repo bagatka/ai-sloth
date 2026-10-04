@@ -12,15 +12,15 @@ internal sealed partial class MachinesApi
 {
     public async Task<Result<MachineRegistration>> AddAsync(Actor actor, AddMachine command, CancellationToken ct)
     {
-        WorkspaceRole? role = await workspaces.GetRoleAsync(actor, command.WorkspaceId, ct);
-        switch (role)
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(command.WorkspaceId), ct);
+        if (access is null)
         {
-            case null:
-                return new Result<MachineRegistration>(WorkspacesErrors.NotFound);
-            case WorkspaceRole.Member:
-                return new Result<MachineRegistration>(Error.Forbidden);
-            case WorkspaceRole.Owner:
-                break;
+            return new Result<MachineRegistration>(WorkspacesErrors.NotFound);
+        }
+
+        if (access < AccessLevel.Manage)
+        {
+            return new Result<MachineRegistration>(Error.Forbidden);
         }
 
         Result<MachineName> name = MachineName.Parse(command.Name);

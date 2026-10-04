@@ -1,9 +1,10 @@
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Model;
-using Bagatka.Foundation;
+using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation.Modules;
+using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Nooks;
 
@@ -11,13 +12,13 @@ internal sealed partial class NooksApi
 {
     public async Task<Result> DeleteAsync(Actor actor, NookId id, CancellationToken ct)
     {
-        Nook? nook = await FindNookAsync(actor, id, ct);
-        if (nook is null)
+        Result<Nook> nook = await FindNookAsync(actor, id, AccessLevel.Write, ct);
+        if (nook.Failed)
         {
-            return new Result(NooksErrors.NotFound);
+            return new Result(nook.Error);
         }
 
-        nook.Delete();
+        nook.Output.Delete();
         Result saved = await db.SaveAsync(ct);
         reconciler.Wake();
         return saved;

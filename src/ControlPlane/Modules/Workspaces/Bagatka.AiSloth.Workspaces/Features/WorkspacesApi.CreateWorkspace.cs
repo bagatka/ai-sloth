@@ -11,7 +11,7 @@ internal sealed partial class WorkspacesApi
 {
     public async Task<Result<WorkspaceSummary>> CreateAsync(Actor actor, CreateWorkspace command, CancellationToken ct)
     {
-        // Only a user can own a workspace.
+        // Only a user can manage a workspace.
         if (actor is not UserActor user)
         {
             return new Result<WorkspaceSummary>(Error.Unauthorized);
@@ -23,14 +23,16 @@ internal sealed partial class WorkspacesApi
             return new Result<WorkspaceSummary>(name.Error);
         }
 
-        Workspace workspace = Workspace.Create(name.Output, user.UserId, time);
+        // The workspace and its first manager are saved together, so a workspace always has one.
+        Workspace workspace = Workspace.Create(name.Output, time);
         db.Workspaces.Add(workspace);
+        db.Grants.Add(Grant.Give(Resource.Workspace(workspace.Id), user.UserId, AccessLevel.Manage));
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)
         {
             return new Result<WorkspaceSummary>(saved.Error);
         }
 
-        return new Result<WorkspaceSummary>(new WorkspaceSummary(workspace.Id, workspace.Name.Value, WorkspaceRole.Owner));
+        return new Result<WorkspaceSummary>(new WorkspaceSummary(workspace.Id, workspace.Name.Value, AccessLevel.Manage));
     }
 }

@@ -36,6 +36,7 @@ internal sealed class StoredEvent
         (string kind, string data) = body switch
         {
             MessageSent sent => ("message-sent", JsonSerializer.Serialize(sent, FoundationJson.Options)),
+            MessageProposed proposed => ("message-proposed", JsonSerializer.Serialize(proposed, FoundationJson.Options)),
             TurnStarted started => ("turn-started", JsonSerializer.Serialize(started, FoundationJson.Options)),
             MessageSteered steered => ("message-steered", JsonSerializer.Serialize(steered, FoundationJson.Options)),
             MessageCancelled cancelled => ("message-cancelled", JsonSerializer.Serialize(cancelled, FoundationJson.Options)),
@@ -50,6 +51,7 @@ internal sealed class StoredEvent
         ChatEventBody body = Kind switch
         {
             "message-sent" => new ChatEventBody(Read<MessageSent>()),
+            "message-proposed" => new ChatEventBody(Read<MessageProposed>()),
             "turn-started" => new ChatEventBody(Read<TurnStarted>()),
             "message-steered" => new ChatEventBody(Read<MessageSteered>()),
             "message-cancelled" => new ChatEventBody(Read<MessageCancelled>()),

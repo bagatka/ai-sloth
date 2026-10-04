@@ -1,7 +1,8 @@
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Chats.Model;
+using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Chats;
@@ -10,10 +11,10 @@ internal sealed partial class ChatsApi
 {
     public async Task<Result> StopAsync(Actor actor, ChatId id, CancellationToken ct)
     {
-        Chat? chat = await FindChatAsync(actor, id, ct);
-        if (chat is null)
+        Result<Chat> chat = await FindChatAsync(actor, id, AccessLevel.Write, ct);
+        if (chat.Failed)
         {
-            return new Result(ChatsErrors.NotFound);
+            return new Result(chat.Error);
         }
 
         // Not handled: a restart between this call and the runner taking it loses the stop; the

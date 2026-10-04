@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.AiSloth.Workspaces.Model;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
@@ -18,15 +20,22 @@ internal sealed partial class WorkspacesApi
             return new Result<Page<WorkspaceSummary>>(Error.Unauthorized);
         }
 
-        Result<IQueryable<Membership>> paged = MembershipsOf(user.UserId).TakePage(membership => membership.Id, KeysetOrder.OldestFirst, page);
+        // A person is in a handful of workspaces, so their grants come first and the page after.
+        List<Grant> grants = await db.Grants.AsNoTracking()
+            .Where(grant => grant.UserId == user.UserId && grant.ResourceKind == ResourceKind.Workspace)
+            .ToListAsync(ct);
+        Dictionary<Guid, AccessLevel> access = grants.ToDictionary(grant => grant.ResourceId, grant => grant.Access);
+        List<WorkspaceId> ids = [.. grants.Select(grant => WorkspaceId.From(grant.ResourceId))];
+        Result<IQueryable<Workspace>> paged = db.Workspaces.AsNoTracking()
+            .Where(workspace => ids.Contains(workspace.Id))
+            .TakePage(workspace => workspace.Id, KeysetOrder.OldestFirst, page);
         if (paged.Failed)
         {
             return new Result<Page<WorkspaceSummary>>(paged.Error);
         }
 
-        List<WorkspaceSummary> fetched = await paged.Output
-            .Select(membership => new WorkspaceSummary(membership.Id, membership.Name.Value, membership.Role))
-            .ToListAsync(ct);
+        List<Workspace> workspaces = await paged.Output.ToListAsync(ct);
+        List<WorkspaceSummary> fetched = [.. workspaces.Select(workspace => new WorkspaceSummary(workspace.Id, workspace.Name.Value, access[workspace.Id.Value]))];
         return new Result<Page<WorkspaceSummary>>(Keyset.ToPage(fetched, page, workspace => workspace.Id.Value));
     }
 }

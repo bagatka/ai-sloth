@@ -8,7 +8,9 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 
 /// <summary>
 /// Nooks: where agents work. A nook is an isolated machine with its files and processes, owned by a
-/// workspace; any member may use it.
+/// workspace. Access comes from Workspaces, through the workspace or given for the nook alone: Read
+/// sees a nook and watches its processes, and Write creates, deletes, and runs processes. Without
+/// access a nook is not found; with too little, forbidden.
 /// </summary>
 /// <remarks>
 /// Suspension is invisible to callers: an operation on a paused or stopped nook resumes it first, so
@@ -25,25 +27,26 @@ public interface INooksApi
     /// it stays <see cref="NookStatus.Creating"/> until the provider is back.
     /// </remarks>
     /// <returns>
-    /// The nook in <see cref="NookStatus.Creating"/>; not found when the actor isn't a member of the
-    /// workspace; or a validation error for a provider the workspace doesn't have or a harness this
-    /// deployment doesn't offer.
+    /// The nook in <see cref="NookStatus.Creating"/>; not found when the actor has no access to the
+    /// workspace, or forbidden without Write; or a validation error for a provider the workspace
+    /// doesn't have or a harness this deployment doesn't offer.
     /// </returns>
     public Task<Result<NookSummary>> CreateAsync(Actor actor, CreateNook command, CancellationToken ct);
 
     /// <summary>
     /// The providers the workspace's nooks can run on: the deployment's own, then the workspace's
-    /// machines, oldest first. Not found when the actor isn't a member.
+    /// machines, oldest first. Not found when the actor has no access to the workspace.
     /// </summary>
     public Task<Result<IReadOnlyList<ProviderSummary>>> ListProvidersAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct);
 
     /// <summary>
-    /// The nook. Not found when it doesn't exist or the actor isn't a member of its workspace.
+    /// The nook. Not found when it doesn't exist or the actor has no access to it.
     /// </summary>
     public Task<Result<NookSummary>> GetAsync(Actor actor, NookId id, CancellationToken ct);
 
     /// <summary>
-    /// The workspace's nooks, newest first. Not found when the actor isn't a member.
+    /// The workspace's nooks, newest first. Not found when the actor has no access to the workspace,
+    /// such as a guest of one of its nooks.
     /// </summary>
     public Task<Result<Page<NookSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, PageRequest page, CancellationToken ct);
 

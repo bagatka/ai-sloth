@@ -19,15 +19,15 @@ internal sealed partial class AgentAccountsApi
 
         if (command.WorkspaceId is not null)
         {
-            WorkspaceRole? role = await workspaces.GetRoleAsync(actor, command.WorkspaceId.Value, ct);
-            switch (role)
+            AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(command.WorkspaceId.Value), ct);
+            if (access is null)
             {
-                case null:
-                    return new Result<AgentAccountSummary>(WorkspacesErrors.NotFound);
-                case WorkspaceRole.Member:
-                    return new Result<AgentAccountSummary>(Error.Forbidden);
-                case WorkspaceRole.Owner:
-                    break;
+                return new Result<AgentAccountSummary>(WorkspacesErrors.NotFound);
+            }
+
+            if (access < AccessLevel.Manage)
+            {
+                return new Result<AgentAccountSummary>(Error.Forbidden);
             }
         }
 
@@ -58,7 +58,7 @@ internal sealed partial class AgentAccountsApi
             return new Result<AgentAccountSummary>(saved.Error);
         }
 
-        return new Result<AgentAccountSummary>(Summary(account));
+        return new Result<AgentAccountSummary>(account.ToSummary());
     }
 
     // Plans are for one person, and Claude subscriptions need the deployment's permission.

@@ -5,14 +5,14 @@ using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Chats.Model;
 
-// A message someone sent to a chat's agent. Sending only records it; the chat's runner announces it
-// and delivers it.
+// A message someone sent to a chat: for the agent, or a proposal from someone who may not use the
+// chat's account. Sending only records it; the chat's runner announces it, and delivers the agent's.
 internal sealed class Message
 {
     public const int MaxTextLength = 100_000;
 
     // Used by Send and by EF: parameter names match property names.
-    private Message(MessageId id, ChatId chatId, UserId sentBy, string text, DateTimeOffset sentAt, MessageState state)
+    private Message(MessageId id, ChatId chatId, UserId sentBy, string text, DateTimeOffset sentAt, MessageState state, bool isProposal, MessageId? proposalId)
     {
         Id = id;
         ChatId = chatId;
@@ -20,6 +20,8 @@ internal sealed class Message
         Text = text;
         SentAt = sentAt;
         State = state;
+        IsProposal = isProposal;
+        ProposalId = proposalId;
     }
 
     public MessageId Id { get; private set; }
@@ -34,9 +36,15 @@ internal sealed class Message
 
     public MessageState State { get; private set; }
 
+    // A proposal never reaches the agent.
+    public bool IsProposal { get; private set; }
+
+    // The proposal this message sends on, if any.
+    public MessageId? ProposalId { get; private set; }
+
     public bool Waiting => State is MessageState.New or MessageState.Queued or MessageState.Steering;
 
-    public static Result<Message> Send(ChatId chatId, UserId sentBy, string? text, TimeProvider time)
+    public static Result<Message> Send(ChatId chatId, UserId sentBy, string? text, bool isProposal, MessageId? proposalId, TimeProvider time)
     {
         if (string.IsNullOrWhiteSpace(text) || text.Length > MaxTextLength)
         {
@@ -44,7 +52,12 @@ internal sealed class Message
             return new Result<Message>(Error.Validation("text", message));
         }
 
-        return new Result<Message>(new Message(MessageId.New(), chatId, sentBy, text, time.GetUtcNow(), MessageState.New));
+        return new Result<Message>(new Message(MessageId.New(), chatId, sentBy, text, time.GetUtcNow(), MessageState.New, isProposal, proposalId));
+    }
+
+    public void Propose()
+    {
+        State = MessageState.Proposed;
     }
 
     public void Queue()
@@ -69,6 +82,6 @@ internal sealed class Message
 
     public ChatMessage ToContract()
     {
-        return new ChatMessage(Id, ChatId, SentBy, Text, SentAt);
+        return new ChatMessage(Id, ChatId, SentBy, Text, SentAt, IsProposal);
     }
 }

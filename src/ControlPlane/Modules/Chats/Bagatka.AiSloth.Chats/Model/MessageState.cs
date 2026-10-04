@@ -9,4 +9,7 @@ internal enum MessageState
     Steering = 3,
     Delivered = 4,
     Cancelled = 5,
+
+    // An announced proposal: it never reaches the agent.
+    Proposed = 6,
 }

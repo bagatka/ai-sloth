@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.AiSloth.Workspaces.Model;
 using Bagatka.Foundation;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,19 +12,19 @@ internal sealed partial class WorkspacesApi
 {
     public async Task<Result<WorkspaceSummary>> GetAsync(Actor actor, WorkspaceId id, CancellationToken ct)
     {
-        // Only members see a workspace; everyone else learns nothing about it.
-        if (actor is not UserActor user)
+        // Only people with access see a workspace; everyone else learns nothing about it.
+        AccessLevel? access = await GetAccessAsync(actor, Resource.Workspace(id), ct);
+        if (access is null)
         {
             return new Result<WorkspaceSummary>(WorkspacesErrors.NotFound);
         }
 
-        WorkspaceSummary? workspace = await MembershipsOf(user.UserId)
-            .Where(membership => membership.Id == id)
-            .Select(membership => new WorkspaceSummary(membership.Id, membership.Name.Value, membership.Role))
-            .SingleOrDefaultAsync(ct);
+        Workspace? workspace = await db.Workspaces.AsNoTracking().SingleOrDefaultAsync(found => found.Id == id, ct);
+        if (workspace is null)
+        {
+            return new Result<WorkspaceSummary>(WorkspacesErrors.NotFound);
+        }
 
-        return workspace is null
-            ? new Result<WorkspaceSummary>(WorkspacesErrors.NotFound)
-            : new Result<WorkspaceSummary>(workspace);
+        return new Result<WorkspaceSummary>(new WorkspaceSummary(workspace.Id, workspace.Name.Value, access.Value));
     }
 }

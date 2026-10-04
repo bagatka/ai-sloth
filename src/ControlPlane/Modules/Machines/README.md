@@ -9,7 +9,7 @@ plane, and runs the provider calls it receives on its local Docker Engine.
 
 - **Data:** the workspace's machines, their registration codes and tokens (stored as hashes), and
   which machine each sandbox and snapshot lives on.
-- **Rules:** who may add and remove machines (workspace owners) and see them (members); how a
+- **Rules:** who may add and remove machines (Manage on the workspace) and see them (Read); how a
   machine proves itself; which machine a provider call goes to.
 - **Runtime state:** each connected machine's connection, in the memory of the instance it dialed.
 - **Integrations:** the `machine` sandbox provider, which this module registers for the host.
@@ -25,8 +25,8 @@ plane, and runs the provider calls it receives on its local Docker Engine.
 
 ## Contract
 
-`IMachinesApi` in `Bagatka.AiSloth.Machines.Contracts`: owners add machines, getting a one-time
-registration code, and remove them; members list them and see whether each is online.
+`IMachinesApi` in `Bagatka.AiSloth.Machines.Contracts`: managers add machines, getting a one-time
+registration code, and remove them; anyone with access lists them and sees whether each is online.
 `IMachineConnectionsApi` is the machine endpoint's side, never a public route or a tool: a machine
 trades its code for a token, then connects with it. `MachineProvider` names the provider and owns
 the location format: a machine's ID.
@@ -45,7 +45,7 @@ MachineRegistration registration = added.Output;
 
 ## Asks
 
-Workspaces (`GetRoleAsync`), on every call made for a user.
+Workspaces (`GetAccessAsync`), on every call made for a user.
 
 ## Publishes
 

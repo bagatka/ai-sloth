@@ -52,13 +52,13 @@ internal sealed class AgentAccount
         return new Result<AgentAccount>(account);
     }
 
-    public AgentAccountSummary ToSummary(bool shareable)
+    public AgentAccountSummary ToSummary()
     {
-        return new AgentAccountSummary(Id, Kind, Name.Value, WorkspaceId, OwnerId, AddedAt, OwnerId is not null && shareable);
+        return new AgentAccountSummary(Id, Kind, Name.Value, WorkspaceId, OwnerId, AddedAt);
     }
 
-    public AgentAccountCredential ToCredential(SecretBox box, bool shareable)
+    public AgentAccountCredential ToCredential(SecretBox box)
     {
-        return new AgentAccountCredential(Id, Kind, OwnerId, OwnerId is not null && shareable, box.Open(SealedSecret, Id));
+        return new AgentAccountCredential(Id, Kind, OwnerId, box.Open(SealedSecret, Id));
     }
 }

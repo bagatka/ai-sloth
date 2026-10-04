@@ -1,23 +1,22 @@
 # AgentAccounts
 
 Agent accounts are accounts at agent vendors that pay for agents' work: an Anthropic API key, a
-GitHub Copilot plan, later a ChatGPT plan. A workspace's account serves all its members; a personal
-account serves its owner, in every workspace they belong to. Secrets are encrypted at rest and never
+GitHub Copilot plan, later a ChatGPT plan. A workspace's account serves everyone with Write on it; a
+personal account serves its owner, wherever they work. Secrets are encrypted at rest and never
 shown again.
 
 ## Owns
 
 - **Data:** the accounts: kind, name, whose they are (a workspace or a person), and the sealed secret.
-- **Rules:** who may add and remove them (a workspace's owners, or the person), who may use them
-  (the workspace's members, or the person; the control plane's own processes, any), which kinds are
-  personal only (plans), which kinds this deployment allows, and whether personal accounts may be
-  shared.
+- **Rules:** who may add and remove them (Manage on the workspace, or the person), who may use them
+  (Write on the workspace, or the person; the control plane's own processes, any), which kinds are
+  personal only (plans), and which kinds this deployment allows.
 
 ## Does not own
 
 - Harnesses, and what each kind of account means to them: `Bagatka.Harnesses` knows harnesses, and
   Chats maps kinds of account to the credentials harnesses take.
-- Who may send messages to a chat: Chats, using the account's owner and whether it is shareable.
+- Whose messages in a chat reach the agent: Chats, asking `MayUseAsync`; everyone else proposes.
 
 ## Contract
 
@@ -43,7 +42,7 @@ AgentAccountCredential credential = used.Output; // credential.Secret
 
 ## Asks
 
-Workspaces (`GetRoleAsync`), for owners and members.
+Workspaces (`GetAccessAsync`), for the caller's access to the workspace.
 
 ## Publishes
 
@@ -70,9 +69,7 @@ None.
 - the encryption key, at least 32 characters (the AppHost generates one and keeps it in its user
   secrets);
 - `AllowClaudeSubscriptions`, off: Anthropic's terms forbid storing Claude sign-in tokens without
-  its written permission, so turn it on only with that permission;
-- `SharePersonalAccounts`, off: vendors' plans are for one person, so turn it on only where a
-  vendor's terms allow sharing.
+  its written permission, so turn it on only with that permission.
 
 ## Decisions and constraints
 
@@ -89,5 +86,4 @@ None.
 - **Key rotation.** A new encryption key makes every stored secret unreadable.
 - **ChatGPT plans** (Sign in with ChatGPT), once OpenAI grants hosted apps plan access, and OpenAI
   API keys for Codex.
-- **Per-vendor sharing rules.** Sharing is one switch for every kind.
-- **Members who aren't owners** can't be tested yet: workspaces have no invitations.
+- **Per-vendor sharing rules.** Plans are always personal; nobody else ever sends to them.

@@ -104,6 +104,7 @@ app.MapDefaultEndpoints();
 app.MapOpenApi().AllowAnonymous();
 app.MapUsersEndpoints();
 app.MapWorkspacesEndpoints();
+app.MapAccessEndpoints();
 app.MapMachinesEndpoints();
 app.MapNooksEndpoints();
 app.MapAgentAccountsEndpoints();

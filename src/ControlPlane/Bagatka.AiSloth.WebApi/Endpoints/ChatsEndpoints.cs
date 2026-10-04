@@ -23,9 +23,8 @@ internal static class ChatsEndpoints
 {
     internal sealed record StartChatRequest(AgentAccountId Account);
 
-    internal sealed record SendMessageRequest(string Text);
+    internal sealed record SendMessageRequest(string Text, MessageId? Proposal = null);
 
-    internal sealed record SetChatSendersRequest(IReadOnlyList<UserId> Members);
 
     // A chat event in a server-sent event: its type is the event's kind, its ID the sequence number.
     internal sealed record ChatEventData(long Sequence, DateTimeOffset At, object Event);
@@ -42,7 +41,6 @@ internal static class ChatsEndpoints
         chats.MapGet("/{id:guid}", Get);
         chats.MapPost("/{id:guid}/messages", Send);
         chats.MapPost("/{id:guid}/stop", Stop);
-        chats.MapPut("/{id:guid}/senders", SetSenders);
         chats.MapGet("/{id:guid}/events", Watch);
         return chats;
     }
@@ -98,8 +96,10 @@ internal static class ChatsEndpoints
     }
 
     /// <summary>
-    /// Sends a message to the agent. It is never refused because the agent is working: it joins the
-    /// running turn when the agent supports that, and otherwise starts the next turn.
+    /// Sends a message. It reaches the agent when the chat runs on the workspace's account or the
+    /// sender's own, and is otherwise a proposal the account's owner may send on, by passing its ID as
+    /// <c>proposal</c>. It is never refused because the agent is working: it joins the running turn when
+    /// the agent supports that, and otherwise starts the next turn.
     /// </summary>
     private static async Task<Results<Ok<ChatMessage>, ProblemHttpResult>> Send(
         [FromRoute] Guid id,
@@ -108,7 +108,7 @@ internal static class ChatsEndpoints
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        Result<ChatMessage> result = await api.SendAsync(principal.ToActor(), new SendMessage(ChatId.From(id), request.Text), ct);
+        Result<ChatMessage> result = await api.SendAsync(principal.ToActor(), new SendMessage(ChatId.From(id), request.Text, request.Proposal), ct);
         return result.ToOk();
     }
 
@@ -124,24 +124,9 @@ internal static class ChatsEndpoints
     }
 
     /// <summary>
-    /// Lets members besides a personal account's owner message a chat running on it. Only the owner,
-    /// and only for an account this deployment lets its owner share.
-    /// </summary>
-    private static async Task<Results<NoContent, ProblemHttpResult>> SetSenders(
-        [FromRoute] Guid id,
-        [FromBody] SetChatSendersRequest request,
-        ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
-        CancellationToken ct)
-    {
-        Result result = await api.SetSendersAsync(principal.ToActor(), new SetChatSenders(ChatId.From(id), request.Members), ct);
-        return result.ToNoContent();
-    }
-
-    /// <summary>
     /// The chat's events as server-sent events, after the sequence number in <c>after</c> or the
     /// <c>Last-Event-ID</c> header: first those saved, then live. Event types: <c>message-sent</c>,
-    /// <c>turn-started</c>, <c>message-steered</c>, <c>message-cancelled</c>, <c>agent-update</c>
+    /// <c>message-proposed</c>, <c>turn-started</c>, <c>message-steered</c>, <c>message-cancelled</c>, <c>agent-update</c>
     /// (an Agent Client Protocol session update), and <c>turn-ended</c>.
     /// </summary>
     private static async Task<Results<ServerSentEventsResult<ChatEventData>, ProblemHttpResult>> Watch(
@@ -172,6 +157,7 @@ internal static class ChatsEndpoints
             (string type, object body) = chatEvent.Body switch
             {
                 MessageSent sent => ("message-sent", (object)sent),
+                MessageProposed proposed => ("message-proposed", proposed),
                 TurnStarted started => ("turn-started", started),
                 MessageSteered steered => ("message-steered", steered),
                 MessageCancelled cancelled => ("message-cancelled", cancelled),

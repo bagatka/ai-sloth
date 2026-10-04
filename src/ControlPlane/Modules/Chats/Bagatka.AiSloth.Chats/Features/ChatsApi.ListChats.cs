@@ -38,9 +38,7 @@ internal sealed partial class ChatsApi
             .Distinct()
             .ToListAsync(ct);
         HashSet<ChatId> waiting = [.. waitingChats];
-        List<ChatSender> senders = await db.Senders.Where(sender => ids.Contains(sender.ChatId)).OrderBy(sender => sender.UserId).ToListAsync(ct);
-        ILookup<ChatId, UserId> letIn = senders.ToLookup(sender => sender.ChatId, sender => sender.UserId);
-        List<ChatSummary> fetched = [.. chats.Select(chat => chat.ToSummary(waiting.Contains(chat.Id), letIn[chat.Id]))];
+        List<ChatSummary> fetched = [.. chats.Select(chat => chat.ToSummary(waiting.Contains(chat.Id)))];
         return new Result<Page<ChatSummary>>(Keyset.ToPage(fetched, page, chat => chat.Id.Value));
     }
 }

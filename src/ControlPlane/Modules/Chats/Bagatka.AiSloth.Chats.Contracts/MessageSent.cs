@@ -6,4 +6,5 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <param name="MessageId">The message.</param>
 /// <param name="SentBy">Who sent it.</param>
 /// <param name="Text">What it says.</param>
-public sealed record MessageSent(MessageId MessageId, UserId SentBy, string Text);
+/// <param name="Proposal">The proposal it sends on, if any.</param>
+public sealed record MessageSent(MessageId MessageId, UserId SentBy, string Text, MessageId? Proposal);

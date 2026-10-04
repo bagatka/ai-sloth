@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,24 +26,34 @@ internal sealed partial class ChatsApi(
     ChatSignals signals,
     TimeProvider time) : IChatsApi, IChatHarnessesApi
 {
-    // The chat, if the actor may use it: every member of its workspace may.
-    private async Task<Chat?> FindChatAsync(Actor actor, ChatId id, CancellationToken ct)
+    // The chat, if the actor may do at least `needed` with it: a chat is as open as its nook. Not found
+    // when they may not see it, so nobody learns that it exists; forbidden when they may only read.
+    private async Task<Result<Chat>> FindChatAsync(Actor actor, ChatId id, AccessLevel needed, CancellationToken ct)
     {
         Chat? chat = await db.Chats.AsNoTracking().SingleOrDefaultAsync(found => found.Id == id, ct);
         if (chat is null)
         {
-            return null;
+            return new Result<Chat>(ChatsErrors.NotFound);
         }
 
-        WorkspaceRole? role = await workspaces.GetRoleAsync(actor, chat.WorkspaceId, ct);
-        return role is null ? null : chat;
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Nook(chat.NookId.Value), ct);
+        if (access is null)
+        {
+            return new Result<Chat>(ChatsErrors.NotFound);
+        }
+
+        if (access < needed)
+        {
+            return new Result<Chat>(Error.Forbidden);
+        }
+
+        return new Result<Chat>(chat);
     }
 
     private async Task<ChatSummary> SummaryAsync(Chat chat, CancellationToken ct)
     {
         bool waiting = await db.Messages.AnyAsync(message => message.ChatId == chat.Id
             && (message.State == MessageState.New || message.State == MessageState.Queued || message.State == MessageState.Steering), ct);
-        List<UserId> letIn = await db.Senders.Where(sender => sender.ChatId == chat.Id).OrderBy(sender => sender.UserId).Select(sender => sender.UserId).ToListAsync(ct);
-        return chat.ToSummary(waiting, letIn);
+        return chat.ToSummary(waiting);
     }
 }

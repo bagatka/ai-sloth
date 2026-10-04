@@ -15,10 +15,15 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<NookSummary>> CreateAsync(Actor actor, CreateNook command, CancellationToken ct)
     {
-        WorkspaceRole? role = await workspaces.GetRoleAsync(actor, command.WorkspaceId, ct);
-        if (role is null)
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(command.WorkspaceId), ct);
+        if (access is null)
         {
             return new Result<NookSummary>(WorkspacesErrors.NotFound);
+        }
+
+        if (access < AccessLevel.Write)
+        {
+            return new Result<NookSummary>(Error.Forbidden);
         }
 
         ProviderId? provider = await FindProviderAsync(actor, command.WorkspaceId, command.Provider, ct);
@@ -34,6 +39,15 @@ internal sealed partial class NooksApi
         }
 
         Nook nook = Nook.Create(command.WorkspaceId, provider.Value, command.Harness, time);
+
+        // Recorded before the nook is saved: a record for a nook that never got saved stands alone harmlessly.
+        AddResource inWorkspace = new AddResource(Resource.Nook(nook.Id.Value), Resource.Workspace(command.WorkspaceId));
+        Result added = await workspaces.AddResourceAsync(actor, inWorkspace, ct);
+        if (added.Failed)
+        {
+            return new Result<NookSummary>(added.Error);
+        }
+
         db.Nooks.Add(nook);
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)

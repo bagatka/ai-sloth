@@ -16,7 +16,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261004163156_Initial";
+    public override string LastMigrationId => "20261004200554_Initial";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -112,22 +112,6 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("chats", "chats");
             });
 
-        modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.ChatSender", b =>
-            {
-                b.Property<Guid>("ChatId")
-                    .HasColumnType("uuid")
-                    .HasColumnName("chat_id");
-
-                b.Property<Guid>("UserId")
-                    .HasColumnType("uuid")
-                    .HasColumnName("user_id");
-
-                b.HasKey("ChatId", "UserId")
-                    .HasName("pk_senders");
-
-                b.ToTable("senders", "chats");
-            });
-
         modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.Message", b =>
             {
                 b.Property<Guid>("Id")
@@ -137,6 +121,14 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.Property<Guid>("ChatId")
                     .HasColumnType("uuid")
                     .HasColumnName("chat_id");
+
+                b.Property<bool>("IsProposal")
+                    .HasColumnType("boolean")
+                    .HasColumnName("is_proposal");
+
+                b.Property<Guid?>("ProposalId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("proposal_id");
 
                 b.Property<DateTimeOffset>("SentAt")
                     .HasColumnType("timestamp with time zone")

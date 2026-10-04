@@ -154,18 +154,53 @@ public sealed class ChatsTests(ControlPlane controlPlane) : IDisposable
     }
 
     [Fact]
-    public async Task A_chat_on_a_personal_account_is_its_owners_alone()
+    public async Task On_a_personal_account_the_owners_messages_reach_the_agent()
     {
         (NookSummary nook, _) = await NookWithAccountAsync();
         AgentAccountSummary own = await Api.ReadAsync<AgentAccountSummary>(
             _alice.SendPostAsync("/agent-accounts", new { kind = "AnthropicApiKey", name = "Mine", secret = FakeModel.ApiKey }), HttpStatusCode.Created);
         ChatSummary chat = await Api.ReadAsync<ChatSummary>(_alice.SendPostAsync(NookChatsPath(nook.Id), new { account = own.Id }), HttpStatusCode.Created);
+        await using ChatWatch watch = await ChatWatch.OpenAsync(_alice, chat);
 
-        Problem shared = await Api.ProblemAsync(_alice.SendPutAsync(PathOf(chat) + "/senders", new { members = new[] { Guid.CreateVersion7() } }), HttpStatusCode.BadRequest);
-        await Api.ExpectAsync(_alice.SendPutAsync(PathOf(chat) + "/senders", new { members = Array.Empty<Guid>() }), HttpStatusCode.NoContent);
+        ChatMessage sent = await SendAsync(chat, "say hello");
+        await watch.NextAsync("turn-ended");
+        Problem noSuchProposal = await Api.ProblemAsync(_alice.SendPostAsync(PathOf(chat) + "/messages", new { text = "again", proposal = Guid.CreateVersion7() }), HttpStatusCode.BadRequest);
 
-        Assert.Equal([chat.StartedBy], chat.Senders);
-        Assert.True(shared.Errors?.ContainsKey("members"));
+        Assert.Equal(chat.StartedBy, chat.AccountOwner);
+        Assert.False(sent.IsProposal);
+        Assert.Contains(watch.Seen, seen => string.Equals(seen.Type, "turn-started", StringComparison.Ordinal)
+            && seen.Event.GetProperty("messageId").GetGuid() == sent.Id.Value);
+        Assert.True(noSuchProposal.Errors?.ContainsKey("proposal"));
+    }
+
+    [Fact]
+    public async Task A_message_from_someone_who_may_not_use_the_account_is_a_proposal_its_owner_sends_on()
+    {
+        (NookSummary nook, _) = await NookWithAccountAsync();
+        AgentAccountSummary own = await Api.ReadAsync<AgentAccountSummary>(
+            _alice.SendPostAsync("/agent-accounts", new { kind = "AnthropicApiKey", name = "Mine", secret = FakeModel.ApiKey }), HttpStatusCode.Created);
+        ChatSummary chat = await Api.ReadAsync<ChatSummary>(_alice.SendPostAsync(NookChatsPath(nook.Id), new { account = own.Id }), HttpStatusCode.Created);
+        using HttpClient bob = controlPlane.ClientFor("bob-" + Guid.CreateVersion7());
+        string invites = string.Create(CultureInfo.InvariantCulture, $"/workspaces/{nook.WorkspaceId.Value}/invites");
+        Invite invite = await Api.ReadAsync<Invite>(_alice.SendPostAsync(invites, new { access = "Write" }), HttpStatusCode.OK);
+        await Api.ExpectAsync(bob.SendPostAsync("/invites/accept", new { code = invite.Code }), HttpStatusCode.OK);
+        string messages = PathOf(chat) + "/messages";
+        await using ChatWatch watch = await ChatWatch.OpenAsync(_alice, chat);
+
+        ChatMessage proposal = await Api.ReadAsync<ChatMessage>(bob.SendPostAsync(messages, new { text = "Please write hello.txt for me" }), HttpStatusCode.OK);
+        JsonElement proposed = await watch.NextAsync("message-proposed");
+        await Api.ExpectAsync(bob.SendPostAsync(messages, new { text = "go", proposal = proposal.Id }), HttpStatusCode.Forbidden);
+        ChatMessage sent = await Api.ReadAsync<ChatMessage>(_alice.SendPostAsync(messages, new { text = "Please write hello.txt for me, thanks", proposal = proposal.Id }), HttpStatusCode.OK);
+        JsonElement messageSent = await watch.NextAsync("message-sent");
+        JsonElement ended = await watch.NextAsync("turn-ended");
+
+        Assert.True(proposal.IsProposal);
+        Assert.Equal(proposal.SentBy.Value, proposed.GetProperty("proposedBy").GetGuid());
+        Assert.False(sent.IsProposal);
+        Assert.Equal(proposal.Id.Value, messageSent.GetProperty("proposal").GetGuid());
+        Assert.Equal(["message-proposed", "message-sent", "turn-started"], watch.Seen.Take(3).Select(seen => seen.Type), StringComparer.Ordinal);
+        Assert.Equal(sent.Id.Value, watch.Seen[2].Event.GetProperty("messageId").GetGuid());
+        Assert.Equal("end_turn", ended.GetProperty("stopReason").GetString());
     }
 
     [Fact]

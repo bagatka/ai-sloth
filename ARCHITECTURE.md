@@ -265,7 +265,7 @@ These decisions are fixed:
 
 | Project | Used by | Holds |
 |---|---|---|
-| `Bagatka.Foundation` | everyone, including Contracts and Sdk clients | `Result`, `Result<T>`, `Success`, `Error`, `ErrorKind`, `Actor`, `UserId`, `ITypedId<T>`, `TypedIdJsonConverter<T>`; later `Page<T>`, `PageRequest`, `FoundationJson`, `Money` |
+| `Bagatka.Foundation` | everyone, including Contracts and Sdk clients | `Result`, `Result<T>`, `Success`, `Error`, `ErrorKind`, `Actor`, `UserId`, `ITypedId<T>`, `TypedIdJsonConverter<T>`, `OneTimeCode`; later `Page<T>`, `PageRequest`, `FoundationJson`, `Money` |
 | `Bagatka.Foundation.Modules` | module projects | `AddModuleDbContext`, `ModuleDatabases.MigrateAsync`, `TypedIdConverter<T>`, `SaveAsync`, keyset pagination; `IOutbox`, the outbox dispatcher, and `IReaction<T>` come with the first integration event |
 | `Bagatka.Foundation.Web` | WebApi hosts | `Result` → HTTP mapping as problem details, `ClaimsPrincipal` → `Actor`; unhandled exceptions use ASP.NET Core's built-in problem details |
 
@@ -438,10 +438,10 @@ this table in the same change.
 
 | Module | Owns | Asks | Reacts to | Schema |
 |---|---|---|---|---|
-| Workspaces (contract only) | Workspaces, their members and roles | — | — | `workspaces` |
+| Workspaces (contract only) | Workspaces, and who may do what with them and their nooks: access levels, invites | — | — | `workspaces` |
 | Nooks (contract only) | Nooks, where each runs, their lifecycle, processes, templates, checkpoints, daemon connections | Workspaces, Sources, Machines | — | `nooks` |
 | Sources (planned) | Repositories and folders, their recipes, delivery, push policy | Workspaces | — | `sources` |
 | AgentAccounts | Accounts at agent vendors that pay for agents: a workspace's and people's own, their sealed secrets | Workspaces | — | `agent_accounts` |
-| Chats | ACP conversations in nooks, their messages, senders, and events, the agents' runners; harness state (planned) | Nooks, AgentAccounts, Workspaces | — | `chats` |
+| Chats | ACP conversations in nooks, their messages, proposals, and events, the agents' runners; harness state (planned) | Nooks, AgentAccounts, Workspaces | — | `chats` |
 | Machines | Computers workspaces add to run nooks, their credentials and connections, the `machine` provider | Workspaces | — | `machines` |
 | Projects (planned, extension) | Groups of nooks, chats, and sources, shared context, project chat | Nooks, Chats, Sources, Workspaces | Nooks, Chats | `projects` |

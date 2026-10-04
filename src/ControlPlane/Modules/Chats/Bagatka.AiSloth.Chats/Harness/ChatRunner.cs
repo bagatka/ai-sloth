@@ -167,16 +167,15 @@ internal sealed class ChatRunner(
             .ToListAsync(ct);
         List<string> outgoing = [];
 
+        foreach (Message message in waiting.Where(message => message.State == MessageState.New))
+        {
+            Announce(db, chat, message);
+        }
+
         bool stopRequested = Interlocked.Exchange(ref _stopRequested, 0) == 1;
         if (stopRequested)
         {
             StopTurn(db, chat, waiting, outgoing);
-        }
-
-        foreach (Message message in waiting.Where(message => message.State == MessageState.New))
-        {
-            db.Events.Add(chat.Record(new ChatEventBody(new MessageSent(message.Id, message.SentBy, message.Text)), time));
-            message.Queue();
         }
 
         List<Message> queued = waiting.Where(message => message.State == MessageState.Queued).ToList();
@@ -196,6 +195,21 @@ internal sealed class ChatRunner(
         return new Progress(chat.NookId, chat.HarnessProcessId, chat.OutputOffset, idle);
     }
 
+    // Everyone in the chat sees a new message: one for the agent queues for it, and a proposal stays
+    // with the people in the chat.
+    private void Announce(ChatsDbContext db, Chat chat, Message message)
+    {
+        if (message.IsProposal)
+        {
+            db.Events.Add(chat.Record(new ChatEventBody(new MessageProposed(message.Id, message.SentBy, message.Text)), time));
+            message.Propose();
+            return;
+        }
+
+        db.Events.Add(chat.Record(new ChatEventBody(new MessageSent(message.Id, message.SentBy, message.Text, message.ProposalId)), time));
+        message.Queue();
+    }
+
     // The turn ends now; whatever the agent still sends about it is kept, but no longer waited for.
     // Messages it hasn't received are cancelled.
     private void StopTurn(ChatsDbContext db, Chat chat, List<Message> waiting, List<string> outgoing)
@@ -211,13 +225,8 @@ internal sealed class ChatRunner(
             }
         }
 
-        foreach (Message message in waiting.Where(message => message.State is MessageState.New or MessageState.Queued))
+        foreach (Message message in waiting.Where(message => message.State == MessageState.Queued))
         {
-            if (message.State == MessageState.New)
-            {
-                db.Events.Add(chat.Record(new ChatEventBody(new MessageSent(message.Id, message.SentBy, message.Text)), time));
-            }
-
             db.Events.Add(chat.Record(new ChatEventBody(new MessageCancelled(message.Id)), time));
             message.Cancel();
         }

@@ -12,13 +12,19 @@ internal sealed class WorkspacesDbContext(DbContextOptions<WorkspacesDbContext> 
 
     public DbSet<Workspace> Workspaces => Set<Workspace>();
 
-    public DbSet<Member> Members => Set<Member>();
+    public DbSet<Grant> Grants => Set<Grant>();
+
+    public DbSet<ResourceLink> Links => Set<ResourceLink>();
+
+    public DbSet<StoredInvite> Invites => Set<StoredInvite>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfiguration(new WorkspaceConfiguration());
-        modelBuilder.ApplyConfiguration(new MemberConfiguration());
+        modelBuilder.ApplyConfiguration(new GrantConfiguration());
+        modelBuilder.ApplyConfiguration(new ResourceLinkConfiguration());
+        modelBuilder.ApplyConfiguration(new StoredInviteConfiguration());
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
@@ -28,6 +34,7 @@ internal sealed class WorkspacesDbContext(DbContextOptions<WorkspacesDbContext> 
         configurationBuilder.Properties<WorkspaceName>()
             .HaveConversion<WorkspaceNameConverter>()
             .HaveMaxLength(WorkspaceName.MaxLength);
-        configurationBuilder.Properties<WorkspaceRole>().HaveConversion<string>().HaveMaxLength(StoredEnums.MaxLength);
+        configurationBuilder.Properties<AccessLevel>().HaveConversion<string>().HaveMaxLength(StoredEnums.MaxLength);
+        configurationBuilder.Properties<ResourceKind>().HaveConversion<string>().HaveMaxLength(StoredEnums.MaxLength);
     }
 }
