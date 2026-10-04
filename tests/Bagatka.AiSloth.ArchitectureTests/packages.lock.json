@@ -300,6 +300,14 @@
           "Grpc.Core.Api": "[2.84.0, )"
         }
       },
+      "bagatka.aisloth.nooks": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Nooks.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation.Modules": "[1.0.0, )",
+          "Bagatka.Sandboxing": "[1.0.0, )"
+        }
+      },
       "bagatka.aisloth.nooks.contracts": {
         "type": "Project",
         "dependencies": {
@@ -311,6 +319,13 @@
         "type": "Project",
         "dependencies": {
           "Bagatka.ServiceDefaults": "[1.0.0, )"
+        }
+      },
+      "bagatka.aisloth.workspaces": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation.Modules": "[1.0.0, )"
         }
       },
       "bagatka.aisloth.workspaces.contracts": {

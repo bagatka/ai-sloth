@@ -1,0 +1,34 @@
+using System.Threading;
+using System.Threading.Tasks;
+using Bagatka.AiSloth.Nooks.Contracts;
+using Bagatka.AiSloth.Nooks.Daemons;
+using Bagatka.AiSloth.Nooks.Model;
+using Bagatka.Foundation;
+
+namespace Bagatka.AiSloth.Nooks;
+
+internal sealed partial class NooksApi
+{
+    private const int MaxInputBytes = 64 * 1024;
+
+    public async Task<Result> SendInputAsync(Actor actor, SendInput command, CancellationToken ct)
+    {
+        if (!(await FindProcessAsync(actor, command.NookId, command.ProcessId, ct)).TryGetValue(out Process? process, out Error? missing))
+        {
+            return new Result(missing);
+        }
+
+        if (command.Data.Length > MaxInputBytes)
+        {
+            return new Result(Error.Validation("data", "Send at most 64 KiB at once."));
+        }
+
+        DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
+        if (connection is null || !await connection.SendAsync(new DaemonInstruction(new SendInputInstruction(process.Id, command.Data)), ct))
+        {
+            return new Result(NooksErrors.NotReady);
+        }
+
+        return new Result(new Success());
+    }
+}

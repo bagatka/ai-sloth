@@ -49,6 +49,9 @@ Nothing yet. Once workspaces can be deleted, `WorkspaceDeleted` deletes their no
 
 ## Lifecycle
 
+Built so far: Creating, Running, Failed, and Deleting. Paused, Stopped, and Unreachable come with
+suspension and with noticing daemons that stay away.
+
 ```
 Creating ──daemon connects──▶ Running ──idle──▶ Paused or Stopped (the provider decides which)
                                  ▲                           │
@@ -69,11 +72,13 @@ exit code).
 
 ## Background work
 
-- **Reconciler** (planned): compares records with each provider's `ListAsync`, in bounded batches,
-  safely on several instances. Recorded `Creating` but missing at the provider: call `CreateAsync`
-  again. Recorded `Deleting`: call `DeleteAsync` until the sandbox is gone, then remove the record.
-  At the provider, not recorded, and older than a grace period: delete it. Reported failed: mark it
-  `Failed`.
+- **Reconciler** (`Jobs/NookReconciler.cs`): runs every 10 seconds, and at once after a nook is
+  recorded or deleted, in bounded batches. Recorded `Creating` and missing at the provider: issue a
+  daemon token and call `CreateAsync`. Recorded `Deleting`: call `DeleteAsync`, then remove the record
+  and its processes. Reported failed at the provider, or rejected by it: mark it `Failed`. Planned:
+  deleting sandboxes without a record (after a grace period) and noticing running nooks whose sandbox
+  failed, by comparing with each provider's `ListAsync`; and claiming nooks atomically before several
+  instances run it.
 - **Idle suspender** (planned): suspends nooks that stay idle longer than a setting.
 
 ## Templates
@@ -98,8 +103,9 @@ every turn, which is what makes forking from an older message possible.
 
 ## Configuration
 
-Settings, passed by the host (`PATTERNS.md`, entry 20): the daemon image, the URL daemons dial,
-default resources, and the idle period before suspension.
+`NooksSettings`, passed by the host (`PATTERNS.md`, entry 20): the connection string, the URL
+daemons dial (the WebApi's daemon endpoint as a nook reaches it), the nook image, and each nook's CPU
+and memory. The idle period before suspension comes with suspension.
 
 ## Decisions and constraints
 
@@ -116,11 +122,29 @@ default resources, and the idle period before suspension.
   and the nook record keeps the latest report; Chats decides what a nearly full disk means for a
   new message. On the Docker provider the figure is the host's disk, because Docker can't cap a
   container's disk on most setups.
-- **Daemon tokens.** Each nook gets a random token when it is created. It reaches the daemon
-  through the provider's environment (`SLOTHD_TOKEN`, with `SLOTHD_NOOK_ID` and
-  `SLOTHD_CONTROL_PLANE_URL`), and only its hash is stored. This module verifies it, which is why
+- **Daemon tokens.** The reconciler issues a random token right before it asks the provider for the
+  sandbox; a retried attempt issues a new one, because the old one never reached a daemon. It reaches
+  the daemon through the provider's environment (`SLOTHD_TOKEN`, with `SLOTHD_NOOK_ID` and
+  `SLOTHD_CONTROL_PLANE_URL`), and only its SHA-256 hash is stored. This module verifies it, which is why
   `INookDaemonsApi` takes an anonymous actor. Anything inside the nook can read the token, so it
   grants only what that nook's daemon needs.
+- **Watches survive reconnects.** A watch asks the daemon for output from the last offset it
+  relayed, again after every reconnect, so a watcher sees each byte once.
 - **One active instance for now.** Daemon connections live in the instance they dialed. A deploy
   hands them over with `ReconnectInstruction`; several active instances are designed when capacity
   requires them.
+
+## Not built yet
+
+- **Suspension.** No nook is Paused or Stopped yet, and none becomes Unreachable: a nook whose daemon
+  stays away still shows Running, and calls wait up to 60 seconds for it, then answer `NotReady`.
+- **Handover.** A control-plane instance that shuts down doesn't send `ReconnectInstruction`;
+  daemons notice the lost connection and reconnect with backoff, within about a second.
+- **Reconciler gaps.** Sandboxes without a record aren't deleted, and a running nook whose sandbox
+  fails stays Running. Nooks aren't claimed atomically, so only one instance may run the job. Image
+  pulls happen one at a time, so the first nook on a fresh host delays the others.
+- **Lost processes.** Processes a restarted daemon lost never report an exit, so watching one waits
+  until the watcher gives up.
+- **Disk usage** is stored and returned, but nothing acts on it yet; Chats will ask for
+  confirmation at 90%.
+- **Checkpoints, forks, and templates.**

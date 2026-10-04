@@ -1,6 +1,6 @@
 # Workspaces
 
-Workspaces are where people work together and what owns sandboxes, like Slack workspaces. A user
+Workspaces are where people work together and what owns nooks, like Slack workspaces. A user
 can be a member of many, such as a personal one and a company one.
 
 ## Owns
@@ -41,10 +41,15 @@ None.
 
 ## Configuration
 
-None.
+`WorkspacesSettings`: the connection string.
 
 ## Decisions and constraints
 
 - **Membership is the only permission data.** The contract answers "what is this actor's role
   here?"; it never answers "may this actor do X?", because X belongs to another module.
-- **Not designed yet:** invitations, removing members, and transferring ownership.
+
+## Not built yet
+
+- Invitations, removing members, and transferring ownership: not designed yet. A workspace has
+  exactly the member who created it.
+- A personal workspace for every new user: waits for Users' `UserRegistered`, which needs the outbox.

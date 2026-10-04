@@ -16,7 +16,7 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 public interface INookDaemonsApi
 {
     /// <summary>
-    /// A daemon's control connection. Its process exits flow in; instructions flow out until either
+    /// A daemon's control connection. Its reports flow in; instructions flow out until either
     /// side ends the connection or <paramref name="ct"/> is cancelled. A newer connection for the same
     /// nook replaces an older one. A control-plane instance that shuts down sends
     /// <see cref="ReconnectInstruction"/> first, so the daemon moves to another instance.
@@ -25,7 +25,7 @@ public interface INookDaemonsApi
     public Task<Result<IAsyncEnumerable<DaemonInstruction>>> ConnectAsync(
         Actor actor,
         ConnectDaemon command,
-        IAsyncEnumerable<ProcessExited> exits,
+        IAsyncEnumerable<DaemonReport> reports,
         CancellationToken ct);
 
     /// <summary>
