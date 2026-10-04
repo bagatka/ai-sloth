@@ -58,7 +58,7 @@ public sealed class DockerSandboxProviderTests
 
     private static SandboxSpec Spec(IReadOnlyDictionary<string, string> environment)
     {
-        return new SandboxSpec(SandboxKey.From(Guid.CreateVersion7()), ProvidersUnderTest.Image, ProvidersUnderTest.Resources, environment);
+        return new SandboxSpec(SandboxKey.From(Guid.CreateVersion7()), ProvidersUnderTest.Image, ProvidersUnderTest.Resources, environment, Location: null);
     }
 
     private static async Task<ImageDetails> SnapshotImageAsync(DockerClient docker, SnapshotKey snapshot)

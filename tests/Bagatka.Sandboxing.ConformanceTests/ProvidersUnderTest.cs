@@ -13,7 +13,7 @@ namespace Bagatka.Sandboxing.ConformanceTests;
 public static class ProvidersUnderTest
 {
     /// <summary>The names the tests run with.</summary>
-    public static TheoryData<string> Names => new TheoryData<string>(["docker"]);
+    public static TheoryData<string> Names => new TheoryData<string>(["docker", "remote"]);
 
     /// <summary>A tiny image whose entry point runs until it is stopped, available to every backend.</summary>
     internal static SandboxSource Image => new SandboxSource(new SandboxImage("registry.k8s.io/pause:3.10"));
@@ -28,15 +28,15 @@ public static class ProvidersUnderTest
     {
         string scope = "conformance-" + RandomNumberGenerator.GetHexString(12, lowercase: true);
         ServiceCollection services = new ServiceCollection();
-        switch (name)
+        services.AddDockerSandboxProvider(new DockerSandboxSettings(new Uri("unix:///var/run/docker.sock"), scope));
+        ServiceProvider built = services.BuildServiceProvider();
+        return name switch
         {
-            case "docker":
-                services.AddDockerSandboxProvider(new DockerSandboxSettings(new Uri("unix:///var/run/docker.sock"), scope));
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(name), name, "No provider has this name.");
-        }
+            "docker" => new ProviderUnderTest(built, throughRemote: false),
 
-        return new ProviderUnderTest(services.BuildServiceProvider());
+            // Docker again, reached through RemoteSandboxProvider and SandboxCalls, as machines are.
+            "remote" => new ProviderUnderTest(built, throughRemote: true),
+            _ => throw new ArgumentOutOfRangeException(nameof(name), name, "No provider has this name."),
+        };
     }
 }

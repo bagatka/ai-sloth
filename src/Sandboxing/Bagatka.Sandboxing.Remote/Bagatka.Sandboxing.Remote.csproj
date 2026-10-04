@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- The sloth CLI, a Native AOT binary, runs these calls on people's machines. -->
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <!-- The messages are generated from sandbox_calls.proto at build time; never hand-edit them. -->
+  <ItemGroup>
+    <Protobuf Include="sandbox_calls.proto" GrpcServices="None" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.Tools" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Bagatka.Sandboxing\Bagatka.Sandboxing.csproj" />
+  </ItemGroup>
+
+</Project>

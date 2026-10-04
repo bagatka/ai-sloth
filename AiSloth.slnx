@@ -48,6 +48,7 @@
   <Folder Name="/src/Sandboxing/">
     <File Path="src/Sandboxing/README.md" />
     <Project Path="src/Sandboxing/Bagatka.Sandboxing.Docker/Bagatka.Sandboxing.Docker.csproj" />
+    <Project Path="src/Sandboxing/Bagatka.Sandboxing.Remote/Bagatka.Sandboxing.Remote.csproj" />
     <Project Path="src/Sandboxing/Bagatka.Sandboxing/Bagatka.Sandboxing.csproj" />
   </Folder>
   <Folder Name="/src/Sdk/">

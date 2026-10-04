@@ -45,6 +45,11 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
     {
         ArgumentNullException.ThrowIfNull(spec);
 
+        if (spec.Location is not null)
+        {
+            return new Result<SandboxObservation>(Error.Validation("location", "A Docker Engine is one place; leave the location empty."));
+        }
+
         // Docker reads zero CPU as unlimited and refuses tiny memory limits.
         if (spec.Resources.CpuMillicores <= 0 || spec.Resources.MemoryMebibytes < MinimumMemoryMebibytes)
         {

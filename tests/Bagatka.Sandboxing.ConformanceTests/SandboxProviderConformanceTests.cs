@@ -48,6 +48,19 @@ public sealed class SandboxProviderConformanceTests
 
     [Theory]
     [MemberData(nameof(ProvidersUnderTest.Names), MemberType = typeof(ProvidersUnderTest))]
+    public async Task Create_rejects_a_location_the_backend_does_not_have(string provider)
+    {
+        await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);
+        SandboxSpec spec = Spec() with { Location = "nowhere" };
+
+        Error error = TestResults.ErrorOf(await under.Provider.CreateAsync(spec, Ct));
+
+        Assert.Equal(ErrorKind.Validation, error.Kind);
+        Assert.Null(await under.Provider.ObserveAsync(spec.Key, Ct));
+    }
+
+    [Theory]
+    [MemberData(nameof(ProvidersUnderTest.Names), MemberType = typeof(ProvidersUnderTest))]
     public async Task Create_rejects_resources_the_backend_cannot_run(string provider)
     {
         await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);
@@ -188,7 +201,8 @@ public sealed class SandboxProviderConformanceTests
             SandboxKey.From(Guid.CreateVersion7()),
             source ?? ProvidersUnderTest.Image,
             ProvidersUnderTest.Resources,
-            Environment("GREETING", "hello"));
+            Environment("GREETING", "hello"),
+            Location: null);
     }
 
     private static Dictionary<string, string> Environment(string name, string value)

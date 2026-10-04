@@ -16,6 +16,7 @@
     <ProjectReference Include="..\..\src\Daemon\Bagatka.AiSloth.DaemonProtocol\Bagatka.AiSloth.DaemonProtocol.csproj" />
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing\Bagatka.Sandboxing.csproj" />
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
+    <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Remote\Bagatka.Sandboxing.Remote.csproj" />
     <ProjectReference Include="..\..\src\Sdk\Bagatka.Sdk.Docker\Bagatka.Sdk.Docker.csproj" />
   </ItemGroup>
 

@@ -155,11 +155,24 @@
           "Bagatka.Sdk.Docker": "[1.0.0, )"
         }
       },
+      "bagatka.sandboxing.remote": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Sandboxing": "[1.0.0, )",
+          "Google.Protobuf": "[3.36.2, )"
+        }
+      },
       "bagatka.sdk.docker": {
         "type": "Project",
         "dependencies": {
           "Bagatka.Foundation": "[1.0.0, )"
         }
+      },
+      "Google.Protobuf": {
+        "type": "CentralTransitive",
+        "requested": "[3.36.2, )",
+        "resolved": "3.36.2",
+        "contentHash": "Ci1q1iJg74qAE5riTA2FbMS0wPbpruPQI/JQ9DrAsRo2VsSxgt1e/pmxGxgrci+pXJEgrSYg2vPl8rrStZkclQ=="
       }
     }
   }

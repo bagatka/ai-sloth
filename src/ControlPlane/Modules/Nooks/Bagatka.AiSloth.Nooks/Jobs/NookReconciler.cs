@@ -169,6 +169,7 @@ internal sealed class NookReconciler(
                 ["SLOTHD_CONTROL_PLANE_URL"] = settings.DaemonUrl.AbsoluteUri,
                 ["SLOTHD_NOOK_ID"] = nook.Id.Value.ToString("D", CultureInfo.InvariantCulture),
                 ["SLOTHD_TOKEN"] = token,
-            });
+            },
+            Location: null);
     }
 }

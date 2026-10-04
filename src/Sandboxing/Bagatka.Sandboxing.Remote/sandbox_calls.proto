@@ -1,0 +1,135 @@
+// Sandbox provider operations as messages, so one ISandboxProvider can run its calls on another
+// provider elsewhere: RemoteSandboxProvider turns each call into a SandboxCall, and
+// SandboxCalls.ExecuteAsync runs it on a local provider and answers with a SandboxCallResult.
+// Moving the messages is the caller's job. Change them additively.
+
+syntax = "proto3";
+
+package bagatka.sandboxing.remote.v1;
+
+option csharp_namespace = "Bagatka.Sandboxing.Remote.V1";
+
+import "google/protobuf/timestamp.proto";
+
+message SandboxCall {
+  // Pairs the call with its result; unique among the calls in flight.
+  string call_id = 1;
+  // Keys are UUID strings.
+  oneof call {
+    SandboxSpec create = 2;
+    string suspend = 3;
+    string resume = 4;
+    string observe = 5;
+    ListSandboxes list = 6;
+    string delete = 7;
+    CreateSnapshot snapshot = 8;
+    ListSnapshots list_snapshots = 9;
+    string delete_snapshot = 10;
+  }
+}
+
+message SandboxSpec {
+  string key = 1;
+  oneof source {
+    string image = 2;
+    string snapshot = 3;
+  }
+  int32 cpu_millicores = 4;
+  int32 memory_mebibytes = 5;
+  map<string, string> environment = 6;
+  optional string location = 7;
+}
+
+message ListSandboxes {
+}
+
+message ListSnapshots {
+}
+
+message CreateSnapshot {
+  string sandbox = 1;
+  string snapshot = 2;
+}
+
+message SandboxCallResult {
+  string call_id = 1;
+  oneof result {
+    // Create, suspend, resume, and an observe that found the sandbox.
+    Sandbox sandbox = 2;
+    // An observe that didn't.
+    Absent absent = 3;
+    Sandboxes sandboxes = 4;
+    Snapshot snapshot = 5;
+    Snapshots snapshots = 6;
+    // Delete and delete snapshot.
+    Done done = 7;
+    // An expected failure the provider returned.
+    Error error = 8;
+    // The provider threw: an infrastructure failure or a bug.
+    Failure failure = 9;
+  }
+}
+
+message Sandbox {
+  string key = 1;
+  SandboxState state = 2;
+  google.protobuf.Timestamp created_at = 3;
+  optional string reason = 4;
+}
+
+message Sandboxes {
+  repeated Sandbox items = 1;
+}
+
+message Snapshot {
+  string key = 1;
+  string source = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message Snapshots {
+  repeated Snapshot items = 1;
+}
+
+message Absent {
+}
+
+message Done {
+}
+
+message Error {
+  ErrorKind kind = 1;
+  string code = 2;
+  string message = 3;
+  repeated FieldError fields = 4;
+}
+
+message FieldError {
+  string field = 1;
+  string message = 2;
+}
+
+message Failure {
+  string message = 1;
+}
+
+enum SandboxState {
+  SANDBOX_STATE_UNSPECIFIED = 0;
+  SANDBOX_STATE_STARTING = 1;
+  SANDBOX_STATE_RUNNING = 2;
+  SANDBOX_STATE_SUSPENDING = 3;
+  SANDBOX_STATE_PAUSED = 4;
+  SANDBOX_STATE_STOPPED = 5;
+  SANDBOX_STATE_RESUMING = 6;
+  SANDBOX_STATE_FAILED = 7;
+  SANDBOX_STATE_DELETING = 8;
+}
+
+enum ErrorKind {
+  ERROR_KIND_UNSPECIFIED = 0;
+  ERROR_KIND_VALIDATION = 1;
+  ERROR_KIND_UNAUTHORIZED = 2;
+  ERROR_KIND_FORBIDDEN = 3;
+  ERROR_KIND_NOT_FOUND = 4;
+  ERROR_KIND_CONFLICT = 5;
+}

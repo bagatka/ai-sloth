@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
+    <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Remote\Bagatka.Sandboxing.Remote.csproj" />
   </ItemGroup>
 
 </Project>

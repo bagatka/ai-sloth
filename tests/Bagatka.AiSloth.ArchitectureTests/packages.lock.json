@@ -559,6 +559,13 @@
           "Bagatka.Sdk.Docker": "[1.0.0, )"
         }
       },
+      "bagatka.sandboxing.remote": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Sandboxing": "[1.0.0, )",
+          "Google.Protobuf": "[3.36.2, )"
+        }
+      },
       "bagatka.sdk.docker": {
         "type": "Project",
         "dependencies": {
