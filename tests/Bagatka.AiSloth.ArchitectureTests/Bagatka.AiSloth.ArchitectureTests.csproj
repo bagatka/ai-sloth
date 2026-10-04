@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Foundation\Bagatka.Foundation\Bagatka.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Foundation\Bagatka.Foundation.Modules\Bagatka.Foundation.Modules.csproj" />
     <ProjectReference Include="..\..\src\Aspire\Bagatka.ServiceDefaults\Bagatka.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Bagatka.AiSloth.WebApi\Bagatka.AiSloth.WebApi.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Nooks\Bagatka.AiSloth.Nooks.Contracts\Bagatka.AiSloth.Nooks.Contracts.csproj" />

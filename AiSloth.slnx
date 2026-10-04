@@ -34,6 +34,7 @@
     <Project Path="src/Daemon/Bagatka.AiSloth.DaemonProtocol/Bagatka.AiSloth.DaemonProtocol.csproj" />
   </Folder>
   <Folder Name="/src/Foundation/">
+    <Project Path="src/Foundation/Bagatka.Foundation.Modules/Bagatka.Foundation.Modules.csproj" />
     <Project Path="src/Foundation/Bagatka.Foundation/Bagatka.Foundation.csproj" />
   </Folder>
   <Folder Name="/src/Sandboxing/">
