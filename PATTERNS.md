@@ -194,6 +194,8 @@ public static class UsersModule
 }
 ```
 
+Canonical example: `src/ControlPlane/Modules/Workspaces/Bagatka.AiSloth.Workspaces/WorkspacesModule.cs`.
+
 - **One public type.** `<Module>Module` is the only public type in a module project; its settings
   record lives next to it and is public too, because the host constructs it (entry 20).
 - **The table of contents.** Every registration is a visible line here, so this file shows
@@ -249,6 +251,9 @@ internal sealed partial class UsersApi
 }
 ```
 
+Canonical examples: `Features/WorkspacesApi.CreateWorkspace.cs` and the query helper shared through
+`WorkspacesApi.cs`, in `src/ControlPlane/Modules/Workspaces/Bagatka.AiSloth.Workspaces/`.
+
 - **Shape.** State-changing features follow five steps: authorize, parse, load, decide, commit.
   Reads authorize, then project (entry 13).
 - **Naming.** The file is named `<Module>Api.<Feature>.cs`: `Features/UsersApi.RenameUser.cs`
@@ -287,7 +292,7 @@ public readonly record struct OrderId : ITypedId<OrderId>
 - **Where they live.** Every entity has a typed ID declared in its module's Contracts. `UserId`
   is the exception: it lives in `Bagatka.Foundation`, because `Actor` needs it.
 - **Why the interface exists.** `ITypedId<T>` declares `static abstract T From(Guid)`, so one
-  generic EF converter (`TypedIdConverter<T>`) and one generic JSON converter
+  generic EF converter (`TypedIdConverter<T>`, in `Bagatka.Foundation.Modules`) and one generic JSON converter
   (`TypedIdJsonConverter<T>`) work for every ID type, checked by the compiler rather than
   discovered by reflection.
 - **Registration is explicit and local.**
@@ -345,6 +350,9 @@ internal sealed class DisplayNameConverter() : ValueConverter<DisplayName, strin
     }
 }
 ```
+
+Canonical examples: `Model/WorkspaceName.cs` and `Data/WorkspaceNameConverter.cs` in the Workspaces
+module.
 
 - **When to create one.** A value gets a type when it has a rule: format, length, range, or
   normalization. Values without rules stay primitives.
@@ -404,6 +412,9 @@ internal sealed class User
     }
 }
 ```
+
+Canonical examples: `Model/Workspace.cs` in the Workspaces module, and `Model/Nook.cs` in the Nooks
+module for an entity with a lifecycle.
 
 - **Plain classes.** No base class.
 - **State is protected.**
@@ -507,6 +518,8 @@ Canonical example: `src/Foundation/Bagatka.Foundation/Actor.cs`.
     `UserId` on first sign-in. No code depends on which provider issued the token.
   - End-to-end tests run a small fake issuer at the HTTP boundary; the WebApi's validation is the
     real one.
+  - Canonical examples: `src/ControlPlane/Bagatka.AiSloth.WebApi/TokenSignIn.cs` and
+    `src/Foundation/Bagatka.Foundation.Web/ActorPrincipals.cs`.
   - It decides no other permissions.
 - **The owner of the data owns the permission rule.** That module checks the rule first. Other
   modules ask it.
@@ -548,8 +561,17 @@ internal sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) :
 }
 ```
 
+Canonical example: `Data/WorkspacesDbContext.cs` in the Workspaces module. The outbox in the snippet
+arrives with the first integration event.
+
 - **One DbContext per module.** Each module has one `internal` `<Module>DbContext`, with its own
-  schema and its migrations history table in that schema.
+  schema and its migrations history table in that schema. `AddModuleDbContext` registers it and an
+  `IDbContextFactory<T>`; work that outlives a request, such as a stream or a job, creates short-lived
+  contexts from the factory instead of using the scoped one.
+- **Names.** Tables and columns are snake_case (EFCore.NamingConventions, applied by
+  `UseModuleDatabase`), so hand-written SQL needs no quotes.
+- **One scope, one operation.** A tracked entity isn't refreshed when a later query in the same
+  scope loads it again, so each operation gets its own scope, as each request does.
 - **Everything is listed.** Every entity configuration and every type conversion is a visible
   line in the DbContext. No scanning.
 - **Writes.**
@@ -600,9 +622,12 @@ internal sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) :
 - **Snapshot conflicts.** Never hand-edit the model snapshot. After a merge conflict in it,
   remove your migration, rebase, and regenerate.
 - **Applying them.**
-  - Production applies migrations as a deployment step (an EF migration bundle or an idempotent
-    script), never on startup.
-  - Development may migrate on startup.
+  - `migrate`: the WebApi run with that single argument applies every module's migrations
+    (`ModuleDatabases.MigrateAsync`) and exits. Production runs it as a deployment step before the new
+    version starts; the AppHost runs it as the `migrations` resource. Nothing migrates on startup.
+- **Generating them.** Each module has a design-time factory (`Data/<Module>DbContextFactory.cs`),
+  so `dotnet ef` needs no configuration. Migrations are generated code: `.editorconfig` marks them
+  so, and analyzers skip them.
 - **Destructive changes use expand–contract across releases.** Add the new shape, migrate the
   data, switch the code, and remove the old shape in a later release.
 
@@ -737,6 +762,8 @@ internal static class UsersEndpoints
 }
 ```
 
+Canonical example: `src/ControlPlane/Bagatka.AiSloth.WebApi/Endpoints/WorkspacesEndpoints.cs`.
+
 - **One file per module.** Each module gets `Endpoints/<Module>Endpoints.cs`, with named handler
   methods, explicit binding attributes, and written return types.
 - **Endpoints translate only.** Build the actor, map the request to a command, call the
@@ -757,8 +784,11 @@ internal static class UsersEndpoints
   plain updates become sub-resources (`POST /orders/{id}/cancel`).
 - **Authentication is required by default** through the fallback policy. Anonymous endpoints
   say `AllowAnonymous()` explicitly.
-- **JSON.** The WebApi configures JSON from `FoundationJson.Options`: camelCase, enums as
-  strings, strict number handling.
+- **JSON.** The WebApi configures JSON with `FoundationJson.Configure`, and clients use
+  `FoundationJson.Options`: camelCase, enums as strings, numbers only as numbers, and required
+  constructor arguments and non-nullable values enforced.
+- **Streams.** A contract stream becomes server-sent events (`TypedResults.ServerSentEvents`), one
+  event type per union case, such as `output` and `exit` when watching a process.
 - **Screens.** A response that combines several modules lives in `Composition/`. Inbound
   webhooks verify their signature with the Sdk client, then call the owning module with a
   system actor.
@@ -771,6 +801,9 @@ internal static class UsersEndpoints
 public sealed record PageRequest(string? Cursor, int Limit);
 public sealed record Page<T>(IReadOnlyList<T> Items, string? NextCursor);
 ```
+
+Canonical example: `Keyset.TakePage` and `Keyset.ToPage` in `Bagatka.Foundation.Modules`, used by
+`Features/WorkspacesApi.ListMyWorkspaces.cs`.
 
 - **Keyset pagination with an opaque cursor.** Order by a unique, stable key; UUIDv7 IDs already
   order by creation.
@@ -830,9 +863,11 @@ builder.Services
 - **Settings validate themselves.** The record's constructor rejects missing and invalid values.
   Configuration binding passes `null` for missing values instead of failing, so the constructor is
   what protects you. An invalid setting is a deployment bug, so it throws at startup.
-- **`GetRequired<T>(section)`** (in `Bagatka.ServiceDefaults`, added with the first settings)
-  binds a section with the source-generated binder and fails startup, naming the section, when the
-  section is missing, a value is invalid, or a key is unknown, which catches typos.
+- **`GetRequired<T>(section)`** (`src/Aspire/Bagatka.ServiceDefaults/ConfigurationExtensions.cs`)
+  binds a section through the record's constructor and fails startup, naming the section, when the
+  section is missing, a value is missing or invalid, or a key is unknown, which catches typos. Every
+  constructor parameter needs a property of the same name, which is how the binder matches keys
+  (`DockerSandboxSettings.Endpoint`).
 - **Values that change while running are rare, and only in product code.** The owner declares them
   as a separate options class and reads `IOptionsMonitor<T>.CurrentValue` at each decision,
   without caching it. Its registration takes `Action<OptionsBuilder<T>>`, so the host must choose
@@ -901,8 +936,11 @@ UserId;System.Guid
 - **Ownership.** Background work is owned by a module, lives in `Jobs/`, and is registered
   explicitly in `<Module>Module`.
 - **Shape.**
-  - Implement it as a `BackgroundService` driven by a `PeriodicTimer`.
-  - Create one DI scope per iteration, and pass `stoppingToken` everywhere.
+  - Implement it as a `BackgroundService` driven by a `PeriodicTimer`. A job that features need
+    to run sooner exposes `Wake()` and waits for that or its interval instead
+    (`Jobs/NookReconciler.cs` in the Nooks module).
+  - Create one DI scope or context per item, and pass `stoppingToken` everywhere.
+- **One failure never stops a job.** Catch per item and per pass, log, and let the next pass retry.
 - **Bounded batches.** Each iteration processes a limited batch.
 - **Assume several instances run the same job.** Work must be idempotent, and items are claimed
   atomically.
@@ -933,10 +971,13 @@ UserId;System.Guid
 
 Test what people and agents rely on, through the surface they use: the public API.
 
-- **End to end first** (`tests/Bagatka.AiSloth.EndToEndTests`, planned). Aspire's test builder
-  starts the real app: PostgreSQL, the WebApi, and the Docker sandbox provider creating real nooks
-  that run a real daemon. Tests call the public API as a client would, so what is tested is what
-  agents can do.
+- **End to end first** (`tests/Bagatka.AiSloth.EndToEndTests`). Aspire's test builder starts the
+  real app: PostgreSQL, the WebApi, and the Docker sandbox provider creating real nooks that run a
+  real daemon. Tests call the public API as a client would, so what is tested is what agents can do.
+  A fake OpenID Connect provider in the test process (`FakeIssuer`) signs their tokens, and the
+  AppHost's `sandbox-scope` parameter keeps each run's nooks apart.
+- **Waiting has a deadline.** A test that waits for background work polls with a bounded patience,
+  so a broken test fails instead of hanging.
 - **Every feature** gets an end-to-end test of its normal path, its consequential failure, and its
   authorization.
 - **Isolation without resets.** Each test creates its own workspace and works only inside it, so
@@ -977,7 +1018,7 @@ The build files are the specification; this entry says what each one owns.
 | `BannedSymbols.txt` | APIs nobody may call, each with what to use instead |
 | `LoggerParameterTypes.txt` | Log placeholder names and their types (entry 21) |
 | `global.json` | SDK version and test runner |
-| `dotnet-tools.json` | The pinned Aspire CLI; `dotnet aspire update` upgrades it with the AppHost |
+| `dotnet-tools.json` | The pinned Aspire CLI (`dotnet aspire update` upgrades it with the AppHost) and `dotnet-ef` |
 | `NuGet.Config` | The only package source, with every package mapped to it |
 | `tests/Directory.Build.props` | The shape of every test project |
 

@@ -47,3 +47,9 @@ Section `Modules:<Module>`. List the settings that differ between environments.
 
 Non-obvious choices, and constraints a future change must respect. Delete this section if it's
 empty.
+
+## Not built yet
+
+Designed behavior that doesn't exist yet, and cases deliberately left unhandled, each with what
+happens today. Remove a line in the change that builds it. Rare cases in code are marked
+`// Not handled:` instead (PATTERNS.md, entry 11).

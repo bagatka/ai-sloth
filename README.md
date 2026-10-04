@@ -6,7 +6,11 @@ On-demand, disposable cloud development environments for AI coding agents.
 
 Install [Nix](https://nixos.org/download/), then run `./dev` to enter Nushell with
 .NET 11 RC1, the Docker CLI, Git, and clang for Native AOT. Run `dotnet tool restore` once for the
-pinned Aspire CLI, then `dotnet aspire run` starts the app locally. Anything that runs containers,
+pinned Aspire CLI, then `dotnet aspire run` starts the app locally: PostgreSQL, the migrations, the
+nook image (the first build takes a few minutes), and the WebApi. The WebApi needs an OpenID Connect
+provider to accept tokens from, such as a WorkOS staging environment; give it once with
+`dotnet user-secrets set Parameters:authentication-issuer <issuer> --project src/Aspire/Bagatka.AiSloth.AppHost`,
+and the same for `Parameters:authentication-audience`, or when the dashboard asks. Anything that runs containers,
 including the tests, needs a Docker engine, which Nix can't provide: use Docker Desktop (with WSL
 integration on Windows), OrbStack, Colima, or a system `dockerd`.
 

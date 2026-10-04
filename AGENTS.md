@@ -294,7 +294,7 @@ conflict.
   - Format check: `dotnet format AiSloth.slnx --verify-no-changes`
   - Aspire CLI (pinned in `dotnet-tools.json`): `dotnet tool restore` once, then
     `dotnet aspire run` to run locally and `dotnet aspire update` to upgrade Aspire
-  - New migration (verify once the first module exists):
+  - New migration (`dotnet-ef` is pinned in `dotnet-tools.json`):
     `dotnet ef migrations add <Name> --project src/ControlPlane/Modules/<Module>/Bagatka.AiSloth.<Module> --startup-project src/ControlPlane/Bagatka.AiSloth.WebApi --context <Module>DbContext --output-dir Data/Migrations`
 - **System map:** `ARCHITECTURE.md`
 - **Pattern registry:** `PATTERNS.md`

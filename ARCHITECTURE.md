@@ -69,12 +69,12 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 
 | Part | Projects | Purpose | Status |
 |---|---|---|---|
-| WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Health endpoints only |
-| Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Contracts for Workspaces and Nooks |
+| WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Sign-in, public API for users, workspaces, and nooks, daemon endpoint, `migrate` |
+| Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, and Nooks built |
 | Sandboxing | `Bagatka.Sandboxing` + `.<Provider>` | Provider contract, conformance tests, one project per compute backend | Contract and Docker provider |
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |
 | CLI | `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API; its machine mode runs nooks on people's own computers | Planned |
-| Foundation | `Bagatka.Foundation` (+ `.Modules`, `.Web`) | Plumbing: results, errors, actors, typed IDs | `Bagatka.Foundation` built |
+| Foundation | `Bagatka.Foundation` (+ `.Modules`, `.Web`) | Plumbing: results, errors, actors, typed IDs | Built |
 | Object storage | `Bagatka.ObjectStorage` + `.<Backend>` | Store and read objects by key: folder versions, checkpoints, harness state | Planned |
 | Sdk | `Bagatka.Sdk.<Vendor>` | Clients for vendor APIs without an official .NET SDK | Docker Engine |
 | Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration; defaults every service host shares | Built |
@@ -115,23 +115,25 @@ src/
   Daemon/
     README.md
     Bagatka.AiSloth.DaemonProtocol/  daemon.proto and the code generated from it
+    Dockerfile                     the nook image: slothd under tini
     Bagatka.AiSloth.Daemon/        slothd
   Cli/                             sloth (planned)
   Sandboxing/
     README.md
     Bagatka.Sandboxing/            the provider contract
-    Bagatka.Sandboxing.<Backend>/  one provider per compute backend (planned)
+    Bagatka.Sandboxing.<Backend>/  one provider per compute backend: Docker
   Storage/
     Bagatka.ObjectStorage/         general-purpose object storage contract and backends (planned)
   Foundation/
     Bagatka.Foundation/            primitives usable everywhere, including Contracts
-    Bagatka.Foundation.Modules/    plumbing for module projects (planned)
-    Bagatka.Foundation.Web/        plumbing for WebApi hosts (planned)
+    Bagatka.Foundation.Modules/    plumbing for module projects
+    Bagatka.Foundation.Web/        plumbing for WebApi hosts
   Sdk/
     README.md
     Bagatka.Sdk.<Vendor>/          general-purpose third-party API clients
 tests/
-  Bagatka.AiSloth.EndToEndTests/   the main suite: the real app through its public API (planned)
+  Bagatka.AiSloth.EndToEndTests/   the main suite: the real app through its public API
+  Bagatka.AiSloth.Daemon.Tests/    the real daemon against a fake control plane
   Bagatka.Sandboxing.ConformanceTests/  one suite every sandbox provider passes
   Bagatka.AiSloth.ArchitectureTests/
   Bagatka.Foundation.Tests/
@@ -159,8 +161,10 @@ The HTTP host of the control plane and its composition root. It has four jobs:
 
 It owns no business rules and touches no database. It references module projects only to call
 their registration in `Program.cs`. Everything else in a module is `internal` and unreachable.
-It will also host the endpoint daemons dial into and the MCP endpoint, which exposes the same
-public operations as HTTP.
+It also hosts the daemon endpoint, an HTTP/2-only gRPC endpoint every nook's daemon dials, and will
+host the MCP endpoint, which exposes the same public operations as HTTP. Run with the single argument
+`migrate`, it applies every module's migrations and exits. Canonical example:
+`src/ControlPlane/Bagatka.AiSloth.WebApi/Program.cs`.
 
 ```csharp
 CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
@@ -171,22 +175,33 @@ builder.AddServiceDefaults();
 
 // The only place that reads configuration (PATTERNS.md, entry 20).
 DockerSandboxSettings docker = builder.Configuration.GetRequired<DockerSandboxSettings>("Sandboxing:Docker");
+UsersSettings users = builder.Configuration.GetRequired<UsersSettings>("Modules:Users");
 WorkspacesSettings workspaces = builder.Configuration.GetRequired<WorkspacesSettings>("Modules:Workspaces");
 NooksSettings nooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
 
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddGrpc();
 builder.Services
-    .AddFoundationWeb()
     .AddDockerSandboxProvider(docker)
+    .AddUsersModule(users)
     .AddWorkspacesModule(workspaces)
     .AddNooksModule(nooks);
 
 await using WebApplication app = builder.Build();
-app.UseFoundationWeb();
+if (args is ["migrate"])
+{
+    await ModuleDatabases.MigrateAsync(app.Services, CancellationToken.None);
+    return;
+}
+
+app.UseExceptionHandler();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapDefaultEndpoints();
+app.MapUsersEndpoints();
 app.MapWorkspacesEndpoints();
 app.MapNooksEndpoints();
-app.MapDaemonEndpoint();
-
+app.MapGrpcService<DaemonEndpoint>().AllowAnonymous();
 await app.RunAsync();
 ```
 
@@ -204,7 +219,8 @@ A capability with one contract, `I<Module>Api`.
 
 ### Nooks, providers, and the daemon
 
-Their contracts exist; their implementations are planned. The maps are
+Built: the Docker provider, the daemon and its image, and the Nooks module from creating a nook to
+deleting it. Suspension, checkpoints, and templates are next. The maps are
 `src/ControlPlane/Modules/Nooks/README.md`, `src/Sandboxing/README.md`, and `src/Daemon/README.md`.
 These decisions are fixed:
 
@@ -234,8 +250,8 @@ These decisions are fixed:
 | Project | Used by | Holds |
 |---|---|---|
 | `Bagatka.Foundation` | everyone, including Contracts and Sdk clients | `Result`, `Result<T>`, `Success`, `Error`, `ErrorKind`, `Actor`, `UserId`, `ITypedId<T>`, `TypedIdJsonConverter<T>`; later `Page<T>`, `PageRequest`, `FoundationJson`, `Money` |
-| `Bagatka.Foundation.Modules` (planned) | module projects | `IOutbox` and its database implementation, `TypedIdConverter<T>`, `SaveAsync`, outbox dispatcher, `IReaction<T>`, module registration helpers |
-| `Bagatka.Foundation.Web` (planned) | WebApi hosts | `Result` → HTTP mapping, `ClaimsPrincipal` → `Actor`, exception handler |
+| `Bagatka.Foundation.Modules` | module projects | `AddModuleDbContext`, `ModuleDatabases.MigrateAsync`, `TypedIdConverter<T>`, `SaveAsync`, keyset pagination; `IOutbox`, the outbox dispatcher, and `IReaction<T>` come with the first integration event |
+| `Bagatka.Foundation.Web` | WebApi hosts | `Result` → HTTP mapping as problem details, `ClaimsPrincipal` → `Actor`; unhandled exceptions use ASP.NET Core's built-in problem details |
 
 Foundation is plumbing only. A business concept never goes into Foundation. If two modules need
 one, one module owns it and exposes it through its contract.
@@ -258,7 +274,7 @@ vendor-shaped, product-agnostic, and used from module internals. Rules are in `s
 
 | Project | May reference | Must not reference |
 |---|---|---|
-| WebApi | Contracts, module projects (registration only), `Foundation`, `Foundation.Web`, `ServiceDefaults`, `DaemonProtocol`, sandbox providers (registration only) | module internals (enforced by `internal`) |
+| WebApi | Contracts, module projects (registration only), `Foundation`, `Foundation.Modules` (`migrate` only), `Foundation.Web`, `ServiceDefaults`, `DaemonProtocol`, sandbox providers (registration only) | module internals (enforced by `internal`) |
 | Module | its Contracts, other modules' Contracts, `Foundation`, `Foundation.Modules`, `Sandboxing`, Sdk clients | other module projects, ASP.NET Core, `Foundation.Web` |
 | Contracts | `Foundation`, the Contracts of modules its module asks | everything else |
 | Daemon | `DaemonProtocol`, `Foundation`, .NET | everything else |
@@ -379,9 +395,10 @@ These are choices, not omissions. Change them only through `PATTERNS.md`, with a
 - **One contract per module, for every caller.** HTTP lives in the WebApi, outside modules.
 - **The daemon carries behavior; providers carry lifecycle.** A new provider implements a small
   contract, and a new nook feature is written once.
-- **Standard sign-in, no provider in code.** The WebApi validates OpenID Connect tokens; WorkOS
-  hosts sign-in for the hosted service. Provider-specific extras, such as directory sync, would be
-  an optional extension.
+- **Standard sign-in, no provider in code.** The WebApi validates OpenID Connect tokens: their
+  signature against the issuer's published keys, the issuer, and the audience, which WorkOS adds
+  through a JWT template. WorkOS hosts sign-in for the hosted service. Provider-specific extras,
+  such as directory sync, would be an optional extension.
 - **Explicit over implicit.**
   - No implicit conversions, no assembly scanning, no base classes, no `var`.
   - No reliance on the machine's culture or time zone.

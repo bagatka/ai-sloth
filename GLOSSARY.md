@@ -38,7 +38,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Term | Meaning | Owner | Don't call it |
 |---|---|---|---|
 | Control plane | The system that owns all state and decisions: the WebApi and its modules, later several services | `src/ControlPlane` | platform, backend, engine |
-| User | A person who signs in. One user can be a member of many workspaces. | Users (planned) | account, customer |
+| User | A person who signs in. One user can be a member of many workspaces. | Users | account, customer |
 | Workspace | Where people work together and what owns nooks, like a Slack workspace: a personal one, a company one | Workspaces | organization, team, tenant |
 | Member | A user's membership in a workspace, with a role | Workspaces | participant, seat |
 | Nook | Where agents work: an isolated machine with its files and processes, owned by a workspace. With its chats, the basic unit. A provider's sandbox underneath. | Nooks | sandbox, orb, VM, container, environment, workspace |
@@ -63,6 +63,10 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Preview | A web server running in a nook, opened in a browser through the control plane | Nooks (planned) | port forward, tunnel |
 | Daemon | `slothd`, the process in every nook that dials the control plane and runs processes for it | `src/Daemon` | agent, sidecar, runner |
 | Daemon token | The secret a daemon proves its nook with; issued by Nooks, stored only as a hash | Nooks | API key, password |
+| Daemon endpoint | The WebApi's HTTP/2-only gRPC endpoint that daemons dial | WebApi | agent API, callback |
+| Nook image | The image every nook starts from: `slothd` under tini, on Ubuntu with git | `src/Daemon/Dockerfile` | base image, runner image |
+| Disk reserve | Space a daemon holds in a file and releases when the disk fills, so output and cleanup keep working | `src/Daemon` | ballast, buffer |
+| Reconciler | The Nooks job that makes providers match the records: it creates the sandboxes of new nooks and deletes those of deleted ones | Nooks | sync job, worker |
 | Instruction | A message from the control plane telling a daemon what to do | Nooks, `daemon.proto` | command, request |
 | Agent | A coding agent, such as Claude Code, Codex, or Amp, working inside a nook | — | bot, assistant, the daemon |
 | Agent actor | An agent acting for the user who sent the current message | `Bagatka.Foundation` (planned) | bot user, service account |
