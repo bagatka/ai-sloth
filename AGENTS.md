@@ -306,4 +306,5 @@ conflict.
   - Everything else in a module is `internal`.
   - Boundaries are enforced by project references, `internal`, analyzers (`AnalysisMode` `All`,
     Meziantou, banned APIs), and `tests/Bagatka.AiSloth.ArchitectureTests`.
-- **Known exceptions:** none yet.
+- **Known exceptions:** `Bagatka.AiSloth.Machines.Contracts` references `Bagatka.Sandboxing.Remote`
+  to relay its call messages (`ARCHITECTURE.md`, "Dependency rules").

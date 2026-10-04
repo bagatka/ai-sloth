@@ -63,14 +63,18 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Preview | A web server running in a nook, opened in a browser through the control plane | Nooks (planned) | port forward, tunnel |
 | Daemon | `slothd`, the process in every nook that dials the control plane and runs processes for it | `src/Daemon` | agent, sidecar, runner |
 | Daemon token | The secret a daemon proves its nook with; issued by Nooks, stored only as a hash | Nooks | API key, password |
-| Daemon endpoint | The WebApi's HTTP/2-only gRPC endpoint that daemons dial | WebApi | agent API, callback |
+| Daemon endpoint | The WebApi's HTTP/2-only gRPC endpoint that daemons and machines dial | WebApi | agent API, callback |
 | Nook image | The image every nook starts from: `slothd` under tini, on Ubuntu with git | `src/Daemon/Dockerfile` | base image, runner image |
 | Disk reserve | Space a daemon holds in a file and releases when the disk fills, so output and cleanup keep working | `src/Daemon` | ballast, buffer |
 | Reconciler | The Nooks job that makes providers match the records: it creates the sandboxes of new nooks and deletes those of deleted ones | Nooks | sync job, worker |
 | Instruction | A message from the control plane telling a daemon what to do | Nooks, `daemon.proto` | command, request |
 | Agent | A coding agent, such as Claude Code, Codex, or Amp, working inside a nook | — | bot, assistant, the daemon |
 | Agent actor | An agent acting for the user who sent the current message | `Bagatka.Foundation` (planned) | bot user, service account |
-| Machine | A computer someone registers to a workspace to run nooks on, such as a VPS or a Mac mini; its nooks still run isolated, in containers or virtual machines | Machines (planned) | runner, worker, node, host |
+| Machine | A computer a workspace adds to run its nooks on, such as a VPS or a Mac mini; its nooks still run isolated, in containers or virtual machines. To nooks, a place within the `machine` provider. | Machines | runner, worker, node, host |
+| Machine mode | `sloth machine run`: the CLI keeping a machine connected and running the control plane's provider calls on its Docker Engine | `src/Cli` | agent, runner, daemon |
+| Registration code | The one-time code an owner gets when adding a machine, traded for the machine's token by `sloth machine connect` | Machines | invite, pairing code |
+| Provider ID | Where a nook runs, as callers name it: a provider, then the place within it for a provider with several, such as `docker` or `machine:<machine ID>` | Nooks | provider name (for the whole ID), backend |
+| Location | The place within a sandbox provider where a sandbox runs, such as a region or a machine | `Bagatka.Sandboxing` | zone, target |
 | Sandbox | A provider's isolated machine: the technical term beneath a nook, used only in `src/Sandboxing` | `Bagatka.Sandboxing` | nook (in provider code) |
 | Sandbox provider | The implementation of the provider contract for one compute backend, such as Docker or Azure Container Apps Sandboxes | `src/Sandboxing` | driver, adapter, backend |
 | Sandbox key | The caller's identifier for a sandbox at a provider; AiSloth uses the nook's ID | `Bagatka.Sandboxing` | resource name |

@@ -10,7 +10,7 @@ templates, runs processes in them through their daemons, and checkpoints and for
 - **Data:** nook records (workspace, provider, sources, status, latest disk usage), the hash of
   each nook's daemon token, the processes started in each nook, templates, and checkpoints.
 - **Rules:** who may use a nook (members of its workspace), the lifecycle below, when an idle nook
-  is suspended, and which providers exist.
+  is suspended, and which providers a workspace's nooks may run on.
 - **Integrations:** sandbox providers (`src/Sandboxing`), registered by the host.
 - **Runtime state:** each running nook's daemon connection and active watches, in the memory of
   the instance the daemon dialed.
@@ -24,20 +24,24 @@ templates, runs processes in them through their daemons, and checkpoints and for
   `INooksApi`.
 - Sources and their recipes: Sources. A nook mounts each of its sources at `/work/<name>`.
 - Projects: a project refers to nooks; nooks never refer to projects.
-- People's own computers: Machines. A nook runs either on an AiSloth cloud provider or on a
-  workspace's machine; this module decides which provider runs each nook in one place, and asks
-  Machines for nooks placed on a machine.
+- People's own computers: Machines. To this module they are one more provider, `machine`, whose
+  places are the workspace's machines; Machines says which machines a workspace has.
 
 ## Contract
 
-`INooksApi` in `Bagatka.AiSloth.Nooks.Contracts`: workspace members and their agents create, list,
-and delete nooks, and start, watch, feed, and stop processes in them. `INookDaemonsApi` is the
-daemon endpoint's side, never a public route or a tool.
+`INooksApi` in `Bagatka.AiSloth.Nooks.Contracts`: workspace members and their agents list the
+providers they can use, create, list, and delete nooks, and start, watch, feed, and stop processes
+in them. `INookDaemonsApi` is the daemon endpoint's side, never a public route or a tool.
+
+A provider ID names where a nook runs: a provider the deployment runs for every workspace, such as
+`docker`, or one of the workspace's machines, `machine:<machine ID>`. Callers take IDs from
+`ListProvidersAsync` and never parse them.
 
 ## Asks
 
-Workspaces (`GetRoleAsync`), on every call made for a user; Sources (planned), for what to mount
-and how to set it up.
+Workspaces (`GetRoleAsync`), on every call made for a user; Machines (`ListAsync`, `GetAsync`), for
+the workspace's machines when listing providers and creating a nook on one; Sources (planned), for
+what to mount and how to set it up.
 
 ## Publishes
 
@@ -66,8 +70,8 @@ nook is suspended: a nook with running processes is never idle.
 
 ## Data
 
-Schema `nooks`. Tables `nooks` (ID, workspace ID, provider, status, created at, daemon token hash;
-the status has a concurrency token) and `processes` (ID, nook ID, command, arguments, started at,
+Schema `nooks`. Tables `nooks` (ID, workspace ID, provider name and location, status, created at,
+daemon token hash; the status has a concurrency token) and `processes` (ID, nook ID, command, arguments, started at,
 exit code).
 
 ## Background work
@@ -109,6 +113,10 @@ and memory. The idle period before suspension comes with suspension.
 
 ## Decisions and constraints
 
+- **Every provider is the same to a nook.** A nook stores a provider name and an optional location,
+  the place within the provider, such as a machine; the reconciler passes the location in the
+  sandbox spec. The one difference between providers is who may use them: the deployment's serve
+  every workspace, and a machine serves only the workspace that added it.
 - **Record first, then create.** A nook is committed before its provider is called, so every
   sandbox at a provider has a record. Reconciliation finishes what a failed call left undone.
 - **Suspension is invisible.** Every operation on a paused or stopped nook resumes it first and
@@ -141,8 +149,10 @@ and memory. The idle period before suspension comes with suspension.
 - **Handover.** A control-plane instance that shuts down doesn't send `ReconnectInstruction`;
   daemons notice the lost connection and reconnect with backoff, within about a second.
 - **Reconciler gaps.** Sandboxes without a record aren't deleted, and a running nook whose sandbox
-  fails stays Running. Nooks aren't claimed atomically, so only one instance may run the job. Image
-  pulls happen one at a time, so the first nook on a fresh host delays the others.
+  fails stays Running. Nooks aren't claimed atomically, so only one instance may run the job. Nooks
+  are reconciled one at a time without deadlines, so a slow call, such as the first image pull on a
+  fresh host or machine, delays every other nook, and a provider that hangs blocks them. A nook on
+  a machine that is offline stays Creating, and its retries log an error every pass.
 - **Lost processes.** Processes a restarted daemon lost never report an exit, so watching one waits
   until the watcher gives up.
 - **Disk usage** is stored and returned, but nothing acts on it yet; Chats will ask for

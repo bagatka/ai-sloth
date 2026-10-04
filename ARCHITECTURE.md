@@ -69,11 +69,11 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 
 | Part | Projects | Purpose | Status |
 |---|---|---|---|
-| WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Sign-in, public API for users, workspaces, and nooks, daemon endpoint, `migrate` |
-| Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, and Nooks built |
-| Sandboxing | `Bagatka.Sandboxing` + `.<Provider>` | Provider contract, conformance tests, one project per compute backend | Contract and Docker provider |
+| WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Sign-in, public API for users, workspaces, machines, and nooks, the gRPC endpoint daemons and machines dial, `migrate` |
+| Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, Machines, and Nooks built |
+| Sandboxing | `Bagatka.Sandboxing` + `.<Provider>`, `.Remote` | Provider contract, conformance tests, one project per compute backend, remote calls | Contract, Docker provider, remote calls |
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |
-| CLI | `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API; its machine mode runs nooks on people's own computers | Planned |
+| CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API; its machine mode runs nooks on people's own computers | Machine mode built; the rest planned |
 | Foundation | `Bagatka.Foundation` (+ `.Modules`, `.Web`) | Plumbing: results, errors, actors, typed IDs | Built |
 | Object storage | `Bagatka.ObjectStorage` + `.<Backend>` | Store and read objects by key: folder versions, checkpoints, harness state | Planned |
 | Sdk | `Bagatka.Sdk.<Vendor>` | Clients for vendor APIs without an official .NET SDK | Docker Engine |
@@ -117,11 +117,14 @@ src/
     Bagatka.AiSloth.DaemonProtocol/  daemon.proto and the code generated from it
     Dockerfile                     the nook image: slothd under tini
     Bagatka.AiSloth.Daemon/        slothd
-  Cli/                             sloth (planned)
+  Cli/
+    Bagatka.AiSloth.MachineProtocol/  machine.proto and the code generated from it
+    Bagatka.AiSloth.Cli/           sloth: machine mode today
   Sandboxing/
     README.md
     Bagatka.Sandboxing/            the provider contract
     Bagatka.Sandboxing.<Backend>/  one provider per compute backend: Docker
+    Bagatka.Sandboxing.Remote/     a provider's calls as messages, run on a provider elsewhere
   Storage/
     Bagatka.ObjectStorage/         general-purpose object storage contract and backends (planned)
   Foundation/
@@ -161,7 +164,7 @@ The HTTP host of the control plane and its composition root. It has four jobs:
 
 It owns no business rules and touches no database. It references module projects only to call
 their registration in `Program.cs`. Everything else in a module is `internal` and unreachable.
-It also hosts the daemon endpoint, an HTTP/2-only gRPC endpoint every nook's daemon dials, and will
+It also hosts an HTTP/2-only gRPC endpoint that every nook's daemon and every machine dial, and will
 host the MCP endpoint, which exposes the same public operations as HTTP. Run with the single argument
 `migrate`, it applies every module's migrations and exits. Canonical example:
 `src/ControlPlane/Bagatka.AiSloth.WebApi/Program.cs`.
@@ -219,9 +222,10 @@ A capability with one contract, `I<Module>Api`.
 
 ### Nooks, providers, and the daemon
 
-Built: the Docker provider, the daemon and its image, and the Nooks module from creating a nook to
-deleting it. Suspension, checkpoints, and templates are next. The maps are
-`src/ControlPlane/Modules/Nooks/README.md`, `src/Sandboxing/README.md`, and `src/Daemon/README.md`.
+Built: the Docker provider, the daemon and its image, the Nooks module from creating a nook to
+deleting it, and machines, a workspace's own computers as a provider. Suspension, checkpoints, and
+templates are next. The maps are `src/ControlPlane/Modules/Nooks/README.md`,
+`src/ControlPlane/Modules/Machines/README.md`, `src/Sandboxing/README.md`, and `src/Daemon/README.md`.
 These decisions are fixed:
 
 - **Lifecycle.** A nook is Running, Paused (memory and files kept: it resumes in about a second and
@@ -230,7 +234,10 @@ These decisions are fixed:
   operation resumes a suspended nook first, so callers only notice latency.
 - **Providers do lifecycle only.** Every operation is safe to repeat, and every provider passes the
   same conformance suite. `Bagatka.Sandboxing.Docker` comes first: it serves local development, CI,
-  and single-machine deployments.
+  single-machine deployments, and machines.
+- **Machines are a provider.** A workspace's own computers are one provider, `machine`, whose places
+  are the machines. `sloth machine run` dials out and runs the provider calls it receives on the
+  computer's Docker Engine, so a machine needs no inbound networking either.
 - **Record first, then reconcile.** The Nooks module records a nook before asking a provider to
   create it, so every sandbox at a provider has a record. A reconciler retries what a failed call
   left undone and deletes what shouldn't exist.
@@ -274,13 +281,14 @@ vendor-shaped, product-agnostic, and used from module internals. Rules are in `s
 
 | Project | May reference | Must not reference |
 |---|---|---|
-| WebApi | Contracts, module projects (registration only), `Foundation`, `Foundation.Modules` (`migrate` only), `Foundation.Web`, `ServiceDefaults`, `DaemonProtocol`, sandbox providers (registration only) | module internals (enforced by `internal`) |
+| WebApi | Contracts, module projects (registration only), `Foundation`, `Foundation.Modules` (`migrate` only), `Foundation.Web`, `ServiceDefaults`, `DaemonProtocol`, `MachineProtocol`, sandbox providers (registration only) | module internals (enforced by `internal`) |
 | Module | its Contracts, other modules' Contracts, `Foundation`, `Foundation.Modules`, `Sandboxing`, Sdk clients | other module projects, ASP.NET Core, `Foundation.Web` |
-| Contracts | `Foundation`, the Contracts of modules its module asks | everything else |
+| Contracts | `Foundation`, the Contracts of modules its module asks; Machines' also `Sandboxing.Remote` (below) | everything else |
 | Daemon | `DaemonProtocol`, `Foundation`, .NET | everything else |
+| CLI | `MachineProtocol`, `Sandboxing` and its providers, `Foundation`, .NET | modules, the WebApi |
 | `Foundation.Modules`, `Foundation.Web`, `ServiceDefaults` | `Foundation`, .NET, approved packages | `Bagatka.AiSloth.*` |
 | `Foundation` | .NET only | everything else |
-| `Sandboxing`, `ObjectStorage`, Sdk client | `Foundation`, .NET, approved packages | `Bagatka.AiSloth.*`, `Foundation.Modules`, `Foundation.Web` |
+| `Sandboxing`, `Sandboxing.Remote`, `ObjectStorage`, Sdk client | `Foundation`, .NET, approved packages | `Bagatka.AiSloth.*`, `Foundation.Modules`, `Foundation.Web` |
 | Sandbox provider, object storage backend | its contract, `Foundation`, its vendor's SDK or Sdk client | `Bagatka.AiSloth.*`, `Foundation.Modules`, `Foundation.Web` |
 
 The "asks" graph is acyclic: if module A calls `I<B>Api`, B never calls `I<A>Api`. When B
@@ -289,6 +297,10 @@ sanctioned reverse direction.
 
 Projects is an extension: no module asks it or reacts to its events, and no other contract mentions
 a project. Only the WebApi references its contracts.
+
+One known exception: `Bagatka.AiSloth.Machines.Contracts` references `Bagatka.Sandboxing.Remote`,
+because `IMachineConnectionsApi` relays its generated call messages unchanged between a machine and
+the `machine` provider. Copying them into contract records would give one wire format two owners.
 
 ## Data
 
@@ -421,5 +433,5 @@ this table in the same change.
 | Nooks (contract only) | Nooks, where each runs, their lifecycle, processes, templates, checkpoints, daemon connections | Workspaces, Sources, Machines | — | `nooks` |
 | Sources (planned) | Repositories and folders, their recipes, delivery, push policy | Workspaces | — | `sources` |
 | Chats (planned) | ACP conversations in nooks, turns, harness profiles and state | Nooks, Workspaces | — | `chats` |
-| Machines (planned) | People's own computers registered to run nooks, their credentials and connections | Workspaces | — | `machines` |
+| Machines | Computers workspaces add to run nooks, their credentials and connections, the `machine` provider | Workspaces | — | `machines` |
 | Projects (planned, extension) | Groups of nooks, chats, and sources, shared context, project chat | Nooks, Chats, Sources, Workspaces | Nooks, Chats | `projects` |

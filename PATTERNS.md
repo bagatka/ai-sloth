@@ -170,7 +170,8 @@ public sealed record UserProfile(UserId Id, string DisplayName, DateTimeOffset C
 - **Contracts are plain data.** They hold interfaces, records, unions, enums, typed IDs, events,
   and errors. No `IQueryable`, no entities, no EF or ASP.NET types, no logic.
 - **References.** A Contracts project references `Bagatka.Foundation`, plus the Contracts of
-  modules its own module asks, for their typed IDs. Nothing else.
+  modules its own module asks, for their typed IDs. Nothing else, with one known exception
+  (`ARCHITECTURE.md`, "Dependency rules").
 - **Contracts are documented.** Every public member has an XML doc comment; the build fails
   without one.
 - **Size is a signal.** If the interface no longer fits on one screen, either the module is too

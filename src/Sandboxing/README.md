@@ -10,6 +10,19 @@ snapshot), suspend, resume, snapshot, observe, list, and delete. Everything that
 sandbox goes through the image's entry point, which keeps a new provider small and lets a feature
 be written once.
 
+A spec's `Location` says where within the backend a sandbox runs, such as a region or a machine,
+for a backend with several places; it is null for a backend with one. A provider rejects a location
+it doesn't have. Operations by key find the sandbox wherever it was created.
+
+## Remote calls
+
+`Bagatka.Sandboxing.Remote` runs one provider's calls on another provider somewhere else.
+`RemoteSandboxProvider` turns each call into a message from `sandbox_calls.proto`, and
+`SandboxCalls.ExecuteAsync` runs it on a local provider and answers. Moving the messages is the
+caller's job: AiSloth's machines carry them over a gRPC stream (`src/Cli`), and the conformance
+suite over an in-memory loop. A remote provider that loses its connection fails the calls in
+flight, as an unreachable backend would.
+
 ## Rules for providers
 
 - **Naming and dependencies.** `Bagatka.Sandboxing.<Backend>` references `Bagatka.Sandboxing`,
@@ -37,7 +50,7 @@ be written once.
 
 | Provider | Status | Suspends to | Notes |
 |---|---|---|---|
-| Docker | Built | `Paused` (`docker pause`) | Local development, CI, single-machine deployments. Snapshots are committed images, with the sandbox's environment values kept out. Sandboxes can reach the host as `host.docker.internal`. |
+| Docker | Built | `Paused` (`docker pause`) | Local development, CI, single-machine deployments, and machines. Snapshots are committed images, with the sandbox's environment values kept out. Sandboxes can reach the host as `host.docker.internal`. |
 | Azure Container Apps Sandboxes | Planned | `Paused` | Memory and disk snapshots with sub-second restore |
 | Cloudflare | After a spike | `Stopped` | Files to R2, no memory; containers are controlled from Workers, so the provider probably includes a small Worker |
 | AWS | After a spike | To be measured | |
@@ -46,7 +59,8 @@ be written once.
 ## Tests
 
 One conformance suite (`tests/Bagatka.Sandboxing.ConformanceTests`) runs against every provider
-listed in `ProvidersUnderTest`: Docker in CI, clouds on demand. It tests the contract only, so
+listed in `ProvidersUnderTest`: Docker in CI, directly and through remote calls, and clouds on
+demand. It tests the contract only, so
 swapping providers is safe. Each test works in a scope of its own and deletes everything in it
 afterwards. Behavior the contract can't observe, such as what a provider's images contain, gets
 tests of that provider next to the suite.
