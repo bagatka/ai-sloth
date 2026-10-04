@@ -46,6 +46,7 @@
     <Project Path="src/Sdk/Bagatka.Sdk.Docker/Bagatka.Sdk.Docker.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Bagatka.AiSloth.ArchitectureTests/Bagatka.AiSloth.ArchitectureTests.csproj" />
     <Project Path="tests/Bagatka.AiSloth.Daemon.Tests/Bagatka.AiSloth.Daemon.Tests.csproj" />
     <Project Path="tests/Bagatka.Foundation.Tests/Bagatka.Foundation.Tests.csproj" />
     <Project Path="tests/Bagatka.Sandboxing.ConformanceTests/Bagatka.Sandboxing.ConformanceTests.csproj" />
