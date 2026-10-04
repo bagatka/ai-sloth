@@ -123,25 +123,33 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
         }
     }
 
+    private static Wire.StartProcess ToWire(StartProcessInstruction start)
+    {
+        Wire.StartProcess wire = new Wire.StartProcess
+        {
+            ProcessId = GrpcCalls.FormatId(start.ProcessId.Value),
+            Command = start.Command,
+            Arguments = { start.Arguments },
+            WorkingDirectory = start.WorkingDirectory ?? string.Empty,
+            Retention = start.Retention switch
+            {
+                OutputRetention.Recent => Wire.OutputRetention.Recent,
+                OutputRetention.Complete => Wire.OutputRetention.Complete,
+            },
+        };
+        foreach (KeyValuePair<string, string> variable in start.Environment)
+        {
+            wire.Environment.Add(variable.Key, variable.Value);
+        }
+
+        return wire;
+    }
+
     private static Wire.DaemonInstruction ToWire(DaemonInstruction instruction)
     {
         return instruction switch
         {
-            StartProcessInstruction start => new Wire.DaemonInstruction
-            {
-                StartProcess = new Wire.StartProcess
-                {
-                    ProcessId = GrpcCalls.FormatId(start.ProcessId.Value),
-                    Command = start.Command,
-                    Arguments = { start.Arguments },
-                    WorkingDirectory = start.WorkingDirectory ?? string.Empty,
-                    Retention = start.Retention switch
-                    {
-                        OutputRetention.Recent => Wire.OutputRetention.Recent,
-                        OutputRetention.Complete => Wire.OutputRetention.Complete,
-                    },
-                },
-            },
+            StartProcessInstruction start => new Wire.DaemonInstruction { StartProcess = ToWire(start) },
             StopProcessInstruction stop => new Wire.DaemonInstruction
             {
                 StopProcess = new Wire.StopProcess { ProcessId = GrpcCalls.FormatId(stop.ProcessId.Value) },

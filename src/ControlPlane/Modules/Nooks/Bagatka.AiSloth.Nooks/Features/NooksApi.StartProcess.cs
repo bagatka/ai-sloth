@@ -38,7 +38,7 @@ internal sealed partial class NooksApi
         // Not handled: the connection ending between the commit and the send, which leaves the
         // process recorded as running. Handling it would mean comparing recorded processes with the
         // daemon's hello when it reconnects.
-        if (!await connection.SendAsync(new DaemonInstruction(process.ToInstruction()), ct))
+        if (!await connection.SendAsync(new DaemonInstruction(process.ToInstruction(command.Environment)), ct))
         {
             throw new InvalidOperationException("Nook " + command.NookId.Value + "'s daemon disconnected before process " + process.Id.Value + " was sent.");
         }

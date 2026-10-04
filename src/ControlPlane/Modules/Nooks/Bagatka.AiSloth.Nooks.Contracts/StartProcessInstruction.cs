@@ -12,9 +12,11 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// <param name="Arguments">Its arguments, passed as they are.</param>
 /// <param name="WorkingDirectory">The directory to start in, or <see langword="null"/> for the daemon's default.</param>
 /// <param name="Retention">How its output is kept.</param>
+/// <param name="Environment">Variables added to the process's environment; they may hold secrets.</param>
 public sealed record StartProcessInstruction(
     ProcessId ProcessId,
     string Command,
     IReadOnlyList<string> Arguments,
     string? WorkingDirectory,
-    OutputRetention Retention);
+    OutputRetention Retention,
+    IReadOnlyDictionary<string, string> Environment);

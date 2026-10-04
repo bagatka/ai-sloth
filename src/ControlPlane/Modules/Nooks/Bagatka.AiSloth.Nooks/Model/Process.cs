@@ -60,6 +60,13 @@ internal sealed class Process
             return new Result<Process>(Error.Validation("arguments", "Arguments can't contain NUL characters."));
         }
 
+        // An environment string is NAME=value up to a NUL, and SLOTHD_ names belong to the daemon.
+        if (command.Environment.Any(variable => variable.Key.Length == 0 || variable.Key.AsSpan().ContainsAny('=', '\0')
+            || variable.Key.StartsWith("SLOTHD_", StringComparison.Ordinal) || variable.Value.Contains('\0', StringComparison.Ordinal)))
+        {
+            return new Result<Process>(Error.Validation("environment", "Names can't be empty, contain = or NUL, or start with SLOTHD_; values can't contain NUL."));
+        }
+
         if (command.Retention is not (OutputRetention.Recent or OutputRetention.Complete))
         {
             return new Result<Process>(Error.Validation("retention", "Must be Recent or Complete."));
@@ -81,9 +88,10 @@ internal sealed class Process
         ExitCode ??= exitCode;
     }
 
-    public StartProcessInstruction ToInstruction()
+    // The environment is passed through, never kept: it may hold secrets.
+    public StartProcessInstruction ToInstruction(IReadOnlyDictionary<string, string> environment)
     {
-        return new StartProcessInstruction(Id, Command, Arguments, WorkingDirectory, Retention);
+        return new StartProcessInstruction(Id, Command, Arguments, WorkingDirectory, Retention, environment);
     }
 
     public ProcessSummary ToSummary()

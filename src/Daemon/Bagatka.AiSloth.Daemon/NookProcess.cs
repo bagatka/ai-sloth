@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -57,7 +58,7 @@ internal sealed class NookProcess : IAsyncDisposable
     /// <summary>
     /// Starts a program directly, without a shell. A program that can't start becomes a process that
     /// exited with 127 after saying why on standard error. The daemon's own environment variables
-    /// (<c>SLOTHD_*</c>) are not passed on.
+    /// (<c>SLOTHD_*</c>) are not passed on; the instruction's are added.
     /// </summary>
     public static NookProcess Start(
         StartProcess instruction,
@@ -84,6 +85,11 @@ internal sealed class NookProcess : IAsyncDisposable
         foreach (string name in start.Environment.Keys.Where(name => name.StartsWith("SLOTHD_", StringComparison.Ordinal)).ToList())
         {
             start.Environment.Remove(name);
+        }
+
+        foreach (KeyValuePair<string, string> variable in instruction.Environment)
+        {
+            start.Environment[variable.Key] = variable.Value;
         }
 
         try

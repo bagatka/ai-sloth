@@ -31,11 +31,23 @@ internal sealed partial class NooksApi(
     // How long a call waits for a nook's daemon, such as a new nook's first connection.
     private static readonly TimeSpan ReadyTimeout = TimeSpan.FromSeconds(60);
 
-    // The nook, if the actor may use it: every member of its workspace may.
+    // The nook, if the actor may use it: every member of its workspace may, and so may the control
+    // plane's own processes, such as Chats running a harness.
     private async Task<Nook?> FindNookAsync(Actor actor, NookId id, CancellationToken ct)
     {
         Nook? nook = await db.Nooks.SingleOrDefaultAsync(found => found.Id == id, ct);
-        return nook is not null && await workspaces.GetRoleAsync(actor, nook.WorkspaceId, ct) is not null ? nook : null;
+        if (nook is null)
+        {
+            return null;
+        }
+
+        bool allowed = actor switch
+        {
+            UserActor => await workspaces.GetRoleAsync(actor, nook.WorkspaceId, ct) is not null,
+            SystemActor => true,
+            AnonymousActor => false,
+        };
+        return allowed ? nook : null;
     }
 
     // The process, if the actor may use its nook.

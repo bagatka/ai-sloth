@@ -26,7 +26,8 @@ internal static class NooksEndpoints
         string Command,
         IReadOnlyList<string>? Arguments = null,
         string? WorkingDirectory = null,
-        OutputRetention? Retention = null);
+        OutputRetention? Retention = null,
+        IReadOnlyDictionary<string, string>? Environment = null);
 
     internal sealed record SendInputRequest(ReadOnlyMemory<byte> Data);
 
@@ -122,7 +123,8 @@ internal static class NooksEndpoints
             request.Command,
             request.Arguments ?? [],
             request.WorkingDirectory,
-            request.Retention ?? OutputRetention.Recent);
+            request.Retention ?? OutputRetention.Recent,
+            request.Environment ?? new Dictionary<string, string>(StringComparer.Ordinal));
         Result<ProcessSummary> result = await api.StartProcessAsync(principal.ToActor(), command, ct);
         return result.ToOk();
     }

@@ -84,6 +84,8 @@ message StartProcess {
   // Empty means the daemon's default directory.
   string working_directory = 4;
   OutputRetention retention = 5;
+  // Added to the process's environment. May hold secrets: never log it.
+  map<string, string> environment = 6;
 }
 
 // How a process's output is kept. Files are never affected: this is only what the process prints.

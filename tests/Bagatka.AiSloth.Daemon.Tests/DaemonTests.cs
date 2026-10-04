@@ -48,6 +48,24 @@ public sealed class DaemonTests
     }
 
     [Fact(Timeout = Timeout)]
+    public async Task A_process_gets_the_variables_it_was_started_with()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await using FakeControlPlane controlPlane = await FakeControlPlane.StartAsync();
+        await using DaemonUnderTest daemon = DaemonUnderTest.Start(controlPlane.Url);
+        FakeControlPlane.Connection connection = await controlPlane.Endpoint.NextConnectionAsync(ct);
+        string process = NewId();
+        DaemonInstruction start = Start(process, "sh", "-c", "printf '%s' \"$GREETING\"");
+        start.StartProcess.Environment.Add("GREETING", "hello from the control plane");
+
+        await connection.Instructions.Writer.WriteAsync(start, ct);
+        await NextExitAsync(connection, process);
+        List<ProcessOutput> output = await WatchAsync(controlPlane, connection, process, fromOffset: 0);
+
+        Assert.Equal("hello from the control plane", Text(output, OutputChannel.StandardOutput));
+    }
+
+    [Fact(Timeout = Timeout)]
     public async Task A_process_keeps_running_when_the_connection_is_lost()
     {
         CancellationToken ct = TestContext.Current.CancellationToken;

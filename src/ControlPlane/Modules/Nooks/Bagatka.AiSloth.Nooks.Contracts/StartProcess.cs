@@ -11,9 +11,14 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// <param name="Arguments">Its arguments, passed as they are.</param>
 /// <param name="WorkingDirectory">The directory to start in, or <see langword="null"/> for the daemon's default.</param>
 /// <param name="Retention">How its output is kept: <see cref="OutputRetention.Recent"/> unless every byte matters.</param>
+/// <param name="Environment">
+/// Variables added to the process's environment. They may hold secrets: they reach the daemon and
+/// are never stored or logged. Names starting with <c>SLOTHD_</c> are the daemon's own.
+/// </param>
 public sealed record StartProcess(
     NookId NookId,
     string Command,
     IReadOnlyList<string> Arguments,
     string? WorkingDirectory,
-    OutputRetention Retention);
+    OutputRetention Retention,
+    IReadOnlyDictionary<string, string> Environment);
