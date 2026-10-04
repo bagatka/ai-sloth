@@ -152,13 +152,14 @@ internal static class NooksEndpoints
         [FromRoute] Guid processId,
         [FromQuery] long? fromOffset,
         ClaimsPrincipal principal,
+        HttpResponse response,
         [FromServices] INooksApi api,
         CancellationToken ct)
     {
         WatchProcess command = new WatchProcess(NookId.From(nookId), ProcessId.From(processId), fromOffset ?? 0);
         Result<IAsyncEnumerable<ProcessEvent>> result = await api.WatchProcessAsync(principal.ToActor(), command, ct);
         return result.TryGetValue(out IAsyncEnumerable<ProcessEvent>? events, out Error? error)
-            ? TypedResults.ServerSentEvents(AsServerSentEvents(events, ct))
+            ? TypedResults.ServerSentEvents(AsServerSentEvents(response, events, ct))
             : error.ToProblem();
     }
 
@@ -187,8 +188,10 @@ internal static class NooksEndpoints
         return result.ToNoContent();
     }
 
-    private static async IAsyncEnumerable<SseItem<object>> AsServerSentEvents(IAsyncEnumerable<ProcessEvent> events, [EnumeratorCancellation] CancellationToken ct)
+    private static async IAsyncEnumerable<SseItem<object>> AsServerSentEvents(HttpResponse response, IAsyncEnumerable<ProcessEvent> events, [EnumeratorCancellation] CancellationToken ct)
     {
+        // The headers go out now, not with the first output, so a client watching a quiet process knows it is connected.
+        await response.Body.FlushAsync(ct);
         await foreach (ProcessEvent processEvent in events.WithCancellation(ct))
         {
             yield return processEvent switch
