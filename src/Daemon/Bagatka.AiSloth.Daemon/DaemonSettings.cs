@@ -13,7 +13,8 @@ internal sealed record DaemonSettings
         string token,
         string workingDirectory,
         string stateDirectory,
-        OutputLimits limits)
+        OutputLimits limits,
+        long diskReserveBytes)
     {
         ArgumentNullException.ThrowIfNull(controlPlaneUrl);
         if (!controlPlaneUrl.IsAbsoluteUri || controlPlaneUrl.Scheme is not ("https" or "http"))
@@ -23,12 +24,14 @@ internal sealed record DaemonSettings
 
         ArgumentException.ThrowIfNullOrWhiteSpace(token);
         ArgumentNullException.ThrowIfNull(limits);
+        ArgumentOutOfRangeException.ThrowIfNegative(diskReserveBytes);
         ControlPlaneUrl = controlPlaneUrl;
         NookId = nookId;
         Token = token;
         WorkingDirectory = workingDirectory;
         StateDirectory = stateDirectory;
         Limits = limits;
+        DiskReserveBytes = diskReserveBytes;
     }
 
     /// <summary>Where the control plane's daemon endpoint listens.</summary>
@@ -48,4 +51,7 @@ internal sealed record DaemonSettings
 
     /// <summary>How much output is kept.</summary>
     public OutputLimits Limits { get; }
+
+    /// <summary>The space the daemon holds back for a full disk; 0 holds none.</summary>
+    public long DiskReserveBytes { get; }
 }

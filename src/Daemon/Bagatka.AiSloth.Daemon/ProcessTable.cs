@@ -15,7 +15,7 @@ namespace Bagatka.AiSloth.Daemon;
 /// The processes this daemon started. Running processes stay until they exit; exited ones stay, with
 /// their output, until more than <see cref="MaxExitedProcesses"/> have exited, oldest first.
 /// </summary>
-internal sealed class ProcessTable(DaemonSettings settings, ILogger<ProcessTable> logger) : IAsyncDisposable
+internal sealed class ProcessTable(DaemonSettings settings, NookDisk disk, ILogger<ProcessTable> logger) : IAsyncDisposable
 {
     private const int MaxExitedProcesses = 100;
 
@@ -54,7 +54,7 @@ internal sealed class ProcessTable(DaemonSettings settings, ILogger<ProcessTable
             _started++;
             string directory = Path.Combine(settings.StateDirectory, "processes", _started.ToString(CultureInfo.InvariantCulture));
             OutputJournal output = new OutputJournal(directory, retention, settings.Limits);
-            _processes.Add(NookProcess.Start(instruction, settings.WorkingDirectory, output, settings.Limits.ChunkBytes, _exits.Writer));
+            _processes.Add(NookProcess.Start(instruction, settings.WorkingDirectory, output, settings.Limits.ChunkBytes, disk, _exits.Writer));
             evicted = Evict();
         }
 

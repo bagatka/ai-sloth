@@ -20,10 +20,11 @@ namespace Bagatka.AiSloth.Daemon;
 /// out instructions, and serves each watch on an upload stream of its own. Processes never depend on
 /// the connection; losing it only means reconnecting.
 /// </summary>
-internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable processes, ILogger<ControlPlaneLink> logger) : IDisposable
+internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable processes, NookDisk disk, TimeProvider time, ILogger<ControlPlaneLink> logger) : IDisposable
 {
     private const int MaxConcurrentUploads = 64;
     private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan DiskReportInterval = TimeSpan.FromSeconds(30);
 
     // A connection that lasted this long resets the backoff.
     private static readonly TimeSpan StableConnection = TimeSpan.FromSeconds(10);
@@ -35,7 +36,7 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
     private readonly SemaphoreSlim _uploadSlots = new SemaphoreSlim(MaxConcurrentUploads);
 
     /// <summary>Connects, and reconnects with backoff, until <paramref name="ct"/> is cancelled.</summary>
-    public async Task RunAsync(TimeProvider time, CancellationToken ct)
+    public async Task RunAsync(CancellationToken ct)
     {
         using GrpcChannel channel = GrpcChannel.ForAddress(settings.ControlPlaneUrl, new GrpcChannelOptions
         {
@@ -98,7 +99,7 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
 
         Log.Connected(logger);
         List<Task> uploads = [];
-        Task sendingExits = SendExitsAsync(call.RequestStream, connection.Token);
+        Task sendingEvents = SendEventsAsync(call.RequestStream, connection.Token);
         try
         {
             await foreach (DaemonInstruction instruction in call.ResponseStream.ReadAllAsync(connection.Token))
@@ -133,17 +134,43 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
             // Ends the exit sender and every upload of this connection; the control plane watches
             // again after the next connection.
             await connection.CancelAsync();
-            await Task.WhenAll(uploads.Append(sendingExits));
+            await Task.WhenAll(uploads.Append(sendingEvents));
         }
     }
 
-    private async Task SendExitsAsync(IClientStreamWriter<DaemonEvent> stream, CancellationToken ct)
+    // Sends exits as they happen, and the disk's usage on connecting, every 30 seconds, and as soon as
+    // it fills. One loop, because a call's request stream takes one write at a time.
+    private async Task SendEventsAsync(IClientStreamWriter<DaemonEvent> stream, CancellationToken ct)
     {
         try
         {
-            await foreach (ProcessExited exited in processes.Exits.ReadAllAsync(ct))
+            Task<bool> exits = processes.Exits.WaitToReadAsync(ct).AsTask();
+            Task diskDue = Task.CompletedTask;
+            while (true)
             {
-                await stream.WriteAsync(new DaemonEvent { ProcessExited = exited }, ct);
+                if (diskDue.IsCompleted)
+                {
+                    disk.Reserve();
+                    await stream.WriteAsync(new DaemonEvent { DiskUsage = disk.Measure() }, ct);
+                    diskDue = Task.WhenAny(Task.Delay(DiskReportInterval, time, ct), disk.Full);
+                }
+
+                if (exits.IsCompleted)
+                {
+                    if (!await exits)
+                    {
+                        return;
+                    }
+
+                    while (processes.Exits.TryRead(out ProcessExited? exited))
+                    {
+                        await stream.WriteAsync(new DaemonEvent { ProcessExited = exited }, ct);
+                    }
+
+                    exits = processes.Exits.WaitToReadAsync(ct).AsTask();
+                }
+
+                await Task.WhenAny(exits, diskDue);
             }
         }
         catch (Exception exception) when (exception is OperationCanceledException or RpcException or InvalidOperationException && ct.IsCancellationRequested)

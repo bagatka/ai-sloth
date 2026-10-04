@@ -22,23 +22,26 @@ internal sealed class NookProcess : IAsyncDisposable
 
     // After the process exits, its output pipes may stay open if it left children behind.
     private static readonly TimeSpan DrainTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan DiskFullRetryDelay = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan StopGracePeriod = TimeSpan.FromSeconds(10);
 
     // Null when the program couldn't start. Disposed only with this object, so killing it is safe
     // after it exits.
     private readonly Process? _process;
     private readonly int _chunkBytes;
+    private readonly NookDisk _disk;
     private readonly Channel<ReadOnlyMemory<byte>> _input = Channel.CreateBounded<ReadOnlyMemory<byte>>(
         new BoundedChannelOptions(1024) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
     private readonly CancellationTokenSource _pumps = new CancellationTokenSource();
     private Task? _stopping;
 
-    private NookProcess(string id, OutputJournal output, Process? process, int chunkBytes, ChannelWriter<ProcessExited> exits)
+    private NookProcess(string id, OutputJournal output, Process? process, int chunkBytes, NookDisk disk, ChannelWriter<ProcessExited> exits)
     {
         Id = id;
         Output = output;
         _process = process;
         _chunkBytes = chunkBytes;
+        _disk = disk;
         Exited = process is null ? Task.FromResult(CannotStart) : RunAsync(process, exits);
     }
 
@@ -61,6 +64,7 @@ internal sealed class NookProcess : IAsyncDisposable
         string defaultWorkingDirectory,
         OutputJournal output,
         int chunkBytes,
+        NookDisk disk,
         ChannelWriter<ProcessExited> exits)
     {
         ProcessStartInfo start = new ProcessStartInfo(instruction.Command)
@@ -86,14 +90,15 @@ internal sealed class NookProcess : IAsyncDisposable
         {
             Process process = Process.Start(start)
                 ?? throw new InvalidOperationException("The operating system started no process for " + instruction.Command + ".");
-            return new NookProcess(instruction.ProcessId, output, process, chunkBytes, exits);
+            return new NookProcess(instruction.ProcessId, output, process, chunkBytes, disk, exits);
         }
         catch (Win32Exception exception)
         {
-            output.Append(OutputChannel.StandardError, Encoding.UTF8.GetBytes("slothd: cannot start '" + instruction.Command + "': " + exception.Message + "\n"));
+            // On a full disk the explanation is lost; the exit code still says the program didn't start.
+            _ = output.TryAppend(OutputChannel.StandardError, Encoding.UTF8.GetBytes("slothd: cannot start '" + instruction.Command + "': " + exception.Message + "\n"));
             output.Complete();
             exits.TryWrite(new ProcessExited { ProcessId = instruction.ProcessId, ExitCode = CannotStart });
-            return new NookProcess(instruction.ProcessId, output, process: null, chunkBytes, exits);
+            return new NookProcess(instruction.ProcessId, output, process: null, chunkBytes, disk, exits);
         }
     }
 
@@ -174,7 +179,12 @@ internal sealed class NookProcess : IAsyncDisposable
                     return;
                 }
 
-                Output.Append(channel, buffer.AsSpan(0, read));
+                // A full disk: keep the chunk and stop reading, so the process waits instead of losing output.
+                while (!Output.TryAppend(channel, buffer.AsSpan(0, read)))
+                {
+                    _disk.Filled();
+                    await Task.Delay(DiskFullRetryDelay, _pumps.Token);
+                }
             }
         }
         catch (OperationCanceledException) when (_pumps.IsCancellationRequested)

@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Bagatka.AiSloth.Daemon.Tests;
 
 /// <summary>
-/// A real daemon, in this process, with its working and state directories in a temporary folder.
+/// A real daemon, in this process, with its working and state directories in a folder of its own.
 /// Disposing it stops the daemon, kills its processes, and deletes the folder.
 /// </summary>
 internal sealed class DaemonUnderTest : IAsyncDisposable
@@ -29,12 +29,13 @@ internal sealed class DaemonUnderTest : IAsyncDisposable
 
     public static Guid NookId { get; } = Guid.CreateVersion7();
 
-    public static DaemonUnderTest Start(Uri controlPlane, OutputLimits? limits = null)
+    /// <summary>Starts a daemon with its folder under <paramref name="parent"/>, the temporary folder by default.</summary>
+    public static DaemonUnderTest Start(Uri controlPlane, OutputLimits? limits = null, string? parent = null, long diskReserveBytes = 0)
     {
-        string root = Path.Combine(Path.GetTempPath(), "slothd-tests", RandomNumberGenerator.GetHexString(12, lowercase: true));
+        string root = Path.Combine(parent ?? Path.Combine(Path.GetTempPath(), "slothd-tests"), RandomNumberGenerator.GetHexString(12, lowercase: true));
         string work = Path.Combine(root, "work");
         Directory.CreateDirectory(work);
-        DaemonSettings settings = new DaemonSettings(controlPlane, NookId, Token, work, Path.Combine(root, "state"), limits ?? OutputLimits.Default);
+        DaemonSettings settings = new DaemonSettings(controlPlane, NookId, Token, work, Path.Combine(root, "state"), limits ?? OutputLimits.Default, diskReserveBytes);
         return new DaemonUnderTest(settings, root);
     }
 

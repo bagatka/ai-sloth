@@ -187,6 +187,41 @@ public sealed class DaemonTests
         Assert.Equal(8000, output.Sum(chunk => (long)chunk.Data.Length));
     }
 
+    [Fact(Timeout = Timeout)]
+    public async Task The_daemon_reports_how_full_the_disk_is_when_it_connects()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await using FakeControlPlane controlPlane = await FakeControlPlane.StartAsync();
+        await using DaemonUnderTest daemon = DaemonUnderTest.Start(controlPlane.Url);
+        FakeControlPlane.Connection connection = await controlPlane.Endpoint.NextConnectionAsync(ct);
+
+        DiskUsage disk = await NextDiskUsageAsync(connection);
+
+        Assert.True(disk.TotalBytes > 0);
+        Assert.InRange(disk.AvailableBytes, 0, disk.TotalBytes);
+    }
+
+    [Fact(Timeout = Timeout)]
+    public async Task A_full_disk_releases_the_reserve_and_no_output_is_lost()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await using SmallDisk smallDisk = await SmallDisk.MountAsync(mebibytes: 4);
+        await using FakeControlPlane controlPlane = await FakeControlPlane.StartAsync();
+        await using DaemonUnderTest daemon = DaemonUnderTest.Start(controlPlane.Url, SmallLimits, smallDisk.Path, diskReserveBytes: 1 << 20);
+        FakeControlPlane.Connection connection = await controlPlane.Endpoint.NextConnectionAsync(ct);
+        DiskUsage before = await NextDiskUsageAsync(connection);
+        await smallDisk.FillAsync();
+        string process = NewId();
+
+        await connection.Instructions.Writer.WriteAsync(Start(process, OutputRetention.Complete, "sh", "-c", EightThousandBytes), ct);
+        List<ProcessOutput> output = await WatchAsync(controlPlane, connection, process, fromOffset: 0);
+        DiskUsage full = await NextDiskUsageAsync(connection);
+
+        string expected = string.Concat(Enumerable.Range(0, 80).Select(line => line.ToString("D99", CultureInfo.InvariantCulture) + "\n"));
+        Assert.Equal(expected, Text(output, OutputChannel.StandardOutput));
+        Assert.True(full.AvailableBytes < before.AvailableBytes);
+    }
+
     private static string NewId()
     {
         return Guid.CreateVersion7().ToString("D", CultureInfo.InvariantCulture);
@@ -230,6 +265,19 @@ public sealed class DaemonTests
         }
 
         throw new InvalidOperationException("The connection ended before the process exited.");
+    }
+
+    private static async Task<DiskUsage> NextDiskUsageAsync(FakeControlPlane.Connection connection)
+    {
+        await foreach (DaemonEvent daemonEvent in connection.Events.Reader.ReadAllAsync(Ct))
+        {
+            if (daemonEvent.DiskUsage is { } disk)
+            {
+                return disk;
+            }
+        }
+
+        throw new InvalidOperationException("The connection ended before the daemon reported its disk.");
     }
 
     // Watches from an offset and returns everything uploaded until the upload ends.

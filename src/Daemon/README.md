@@ -44,16 +44,18 @@ feeds, watches, and stops processes on its instructions. It is a single .NET Nat
 - **Handover.** On `Reconnect`, the daemon reconnects at once and reaches another control-plane
   instance; running processes are unaffected.
 
-## Full disk (planned)
+## Full disk
 
 A full disk must never cost output or leave a nook unrecoverable (`ARCHITECTURE.md`, "Nothing
 delivered is lost").
 
 - **Reported.** The daemon reports how full the working directory's disk is, so the control plane
   can ask for confirmation before it fills up.
-- **A reserve.** The daemon keeps a 256 MiB reserve file in its state directory. When output can't
-  be written because the disk is full, it deletes the reserve and says so, so watchers still get
-  output and people can still start the commands that free space.
+- **A reserve.** The daemon keeps a 256 MiB reserve file in its state directory, preallocated so the
+  space is really held, and takes it only while the disk has twice that free. When output can't be
+  written because the disk is full, it deletes the reserve and reports at once, so watchers still
+  get output and people can still start the commands that free space. It takes the reserve again
+  once there is room.
 - **Waiting, not dropping.** While output can't be written, the daemon stops reading the process's
   output, so the process waits instead of losing it.
 
@@ -67,8 +69,8 @@ once at startup; a missing or invalid value prints one line to standard error an
 ## Lifetime
 
 The daemon lives as long as its nook. `SIGTERM` or `SIGINT`, as when the nook stops, kills its
-processes and deletes their output; a daemon that starts again starts with none. The image must run
-it under an init such as `tini`, which reaps the orphaned processes that agents leave behind.
+processes and deletes their output; a daemon that starts again starts with none. The nook image runs
+it under `tini`, which reaps the orphaned processes that agents leave behind.
 
 ## Build and test
 
@@ -78,8 +80,19 @@ restoring; restoring during a publish for a runtime would rewrite the protocol p
     dotnet restore AiSloth.slnx --locked-mode
     dotnet publish src/Daemon/Bagatka.AiSloth.Daemon -c Release -r linux-x64 --no-restore
 
-The image installs the published `Bagatka.AiSloth.Daemon` binary as `slothd`. The tests run the
-real daemon against a fake control plane: a real gRPC server on a loopback port.
+The nook image (`Dockerfile`) does the same inside the SDK image that `global.json` pins, and
+installs the binary as `/usr/local/bin/slothd` under tini, on Ubuntu with git. Build it from the
+repository root with `docker build -f src/Daemon/Dockerfile -t aisloth-nook .`; the AppHost builds
+it as `aisloth-nook:dev`.
+
+The tests run the real daemon against a fake control plane: a real gRPC server on a loopback port.
+The full-disk test mounts a small tmpfs, which needs root, and skips elsewhere.
+
+## Not built yet
+
+- **Compressed uploads.** Output travels uncompressed; gzip on `UploadOutput` is a few lines, worth
+  it once nooks and the control plane run in different clouds and egress costs money.
+- **Version checks.** The control plane accepts any daemon version.
 
 ## Open questions
 

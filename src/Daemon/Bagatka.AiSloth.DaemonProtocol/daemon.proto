@@ -31,6 +31,7 @@ message DaemonEvent {
   oneof event {
     Hello hello = 1;
     ProcessExited process_exited = 2;
+    DiskUsage disk_usage = 3;
   }
 }
 
@@ -55,6 +56,13 @@ message RunningProcess {
 message ProcessExited {
   string process_id = 1;
   int32 exit_code = 2;
+}
+
+// How full the working directory's disk is. Sent after Hello, every 30 seconds, and as soon as the
+// disk is full, so the control plane can warn before new work fills it.
+message DiskUsage {
+  int64 total_bytes = 1;
+  int64 available_bytes = 2;
 }
 
 // Sent by the control plane on the control stream.

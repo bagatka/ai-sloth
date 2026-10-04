@@ -19,7 +19,8 @@ try
         Required("SLOTHD_TOKEN"),
         Optional("SLOTHD_WORKING_DIRECTORY") ?? "/work",
         Optional("SLOTHD_STATE_DIRECTORY") ?? "/var/lib/slothd",
-        OutputLimits.Default);
+        OutputLimits.Default,
+        NookDisk.DefaultReserveBytes);
 }
 catch (Exception exception) when (exception is InvalidOperationException or ArgumentException)
 {

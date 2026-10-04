@@ -21,6 +21,12 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Information, Message = "Started process {ProcessId}")]
     public static partial void ProcessStarted(ILogger logger, string processId);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The disk is full: released the reserve so output and cleanup can continue")]
+    public static partial void ReserveReleased(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't take the disk reserve; on a full disk, processes wait until space is freed")]
+    public static partial void ReserveUnavailable(ILogger logger, Exception exception);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Watch {WatchId} ended before the process's output was delivered")]
     public static partial void WatchEnded(ILogger logger, Exception exception, string watchId);
 }

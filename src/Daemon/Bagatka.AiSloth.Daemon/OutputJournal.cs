@@ -83,12 +83,15 @@ internal sealed class OutputJournal : IDisposable
         }
     }
 
-    /// <summary>Appends a chunk the process wrote to one channel.</summary>
-    public void Append(OutputChannel channel, ReadOnlySpan<byte> data)
+    /// <summary>
+    /// Appends a chunk the process wrote to one channel. Returns false, having appended nothing, when
+    /// the disk has no room for it.
+    /// </summary>
+    public bool TryAppend(OutputChannel channel, ReadOnlySpan<byte> data)
     {
         if (data.IsEmpty)
         {
-            return;
+            return true;
         }
 
         lock (_gate)
@@ -98,18 +101,38 @@ internal sealed class OutputJournal : IDisposable
                 throw new InvalidOperationException("The journal is complete.");
             }
 
-            FileStream writer = _writer is not null && _segments[^1].Length < _limits.SegmentBytes ? _writer : StartSegment();
+            FileStream writer;
+            try
+            {
+                writer = _writer is not null && _segments[^1].Length < _limits.SegmentBytes ? _writer : StartSegment();
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+
+            long frameStart = writer.Position;
             Span<byte> header = stackalloc byte[FrameHeaderBytes];
             header[0] = (byte)channel;
             BinaryPrimitives.WriteInt32LittleEndian(header[1..], data.Length);
-            writer.Write(header);
-            writer.Write(data);
-            writer.Flush();
+            try
+            {
+                writer.Write(header);
+                writer.Write(data);
+            }
+            catch (IOException)
+            {
+                // Nothing counts until the whole frame is written, so cut off whatever part of it was.
+                writer.SetLength(frameStart);
+                writer.Position = frameStart;
+                return false;
+            }
 
             _segments[^1] = _segments[^1] with { Length = _segments[^1].Length + data.Length };
             _length += data.Length;
             Trim();
             Signal();
+            return true;
         }
     }
 
@@ -218,14 +241,15 @@ internal sealed class OutputJournal : IDisposable
         }
     }
 
-    // Callers hold _gate.
+    // Callers hold _gate. Unbuffered, so a failed write leaves nothing behind to be flushed later.
     private FileStream StartSegment()
     {
-        _writer?.Dispose();
         string path = Path.Combine(_directory, _length.ToString("D20", CultureInfo.InvariantCulture));
-        _writer = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+        FileStream writer = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, bufferSize: 0);
+        _writer?.Dispose();
+        _writer = writer;
         _segments.Add(new Segment(_length, 0, path));
-        return _writer;
+        return writer;
     }
 
     // Callers hold _gate. Drops whole segments that retention no longer needs; the newest always stays.

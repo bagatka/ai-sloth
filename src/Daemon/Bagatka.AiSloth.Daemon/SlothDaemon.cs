@@ -12,9 +12,9 @@ namespace Bagatka.AiSloth.Daemon;
 /// </summary>
 internal sealed class SlothDaemon : IAsyncDisposable
 {
+    private readonly NookDisk _disk;
     private readonly ProcessTable _processes;
     private readonly ControlPlaneLink _link;
-    private readonly TimeProvider _time;
 
     public SlothDaemon(DaemonSettings settings, TimeProvider time, ILoggerFactory loggers)
     {
@@ -25,15 +25,16 @@ internal sealed class SlothDaemon : IAsyncDisposable
             Directory.Delete(processes, recursive: true);
         }
 
-        _time = time;
-        _processes = new ProcessTable(settings, loggers.CreateLogger<ProcessTable>());
-        _link = new ControlPlaneLink(settings, _processes, loggers.CreateLogger<ControlPlaneLink>());
+        _disk = new NookDisk(settings, loggers.CreateLogger<NookDisk>());
+        _processes = new ProcessTable(settings, _disk, loggers.CreateLogger<ProcessTable>());
+        _link = new ControlPlaneLink(settings, _processes, _disk, time, loggers.CreateLogger<ControlPlaneLink>());
     }
 
     /// <summary>Serves the control plane until <paramref name="ct"/> is cancelled.</summary>
     public Task RunAsync(CancellationToken ct)
     {
-        return _link.RunAsync(_time, ct);
+        _disk.Reserve();
+        return _link.RunAsync(ct);
     }
 
     public async ValueTask DisposeAsync()

@@ -1,0 +1,5 @@
+# Only sources go into image builds; local build output would clash with the image's own.
+**/bin/
+**/obj/
+.git/
+.claude-web-chat/
