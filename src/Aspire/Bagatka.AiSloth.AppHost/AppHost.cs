@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -23,8 +24,24 @@ IResourceBuilder<PostgresDatabaseResource> database = builder.AddPostgres("postg
 IResourceBuilder<ExecutableResource> nookImage = builder.AddExecutable(
     "nook-image", "docker", repositoryRoot, "build", "--file", "src/Daemon/Dockerfile", "--tag", NookImage, ".");
 
+// Nooks are containers that reach the daemon endpoint through the Docker host's gateway. On Linux the
+// gateway isn't localhost, where Aspire's proxy and Kestrel would listen, so the WebApi listens on
+// every IPv4 interface itself; Docker Desktop on WSL doesn't forward to dual-stack (`*`) listeners.
+// Without the proxy the port is fixed (5171, appsettings.json), so tests pass a free one as DaemonPort.
+string? daemonPort = builder.Configuration["DaemonPort"];
 IResourceBuilder<ProjectResource> webApi = builder.AddProject<Projects.Bagatka_AiSloth_WebApi>("webapi")
-    .WithHttpHealthCheck("/health", endpointName: "Http");
+    .WithHttpHealthCheck("/health", endpointName: "Http")
+    .WithEndpoint("Daemon", daemon =>
+    {
+        daemon.IsProxied = false;
+        if (daemonPort is not null)
+        {
+            daemon.Port = int.Parse(daemonPort, CultureInfo.InvariantCulture);
+            daemon.TargetPort = daemon.Port;
+        }
+    });
+EndpointReference daemonEndpoint = webApi.GetEndpoint("Daemon");
+webApi.WithEnvironment("Kestrel__Endpoints__Daemon__Url", ReferenceExpression.Create($"http://0.0.0.0:{daemonEndpoint.Property(EndpointProperty.TargetPort)}"));
 
 // The WebApi in migration mode: applies every module's migrations, then exits.
 IResourceBuilder<ProjectResource> migrations = builder.AddProject<Projects.Bagatka_AiSloth_WebApi>("migrations", options => options.ExcludeKestrelEndpoints = true)
@@ -33,7 +50,6 @@ IResourceBuilder<ProjectResource> migrations = builder.AddProject<Projects.Bagat
 
 // Both modes read the same settings (PATTERNS.md, entry 20). Nooks reach the daemon endpoint
 // through the Docker host.
-EndpointReference daemonEndpoint = webApi.GetEndpoint("Daemon");
 foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
 {
     mode.WithEnvironment("Authentication__Issuer", issuer)

@@ -1,6 +1,9 @@
 using System;
+using System.Globalization;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,6 +44,7 @@ public sealed class ControlPlane : IAsyncLifetime
                 "Parameters:authentication-issuer=" + _issuer.Issuer,
                 "Parameters:authentication-audience=" + FakeIssuer.Audience,
                 "Parameters:sandbox-scope=" + Scope,
+                "DaemonPort=" + FreePort().ToString(CultureInfo.InvariantCulture),
             ],
             ct);
         _app = await appHost.BuildAsync(ct);
@@ -82,6 +86,14 @@ public sealed class ControlPlane : IAsyncLifetime
         {
             await _issuer.DisposeAsync();
         }
+    }
+
+    // The daemon endpoint gets a port of its own, so tests run while the app runs for development.
+    private static int FreePort()
+    {
+        using TcpListener listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
     // Whatever tests left behind, including after a failure.
