@@ -17,11 +17,10 @@ public static class MachineProvider
         return machine.Value.ToString("D", CultureInfo.InvariantCulture);
     }
 
-    /// <summary>The machine a location names; false when it names none.</summary>
-    public static bool TryParseLocation(string? location, out MachineId machine)
+    /// <summary>The machine a location names, or <see langword="null"/> when it names none.</summary>
+    public static MachineId? ParseLocation(string? location)
     {
         bool parsed = Guid.TryParseExact(location, "D", out Guid id);
-        machine = MachineId.From(id);
-        return parsed;
+        return parsed ? MachineId.From(id) : null;
     }
 }

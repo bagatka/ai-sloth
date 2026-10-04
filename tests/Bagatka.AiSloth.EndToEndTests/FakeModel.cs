@@ -26,6 +26,7 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// </summary>
 internal sealed class FakeModel : IAsyncDisposable
 {
+    /// <summary>The key tests give workspaces' Anthropic accounts; the gateway forwards it.</summary>
     public const string ApiKey = "e2e-model-key";
 
     private readonly WebApplication _app;
@@ -65,8 +66,12 @@ internal sealed class FakeModel : IAsyncDisposable
         app.MapPost("/v1/messages/count_tokens", () => Results.Json(new { input_tokens = 10 }));
         app.MapPost("/v1/messages", model.MessagesAsync);
         await app.StartAsync();
-        IServerAddressesFeature addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()
-            ?? throw new InvalidOperationException("Kestrel reported no addresses.");
+        IServerAddressesFeature? addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
+        if (addresses is null)
+        {
+            throw new InvalidOperationException("Kestrel reported no addresses.");
+        }
+
         model.Url = new Uri(addresses.Addresses.Single());
         return model;
     }
@@ -86,8 +91,12 @@ internal sealed class FakeModel : IAsyncDisposable
     private async Task MessagesAsync(HttpContext context)
     {
         Credentials.Enqueue((context.Request.Headers["X-Api-Key"].FirstOrDefault(), context.Request.Headers.Authorization.FirstOrDefault()));
-        JsonNode request = await JsonNode.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted)
-            ?? throw new InvalidOperationException("The call had no body.");
+        JsonNode? request = await JsonNode.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted);
+        if (request is null)
+        {
+            throw new InvalidOperationException("The call had no body.");
+        }
+
         JsonArray messages = request["messages"]!.AsArray();
         JsonNode? lastUser = messages.LastOrDefault(message => string.Equals((string?)message!["role"], "user", StringComparison.Ordinal));
         bool tools = request["tools"] is JsonArray offered && offered.Any(tool => string.Equals((string?)tool!["name"], "Write", StringComparison.Ordinal));

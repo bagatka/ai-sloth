@@ -19,11 +19,12 @@ public sealed class WorkspacesTests(ControlPlane controlPlane)
 
         HttpResponseMessage response = await alice.SendPostAsync("/workspaces", new { name = "  Acme  " });
         WorkspaceSummary created = await Api.ReadAsync<WorkspaceSummary>(response, HttpStatusCode.Created);
+        WorkspaceSummary fetched = await Api.ReadAsync<WorkspaceSummary>(alice.SendGetAsync(PathOf(created)), HttpStatusCode.OK);
 
         Assert.Equal("Acme", created.Name);
         Assert.Equal(WorkspaceRole.Owner, created.Role);
         Assert.Equal(PathOf(created), response.Headers.Location?.OriginalString);
-        Assert.Equal(created, await Api.ReadAsync<WorkspaceSummary>(await alice.SendGetAsync(PathOf(created)), HttpStatusCode.OK));
+        Assert.Equal(created, fetched);
     }
 
     [Fact]
@@ -31,7 +32,7 @@ public sealed class WorkspacesTests(ControlPlane controlPlane)
     {
         using HttpClient alice = controlPlane.ClientFor("alice-" + Guid.CreateVersion7());
 
-        Problem problem = await Api.ProblemAsync(await alice.SendPostAsync("/workspaces", new { name = "   " }), HttpStatusCode.BadRequest);
+        Problem problem = await Api.ProblemAsync(alice.SendPostAsync("/workspaces", new { name = "   " }), HttpStatusCode.BadRequest);
 
         Assert.True(problem.Errors?.ContainsKey("name"));
     }
@@ -41,10 +42,10 @@ public sealed class WorkspacesTests(ControlPlane controlPlane)
     {
         using HttpClient alice = controlPlane.ClientFor("alice-" + Guid.CreateVersion7());
         using HttpClient bob = controlPlane.ClientFor("bob-" + Guid.CreateVersion7());
-        WorkspaceSummary created = await Api.ReadAsync<WorkspaceSummary>(await alice.SendPostAsync("/workspaces", new { name = "Acme" }), HttpStatusCode.Created);
+        WorkspaceSummary created = await Api.ReadAsync<WorkspaceSummary>(alice.SendPostAsync("/workspaces", new { name = "Acme" }), HttpStatusCode.Created);
 
-        Problem problem = await Api.ProblemAsync(await bob.SendGetAsync(PathOf(created)), HttpStatusCode.NotFound);
-        Page<WorkspaceSummary> bobs = await Api.ReadAsync<Page<WorkspaceSummary>>(await bob.SendGetAsync("/workspaces"), HttpStatusCode.OK);
+        Problem problem = await Api.ProblemAsync(bob.SendGetAsync(PathOf(created)), HttpStatusCode.NotFound);
+        Page<WorkspaceSummary> bobs = await Api.ReadAsync<Page<WorkspaceSummary>>(bob.SendGetAsync("/workspaces"), HttpStatusCode.OK);
 
         Assert.Equal(WorkspacesErrors.NotFound.Code, problem.Code);
         Assert.Empty(bobs.Items);
@@ -57,11 +58,11 @@ public sealed class WorkspacesTests(ControlPlane controlPlane)
         string[] names = ["First", "Second", "Third"];
         foreach (string name in names)
         {
-            await Api.ExpectAsync(await alice.SendPostAsync("/workspaces", new { name }), HttpStatusCode.Created);
+            await Api.ExpectAsync(alice.SendPostAsync("/workspaces", new { name }), HttpStatusCode.Created);
         }
 
-        Page<WorkspaceSummary> first = await Api.ReadAsync<Page<WorkspaceSummary>>(await alice.SendGetAsync("/workspaces?limit=2"), HttpStatusCode.OK);
-        Page<WorkspaceSummary> second = await Api.ReadAsync<Page<WorkspaceSummary>>(await alice.SendGetAsync("/workspaces?limit=2&cursor=" + first.NextCursor), HttpStatusCode.OK);
+        Page<WorkspaceSummary> first = await Api.ReadAsync<Page<WorkspaceSummary>>(alice.SendGetAsync("/workspaces?limit=2"), HttpStatusCode.OK);
+        Page<WorkspaceSummary> second = await Api.ReadAsync<Page<WorkspaceSummary>>(alice.SendGetAsync("/workspaces?limit=2&cursor=" + first.NextCursor), HttpStatusCode.OK);
 
         Assert.Equal(names, first.Items.Concat(second.Items).Select(workspace => workspace.Name), StringComparer.Ordinal);
         Assert.Null(second.NextCursor);
@@ -72,7 +73,7 @@ public sealed class WorkspacesTests(ControlPlane controlPlane)
     {
         using HttpClient alice = controlPlane.ClientFor("alice-" + Guid.CreateVersion7());
 
-        Problem problem = await Api.ProblemAsync(await alice.SendGetAsync("/workspaces?cursor=not-a-cursor"), HttpStatusCode.BadRequest);
+        Problem problem = await Api.ProblemAsync(alice.SendGetAsync("/workspaces?cursor=not-a-cursor"), HttpStatusCode.BadRequest);
 
         Assert.True(problem.Errors?.ContainsKey("cursor"));
     }

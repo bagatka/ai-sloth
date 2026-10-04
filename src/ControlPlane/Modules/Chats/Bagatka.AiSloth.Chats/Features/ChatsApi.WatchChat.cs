@@ -17,9 +17,13 @@ internal sealed partial class ChatsApi
 
     public async Task<Result<IAsyncEnumerable<ChatEvent>>> WatchAsync(Actor actor, WatchChat command, CancellationToken ct)
     {
-        return await FindChatAsync(actor, command.ChatId, ct) is null
-            ? new Result<IAsyncEnumerable<ChatEvent>>(ChatsErrors.NotFound)
-            : new Result<IAsyncEnumerable<ChatEvent>>(WatchEventsAsync(command.ChatId, command.AfterSequence, ct));
+        Chat? chat = await FindChatAsync(actor, command.ChatId, ct);
+        if (chat is null)
+        {
+            return new Result<IAsyncEnumerable<ChatEvent>>(ChatsErrors.NotFound);
+        }
+
+        return new Result<IAsyncEnumerable<ChatEvent>>(WatchEventsAsync(command.ChatId, command.AfterSequence, ct));
     }
 
     private async IAsyncEnumerable<ChatEvent> WatchEventsAsync(ChatId id, long after, [EnumeratorCancellation] CancellationToken ct)

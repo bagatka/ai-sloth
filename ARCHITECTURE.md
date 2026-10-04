@@ -69,8 +69,9 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 
 | Part | Projects | Purpose | Status |
 |---|---|---|---|
-| WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Sign-in, public API for users, workspaces, machines, nooks, and chats, the gRPC endpoint daemons and machines dial, the model gateway, `migrate` |
-| Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, Machines, Nooks, and Chats built |
+| WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Sign-in, public API for users, workspaces, machines, nooks, agent accounts, and chats, the gRPC endpoint daemons and machines dial, the model gateway, `migrate` |
+| Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, Machines, Nooks, AgentAccounts, and Chats built |
+| Harnesses | `Bagatka.Harnesses` | The programs that run coding agents, how to start and pay for each, and the client's side of ACP | Claude Code and GitHub Copilot |
 | Sandboxing | `Bagatka.Sandboxing` + `.<Provider>`, `.Remote` | Provider contract, conformance tests, one project per compute backend, remote calls | Contract, Docker provider, remote calls |
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |
 | CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API; its machine mode runs nooks on people's own computers | Machine mode built; the rest planned |
@@ -90,6 +91,8 @@ Directory.Packages.props           the single version of every package
 BannedSymbols.txt                  APIs nobody may call
 LoggerParameterTypes.txt           log placeholder names and their types
 docs/templates/                    templates (module README)
+analyzers/
+  Bagatka.Analyzers/               our own code-shape rules, run on every project (PATTERNS.md, entry 27)
 src/
   Aspire/
     Bagatka.AiSloth.AppHost/       local orchestration
@@ -115,11 +118,14 @@ src/
   Daemon/
     README.md
     Bagatka.AiSloth.DaemonProtocol/  daemon.proto and the code generated from it
-    Dockerfile                     the nook image: slothd under tini
+    Dockerfile                     the nook images: slothd under tini, alone or with one harness
     Bagatka.AiSloth.Daemon/        slothd
   Cli/
     Bagatka.AiSloth.MachineProtocol/  machine.proto and the code generated from it
     Bagatka.AiSloth.Cli/           sloth: machine mode today
+  Harnesses/
+    README.md
+    Bagatka.Harnesses/             harness profiles and the client's side of ACP
   Sandboxing/
     README.md
     Bagatka.Sandboxing/            the provider contract
@@ -139,7 +145,9 @@ tests/
   Bagatka.AiSloth.Daemon.Tests/    the real daemon against a fake control plane
   Bagatka.Sandboxing.ConformanceTests/  one suite every sandbox provider passes
   Bagatka.AiSloth.ArchitectureTests/
+  Bagatka.Analyzers.Tests/
   Bagatka.Foundation.Tests/
+  Bagatka.Harnesses.Tests/
 ```
 
 ## Naming rule
@@ -166,7 +174,7 @@ It owns no business rules and touches no database. It references module projects
 their registration in `Program.cs`. Everything else in a module is `internal` and unreachable.
 It also hosts an HTTP/2-only gRPC endpoint that every nook's daemon and every machine dial, the
 model gateway agents in nooks call the model provider through (on its own plain HTTP endpoint,
-adding the deployment's key, so no nook holds one), and will host the MCP endpoint, which exposes the same public operations as HTTP. Run with the single argument
+adding the key of the chat's agent account, so no nook holds an API key), and will host the MCP endpoint, which exposes the same public operations as HTTP. Run with the single argument
 `migrate`, it applies every module's migrations and exits. Canonical example:
 `src/ControlPlane/Bagatka.AiSloth.WebApi/Program.cs`.
 
@@ -289,7 +297,7 @@ vendor-shaped, product-agnostic, and used from module internals. Rules are in `s
 | CLI | `MachineProtocol`, `Sandboxing` and its providers, `Foundation`, .NET | modules, the WebApi |
 | `Foundation.Modules`, `Foundation.Web`, `ServiceDefaults` | `Foundation`, .NET, approved packages | `Bagatka.AiSloth.*` |
 | `Foundation` | .NET only | everything else |
-| `Sandboxing`, `Sandboxing.Remote`, `ObjectStorage`, Sdk client | `Foundation`, .NET, approved packages | `Bagatka.AiSloth.*`, `Foundation.Modules`, `Foundation.Web` |
+| `Sandboxing`, `Sandboxing.Remote`, `Harnesses`, `ObjectStorage`, Sdk client | `Foundation`, .NET, approved packages | `Bagatka.AiSloth.*`, `Foundation.Modules`, `Foundation.Web` |
 | Sandbox provider, object storage backend | its contract, `Foundation`, its vendor's SDK or Sdk client | `Bagatka.AiSloth.*`, `Foundation.Modules`, `Foundation.Web` |
 
 The "asks" graph is acyclic: if module A calls `I<B>Api`, B never calls `I<A>Api`. When B
@@ -433,6 +441,7 @@ this table in the same change.
 | Workspaces (contract only) | Workspaces, their members and roles | — | — | `workspaces` |
 | Nooks (contract only) | Nooks, where each runs, their lifecycle, processes, templates, checkpoints, daemon connections | Workspaces, Sources, Machines | — | `nooks` |
 | Sources (planned) | Repositories and folders, their recipes, delivery, push policy | Workspaces | — | `sources` |
-| Chats | ACP conversations in nooks, their messages and events, the agents' runners; harness profiles and state (planned) | Nooks, Workspaces | — | `chats` |
+| AgentAccounts | Accounts at agent vendors that pay for agents: a workspace's and people's own, their sealed secrets | Workspaces | — | `agent_accounts` |
+| Chats | ACP conversations in nooks, their messages, senders, and events, the agents' runners; harness state (planned) | Nooks, AgentAccounts, Workspaces | — | `chats` |
 | Machines | Computers workspaces add to run nooks, their credentials and connections, the `machine` provider | Workspaces | — | `machines` |
 | Projects (planned, extension) | Groups of nooks, chats, and sources, shared context, project chat | Nooks, Chats, Sources, Workspaces | Nooks, Chats | `projects` |

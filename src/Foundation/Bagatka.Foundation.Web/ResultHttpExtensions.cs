@@ -16,7 +16,12 @@ public static class ResultHttpExtensions
     public static Results<Ok<T>, ProblemHttpResult> ToOk<T>(this Result<T> result)
         where T : notnull
     {
-        return result.TryGetValue(out T? value, out Error? error) ? TypedResults.Ok(value) : error.ToProblem();
+        if (result.Failed)
+        {
+            return result.Error.ToProblem();
+        }
+
+        return TypedResults.Ok(result.Output);
     }
 
     /// <summary>201 with the value and the location of its own route, or the error's problem.</summary>
@@ -24,13 +29,24 @@ public static class ResultHttpExtensions
         where T : notnull
     {
         ArgumentNullException.ThrowIfNull(location);
-        return result.TryGetValue(out T? value, out Error? error) ? TypedResults.Created(new Uri(location(value), UriKind.Relative), value) : error.ToProblem();
+        if (result.Failed)
+        {
+            return result.Error.ToProblem();
+        }
+
+        Uri created = new Uri(location(result.Output), UriKind.Relative);
+        return TypedResults.Created(created, result.Output);
     }
 
     /// <summary>204, or the error's problem.</summary>
     public static Results<NoContent, ProblemHttpResult> ToNoContent(this Result result)
     {
-        return result.IsError(out Error? error) ? error.ToProblem() : TypedResults.NoContent();
+        if (result.Failed)
+        {
+            return result.Error.ToProblem();
+        }
+
+        return TypedResults.NoContent();
     }
 
     /// <summary>

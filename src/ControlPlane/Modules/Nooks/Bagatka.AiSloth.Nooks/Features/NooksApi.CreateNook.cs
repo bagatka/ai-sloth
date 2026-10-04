@@ -15,21 +15,30 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<NookSummary>> CreateAsync(Actor actor, CreateNook command, CancellationToken ct)
     {
-        if (await workspaces.GetRoleAsync(actor, command.WorkspaceId, ct) is null)
+        WorkspaceRole? role = await workspaces.GetRoleAsync(actor, command.WorkspaceId, ct);
+        if (role is null)
         {
             return new Result<NookSummary>(WorkspacesErrors.NotFound);
         }
 
-        if (await FindProviderAsync(actor, command.WorkspaceId, command.Provider, ct) is not ProviderId provider)
+        ProviderId? provider = await FindProviderAsync(actor, command.WorkspaceId, command.Provider, ct);
+        if (provider is null)
         {
             return new Result<NookSummary>(Error.Validation("provider", "The workspace has no provider with this ID."));
         }
 
-        Nook nook = Nook.Create(command.WorkspaceId, provider, time);
-        db.Nooks.Add(nook);
-        if ((await db.SaveAsync(ct)).IsError(out Error? failed))
+        bool harnessOffered = command.Harness is null || settings.HarnessImages.ContainsKey(command.Harness);
+        if (!harnessOffered)
         {
-            return new Result<NookSummary>(failed);
+            return new Result<NookSummary>(Error.Validation("harness", "This deployment offers no harness with this ID."));
+        }
+
+        Nook nook = Nook.Create(command.WorkspaceId, provider.Value, command.Harness, time);
+        db.Nooks.Add(nook);
+        Result saved = await db.SaveAsync(ct);
+        if (saved.Failed)
+        {
+            return new Result<NookSummary>(saved.Error);
         }
 
         reconciler.Wake();
@@ -50,10 +59,14 @@ internal sealed partial class NooksApi
             return provider.Location is null ? provider : null;
         }
 
-        return MachineProvider.TryParseLocation(provider.Location, out MachineId machineId)
-            && (await machines.GetAsync(actor, machineId, ct)).TryGetValue(out MachineSummary? machine, out _)
-            && machine.WorkspaceId == workspaceId
-            ? provider with { Location = MachineProvider.LocationOf(machineId) }
-            : null;
+        MachineId? machineId = MachineProvider.ParseLocation(provider.Location);
+        if (machineId is null)
+        {
+            return null;
+        }
+
+        Result<MachineSummary> machine = await machines.GetAsync(actor, machineId.Value, ct);
+        bool workspaceMachine = !machine.Failed && machine.Output.WorkspaceId == workspaceId;
+        return workspaceMachine ? provider with { Location = MachineProvider.LocationOf(machineId.Value) } : null;
     }
 }

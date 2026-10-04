@@ -62,7 +62,12 @@ internal sealed class StoredEvent
 
     private T Read<T>()
     {
-        return JsonSerializer.Deserialize<T>(Data, FoundationJson.Options)
-            ?? throw new InvalidOperationException("Chat " + ChatId.Value + " has an empty " + Kind + " event.");
+        T? body = JsonSerializer.Deserialize<T>(Data, FoundationJson.Options);
+        if (body is null)
+        {
+            throw new InvalidOperationException("Chat " + ChatId.Value + " has an empty " + Kind + " event.");
+        }
+
+        return body;
     }
 }

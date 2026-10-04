@@ -11,7 +11,7 @@ namespace Bagatka.AiSloth.Users;
 
 internal sealed partial class UsersApi
 {
-    public async Task<Result<UserId>> SignInAsync(Actor actor, SignIn command, CancellationToken ct)
+    public async Task<Result<UserId>> SignInAsync(Actor actor, VerifiedIdentity identity, CancellationToken ct)
     {
         // Only system code, which validated the provider's token, may vouch for an identity.
         if (actor is not SystemActor)
@@ -19,33 +19,42 @@ internal sealed partial class UsersApi
             return new Result<UserId>(Error.Forbidden);
         }
 
-        if (!User.Register(command, time).TryGetValue(out User? newcomer, out Error? invalid))
+        Result<User> registration = User.Register(identity, time);
+        if (registration.Failed)
         {
-            return new Result<UserId>(invalid);
+            return new Result<UserId>(registration.Error);
         }
 
-        if (await FindAsync() is UserId known)
+        UserId? existing = await FindUserIdAsync(identity, ct);
+        if (existing is not null)
         {
-            return new Result<UserId>(known);
+            return new Result<UserId>(existing.Value);
         }
 
+        User newcomer = registration.Output;
         db.Users.Add(newcomer);
-        if ((await db.SaveAsync(ct)).IsError(out Error? failed))
+        Result saved = await db.SaveAsync(ct);
+        if (saved.Failed)
         {
             // Two first sign-ins at once, such as a web app's parallel requests: the other one won.
-            return ReferenceEquals(failed, ModuleDbContextExtensions.AlreadyExists) && await FindAsync() is UserId raced
-                ? new Result<UserId>(raced)
-                : new Result<UserId>(failed);
+            bool otherSignInWon = saved.Error == ModuleDbContextExtensions.AlreadyExists;
+            UserId? winner = null;
+            if (otherSignInWon)
+            {
+                winner = await FindUserIdAsync(identity, ct);
+            }
+
+            return winner is null ? new Result<UserId>(saved.Error) : new Result<UserId>(winner.Value);
         }
 
         return new Result<UserId>(newcomer.Id);
+    }
 
-        async Task<UserId?> FindAsync()
-        {
-            return await db.Users
-                .Where(user => user.Issuer == command.Issuer && user.Subject == command.Subject)
-                .Select(user => (UserId?)user.Id)
-                .SingleOrDefaultAsync(ct);
-        }
+    private async Task<UserId?> FindUserIdAsync(VerifiedIdentity identity, CancellationToken ct)
+    {
+        return await db.Users
+            .Where(user => user.Issuer == identity.Issuer && user.Subject == identity.Subject)
+            .Select(user => (UserId?)user.Id)
+            .SingleOrDefaultAsync(ct);
     }
 }

@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.Foundation;
@@ -20,13 +21,19 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class ChatsEndpoints
 {
+    internal sealed record StartChatRequest(AgentAccountId Account);
+
     internal sealed record SendMessageRequest(string Text);
+
+    internal sealed record SetChatSendersRequest(IReadOnlyList<UserId> Members);
 
     // A chat event in a server-sent event: its type is the event's kind, its ID the sequence number.
     internal sealed record ChatEventData(long Sequence, DateTimeOffset At, object Event);
 
     public static RouteGroupBuilder MapChatsEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapGet("/harnesses", ListHarnesses).WithTags("Chats");
+
         RouteGroupBuilder nookChats = app.MapGroup("/nooks/{nookId:guid}/chats").WithTags("Chats");
         nookChats.MapPost("/", Start);
         nookChats.MapGet("/", List);
@@ -35,18 +42,34 @@ internal static class ChatsEndpoints
         chats.MapGet("/{id:guid}", Get);
         chats.MapPost("/{id:guid}/messages", Send);
         chats.MapPost("/{id:guid}/stop", Stop);
+        chats.MapPut("/{id:guid}/senders", SetSenders);
         chats.MapGet("/{id:guid}/events", Watch);
         return chats;
     }
 
-    /// <summary>Starts a chat with a coding agent in the nook; the agent starts with the first message.</summary>
-    private static async Task<Results<Created<ChatSummary>, ProblemHttpResult>> Start(
-        [FromRoute] Guid nookId,
+    /// <summary>The harnesses chats can run, and the kinds of agent account each takes; a nook carries one, chosen when it is created.</summary>
+    private static async Task<Ok<IReadOnlyList<HarnessSummary>>> ListHarnesses(
         ClaimsPrincipal principal,
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        Result<ChatSummary> result = await api.StartAsync(principal.ToActor(), new StartChat(NookId.From(nookId)), ct);
+        IReadOnlyList<HarnessSummary> harnesses = await api.ListHarnessesAsync(principal.ToActor(), ct);
+        return TypedResults.Ok(harnesses);
+    }
+
+    /// <summary>
+    /// Starts a chat with a coding agent in the nook, run by the nook's harness on an agent account:
+    /// the workspace's, or the caller's own. The agent starts with the first message.
+    /// </summary>
+    private static async Task<Results<Created<ChatSummary>, ProblemHttpResult>> Start(
+        [FromRoute] Guid nookId,
+        [FromBody] StartChatRequest request,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        StartChat command = new StartChat(NookId.From(nookId), request.Account);
+        Result<ChatSummary> result = await api.StartAsync(principal.ToActor(), command, ct);
         return result.ToCreated(chat => string.Create(CultureInfo.InvariantCulture, $"/chats/{chat.Id.Value}"));
     }
 
@@ -101,6 +124,21 @@ internal static class ChatsEndpoints
     }
 
     /// <summary>
+    /// Lets members besides a personal account's owner message a chat running on it. Only the owner,
+    /// and only for an account this deployment lets its owner share.
+    /// </summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> SetSenders(
+        [FromRoute] Guid id,
+        [FromBody] SetChatSendersRequest request,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result result = await api.SetSendersAsync(principal.ToActor(), new SetChatSenders(ChatId.From(id), request.Members), ct);
+        return result.ToNoContent();
+    }
+
+    /// <summary>
     /// The chat's events as server-sent events, after the sequence number in <c>after</c> or the
     /// <c>Last-Event-ID</c> header: first those saved, then live. Event types: <c>message-sent</c>,
     /// <c>turn-started</c>, <c>message-steered</c>, <c>message-cancelled</c>, <c>agent-update</c>
@@ -117,9 +155,12 @@ internal static class ChatsEndpoints
     {
         WatchChat command = new WatchChat(ChatId.From(id), after ?? lastEventId ?? 0);
         Result<IAsyncEnumerable<ChatEvent>> result = await api.WatchAsync(principal.ToActor(), command, ct);
-        return result.TryGetValue(out IAsyncEnumerable<ChatEvent>? events, out Error? error)
-            ? TypedResults.ServerSentEvents(AsServerSentEvents(response, events, ct))
-            : error.ToProblem();
+        if (result.Failed)
+        {
+            return result.Error.ToProblem();
+        }
+
+        return TypedResults.ServerSentEvents(AsServerSentEvents(response, result.Output, ct));
     }
 
     private static async IAsyncEnumerable<SseItem<ChatEventData>> AsServerSentEvents(HttpResponse response, IAsyncEnumerable<ChatEvent> events, [EnumeratorCancellation] CancellationToken ct)

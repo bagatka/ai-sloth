@@ -13,16 +13,23 @@ internal static class GrpcCalls
     {
         const string Scheme = "Bearer ";
         string? authorization = context.RequestHeaders.GetValue("authorization");
-        return authorization is not null && authorization.StartsWith(Scheme, StringComparison.Ordinal)
-            ? authorization[Scheme.Length..]
-            : throw new RpcException(new Status(StatusCode.Unauthenticated, "Calls carry a bearer token."));
+        if (authorization is null || !authorization.StartsWith(Scheme, StringComparison.Ordinal))
+        {
+            throw new RpcException(new Status(StatusCode.Unauthenticated, "Calls carry a bearer token."));
+        }
+
+        return authorization[Scheme.Length..];
     }
 
     public static Guid ParseId(string value)
     {
-        return Guid.TryParse(value, CultureInfo.InvariantCulture, out Guid id)
-            ? id
-            : throw new RpcException(new Status(StatusCode.InvalidArgument, "IDs are UUIDs."));
+        bool parsed = Guid.TryParse(value, CultureInfo.InvariantCulture, out Guid id);
+        if (!parsed)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "IDs are UUIDs."));
+        }
+
+        return id;
     }
 
     public static string FormatId(Guid value)

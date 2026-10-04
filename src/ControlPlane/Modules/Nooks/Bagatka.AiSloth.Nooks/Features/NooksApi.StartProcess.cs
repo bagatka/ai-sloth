@@ -13,15 +13,19 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<ProcessSummary>> StartProcessAsync(Actor actor, StartProcess command, CancellationToken ct)
     {
-        if (await FindNookAsync(actor, command.NookId, ct) is null)
+        Nook? nook = await FindNookAsync(actor, command.NookId, ct);
+        if (nook is null)
         {
             return new Result<ProcessSummary>(NooksErrors.NotFound);
         }
 
-        if (!Process.Start(command, time).TryGetValue(out Process? process, out Error? invalid))
+        Result<Process> started = Process.Start(command, time);
+        if (started.Failed)
         {
-            return new Result<ProcessSummary>(invalid);
+            return new Result<ProcessSummary>(started.Error);
         }
+
+        Process process = started.Output;
 
         DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
         if (connection is null)
@@ -30,15 +34,17 @@ internal sealed partial class NooksApi
         }
 
         db.Processes.Add(process);
-        if ((await db.SaveAsync(ct)).IsError(out Error? failed))
+        Result saved = await db.SaveAsync(ct);
+        if (saved.Failed)
         {
-            return new Result<ProcessSummary>(failed);
+            return new Result<ProcessSummary>(saved.Error);
         }
 
         // Not handled: the connection ending between the commit and the send, which leaves the
         // process recorded as running. Handling it would mean comparing recorded processes with the
         // daemon's hello when it reconnects.
-        if (!await connection.SendAsync(new DaemonInstruction(process.ToInstruction(command.Environment)), ct))
+        bool sent = await connection.SendAsync(new DaemonInstruction(process.ToInstruction(command.Environment)), ct);
+        if (!sent)
         {
             throw new InvalidOperationException("Nook " + command.NookId.Value + "'s daemon disconnected before process " + process.Id.Value + " was sent.");
         }

@@ -22,7 +22,9 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
     public override async Task Connect(IAsyncStreamReader<Wire.DaemonEvent> requestStream, IServerStreamWriter<Wire.DaemonInstruction> responseStream, ServerCallContext context)
     {
         CancellationToken ct = context.CancellationToken;
-        if (!await requestStream.MoveNext(ct) || requestStream.Current.Hello is not Wire.Hello hello)
+        bool opened = await requestStream.MoveNext(ct);
+        Wire.Hello? hello = opened ? requestStream.Current.Hello : null;
+        if (hello is null)
         {
             throw new RpcException(new Status(StatusCode.InvalidArgument, "The first event must be Hello."));
         }
@@ -33,14 +35,14 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
             hello.DaemonVersion,
             hello.RunningProcesses.Select(running => new RunningProcess(ProcessId.From(GrpcCalls.ParseId(running.ProcessId)), running.OutputLength)).ToList());
         Result<IAsyncEnumerable<DaemonInstruction>> connected = await nooks.ConnectAsync(Actor.Anonymous, command, ReportsAsync(requestStream, ct), ct);
-        if (!connected.TryGetValue(out IAsyncEnumerable<DaemonInstruction>? instructions, out Error? rejected))
+        if (connected.Failed)
         {
-            throw GrpcCalls.Rejection(rejected);
+            throw GrpcCalls.Rejection(connected.Error);
         }
 
         try
         {
-            await foreach (DaemonInstruction instruction in instructions.WithCancellation(ct))
+            await foreach (DaemonInstruction instruction in connected.Output.WithCancellation(ct))
             {
                 await responseStream.WriteAsync(ToWire(instruction), ct);
             }
@@ -54,16 +56,18 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
     public override async Task<Wire.OutputUploadResult> UploadOutput(IAsyncStreamReader<Wire.OutputUploadMessage> requestStream, ServerCallContext context)
     {
         CancellationToken ct = context.CancellationToken;
-        if (!await requestStream.MoveNext(ct) || requestStream.Current.Header is not Wire.OutputUploadHeader header)
+        bool opened = await requestStream.MoveNext(ct);
+        Wire.OutputUploadHeader? header = opened ? requestStream.Current.Header : null;
+        if (header is null)
         {
             throw new RpcException(new Status(StatusCode.InvalidArgument, "The first message must be the header."));
         }
 
         OutputUpload upload = new OutputUpload(NookId.From(GrpcCalls.ParseId(header.NookId)), GrpcCalls.BearerToken(context), WatchId.From(GrpcCalls.ParseId(header.WatchId)));
-        Result accepted = await nooks.AcceptOutputAsync(Actor.Anonymous, upload, OutputAsync(requestStream, ct), ct);
-        if (accepted.IsError(out Error? rejected))
+        Result accepted = await nooks.AcceptOutputAsync(Actor.Anonymous, upload, UploadedAsync(requestStream, ct), ct);
+        if (accepted.Failed)
         {
-            throw GrpcCalls.Rejection(rejected);
+            throw GrpcCalls.Rejection(accepted.Error);
         }
 
         return new Wire.OutputUploadResult();
@@ -106,20 +110,30 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
         }
     }
 
-    // An upload's chunks. Unlike reports, a daemon leaving mid-upload throws, so the watch knows its
-    // output is incomplete.
-    private static async IAsyncEnumerable<ProcessOutput> OutputAsync(IAsyncStreamReader<Wire.OutputUploadMessage> messages, [EnumeratorCancellation] CancellationToken ct)
+    // An upload's chunks, then the exit. Unlike reports, a daemon leaving mid-upload throws, so the
+    // watch knows its output is incomplete.
+    private static async IAsyncEnumerable<ProcessEvent> UploadedAsync(IAsyncStreamReader<Wire.OutputUploadMessage> messages, [EnumeratorCancellation] CancellationToken ct)
     {
-        while (await messages.MoveNext(ct))
+        await foreach (Wire.OutputUploadMessage message in messages.ReadAllAsync(ct))
         {
-            Wire.ProcessOutput output = messages.Current.Output
-                ?? throw new RpcException(new Status(StatusCode.InvalidArgument, "Only output follows the header."));
-            OutputChannel channel = output.Channel switch
+            switch (message.PartCase)
             {
-                Wire.OutputChannel.StandardError => OutputChannel.StandardError,
-                Wire.OutputChannel.StandardOutput or Wire.OutputChannel.Unspecified => OutputChannel.StandardOutput,
-            };
-            yield return new ProcessOutput(ProcessId.From(GrpcCalls.ParseId(output.ProcessId)), output.Offset, channel, output.Data.Memory);
+                case Wire.OutputUploadMessage.PartOneofCase.Output:
+                    Wire.ProcessOutput output = message.Output;
+                    OutputChannel channel = output.Channel switch
+                    {
+                        Wire.OutputChannel.StandardError => OutputChannel.StandardError,
+                        Wire.OutputChannel.StandardOutput or Wire.OutputChannel.Unspecified => OutputChannel.StandardOutput,
+                    };
+                    yield return new ProcessEvent(new ProcessOutput(ProcessId.From(GrpcCalls.ParseId(output.ProcessId)), output.Offset, channel, output.Data.Memory));
+                    break;
+                case Wire.OutputUploadMessage.PartOneofCase.Exited:
+                    Wire.ProcessExited exited = message.Exited;
+                    yield return new ProcessEvent(new ProcessExited(ProcessId.From(GrpcCalls.ParseId(exited.ProcessId)), exited.ExitCode));
+                    break;
+                case Wire.OutputUploadMessage.PartOneofCase.Header or Wire.OutputUploadMessage.PartOneofCase.None:
+                    throw new RpcException(new Status(StatusCode.InvalidArgument, "Only output and the exit follow the header."));
+            }
         }
     }
 

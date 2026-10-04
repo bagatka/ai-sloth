@@ -16,7 +16,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261004152155_Initial";
+    public override string LastMigrationId => "20261004163156_Initial";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -33,6 +33,20 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.Property<Guid>("Id")
                     .HasColumnType("uuid")
                     .HasColumnName("id");
+
+                b.Property<Guid?>("AccountOwnerId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("account_owner_id");
+
+                b.Property<Guid>("AgentAccountId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("agent_account_id");
+
+                b.Property<string>("Harness")
+                    .IsRequired()
+                    .HasMaxLength(32)
+                    .HasColumnType("character varying(32)")
+                    .HasColumnName("harness");
 
                 b.Property<Guid?>("HarnessProcessId")
                     .HasColumnType("uuid")
@@ -96,6 +110,22 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasDatabaseName("ix_chats_nook_id_id");
 
                 b.ToTable("chats", "chats");
+            });
+
+        modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.ChatSender", b =>
+            {
+                b.Property<Guid>("ChatId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("chat_id");
+
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("user_id");
+
+                b.HasKey("ChatId", "UserId")
+                    .HasName("pk_senders");
+
+                b.ToTable("senders", "chats");
             });
 
         modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.Message", b =>

@@ -187,7 +187,8 @@ internal sealed class OutputJournal : IDisposable
                 continue;
             }
 
-            if (!cursor.TryOpen(position.Segment))
+            bool opened = cursor.TryOpen(position.Segment);
+            if (!opened)
             {
                 // Retention dropped the segment meanwhile; the next pass starts at the earliest byte kept.
                 continue;
@@ -316,7 +317,12 @@ internal sealed class OutputJournal : IDisposable
         // frames, skipping output before `from`.
         public async IAsyncEnumerable<OutputChunk> ReadAsync(Segment segment, long from, [EnumeratorCancellation] CancellationToken ct)
         {
-            FileStream file = _file ?? throw new InvalidOperationException("No segment is open.");
+            if (_file is null)
+            {
+                throw new InvalidOperationException("No segment is open.");
+            }
+
+            FileStream file = _file;
             long end = segment.Start + segment.Length;
             while (Offset < end)
             {

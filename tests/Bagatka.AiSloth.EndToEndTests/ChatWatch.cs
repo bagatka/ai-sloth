@@ -42,7 +42,8 @@ internal sealed class ChatWatch : IAsyncDisposable
         Uri events = new Uri(string.Create(CultureInfo.InvariantCulture, $"/chats/{chat.Id.Value}/events"), UriKind.Relative);
         HttpResponseMessage response = await client.GetAsync(events, HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
         await Api.ExpectAsync(response, HttpStatusCode.OK);
-        return new ChatWatch(response, await response.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken));
+        Stream stream = await response.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken);
+        return new ChatWatch(response, stream);
     }
 
     /// <summary>Reads until the next event of the type, and returns its body.</summary>

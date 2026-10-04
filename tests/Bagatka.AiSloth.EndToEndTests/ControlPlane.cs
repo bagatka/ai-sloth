@@ -42,14 +42,47 @@ public sealed class ControlPlane : IAsyncLifetime
     private string MachineScope => Scope + "-m";
 
     /// <summary>The model agents talk to through the gateway.</summary>
-    internal FakeModel Model => _model ?? throw new InvalidOperationException("The model hasn't started.");
+    internal FakeModel Model
+    {
+        get
+        {
+            if (_model is null)
+            {
+                throw new InvalidOperationException("The model hasn't started.");
+            }
+
+            return _model;
+        }
+    }
 
     /// <summary>The model gateway on the endpoint agents in nooks reach.</summary>
     public Uri ModelGatewayUrl => new Uri(string.Create(CultureInfo.InvariantCulture, $"http://localhost:{_modelsPort}/models/"));
 
-    private DistributedApplication App => _app ?? throw new InvalidOperationException("The app hasn't started.");
+    private DistributedApplication App
+    {
+        get
+        {
+            if (_app is null)
+            {
+                throw new InvalidOperationException("The app hasn't started.");
+            }
 
-    private FakeIssuer Issuer => _issuer ?? throw new InvalidOperationException("The issuer hasn't started.");
+            return _app;
+        }
+    }
+
+    private FakeIssuer Issuer
+    {
+        get
+        {
+            if (_issuer is null)
+            {
+                throw new InvalidOperationException("The issuer hasn't started.");
+            }
+
+            return _issuer;
+        }
+    }
 
     public async ValueTask InitializeAsync()
     {
@@ -62,7 +95,7 @@ public sealed class ControlPlane : IAsyncLifetime
                 "Parameters:authentication-audience=" + FakeIssuer.Audience,
                 "Parameters:sandbox-scope=" + Scope,
                 "Parameters:model-upstream=" + _model.Url,
-                "Parameters:anthropic-api-key=" + FakeModel.ApiKey,
+                "Parameters:agent-accounts-key=" + RandomNumberGenerator.GetHexString(64),
                 "DaemonPort=" + _daemonPort.ToString(CultureInfo.InvariantCulture),
                 "ModelsPort=" + _modelsPort.ToString(CultureInfo.InvariantCulture),
             ],

@@ -6,18 +6,16 @@ using Bagatka.AiSloth.Nooks.Contracts;
 
 namespace Bagatka.AiSloth.Nooks.Daemons;
 
-// The receiving end of one upload: what a daemon sends for one WatchOutputInstruction, relayed to
-// the watch that asked for it. Disposing it means the watcher left, which ends the upload.
+// The receiving end of one upload: what a daemon sends for one WatchOutputInstruction, the output and
+// then the exit, relayed to the watch that asked for it. Disposing it means the watcher left, which
+// ends the upload.
 internal sealed class OutputReceiver : IDisposable
 {
     // A small buffer: a slow watcher slows the upload, which slows the daemon's reading, never memory.
-    private readonly Channel<ProcessOutput> _output = Channel.CreateBounded<ProcessOutput>(
+    private readonly Channel<ProcessEvent> _events = Channel.CreateBounded<ProcessEvent>(
         new BoundedChannelOptions(8) { SingleReader = true, SingleWriter = true, FullMode = BoundedChannelFullMode.Wait });
 
-    private readonly Lock _gate = new Lock();
     private readonly CancellationTokenSource _watcherLeft = new CancellationTokenSource();
-    private bool _ended;
-    private readonly TaskCompletionSource<int> _exited = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public OutputReceiver(DaemonConnection connection, ProcessId processId)
     {
@@ -33,22 +31,16 @@ internal sealed class OutputReceiver : IDisposable
 
     public ProcessId ProcessId { get; }
 
-    public ChannelReader<ProcessOutput> Output => _output.Reader;
-
-    // True when the upload ended because the daemon delivered all of the process's output.
-    public bool Complete { get; private set; }
-
-    // The process's exit code, once the daemon reports it.
-    public Task<int> Exited => _exited.Task;
+    public ChannelReader<ProcessEvent> Events => _events.Reader;
 
     public CancellationToken WatcherLeft { get; }
 
     // False when the watcher left.
-    public async Task<bool> DeliverAsync(ProcessOutput output, CancellationToken ct)
+    public async Task<bool> DeliverAsync(ProcessEvent processEvent, CancellationToken ct)
     {
         try
         {
-            await _output.Writer.WriteAsync(output, ct);
+            await _events.Writer.WriteAsync(processEvent, ct);
             return true;
         }
         catch (ChannelClosedException)
@@ -57,33 +49,16 @@ internal sealed class OutputReceiver : IDisposable
         }
     }
 
-    // The upload ended; `complete` says whether all the output arrived. Ending again changes nothing.
-    // Complete is set before the output ends, so the watch reads it once it has read everything.
-    public void End(bool complete)
+    // The upload ended, with or without the exit. Ending again changes nothing.
+    public void End()
     {
-        lock (_gate)
-        {
-            if (_ended)
-            {
-                return;
-            }
-
-            _ended = true;
-            Complete = complete;
-        }
-
-        _output.Writer.TryComplete();
-    }
-
-    public void ProcessExited(int exitCode)
-    {
-        _exited.TrySetResult(exitCode);
+        _events.Writer.TryComplete();
     }
 
     public void Dispose()
     {
         _watcherLeft.Cancel();
-        _output.Writer.TryComplete();
+        _events.Writer.TryComplete();
         _watcherLeft.Dispose();
     }
 }

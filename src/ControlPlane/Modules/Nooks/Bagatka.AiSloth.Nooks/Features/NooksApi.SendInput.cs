@@ -13,10 +13,13 @@ internal sealed partial class NooksApi
 
     public async Task<Result> SendInputAsync(Actor actor, SendInput command, CancellationToken ct)
     {
-        if (!(await FindProcessAsync(actor, command.NookId, command.ProcessId, ct)).TryGetValue(out Process? process, out Error? missing))
+        Result<Process> found = await FindProcessAsync(actor, command.NookId, command.ProcessId, ct);
+        if (found.Failed)
         {
-            return new Result(missing);
+            return new Result(found.Error);
         }
+
+        Process process = found.Output;
 
         if (command.Data.Length > MaxInputBytes)
         {
@@ -24,7 +27,13 @@ internal sealed partial class NooksApi
         }
 
         DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
-        if (connection is null || !await connection.SendAsync(new DaemonInstruction(new SendInputInstruction(process.Id, command.Data)), ct))
+        if (connection is null)
+        {
+            return new Result(NooksErrors.NotReady);
+        }
+
+        bool sent = await connection.SendAsync(new DaemonInstruction(new SendInputInstruction(process.Id, command.Data)), ct);
+        if (!sent)
         {
             return new Result(NooksErrors.NotReady);
         }

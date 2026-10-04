@@ -13,9 +13,21 @@ CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 DaemonSettings settings;
 try
 {
+    Uri? controlPlaneUrl = ParseUrl(Required("SLOTHD_CONTROL_PLANE_URL"));
+    if (controlPlaneUrl is null)
+    {
+        throw Invalid("SLOTHD_CONTROL_PLANE_URL");
+    }
+
+    bool nookIdParsed = Guid.TryParse(Required("SLOTHD_NOOK_ID"), CultureInfo.InvariantCulture, out Guid nookId);
+    if (!nookIdParsed)
+    {
+        throw Invalid("SLOTHD_NOOK_ID");
+    }
+
     settings = new DaemonSettings(
-        Uri.TryCreate(Required("SLOTHD_CONTROL_PLANE_URL"), UriKind.Absolute, out Uri? url) ? url : throw Invalid("SLOTHD_CONTROL_PLANE_URL"),
-        Guid.TryParse(Required("SLOTHD_NOOK_ID"), CultureInfo.InvariantCulture, out Guid nookId) ? nookId : throw Invalid("SLOTHD_NOOK_ID"),
+        controlPlaneUrl,
+        nookId,
         Required("SLOTHD_TOKEN"),
         Optional("SLOTHD_WORKING_DIRECTORY") ?? "/work",
         Optional("SLOTHD_STATE_DIRECTORY") ?? "/var/lib/slothd",
@@ -58,9 +70,21 @@ void Stop(PosixSignalContext context)
     shutdown.Cancel();
 }
 
+static Uri? ParseUrl(string text)
+{
+    bool parsed = Uri.TryCreate(text, UriKind.Absolute, out Uri? url);
+    return parsed ? url : null;
+}
+
 static string Required(string name)
 {
-    return Optional(name) ?? throw new InvalidOperationException(name + " is not set.");
+    string? value = Optional(name);
+    if (value is null)
+    {
+        throw new InvalidOperationException(name + " is not set.");
+    }
+
+    return value;
 }
 
 static InvalidOperationException Invalid(string name)

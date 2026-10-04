@@ -17,9 +17,13 @@ internal sealed partial class MachinesApi(
 {
     private MachineSummary Summary(Machine machine)
     {
-        MachineStatus status = !machine.IsRegistered ? MachineStatus.AwaitingRegistration
-            : connections.Find(machine.Id) is not null ? MachineStatus.Online
-            : MachineStatus.Offline;
+        bool connected = connections.Find(machine.Id) is not null;
+        MachineStatus status = MachineStatus.AwaitingRegistration;
+        if (machine.IsRegistered)
+        {
+            status = connected ? MachineStatus.Online : MachineStatus.Offline;
+        }
+
         return new MachineSummary(machine.Id, machine.WorkspaceId, machine.Name.Value, status, machine.AddedAt);
     }
 }

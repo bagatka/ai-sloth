@@ -26,7 +26,8 @@ public interface INooksApi
     /// </remarks>
     /// <returns>
     /// The nook in <see cref="NookStatus.Creating"/>; not found when the actor isn't a member of the
-    /// workspace; or a validation error for a provider the workspace doesn't have.
+    /// workspace; or a validation error for a provider the workspace doesn't have or a harness this
+    /// deployment doesn't offer.
     /// </returns>
     public Task<Result<NookSummary>> CreateAsync(Actor actor, CreateNook command, CancellationToken ct);
 

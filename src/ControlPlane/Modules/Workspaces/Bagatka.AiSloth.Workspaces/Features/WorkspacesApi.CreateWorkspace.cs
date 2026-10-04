@@ -17,16 +17,18 @@ internal sealed partial class WorkspacesApi
             return new Result<WorkspaceSummary>(Error.Unauthorized);
         }
 
-        if (!WorkspaceName.Parse(command.Name).TryGetValue(out WorkspaceName? name, out Error? invalid))
+        Result<WorkspaceName> name = WorkspaceName.Parse(command.Name);
+        if (name.Failed)
         {
-            return new Result<WorkspaceSummary>(invalid);
+            return new Result<WorkspaceSummary>(name.Error);
         }
 
-        Workspace workspace = Workspace.Create(name, user.UserId, time);
+        Workspace workspace = Workspace.Create(name.Output, user.UserId, time);
         db.Workspaces.Add(workspace);
-        if ((await db.SaveAsync(ct)).IsError(out Error? failed))
+        Result saved = await db.SaveAsync(ct);
+        if (saved.Failed)
         {
-            return new Result<WorkspaceSummary>(failed);
+            return new Result<WorkspaceSummary>(saved.Error);
         }
 
         return new Result<WorkspaceSummary>(new WorkspaceSummary(workspace.Id, workspace.Name.Value, WorkspaceRole.Owner));

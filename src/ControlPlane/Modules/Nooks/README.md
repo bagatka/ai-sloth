@@ -7,7 +7,7 @@ templates, runs processes in them through their daemons, and checkpoints and for
 
 ## Owns
 
-- **Data:** nook records (workspace, provider, sources, status, latest disk usage), the hash of
+- **Data:** nook records (workspace, provider, harness, sources, status, latest disk usage), the hash of
   each nook's daemon token, the processes started in each nook, templates, and checkpoints.
 - **Rules:** who may use a nook (members of its workspace, and the control plane's own processes,
   such as Chats running an agent), the lifecycle below, when an idle nook is suspended, and which
@@ -109,7 +109,8 @@ every turn, which is what makes forking from an older message possible.
 ## Configuration
 
 `NooksSettings`, passed by the host (`PATTERNS.md`, entry 20): the connection string, the URL
-daemons dial (the WebApi's daemon endpoint as a nook reaches it), the nook image, and each nook's CPU
+daemons dial (the WebApi's daemon endpoint as a nook reaches it), the base nook image and the image
+for each harness a nook can carry, and each nook's CPU
 and memory. The idle period before suspension comes with suspension.
 
 ## Decisions and constraints
@@ -122,6 +123,9 @@ and memory. The idle period before suspension comes with suspension.
   sandbox at a provider has a record. Reconciliation finishes what a failed call left undone.
 - **Suspension is invisible.** Every operation on a paused or stopped nook resumes it first and
   waits for its daemon, so callers only notice latency.
+- **A nook carries at most one harness,** chosen when it is created: its image is the base image
+  with that harness installed, so hosts pull only the harnesses their nooks use. Chats in the nook
+  run that harness; switching harness means a new nook.
 - **A process's environment is never stored.** Variables passed to a process may hold secrets, such
   as an agent's token: they reach the daemon and nothing keeps them.
 - **Processes are detached.** A process runs until it exits or is stopped. Watches come and go, and
@@ -156,8 +160,9 @@ and memory. The idle period before suspension comes with suspension.
   are reconciled one at a time without deadlines, so a slow call, such as the first image pull on a
   fresh host or machine, delays every other nook, and a provider that hangs blocks them. A nook on
   a machine that is offline stays Creating, and its retries log an error every pass.
-- **Lost processes.** Processes a restarted daemon lost never report an exit, so watching one waits
-  until the watcher gives up.
+- **Lost processes.** Processes a restarted daemon lost never report an exit: watching one ends at
+  once with exit code -1, but the process list still shows it running. Handling it means marking
+  them exited on the daemon's next hello.
 - **Disk usage** is stored and returned, but nothing acts on it yet; Chats will ask for
   confirmation at 90%.
 - **Checkpoints, forks, and templates.**

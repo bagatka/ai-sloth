@@ -1,33 +1,33 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Chats.Data;
 using Bagatka.AiSloth.Chats.Model;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
+using Bagatka.Harnesses;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Bagatka.AiSloth.Chats.Harness;
 
-// Talks to one chat's agent over ACP on its process's standard input and output: starts it, hands it
-// messages, answers its requests, and saves what it reports. ChatRunners keeps at most one runner per
-// chat. A runner exits when its chat is idle; how far the agent's output was read is saved with every
-// change, so the next runner, even after a restart, continues exactly there.
+// Talks to one chat's agent over ACP, through its process's lines: starts it, hands it messages,
+// answers its requests, and saves what it reports. ChatRunners keeps at most one runner per chat. A
+// runner exits when its chat is idle; how far the agent's output was read is saved with every change,
+// so the next runner, even after a restart, continues exactly there.
 internal sealed class ChatRunner(
     ChatId chatId,
     IDbContextFactory<ChatsDbContext> databases,
     IServiceScopeFactory scopes,
+    AgentProcess agent,
     ChatsSettings settings,
     ChatSignals signals,
     TimeProvider time,
@@ -35,18 +35,14 @@ internal sealed class ChatRunner(
 {
     private const int MaxBatch = 200;
 
-    // SendInput's limit, and the longest line an agent may write before something is clearly off.
-    private const int MaxInputBytes = 64 * 1024;
-    private const int MaxLineBytes = 32 * 1024 * 1024;
-
     private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(5);
-    private static readonly Actor Harness = Actor.ForSystem("chats.harness");
 
     private readonly Channel<RunnerInput> _inputs = Channel.CreateBounded<RunnerInput>(
         new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
 
-    // Messages the agent answered promptRequired for in the running turn; they start the next one.
-    private readonly HashSet<MessageId> _notSteerable = [];
+    // The agent answered a steer with promptRequired: its turn is over even if its answer to the prompt
+    // isn't read yet, so nothing more is offered to it until the turn ends here too.
+    private bool _agentFinishedTurn;
     private int _stopRequested;
 
     public ChatId ChatId => chatId;
@@ -74,20 +70,29 @@ internal sealed class ChatRunner(
             try
             {
                 Progress progress = await AdvanceAsync(ct);
-                if (progress.Harness is ProcessId process)
+                bool retired;
+                if (progress.Harness is not null)
                 {
-                    if (await ServeAsync(progress, process, retire, ct))
-                    {
-                        return;
-                    }
-                }
-                else if (progress.Idle && retire(this))
-                {
-                    return;
+                    retired = await ServeAsync(progress, progress.Harness.Value, retire, ct);
                 }
                 else
                 {
-                    await HandleAsync(await NextBatchAsync(ct), ct);
+                    retired = false;
+                    if (progress.Idle)
+                    {
+                        retired = retire(this);
+                    }
+
+                    if (!retired)
+                    {
+                        List<RunnerInput> batch = await NextBatchAsync(ct);
+                        await HandleAsync(batch, ct);
+                    }
+                }
+
+                if (retired)
+                {
+                    return;
                 }
             }
             catch (Exception exception) when (!ct.IsCancellationRequested)
@@ -110,21 +115,28 @@ internal sealed class ChatRunner(
     {
         NookId nookId = progress.NookId;
         long offset = progress.OutputOffset;
-        await using Reading reading = new Reading(token => ReadAsync(nookId, process, offset, token), ct);
+        await using Reading reading = new Reading(token => PumpAsync(nookId, process, offset, token), ct);
         while (true)
         {
-            if (progress.Idle && retire(this))
+            if (progress.Idle)
             {
-                return true;
+                bool retired = retire(this);
+                if (retired)
+                {
+                    return true;
+                }
             }
 
-            if (await HandleAsync(await NextBatchAsync(ct), ct))
+            List<RunnerInput> batch = await NextBatchAsync(ct);
+            bool exited = await HandleAsync(batch, ct);
+            if (exited)
             {
                 return false;
             }
 
             progress = await AdvanceAsync(ct);
-            if (progress.Harness != process)
+            bool replaced = progress.Harness != process;
+            if (replaced)
             {
                 return false;
             }
@@ -133,7 +145,8 @@ internal sealed class ChatRunner(
 
     private async Task<List<RunnerInput>> NextBatchAsync(CancellationToken ct)
     {
-        List<RunnerInput> batch = [await _inputs.Reader.ReadAsync(ct)];
+        RunnerInput first = await _inputs.Reader.ReadAsync(ct);
+        List<RunnerInput> batch = [first];
         while (batch.Count < MaxBatch && _inputs.Reader.TryRead(out RunnerInput more))
         {
             batch.Add(more);
@@ -154,7 +167,8 @@ internal sealed class ChatRunner(
             .ToListAsync(ct);
         List<string> outgoing = [];
 
-        if (Interlocked.Exchange(ref _stopRequested, 0) == 1)
+        bool stopRequested = Interlocked.Exchange(ref _stopRequested, 0) == 1;
+        if (stopRequested)
         {
             StopTurn(db, chat, waiting, outgoing);
         }
@@ -170,9 +184,9 @@ internal sealed class ChatRunner(
         {
             await StartHarnessAsync(db, chat, queued[0], outgoing, ct);
         }
-        else if (chat.SessionId is string sessionId)
+        else if (chat.SessionId is not null)
         {
-            Deliver(db, chat, sessionId, queued, outgoing);
+            Deliver(db, chat, chat.SessionId, queued, outgoing);
         }
 
         await SaveAsync(db, ct);
@@ -190,10 +204,10 @@ internal sealed class ChatRunner(
         {
             db.Events.Add(chat.Record(new ChatEventBody(new TurnEnded("cancelled", Failure: null)), time));
             chat.TurnEnded();
-            _notSteerable.Clear();
-            if (chat.SessionId is string sessionId)
+            _agentFinishedTurn = false;
+            if (chat.SessionId is not null)
             {
-                outgoing.Add(Acp.Cancel(sessionId));
+                outgoing.Add(Acp.Cancel(chat.SessionId));
             }
         }
 
@@ -220,47 +234,56 @@ internal sealed class ChatRunner(
             db.Events.Add(chat.Record(new ChatEventBody(new TurnStarted(first.Id)), time));
             first.Deliver();
             chat.TurnStarted(first.Id);
-            outgoing.Add(Acp.Prompt(sessionId, first.Id, first.Text));
+            outgoing.Add(Acp.Prompt(first.Id.Value, sessionId, first.Text));
         }
 
-        if (chat.TurnMessageId is not null && chat.SupportsSteering)
+        if (chat.TurnMessageId is not null && chat.SupportsSteering && !_agentFinishedTurn)
         {
-            foreach (Message message in queued.Where(message => !_notSteerable.Contains(message.Id)))
+            foreach (Message message in queued)
             {
                 message.Steer();
-                outgoing.Add(Acp.Steer(sessionId, message.Id, message.Text));
+                outgoing.Add(Acp.Steer(message.Id.Value, sessionId, message.Text));
             }
         }
     }
 
     private async Task StartHarnessAsync(ChatsDbContext db, Chat chat, Message first, List<string> outgoing, CancellationToken ct)
     {
-        // Saved first, so the agent's first model call finds its token.
-        string token = chat.IssueHarnessToken();
-        await SaveAsync(db, ct);
-
-        StartProcess start = new StartProcess(
-            chat.NookId,
-            ClaudeCodeHarness.Command,
-            [],
-            ClaudeCodeHarness.WorkingDirectory,
-            OutputRetention.Complete,
-            ClaudeCodeHarness.Environment(settings.ModelGatewayUrl, token));
-        Result<ProcessSummary> started;
-        await using (AsyncServiceScope scope = scopes.CreateAsyncScope())
+        // Each waiting message tries once, so an agent that can't start ends with every message answered.
+        HarnessProfile? harness = HarnessProfiles.Find(chat.Harness);
+        if (harness is null)
         {
-            started = await scope.ServiceProvider.GetRequiredService<INooksApi>().StartProcessAsync(Harness, start, ct);
-        }
-
-        if (started.TryGetValue(out ProcessSummary? process, out Error? error))
-        {
-            chat.HarnessStarted(process.Id);
-            outgoing.Add(Acp.Initialize());
+            Fail(db, chat, first, "The agent couldn't start: its harness is no longer offered.");
             return;
         }
 
-        // Each waiting message tries once, so a nook that can't run agents ends with every message answered.
-        Fail(db, chat, first, "The agent couldn't start: " + error.Message);
+        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
+        Result<AgentAccountCredential> used = await scope.ServiceProvider.GetRequiredService<IAgentAccountsApi>()
+            .UseAsync(SystemActors.Harness, chat.AgentAccountId, chat.WorkspaceId, ct);
+        if (used.Failed)
+        {
+            Fail(db, chat, first, "The agent couldn't start: " + used.Error.Message);
+            return;
+        }
+
+        AgentAccountCredential account = used.Output;
+
+        // A secret that stays behind the model gateway is replaced by a token for this chat, saved
+        // first so the agent's first model call finds it.
+        CredentialKind kind = AccountCredentials.KindOf(account.Kind);
+        string credential = harness.UsesGateway(kind) ? chat.IssueHarnessToken() : account.Secret;
+        await SaveAsync(db, ct);
+
+        IReadOnlyDictionary<string, string> environment = harness.EnvironmentFor(kind, credential, settings.ModelGatewayUrl);
+        Result<ProcessId> started = await agent.StartAsync(chat.NookId, harness, environment, ct);
+        if (started.Failed)
+        {
+            Fail(db, chat, first, "The agent couldn't start: " + started.Error.Message);
+            return;
+        }
+
+        chat.HarnessStarted(started.Output);
+        outgoing.Add(Acp.Initialize());
     }
 
     // Returns true when the agent's process ended.
@@ -296,98 +319,85 @@ internal sealed class ChatRunner(
 
     private async Task HandleLineAsync(ChatsDbContext db, Chat chat, string line, List<string> outgoing, CancellationToken ct)
     {
-        JsonDocument document;
-        try
+        AcpEvent? read = Acp.Read(line);
+        if (read is null)
         {
-            document = JsonDocument.Parse(line);
-        }
-        catch (JsonException)
-        {
-            // Not a protocol message; agents log to standard error, so this is noise.
             return;
         }
 
-        using (document)
+        switch (read.Value)
         {
-            JsonElement root = document.RootElement;
-            bool isCall = root.TryGetProperty("method", out JsonElement method);
-            bool hasId = root.TryGetProperty("id", out JsonElement id);
-            if (isCall && hasId)
-            {
-                outgoing.Add(string.Equals(method.GetString(), "session/request_permission", StringComparison.Ordinal)
-                    ? Acp.Allow(id, root.GetProperty("params").GetProperty("options"))
-                    : Acp.MethodNotFound(id));
-            }
-            else if (isCall)
-            {
-                if (string.Equals(method.GetString(), "session/update", StringComparison.Ordinal)
-                    && root.TryGetProperty("params", out JsonElement parameters) && parameters.TryGetProperty("update", out JsonElement update))
-                {
-                    db.Events.Add(chat.Record(new ChatEventBody(new AgentUpdate(update.Clone())), time));
-                }
-            }
-            else if (hasId && id.ValueKind == JsonValueKind.String)
-            {
-                await HandleResponseAsync(db, chat, id.GetString()!, root, outgoing, ct);
-            }
+            case AcpUpdate update:
+                db.Events.Add(chat.Record(new ChatEventBody(new AgentUpdate(update.Update)), time));
+                break;
+            case AcpRequest request:
+                outgoing.Add(request.IsPermissionRequest ? Acp.Allow(request) : Acp.MethodNotFound(request));
+                break;
+            case AcpInitialized initialized:
+                chat.Initialized(initialized.SupportsSteering);
+                outgoing.Add(Acp.NewSession(AgentProcess.WorkingDirectory));
+                break;
+            case AcpSessionCreated created:
+                chat.SessionReady(created.SessionId);
+                break;
+            case AcpStartFailed failed:
+                await FailStartAsync(db, chat, failed.Error, ct);
+                break;
+            case AcpPromptEnded ended:
+                EndTurn(db, chat, MessageId.From(ended.Prompt), new TurnEnded(ended.StopReason, Failure: null));
+                break;
+            case AcpPromptFailed failed:
+                EndTurn(db, chat, MessageId.From(failed.Prompt), new TurnEnded("failed", failed.Error));
+                break;
+            case AcpSteerAnswered answered:
+                await HandleSteerAnswerAsync(db, chat, MessageId.From(answered.Message), answered.Injected, ct);
+                break;
         }
     }
 
-    private async Task HandleResponseAsync(ChatsDbContext db, Chat chat, string id, JsonElement response, List<string> outgoing, CancellationToken ct)
+    // The agent can't be used: the first waiting message gets the answer, and the process goes.
+    private async Task FailStartAsync(ChatsDbContext db, Chat chat, string error, CancellationToken ct)
     {
-        bool failed = response.TryGetProperty("error", out JsonElement error);
-        response.TryGetProperty("result", out JsonElement result);
-        if (string.Equals(id, Acp.InitializeId, StringComparison.Ordinal) || string.Equals(id, Acp.NewSessionId, StringComparison.Ordinal))
+        Message? first = await db.Messages.Where(message => message.ChatId == chatId && message.State == MessageState.Queued).OrderBy(message => message.Id).FirstOrDefaultAsync(ct);
+        if (first is not null)
         {
-            if (failed)
-            {
-                // The agent can't be used: the first waiting message gets the answer, and the process goes.
-                Message? first = await db.Messages.Where(message => message.ChatId == chatId && message.State == MessageState.Queued).OrderBy(message => message.Id).FirstOrDefaultAsync(ct);
-                if (first is not null)
-                {
-                    Fail(db, chat, first, "The agent couldn't start: " + ErrorText(error));
-                }
+            Fail(db, chat, first, "The agent couldn't start: " + error);
+        }
 
-                await StopHarnessAsync(chat, ct);
-            }
-            else if (string.Equals(id, Acp.InitializeId, StringComparison.Ordinal))
-            {
-                chat.Initialized(SupportsSteering(result));
-                outgoing.Add(Acp.NewSession());
-            }
-            else
-            {
-                chat.SessionReady(result.GetProperty("sessionId").GetString()!);
-            }
-        }
-        else if (Acp.PromptMessage(id) is MessageId prompted)
+        await StopHarnessAsync(chat, ct);
+    }
+
+    // A stopped turn already ended; its late answer changes nothing.
+    private void EndTurn(ChatsDbContext db, Chat chat, MessageId prompt, TurnEnded ended)
+    {
+        if (chat.TurnMessageId != prompt)
         {
-            // A stopped turn already ended; its late answer changes nothing.
-            if (chat.TurnMessageId == prompted)
-            {
-                TurnEnded ended = failed
-                    ? new TurnEnded("failed", ErrorText(error))
-                    : new TurnEnded(result.GetProperty("stopReason").GetString()!, Failure: null);
-                db.Events.Add(chat.Record(new ChatEventBody(ended), time));
-                chat.TurnEnded();
-                _notSteerable.Clear();
-            }
+            return;
         }
-        else if (Acp.SteeredMessage(id) is MessageId steered)
+
+        db.Events.Add(chat.Record(new ChatEventBody(ended), time));
+        chat.TurnEnded();
+        _agentFinishedTurn = false;
+    }
+
+    private async Task HandleSteerAnswerAsync(ChatsDbContext db, Chat chat, MessageId steered, bool injected, CancellationToken ct)
+    {
+        Message? message = await db.Messages.SingleOrDefaultAsync(found => found.Id == steered && found.State == MessageState.Steering, ct);
+        if (message is null)
         {
-            Message? message = await db.Messages.SingleOrDefaultAsync(found => found.Id == steered && found.State == MessageState.Steering, ct);
-            if (message is not null && !failed && string.Equals(result.GetProperty("outcome").GetString(), "injected", StringComparison.Ordinal))
-            {
-                message.Deliver();
-                db.Events.Add(chat.Record(new ChatEventBody(new MessageSteered(message.Id)), time));
-            }
-            else if (message is not null)
-            {
-                // No running turn to join: it starts the next one.
-                message.Queue();
-                _notSteerable.Add(message.Id);
-            }
+            return;
         }
+
+        if (injected)
+        {
+            message.Deliver();
+            db.Events.Add(chat.Record(new ChatEventBody(new MessageSteered(message.Id)), time));
+            return;
+        }
+
+        // No running turn to join: it starts the next one.
+        message.Queue();
+        _agentFinishedTurn = true;
     }
 
     private async Task HandleExitAsync(ChatsDbContext db, Chat chat, int exitCode, CancellationToken ct)
@@ -398,7 +408,8 @@ internal sealed class ChatRunner(
             db.Events.Add(chat.Record(new ChatEventBody(new TurnEnded("failed", failure)), time));
         }
 
-        foreach (Message message in await db.Messages.Where(message => message.ChatId == chatId && message.State == MessageState.Steering).ToListAsync(ct))
+        List<Message> steering = await db.Messages.Where(message => message.ChatId == chatId && message.State == MessageState.Steering).ToListAsync(ct);
+        foreach (Message message in steering)
         {
             message.Queue();
         }
@@ -406,7 +417,7 @@ internal sealed class ChatRunner(
         // Not handled: resuming the conversation in the next agent (session/load); the next message
         // starts a new session.
         chat.HarnessStopped();
-        _notSteerable.Clear();
+        _agentFinishedTurn = false;
     }
 
     private void Fail(ChatsDbContext db, Chat chat, Message message, string failure)
@@ -417,54 +428,19 @@ internal sealed class ChatRunner(
         Log.AgentFailed(logger, chatId.Value, failure);
     }
 
-    // Reads the agent's standard output from an offset and hands each complete line to the runner.
-    private async Task ReadAsync(NookId nookId, ProcessId processId, long offset, CancellationToken ct)
+    // Hands each line of the agent's output, and its exit, to the runner.
+    private async Task PumpAsync(NookId nookId, ProcessId processId, long offset, CancellationToken ct)
     {
         try
         {
-            await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-            Result<IAsyncEnumerable<ProcessEvent>> watched = await scope.ServiceProvider.GetRequiredService<INooksApi>()
-                .WatchProcessAsync(Harness, new WatchProcess(nookId, processId, offset), ct);
-            if (!watched.TryGetValue(out IAsyncEnumerable<ProcessEvent>? events, out Error? error))
+            await foreach (AgentOutput output in agent.ReadAsync(nookId, processId, offset, ct))
             {
-                // A nook that is gone takes its processes with it; one that isn't ready may be back later.
-                await _inputs.Writer.WriteAsync(error == NooksErrors.NotReady
-                    ? new RunnerInput(new ReaderFailed(new InvalidOperationException(error.Message)))
-                    : new RunnerInput(new HarnessExited(-1)), ct);
-                return;
-            }
-
-            ArrayBufferWriter<byte> pending = new ArrayBufferWriter<byte>();
-            await foreach (ProcessEvent processEvent in events.WithCancellation(ct))
-            {
-                switch (processEvent)
+                RunnerInput input = output switch
                 {
-                    case ProcessOutput output when output.Channel == OutputChannel.StandardOutput:
-                        ReadOnlyMemory<byte> data = output.Data;
-                        int newline;
-                        while ((newline = data.Span.IndexOf((byte)'\n')) >= 0)
-                        {
-                            pending.Write(data.Span[..newline]);
-                            long end = output.Offset + (output.Data.Length - data.Length) + newline + 1;
-                            await _inputs.Writer.WriteAsync(new RunnerInput(new HarnessLine(Encoding.UTF8.GetString(pending.WrittenSpan), end)), ct);
-                            pending.ResetWrittenCount();
-                            data = data[(newline + 1)..];
-                        }
-
-                        pending.Write(data.Span);
-                        if (pending.WrittenCount > MaxLineBytes)
-                        {
-                            throw new InvalidOperationException("The agent of chat " + chatId.Value + " wrote a line longer than 32 MiB.");
-                        }
-
-                        break;
-                    case ProcessOutput:
-                        // Standard error is the agent's own log; it may hold anything, so it isn't kept.
-                        break;
-                    case ProcessExited exited:
-                        await _inputs.Writer.WriteAsync(new RunnerInput(new HarnessExited(exited.ExitCode)), ct);
-                        return;
-                }
+                    HarnessLine line => new RunnerInput(line),
+                    HarnessExited exited => new RunnerInput(exited),
+                };
+                await _inputs.Writer.WriteAsync(input, ct);
             }
         }
         catch (Exception exception) when (!ct.IsCancellationRequested)
@@ -479,64 +455,45 @@ internal sealed class ChatRunner(
 
     private async Task SendAsync(Chat chat, List<string> lines, CancellationToken ct)
     {
-        if (lines.Count == 0 || chat.HarnessProcessId is not ProcessId processId)
+        if (lines.Count == 0 || chat.HarnessProcessId is null)
         {
             return;
         }
 
-        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-        INooksApi nooks = scope.ServiceProvider.GetRequiredService<INooksApi>();
-        foreach (string line in lines)
+        Result sent = await agent.SendAsync(chat.NookId, chat.HarnessProcessId.Value, lines, ct);
+        if (sent.Failed)
         {
-            ReadOnlyMemory<byte> bytes = Encoding.UTF8.GetBytes(line + "\n");
-            for (int start = 0; start < bytes.Length; start += MaxInputBytes)
-            {
-                ReadOnlyMemory<byte> chunk = bytes[start..Math.Min(bytes.Length, start + MaxInputBytes)];
-                if ((await nooks.SendInputAsync(Harness, new SendInput(chat.NookId, processId, chunk), ct)).IsError(out Error? error))
-                {
-                    // The process is gone or out of reach; its exit arrives through the reader.
-                    Log.InputFailed(logger, chatId.Value, error.Message);
-                    return;
-                }
-            }
+            // The process is gone or out of reach; its exit arrives through the reader.
+            Log.InputFailed(logger, chatId.Value, sent.Error.Message);
         }
     }
 
     private async Task StopHarnessAsync(Chat chat, CancellationToken ct)
     {
-        if (chat.HarnessProcessId is ProcessId processId)
+        if (chat.HarnessProcessId is null)
         {
-            await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-            await scope.ServiceProvider.GetRequiredService<INooksApi>().StopProcessAsync(Harness, new StopProcess(chat.NookId, processId), ct);
+            return;
         }
+
+        // Not handled: a nook out of reach keeps the unusable agent running until its next exit; the
+        // chat has already answered the message that waited for it.
+        _ = await agent.StopAsync(chat.NookId, chat.HarnessProcessId.Value, ct);
     }
 
     private async Task SaveAsync(ChatsDbContext db, CancellationToken ct)
     {
         bool recorded = db.ChangeTracker.Entries<StoredEvent>().Any(entry => entry.State == EntityState.Added);
-        if ((await db.SaveAsync(ct)).IsError(out Error? error))
+        Result saved = await db.SaveAsync(ct);
+        if (saved.Failed)
         {
             // The runner is the chat's only writer, so a conflict is a defect.
-            throw new InvalidOperationException("Saving chat " + chatId.Value + " failed: " + error.Message);
+            throw new InvalidOperationException("Saving chat " + chatId.Value + " failed: " + saved.Error.Message);
         }
 
         if (recorded)
         {
             signals.Notify(chatId);
         }
-    }
-
-    private static bool SupportsSteering(JsonElement initialized)
-    {
-        return initialized.TryGetProperty("_meta", out JsonElement meta)
-            && meta.TryGetProperty("steering", out JsonElement steering)
-            && steering.TryGetProperty("supported", out JsonElement supported)
-            && supported.ValueKind == JsonValueKind.True;
-    }
-
-    private static string ErrorText(JsonElement error)
-    {
-        return error.TryGetProperty("message", out JsonElement message) && message.GetString() is string text ? text : "The agent reported an error.";
     }
 
     private sealed record Progress(NookId NookId, ProcessId? Harness, long OutputOffset, bool Idle);

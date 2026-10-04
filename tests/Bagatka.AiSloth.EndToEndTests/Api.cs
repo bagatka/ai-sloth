@@ -21,18 +21,43 @@ internal static class Api
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    // Tests pass the request, so each line is one step. A test that reads more of the response (a
+    // header, the raw body, a stream) sends the request first and passes the response.
+    public static async Task<T> ReadAsync<T>(Task<HttpResponseMessage> request, HttpStatusCode expected)
+    {
+        HttpResponseMessage response = await request;
+        return await ReadAsync<T>(response, expected);
+    }
+
+    public static async Task<Problem> ProblemAsync(Task<HttpResponseMessage> request, HttpStatusCode expected)
+    {
+        HttpResponseMessage response = await request;
+        await ExpectAsync(response, expected);
+        Problem? problem = await response.Content.ReadFromJsonAsync<Problem>(FoundationJson.Options, Ct);
+        if (problem is null)
+        {
+            throw new InvalidOperationException("The response had no problem details.");
+        }
+
+        return problem;
+    }
+
+    public static async Task ExpectAsync(Task<HttpResponseMessage> request, HttpStatusCode expected)
+    {
+        HttpResponseMessage response = await request;
+        await ExpectAsync(response, expected);
+    }
+
     public static async Task<T> ReadAsync<T>(HttpResponseMessage response, HttpStatusCode expected)
     {
         await ExpectAsync(response, expected);
-        return await response.Content.ReadFromJsonAsync<T>(FoundationJson.Options, Ct)
-            ?? throw new InvalidOperationException("The response had no body.");
-    }
+        T? body = await response.Content.ReadFromJsonAsync<T>(FoundationJson.Options, Ct);
+        if (body is null)
+        {
+            throw new InvalidOperationException("The response had no body.");
+        }
 
-    public static async Task<Problem> ProblemAsync(HttpResponseMessage response, HttpStatusCode expected)
-    {
-        await ExpectAsync(response, expected);
-        return await response.Content.ReadFromJsonAsync<Problem>(FoundationJson.Options, Ct)
-            ?? throw new InvalidOperationException("The response had no problem details.");
+        return body;
     }
 
     public static async Task ExpectAsync(HttpResponseMessage response, HttpStatusCode expected)
@@ -49,6 +74,11 @@ internal static class Api
         return client.PostAsJsonAsync(new Uri(path, UriKind.Relative), body, FoundationJson.Options, Ct);
     }
 
+    public static Task<HttpResponseMessage> SendPutAsync(this HttpClient client, string path, object body)
+    {
+        return client.PutAsJsonAsync(new Uri(path, UriKind.Relative), body, FoundationJson.Options, Ct);
+    }
+
     public static Task<HttpResponseMessage> SendGetAsync(this HttpClient client, string path)
     {
         return client.GetAsync(new Uri(path, UriKind.Relative), Ct);
@@ -61,7 +91,8 @@ internal static class Api
         long started = TimeProvider.System.GetTimestamp();
         while (TimeProvider.System.GetElapsedTime(started) < Patience)
         {
-            if (await read() is T value)
+            T? value = await read();
+            if (value is not null)
             {
                 return value;
             }

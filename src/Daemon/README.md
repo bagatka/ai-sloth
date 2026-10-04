@@ -18,8 +18,9 @@ feeds, watches, and stops processes on its instructions. It is a single .NET Nat
   sends `Hello` first, listing the processes still running. It reconnects with backoff when the
   stream drops. A newer stream for the same nook replaces an older one.
 - **Bulk streams.** Output travels in a separate `UploadOutput` call per watch, on its own HTTP/2
-  stream over the same connection, so a busy process never delays instructions. Previews of web
-  servers will travel the same way.
+  stream over the same connection, so a busy process never delays instructions. An upload ends with
+  the process's exit, so a watch gets everything from one stream; one that ends without it broke off.
+  Previews of web servers will travel the same way.
 - **Authentication.** Every call carries `authorization: Bearer <token>`. The Nooks module issued
   the token and verifies it.
 - **Instructions:** `StartProcess`, `StopProcess`, `SendInput`, `WatchOutput`, and `Reconnect`.
@@ -80,12 +81,14 @@ restoring; restoring during a publish for a runtime would rewrite the protocol p
     dotnet restore AiSloth.slnx --locked-mode
     dotnet publish src/Daemon/Bagatka.AiSloth.Daemon -c Release -r linux-x64 --no-restore
 
-The nook image (`Dockerfile`) does the same inside the SDK image that `global.json` pins, and
-installs the binary as `/usr/local/bin/slothd` under tini, on Ubuntu with git. It also carries the
-harnesses agents run in, with Node.js: Claude Code's ACP adapter, `claude-agent-acp`, whose version
-is pinned there; Claude Code's own binary makes most of the image's size. Build it from the
-repository root with `docker build -f src/Daemon/Dockerfile -t aisloth-nook .`; the AppHost builds
-it as `aisloth-nook:dev`.
+The nook images (`Dockerfile`) do the same inside the SDK image that `global.json` pins. The `nook`
+target installs the binary as `/usr/local/bin/slothd` under tini, on plain Ubuntu 26.04 with git,
+for nooks without chats; the daemon needs only libc and OpenSSL, and runs without ICU. Each harness target adds Node.js and one harness, at the version the profiles in
+`src/Harnesses` are written for: `claude-code` (Claude Code's ACP adapter) and `copilot` (GitHub
+Copilot CLI). A nook carries one, so a host pulls only what its nooks use; each harness's own files
+make most of its image's size. Build one from the repository root with
+`docker build -f src/Daemon/Dockerfile --target <target> -t aisloth-nook[-<harness>] .`; the AppHost
+builds them all as `aisloth-nook:dev`, `aisloth-nook-claude-code:dev`, and `aisloth-nook-copilot:dev`.
 
 The tests run the real daemon against a fake control plane: a real gRPC server on a loopback port.
 The full-disk test mounts a small tmpfs, which needs root, and skips elsewhere.

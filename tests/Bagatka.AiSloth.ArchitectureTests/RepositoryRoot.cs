@@ -15,7 +15,11 @@ internal static class RepositoryRoot
             directory = directory.Parent;
         }
 
-        return directory?.FullName
-            ?? throw new InvalidOperationException("AiSloth.slnx was not found above " + AppContext.BaseDirectory);
+        if (directory is null)
+        {
+            throw new InvalidOperationException("AiSloth.slnx was not found above " + AppContext.BaseDirectory);
+        }
+
+        return directory.FullName;
     }
 }

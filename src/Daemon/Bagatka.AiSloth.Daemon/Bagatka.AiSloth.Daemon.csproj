@@ -11,6 +11,8 @@
     <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
     <!-- Required by the LibraryImport source generator that sends SIGTERM. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- The nook image has no ICU: the daemon only writes invariant text, so it needs none. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>

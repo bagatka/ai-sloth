@@ -23,9 +23,10 @@ internal sealed partial class NooksApi
             return new Result<IAsyncEnumerable<DaemonInstruction>>(Error.Unauthorized);
         }
 
-        if ((await db.SaveAsync(ct)).IsError(out Error? failed))
+        Result saved = await db.SaveAsync(ct);
+        if (saved.Failed)
         {
-            return new Result<IAsyncEnumerable<DaemonInstruction>>(failed);
+            return new Result<IAsyncEnumerable<DaemonInstruction>>(saved.Error);
         }
 
         return new Result<IAsyncEnumerable<DaemonInstruction>>(RelayAsync(nook.Id, reports, ct));
@@ -65,7 +66,6 @@ internal sealed partial class NooksApi
                         Process? process = await current.Processes.SingleOrDefaultAsync(found => found.Id == exited.ProcessId && found.NookId == nookId, ct);
                         process?.Exited(exited.ExitCode);
                         await current.SaveAsync(ct);
-                        daemons.ProcessExited(exited.ProcessId, exited.ExitCode);
                         break;
                     case DiskUsage disk:
                         Nook? nook = await current.Nooks.SingleOrDefaultAsync(found => found.Id == nookId, ct);

@@ -1,15 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Daemons;
-using Bagatka.AiSloth.Nooks.Data;
 using Bagatka.AiSloth.Nooks.Model;
 using Bagatka.Foundation;
-using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Nooks;
 
@@ -17,9 +14,10 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<IAsyncEnumerable<ProcessEvent>>> WatchProcessAsync(Actor actor, WatchProcess command, CancellationToken ct)
     {
-        if (!(await FindProcessAsync(actor, command.NookId, command.ProcessId, ct)).TryGetValue(out Process? process, out Error? missing))
+        Result<Process> found = await FindProcessAsync(actor, command.NookId, command.ProcessId, ct);
+        if (found.Failed)
         {
-            return new Result<IAsyncEnumerable<ProcessEvent>>(missing);
+            return new Result<IAsyncEnumerable<ProcessEvent>>(found.Error);
         }
 
         DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
@@ -28,11 +26,12 @@ internal sealed partial class NooksApi
             return new Result<IAsyncEnumerable<ProcessEvent>>(NooksErrors.NotReady);
         }
 
-        return new Result<IAsyncEnumerable<ProcessEvent>>(WatchAsync(connection, process.Id, Math.Max(command.FromOffset, 0), ct));
+        return new Result<IAsyncEnumerable<ProcessEvent>>(WatchAsync(connection, found.Output.Id, Math.Max(command.FromOffset, 0), ct));
     }
 
-    // Relays the daemon's uploads. When the daemon's connection ends first, the watch asks again
-    // from where it stopped on the next connection, so the watcher sees every byte once.
+    // Relays the daemon's uploads until one ends with the exit. An upload that breaks off, because
+    // the daemon's connection ended, is asked for again from where it stopped on the next connection,
+    // so the watcher sees every byte once.
     private async IAsyncEnumerable<ProcessEvent> WatchAsync(DaemonConnection connection, ProcessId processId, long offset, [EnumeratorCancellation] CancellationToken ct)
     {
         while (true)
@@ -41,19 +40,19 @@ internal sealed partial class NooksApi
             {
                 try
                 {
-                    if (await connection.SendAsync(new DaemonInstruction(new WatchOutputInstruction(receiver.WatchId, processId, offset)), ct))
+                    bool asked = await connection.SendAsync(new DaemonInstruction(new WatchOutputInstruction(receiver.WatchId, processId, offset)), ct);
+                    if (asked)
                     {
-                        await foreach (ProcessOutput output in receiver.Output.ReadAllAsync(ct))
+                        await foreach (ProcessEvent processEvent in receiver.Events.ReadAllAsync(ct))
                         {
-                            offset = output.Offset + output.Data.Length;
-                            yield return new ProcessEvent(output);
-                        }
-                    }
+                            yield return processEvent;
+                            if (processEvent.Value is not ProcessOutput output)
+                            {
+                                yield break;
+                            }
 
-                    if (receiver.Complete)
-                    {
-                        yield return new ProcessEvent(new ProcessExited(processId, await ExitCodeAsync(receiver, ct)));
-                        yield break;
+                            offset = output.Offset + output.Data.Length;
+                        }
                     }
                 }
                 finally
@@ -62,23 +61,13 @@ internal sealed partial class NooksApi
                 }
             }
 
-            connection = await daemons.WaitAsync(connection.NookId, ReadyTimeout, ct)
-                ?? throw new InvalidOperationException("Nook " + connection.NookId.Value + "'s daemon didn't reconnect in time; watch the process again later.");
-        }
-    }
+            DaemonConnection? reconnected = await daemons.WaitAsync(connection.NookId, ReadyTimeout, ct);
+            if (reconnected is null)
+            {
+                throw new InvalidOperationException("Nook " + connection.NookId.Value + "'s daemon didn't reconnect in time; watch the process again later.");
+            }
 
-    // Once all output is delivered, the exit is recorded already or reported within moments. Not
-    // handled: a daemon that restarted lost its processes and never reports their exits; handling it
-    // means marking them on its next hello.
-    private async Task<int> ExitCodeAsync(OutputReceiver receiver, CancellationToken ct)
-    {
-        if (receiver.Exited.IsCompleted)
-        {
-            return await receiver.Exited;
+            connection = reconnected;
         }
-
-        await using NooksDbContext current = await databases.CreateDbContextAsync(ct);
-        int? recorded = await current.Processes.Where(process => process.Id == receiver.ProcessId).Select(process => process.ExitCode).SingleAsync(ct);
-        return recorded ?? await receiver.Exited.WaitAsync(ct);
     }
 }

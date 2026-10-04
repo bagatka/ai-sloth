@@ -12,14 +12,16 @@ internal sealed class Nook
 {
     public const int MaxProviderLength = 40;
     public const int MaxLocationLength = 64;
+    public const int MaxHarnessLength = 32;
 
     // Used by Create and by EF: parameter names match property names.
-    private Nook(NookId id, WorkspaceId workspaceId, string provider, string? location, NookStatus status, DateTimeOffset createdAt)
+    private Nook(NookId id, WorkspaceId workspaceId, string provider, string? location, string? harness, NookStatus status, DateTimeOffset createdAt)
     {
         Id = id;
         WorkspaceId = workspaceId;
         Provider = provider;
         Location = location;
+        Harness = harness;
         Status = status;
         CreatedAt = createdAt;
     }
@@ -32,6 +34,9 @@ internal sealed class Nook
     public string Provider { get; private set; }
 
     public string? Location { get; private set; }
+
+    // The harness its image carries for chats' agents; it never changes, because the image doesn't.
+    public string? Harness { get; private set; }
 
     public NookStatus Status { get; private set; }
 
@@ -47,9 +52,9 @@ internal sealed class Nook
     // PostgreSQL's xmin: concurrent changes to one nook conflict instead of overwriting each other.
     public uint Version { get; private set; }
 
-    public static Nook Create(WorkspaceId workspaceId, ProviderId provider, TimeProvider time)
+    public static Nook Create(WorkspaceId workspaceId, ProviderId provider, string? harness, TimeProvider time)
     {
-        return new Nook(NookId.New(), workspaceId, provider.Name, provider.Location, NookStatus.Creating, time.GetUtcNow());
+        return new Nook(NookId.New(), workspaceId, provider.Name, provider.Location, harness, NookStatus.Creating, time.GetUtcNow());
     }
 
     // A new token for the daemon of a sandbox about to be created. It replaces any earlier one, which
@@ -104,7 +109,7 @@ internal sealed class Nook
     public NookSummary ToSummary()
     {
         DiskUsage? disk = DiskTotalBytes is long total && DiskAvailableBytes is long available ? new DiskUsage(total, available) : null;
-        return new NookSummary(Id, WorkspaceId, new ProviderId(Provider, Location).ToString(), Status, CreatedAt, disk);
+        return new NookSummary(Id, WorkspaceId, new ProviderId(Provider, Location).ToString(), Status, CreatedAt, disk, Harness);
     }
 
     private static byte[] Hash(string token)

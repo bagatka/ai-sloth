@@ -30,8 +30,12 @@ internal sealed class FakeControlPlane : IAsyncDisposable
     {
         _app = app;
         Endpoint = endpoint;
-        IServerAddressesFeature addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()
-            ?? throw new InvalidOperationException("Kestrel reported no addresses.");
+        IServerAddressesFeature? addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
+        if (addresses is null)
+        {
+            throw new InvalidOperationException("Kestrel reported no addresses.");
+        }
+
         Url = new Uri(addresses.Addresses.Single());
     }
 
@@ -65,6 +69,7 @@ internal sealed class FakeControlPlane : IAsyncDisposable
     {
         private readonly Channel<Connection> _connections = Channel.CreateUnbounded<Connection>();
         private readonly ConcurrentDictionary<string, Channel<ProcessOutput>> _uploads = new ConcurrentDictionary<string, Channel<ProcessOutput>>(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, TaskCompletionSource<ProcessExited?>> _exits = new ConcurrentDictionary<string, TaskCompletionSource<ProcessExited?>>(StringComparer.Ordinal);
 
         /// <summary>The daemon's next connection.</summary>
         public async Task<Connection> NextConnectionAsync(CancellationToken ct)
@@ -78,9 +83,21 @@ internal sealed class FakeControlPlane : IAsyncDisposable
             return _uploads.GetOrAdd(watchId, _ => Channel.CreateUnbounded<ProcessOutput>()).Reader;
         }
 
+        /// <summary>The exit a watch's upload ended with, once it ends; null when it ended without one.</summary>
+        public Task<ProcessExited?> UploadExitAsync(string watchId)
+        {
+            return Exit(watchId).Task;
+        }
+
+        private TaskCompletionSource<ProcessExited?> Exit(string watchId)
+        {
+            return _exits.GetOrAdd(watchId, _ => new TaskCompletionSource<ProcessExited?>(TaskCreationOptions.RunContinuationsAsynchronously));
+        }
+
         public override async Task Connect(IAsyncStreamReader<DaemonEvent> requestStream, IServerStreamWriter<DaemonInstruction> responseStream, ServerCallContext context)
         {
-            if (!await requestStream.MoveNext(context.CancellationToken) || requestStream.Current.EventCase != DaemonEvent.EventOneofCase.Hello)
+            bool opened = await requestStream.MoveNext(context.CancellationToken);
+            if (!opened || requestStream.Current.EventCase != DaemonEvent.EventOneofCase.Hello)
             {
                 throw new RpcException(new Status(StatusCode.InvalidArgument, "The first event must be Hello."));
             }
@@ -110,18 +127,28 @@ internal sealed class FakeControlPlane : IAsyncDisposable
 
         public override async Task<OutputUploadResult> UploadOutput(IAsyncStreamReader<OutputUploadMessage> requestStream, ServerCallContext context)
         {
-            if (!await requestStream.MoveNext(context.CancellationToken) || requestStream.Current.PartCase != OutputUploadMessage.PartOneofCase.Header)
+            bool opened = await requestStream.MoveNext(context.CancellationToken);
+            if (!opened || requestStream.Current.PartCase != OutputUploadMessage.PartOneofCase.Header)
             {
                 throw new RpcException(new Status(StatusCode.InvalidArgument, "The first message must be the header."));
             }
 
-            ChannelWriter<ProcessOutput> upload = _uploads.GetOrAdd(requestStream.Current.Header.WatchId, _ => Channel.CreateUnbounded<ProcessOutput>()).Writer;
+            string watchId = requestStream.Current.Header.WatchId;
+            ChannelWriter<ProcessOutput> upload = _uploads.GetOrAdd(watchId, _ => Channel.CreateUnbounded<ProcessOutput>()).Writer;
+            ProcessExited? exited = null;
             await foreach (OutputUploadMessage message in requestStream.ReadAllAsync(context.CancellationToken))
             {
+                if (message.PartCase == OutputUploadMessage.PartOneofCase.Exited)
+                {
+                    exited = message.Exited;
+                    continue;
+                }
+
                 await upload.WriteAsync(message.Output, context.CancellationToken);
             }
 
             upload.TryComplete();
+            Exit(watchId).TrySetResult(exited);
             return new OutputUploadResult();
         }
     }

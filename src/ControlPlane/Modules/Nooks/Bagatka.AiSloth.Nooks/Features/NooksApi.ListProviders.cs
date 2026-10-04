@@ -15,16 +15,17 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<IReadOnlyList<ProviderSummary>>> ListProvidersAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct)
     {
-        if (!(await machines.ListAsync(actor, workspaceId, ct)).TryGetValue(out IReadOnlyList<MachineSummary>? workspaceMachines, out Error? error))
+        Result<IReadOnlyList<MachineSummary>> workspaceMachines = await machines.ListAsync(actor, workspaceId, ct);
+        if (workspaceMachines.Failed)
         {
-            return new Result<IReadOnlyList<ProviderSummary>>(error);
+            return new Result<IReadOnlyList<ProviderSummary>>(workspaceMachines.Error);
         }
 
         List<ProviderSummary> found = providers
             .Where(provider => !string.Equals(provider.Name, MachineProvider.Name, StringComparison.Ordinal))
             .Select(provider => new ProviderSummary(provider.Name, provider.Name, Available: true))
             .ToList();
-        found.AddRange(workspaceMachines.Select(machine => new ProviderSummary(
+        found.AddRange(workspaceMachines.Output.Select(machine => new ProviderSummary(
             new ProviderId(MachineProvider.Name, MachineProvider.LocationOf(machine.Id)).ToString(),
             machine.Name,
             machine.Status == MachineStatus.Online)));

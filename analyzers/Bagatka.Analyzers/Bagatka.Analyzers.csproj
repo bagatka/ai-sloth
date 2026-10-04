@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The compiler loads analyzers as .NET Standard 2.0 assemblies. Directory.Build.props adds this
+       project to every other one as an analyzer. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- .NET Standard 2.0 would otherwise default to C# 7.3; the code uses only syntax, no new runtime types. -->
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 5.9 is the first release on nuget.org that knows C# 15 unions; the SDK's compiler is newer. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

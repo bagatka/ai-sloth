@@ -73,19 +73,22 @@ public sealed class RemoteSandboxProvider(string name) : ISandboxProvider
     public async Task<Result<SandboxObservation>> CreateAsync(SandboxSpec spec, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(spec);
-        return Observation(await CallAsync(new Wire.SandboxCall { Create = SandboxWire.ToWire(spec) }, ct));
+        Wire.SandboxCallResult result = await CallAsync(new Wire.SandboxCall { Create = SandboxWire.ToWire(spec) }, ct);
+        return Observation(result);
     }
 
     /// <inheritdoc />
     public async Task<Result<SandboxObservation>> SuspendAsync(SandboxKey key, CancellationToken ct)
     {
-        return Observation(await CallAsync(new Wire.SandboxCall { Suspend = SandboxWire.Key(key.Value) }, ct));
+        Wire.SandboxCallResult result = await CallAsync(new Wire.SandboxCall { Suspend = SandboxWire.Key(key.Value) }, ct);
+        return Observation(result);
     }
 
     /// <inheritdoc />
     public async Task<Result<SandboxObservation>> ResumeAsync(SandboxKey key, CancellationToken ct)
     {
-        return Observation(await CallAsync(new Wire.SandboxCall { Resume = SandboxWire.Key(key.Value) }, ct));
+        Wire.SandboxCallResult result = await CallAsync(new Wire.SandboxCall { Resume = SandboxWire.Key(key.Value) }, ct);
+        return Observation(result);
     }
 
     /// <inheritdoc />
@@ -104,8 +107,12 @@ public sealed class RemoteSandboxProvider(string name) : ISandboxProvider
     public async IAsyncEnumerable<SandboxObservation> ListAsync([EnumeratorCancellation] CancellationToken ct)
     {
         Wire.SandboxCallResult result = await CallAsync(new Wire.SandboxCall { List = new Wire.ListSandboxes() }, ct);
-        Wire.Sandboxes sandboxes = result.ResultCase == Wire.SandboxCallResult.ResultOneofCase.Sandboxes ? result.Sandboxes : throw Unexpected(result);
-        foreach (Wire.Sandbox sandbox in sandboxes.Items)
+        if (result.ResultCase != Wire.SandboxCallResult.ResultOneofCase.Sandboxes)
+        {
+            throw Unexpected(result);
+        }
+
+        foreach (Wire.Sandbox sandbox in result.Sandboxes.Items)
         {
             yield return SandboxWire.FromWire(sandbox);
         }
@@ -114,7 +121,8 @@ public sealed class RemoteSandboxProvider(string name) : ISandboxProvider
     /// <inheritdoc />
     public async Task DeleteAsync(SandboxKey key, CancellationToken ct)
     {
-        Done(await CallAsync(new Wire.SandboxCall { Delete = SandboxWire.Key(key.Value) }, ct));
+        Wire.SandboxCallResult result = await CallAsync(new Wire.SandboxCall { Delete = SandboxWire.Key(key.Value) }, ct);
+        Done(result);
     }
 
     /// <inheritdoc />
@@ -134,8 +142,12 @@ public sealed class RemoteSandboxProvider(string name) : ISandboxProvider
     public async IAsyncEnumerable<SnapshotObservation> ListSnapshotsAsync([EnumeratorCancellation] CancellationToken ct)
     {
         Wire.SandboxCallResult result = await CallAsync(new Wire.SandboxCall { ListSnapshots = new Wire.ListSnapshots() }, ct);
-        Wire.Snapshots snapshots = result.ResultCase == Wire.SandboxCallResult.ResultOneofCase.Snapshots ? result.Snapshots : throw Unexpected(result);
-        foreach (Wire.Snapshot snapshot in snapshots.Items)
+        if (result.ResultCase != Wire.SandboxCallResult.ResultOneofCase.Snapshots)
+        {
+            throw Unexpected(result);
+        }
+
+        foreach (Wire.Snapshot snapshot in result.Snapshots.Items)
         {
             yield return SandboxWire.FromWire(snapshot);
         }
@@ -144,7 +156,8 @@ public sealed class RemoteSandboxProvider(string name) : ISandboxProvider
     /// <inheritdoc />
     public async Task DeleteSnapshotAsync(SnapshotKey snapshot, CancellationToken ct)
     {
-        Done(await CallAsync(new Wire.SandboxCall { DeleteSnapshot = SandboxWire.Key(snapshot.Value) }, ct));
+        Wire.SandboxCallResult result = await CallAsync(new Wire.SandboxCall { DeleteSnapshot = SandboxWire.Key(snapshot.Value) }, ct);
+        Done(result);
     }
 
     private static Result<SandboxObservation> Observation(Wire.SandboxCallResult result)
@@ -194,11 +207,7 @@ public sealed class RemoteSandboxProvider(string name) : ISandboxProvider
 
         try
         {
-            if (!_calls.Writer.TryWrite(call))
-            {
-                await _calls.Writer.WriteAsync(call, ct);
-            }
-
+            await _calls.Writer.WriteAsync(call, ct);
             return await result.Task.WaitAsync(ct);
         }
         catch (ChannelClosedException)

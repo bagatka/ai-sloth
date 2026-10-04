@@ -16,7 +16,9 @@ internal static class TokenSignIn
 {
     public static async Task RecordUserAsync(TokenValidatedContext context)
     {
-        if (context.Principal?.Identity is not ClaimsIdentity identity || identity.FindFirst("sub")?.Value is not string subject)
+        ClaimsIdentity? identity = context.Principal?.Identity as ClaimsIdentity;
+        string? subject = identity?.FindFirst("sub")?.Value;
+        if (identity is null || subject is null)
         {
             context.Fail("The token names no subject.");
             return;
@@ -24,14 +26,14 @@ internal static class TokenSignIn
 
         // A framework callback can't take constructor dependencies, so it asks the request's services.
         IUsersApi users = context.HttpContext.RequestServices.GetRequiredService<IUsersApi>();
-        SignIn identityProviderSays = new SignIn(context.SecurityToken.Issuer, subject);
-        Result<UserId> signedIn = await users.SignInAsync(Actor.ForSystem("webapi.authentication"), identityProviderSays, context.HttpContext.RequestAborted);
-        if (!signedIn.TryGetValue(out UserId userId, out Error? error))
+        VerifiedIdentity verified = new VerifiedIdentity(context.SecurityToken.Issuer, subject);
+        Result<UserId> signedIn = await users.SignInAsync(Actor.ForSystem("webapi.authentication"), verified, context.HttpContext.RequestAborted);
+        if (signedIn.Failed)
         {
-            context.Fail(error.Message);
+            context.Fail(signedIn.Error.Message);
             return;
         }
 
-        identity.AddUser(userId);
+        identity.AddUser(signedIn.Output);
     }
 }

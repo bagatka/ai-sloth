@@ -24,7 +24,7 @@ internal sealed class DaemonConnections(TimeProvider time)
         DaemonConnection? replaced;
         lock (_gate)
         {
-            _connections.TryGetValue(nookId, out replaced);
+            replaced = _connections.GetValueOrDefault(nookId);
             _connections[nookId] = connection;
             TaskCompletionSource connected = _connected;
             _connected = NewSignal();
@@ -43,7 +43,8 @@ internal sealed class DaemonConnections(TimeProvider time)
     {
         lock (_gate)
         {
-            if (_connections.TryGetValue(connection.NookId, out DaemonConnection? current) && current == connection)
+            DaemonConnection? current = _connections.GetValueOrDefault(connection.NookId);
+            if (current == connection)
             {
                 _connections.Remove(connection.NookId);
             }
@@ -61,7 +62,8 @@ internal sealed class DaemonConnections(TimeProvider time)
             Task connected;
             lock (_gate)
             {
-                if (_connections.TryGetValue(nookId, out DaemonConnection? connection))
+                DaemonConnection? connection = _connections.GetValueOrDefault(nookId);
+                if (connection is not null)
                 {
                     return connection;
                 }
@@ -70,7 +72,13 @@ internal sealed class DaemonConnections(TimeProvider time)
             }
 
             TimeSpan left = timeout - time.GetElapsedTime(started);
-            if (left <= TimeSpan.Zero || await Task.WhenAny(connected, Task.Delay(left, time, ct)) != connected)
+            if (left <= TimeSpan.Zero)
+            {
+                return null;
+            }
+
+            Task first = await Task.WhenAny(connected, Task.Delay(left, time, ct));
+            if (first != connected)
             {
                 ct.ThrowIfCancellationRequested();
                 return null;
@@ -106,14 +114,6 @@ internal sealed class DaemonConnections(TimeProvider time)
         }
     }
 
-    public void ProcessExited(ProcessId processId, int exitCode)
-    {
-        foreach (OutputReceiver receiver in ReceiversWhere(receiver => receiver.ProcessId == processId))
-        {
-            receiver.ProcessExited(exitCode);
-        }
-    }
-
     private static TaskCompletionSource NewSignal()
     {
         return new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -124,17 +124,15 @@ internal sealed class DaemonConnections(TimeProvider time)
     private void End(DaemonConnection connection)
     {
         connection.Close();
-        foreach (OutputReceiver receiver in ReceiversWhere(receiver => receiver.Connection == connection))
-        {
-            receiver.End(complete: false);
-        }
-    }
-
-    private List<OutputReceiver> ReceiversWhere(Func<OutputReceiver, bool> predicate)
-    {
+        List<OutputReceiver> requested;
         lock (_gate)
         {
-            return _receivers.Values.Where(predicate).ToList();
+            requested = _receivers.Values.Where(receiver => receiver.Connection == connection).ToList();
+        }
+
+        foreach (OutputReceiver receiver in requested)
+        {
+            receiver.End();
         }
     }
 }

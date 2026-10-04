@@ -38,7 +38,11 @@ internal sealed class RemoteLoop : IAsyncDisposable
         List<Task> running = [];
         await foreach (SandboxCall call in Provider.Calls.ReadAllAsync(CancellationToken.None))
         {
-            running.Add(Task.Run(async () => Provider.Complete(await SandboxCalls.ExecuteAsync(local, call, _stop.Token))));
+            running.Add(Task.Run(async () =>
+            {
+                SandboxCallResult result = await SandboxCalls.ExecuteAsync(local, call, _stop.Token);
+                Provider.Complete(result);
+            }));
         }
 
         try

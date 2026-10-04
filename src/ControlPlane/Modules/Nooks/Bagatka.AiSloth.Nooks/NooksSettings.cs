@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Bagatka.AiSloth.Nooks;
 
@@ -10,10 +11,14 @@ public sealed record NooksSettings
     /// <summary>Creates the settings.</summary>
     /// <param name="connectionString">The PostgreSQL database that holds the <c>nooks</c> schema.</param>
     /// <param name="daemonUrl">The control plane's daemon endpoint as a nook reaches it, such as <c>http://host.docker.internal:5171</c> in development.</param>
-    /// <param name="image">The image every nook starts from; it runs <c>slothd</c> (<c>src/Daemon/Dockerfile</c>).</param>
+    /// <param name="image">The image a nook without a harness starts from; it runs <c>slothd</c> (<c>src/Daemon/Dockerfile</c>).</param>
     /// <param name="cpuMillicores">The CPU each nook gets, in thousandths of a core.</param>
     /// <param name="memoryMebibytes">The memory each nook gets.</param>
-    public NooksSettings(string connectionString, Uri daemonUrl, string image, int cpuMillicores, int memoryMebibytes)
+    /// <param name="harnessImages">
+    /// The image for each harness a nook can carry, by harness ID, such as <c>claude-code</c>: the base
+    /// image with that harness installed. A nook carries one harness, so hosts pull only the ones used.
+    /// </param>
+    public NooksSettings(string connectionString, Uri daemonUrl, string image, int cpuMillicores, int memoryMebibytes, IReadOnlyDictionary<string, string>? harnessImages = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         ArgumentNullException.ThrowIfNull(daemonUrl);
@@ -30,6 +35,7 @@ public sealed record NooksSettings
         Image = image;
         CpuMillicores = cpuMillicores;
         MemoryMebibytes = memoryMebibytes;
+        HarnessImages = new Dictionary<string, string>(harnessImages ?? new Dictionary<string, string>(StringComparer.Ordinal), StringComparer.Ordinal);
     }
 
     /// <summary>The PostgreSQL database that holds the <c>nooks</c> schema.</summary>
@@ -38,8 +44,11 @@ public sealed record NooksSettings
     /// <summary>The control plane's daemon endpoint as a nook reaches it.</summary>
     public Uri DaemonUrl { get; }
 
-    /// <summary>The image every nook starts from.</summary>
+    /// <summary>The image a nook without a harness starts from.</summary>
     public string Image { get; }
+
+    /// <summary>The image for each harness a nook can carry, by harness ID.</summary>
+    public IReadOnlyDictionary<string, string> HarnessImages { get; }
 
     /// <summary>The CPU each nook gets, in thousandths of a core.</summary>
     public int CpuMillicores { get; }

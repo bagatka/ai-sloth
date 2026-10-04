@@ -83,12 +83,14 @@ public sealed class DockerClient : IDisposable
         using HttpResponseMessage response = await _http.PostAsync(Path("containers/create?name=", name, string.Empty), content, ct).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.Conflict)
         {
-            return new Result<string>(Error.Conflict("docker.name_in_use", await MessageAsync(response, ct).ConfigureAwait(false)));
+            string message = await MessageAsync(response, ct).ConfigureAwait(false);
+            return new Result<string>(Error.Conflict("docker.name_in_use", message));
         }
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            return new Result<string>(Error.NotFound("docker.image_not_found", await MessageAsync(response, ct).ConfigureAwait(false)));
+            string message = await MessageAsync(response, ct).ConfigureAwait(false);
+            return new Result<string>(Error.NotFound("docker.image_not_found", message));
         }
 
         DockerWire.IdResponse created = await ReadAsync(response, DockerJsonContext.Default.IdResponse, ct).ConfigureAwait(false);
@@ -315,7 +317,12 @@ public sealed class DockerClient : IDisposable
     {
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
         T? body = await response.Content.ReadFromJsonAsync(typeInfo, ct).ConfigureAwait(false);
-        return body ?? throw new HttpRequestException("The Docker Engine returned an empty body for " + response.RequestMessage?.RequestUri);
+        if (body is null)
+        {
+            throw new HttpRequestException("The Docker Engine returned an empty body for " + response.RequestMessage?.RequestUri);
+        }
+
+        return body;
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)

@@ -60,9 +60,8 @@ internal sealed class Process
             return new Result<Process>(Error.Validation("arguments", "Arguments can't contain NUL characters."));
         }
 
-        // An environment string is NAME=value up to a NUL, and SLOTHD_ names belong to the daemon.
-        if (command.Environment.Any(variable => variable.Key.Length == 0 || variable.Key.AsSpan().ContainsAny('=', '\0')
-            || variable.Key.StartsWith("SLOTHD_", StringComparison.Ordinal) || variable.Value.Contains('\0', StringComparison.Ordinal)))
+        bool environmentValid = command.Environment.All(variable => IsVariable(variable.Key, variable.Value));
+        if (!environmentValid)
         {
             return new Result<Process>(Error.Validation("environment", "Names can't be empty, contain = or NUL, or start with SLOTHD_; values can't contain NUL."));
         }
@@ -97,6 +96,14 @@ internal sealed class Process
     public ProcessSummary ToSummary()
     {
         return new ProcessSummary(Id, NookId, Command, Arguments, StartedAt, ExitCode);
+    }
+
+    // An environment string is NAME=value up to a NUL, and SLOTHD_ names belong to the daemon.
+    private static bool IsVariable(string name, string value)
+    {
+        bool validName = name.Length > 0 && !name.AsSpan().ContainsAny('=', '\0') && !name.StartsWith("SLOTHD_", StringComparison.Ordinal);
+        bool validValue = !value.Contains('\0', StringComparison.Ordinal);
+        return validName && validValue;
     }
 
     private static bool IsPath(string value)

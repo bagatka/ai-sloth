@@ -14,7 +14,7 @@ internal sealed partial class NooksApi
 {
     private static readonly Error WatchEnded = Error.NotFound("nooks.watch_ended", "Nobody watches this upload anymore.");
 
-    public async Task<Result> AcceptOutputAsync(Actor actor, OutputUpload upload, IAsyncEnumerable<ProcessOutput> output, CancellationToken ct)
+    public async Task<Result> AcceptOutputAsync(Actor actor, OutputUpload upload, IAsyncEnumerable<ProcessEvent> events, CancellationToken ct)
     {
         Nook? nook = await db.Nooks.AsNoTracking().SingleOrDefaultAsync(found => found.Id == upload.NookId, ct);
         if (nook is null || !nook.AcceptsDaemonToken(upload.Token))
@@ -30,18 +30,17 @@ internal sealed partial class NooksApi
 
         // The watcher leaving cancels the upload, which tells the daemon to stop.
         using CancellationTokenSource watched = CancellationTokenSource.CreateLinkedTokenSource(ct, receiver.WatcherLeft);
-        bool complete = false;
         try
         {
-            await foreach (ProcessOutput chunk in output.WithCancellation(watched.Token))
+            await foreach (ProcessEvent processEvent in events.WithCancellation(watched.Token))
             {
-                if (!await receiver.DeliverAsync(chunk, watched.Token))
+                bool delivered = await receiver.DeliverAsync(processEvent, watched.Token);
+                if (!delivered)
                 {
                     return new Result(new Success());
                 }
             }
 
-            complete = true;
             return new Result(new Success());
         }
         catch (OperationCanceledException) when (receiver.WatcherLeft.IsCancellationRequested)
@@ -50,7 +49,7 @@ internal sealed partial class NooksApi
         }
         finally
         {
-            receiver.End(complete);
+            receiver.End();
         }
     }
 }

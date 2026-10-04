@@ -15,28 +15,32 @@ internal sealed partial class ChatsApi
 {
     public async Task<Result<Page<ChatSummary>>> ListAsync(Actor actor, NookId nookId, PageRequest page, CancellationToken ct)
     {
-        if (!(await nooks.GetAsync(actor, nookId, ct)).TryGetValue(out _, out Error? missing))
+        Result<NookSummary> nook = await nooks.GetAsync(actor, nookId, ct);
+        if (nook.Failed)
         {
-            return new Result<Page<ChatSummary>>(missing);
+            return new Result<Page<ChatSummary>>(nook.Error);
         }
 
-        if (!db.Chats.AsNoTracking()
-                .Where(chat => chat.NookId == nookId)
-                .TakePage(chat => chat.Id, KeysetOrder.NewestFirst, page)
-                .TryGetValue(out IQueryable<Chat>? query, out Error? invalid))
+        Result<IQueryable<Chat>> paged = db.Chats.AsNoTracking()
+            .Where(chat => chat.NookId == nookId)
+            .TakePage(chat => chat.Id, KeysetOrder.NewestFirst, page);
+        if (paged.Failed)
         {
-            return new Result<Page<ChatSummary>>(invalid);
+            return new Result<Page<ChatSummary>>(paged.Error);
         }
 
-        List<Chat> chats = await query.ToListAsync(ct);
+        List<Chat> chats = await paged.Output.ToListAsync(ct);
         List<ChatId> ids = [.. chats.Select(chat => chat.Id)];
-        HashSet<ChatId> waiting = [.. await db.Messages
+        List<ChatId> waitingChats = await db.Messages
             .Where(message => ids.Contains(message.ChatId)
                 && (message.State == MessageState.New || message.State == MessageState.Queued || message.State == MessageState.Steering))
             .Select(message => message.ChatId)
             .Distinct()
-            .ToListAsync(ct)];
-        List<ChatSummary> fetched = [.. chats.Select(chat => chat.ToSummary(waiting.Contains(chat.Id)))];
+            .ToListAsync(ct);
+        HashSet<ChatId> waiting = [.. waitingChats];
+        List<ChatSender> senders = await db.Senders.Where(sender => ids.Contains(sender.ChatId)).OrderBy(sender => sender.UserId).ToListAsync(ct);
+        ILookup<ChatId, UserId> letIn = senders.ToLookup(sender => sender.ChatId, sender => sender.UserId);
+        List<ChatSummary> fetched = [.. chats.Select(chat => chat.ToSummary(waiting.Contains(chat.Id), letIn[chat.Id]))];
         return new Result<Page<ChatSummary>>(Keyset.ToPage(fetched, page, chat => chat.Id.Value));
     }
 }

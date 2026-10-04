@@ -15,7 +15,7 @@ public interface IUsersApi
     /// calls it, such as the WebApi's authentication after it validated the provider's token.
     /// </summary>
     /// <returns>The user; a validation error for an empty or oversized issuer or subject; or forbidden for an actor that isn't a system process.</returns>
-    public Task<Result<UserId>> SignInAsync(Actor actor, SignIn command, CancellationToken ct);
+    public Task<Result<UserId>> SignInAsync(Actor actor, VerifiedIdentity identity, CancellationToken ct);
 
     /// <summary>The calling user.</summary>
     /// <returns>The user; unauthorized for an actor that isn't a user; or not found for a user never recorded.</returns>

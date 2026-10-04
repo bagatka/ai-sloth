@@ -39,11 +39,14 @@ public static class SandboxCalls
         switch (call.CallCase)
         {
             case Wire.SandboxCall.CallOneofCase.Create:
-                return Observation(await provider.CreateAsync(SandboxWire.FromWire(call.Create), ct));
+                Result<SandboxObservation> created = await provider.CreateAsync(SandboxWire.FromWire(call.Create), ct);
+                return Observation(created);
             case Wire.SandboxCall.CallOneofCase.Suspend:
-                return Observation(await provider.SuspendAsync(SandboxKey.From(SandboxWire.Key(call.Suspend)), ct));
+                Result<SandboxObservation> suspended = await provider.SuspendAsync(SandboxKey.From(SandboxWire.Key(call.Suspend)), ct);
+                return Observation(suspended);
             case Wire.SandboxCall.CallOneofCase.Resume:
-                return Observation(await provider.ResumeAsync(SandboxKey.From(SandboxWire.Key(call.Resume)), ct));
+                Result<SandboxObservation> resumed = await provider.ResumeAsync(SandboxKey.From(SandboxWire.Key(call.Resume)), ct);
+                return Observation(resumed);
             case Wire.SandboxCall.CallOneofCase.Observe:
                 SandboxObservation? observed = await provider.ObserveAsync(SandboxKey.From(SandboxWire.Key(call.Observe)), ct);
                 return observed is null
@@ -65,9 +68,12 @@ public static class SandboxCalls
                     SandboxKey.From(SandboxWire.Key(call.Snapshot.Sandbox)),
                     SnapshotKey.From(SandboxWire.Key(call.Snapshot.Snapshot)),
                     ct);
-                return snapshot.TryGetValue(out SnapshotObservation? taken, out Error? error)
-                    ? new Wire.SandboxCallResult { Snapshot = SandboxWire.ToWire(taken) }
-                    : new Wire.SandboxCallResult { Error = SandboxWire.ToWire(error) };
+                if (snapshot.Failed)
+                {
+                    return new Wire.SandboxCallResult { Error = SandboxWire.ToWire(snapshot.Error) };
+                }
+
+                return new Wire.SandboxCallResult { Snapshot = SandboxWire.ToWire(snapshot.Output) };
             case Wire.SandboxCall.CallOneofCase.ListSnapshots:
                 Wire.Snapshots snapshots = new Wire.Snapshots();
                 await foreach (SnapshotObservation listed in provider.ListSnapshotsAsync(ct))
@@ -89,8 +95,11 @@ public static class SandboxCalls
 
     private static Wire.SandboxCallResult Observation(Result<SandboxObservation> result)
     {
-        return result.TryGetValue(out SandboxObservation? sandbox, out Error? error)
-            ? new Wire.SandboxCallResult { Sandbox = SandboxWire.ToWire(sandbox) }
-            : new Wire.SandboxCallResult { Error = SandboxWire.ToWire(error) };
+        if (result.Failed)
+        {
+            return new Wire.SandboxCallResult { Error = SandboxWire.ToWire(result.Error) };
+        }
+
+        return new Wire.SandboxCallResult { Sandbox = SandboxWire.ToWire(result.Output) };
     }
 }

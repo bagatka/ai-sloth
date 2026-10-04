@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Bagatka.AiSloth.Chats.Data.Migrations;
 
 [DbContext(typeof(ChatsDbContext))]
-[Migration("20261004152155_Initial")]
-partial class _20261004152155_Initial
+[Migration("20261004163156_Initial")]
+partial class _20261004163156_Initial
 {
     /// <inheritdoc />
     protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -31,6 +31,20 @@ partial class _20261004152155_Initial
                 b.Property<Guid>("Id")
                     .HasColumnType("uuid")
                     .HasColumnName("id");
+
+                b.Property<Guid?>("AccountOwnerId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("account_owner_id");
+
+                b.Property<Guid>("AgentAccountId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("agent_account_id");
+
+                b.Property<string>("Harness")
+                    .IsRequired()
+                    .HasMaxLength(32)
+                    .HasColumnType("character varying(32)")
+                    .HasColumnName("harness");
 
                 b.Property<Guid?>("HarnessProcessId")
                     .HasColumnType("uuid")
@@ -94,6 +108,22 @@ partial class _20261004152155_Initial
                     .HasDatabaseName("ix_chats_nook_id_id");
 
                 b.ToTable("chats", "chats");
+            });
+
+        modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.ChatSender", b =>
+            {
+                b.Property<Guid>("ChatId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("chat_id");
+
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("user_id");
+
+                b.HasKey("ChatId", "UserId")
+                    .HasName("pk_senders");
+
+                b.ToTable("senders", "chats");
             });
 
         modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.Message", b =>

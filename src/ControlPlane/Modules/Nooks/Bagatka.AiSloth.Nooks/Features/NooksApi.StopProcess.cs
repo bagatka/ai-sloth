@@ -11,10 +11,13 @@ internal sealed partial class NooksApi
 {
     public async Task<Result> StopProcessAsync(Actor actor, StopProcess command, CancellationToken ct)
     {
-        if (!(await FindProcessAsync(actor, command.NookId, command.ProcessId, ct)).TryGetValue(out Process? process, out Error? missing))
+        Result<Process> found = await FindProcessAsync(actor, command.NookId, command.ProcessId, ct);
+        if (found.Failed)
         {
-            return new Result(missing);
+            return new Result(found.Error);
         }
+
+        Process process = found.Output;
 
         if (process.ExitCode is not null)
         {
@@ -22,7 +25,13 @@ internal sealed partial class NooksApi
         }
 
         DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
-        if (connection is null || !await connection.SendAsync(new DaemonInstruction(new StopProcessInstruction(process.Id)), ct))
+        if (connection is null)
+        {
+            return new Result(NooksErrors.NotReady);
+        }
+
+        bool sent = await connection.SendAsync(new DaemonInstruction(new StopProcessInstruction(process.Id)), ct);
+        if (!sent)
         {
             return new Result(NooksErrors.NotReady);
         }

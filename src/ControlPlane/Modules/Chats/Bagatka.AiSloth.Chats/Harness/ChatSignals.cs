@@ -17,7 +17,8 @@ internal sealed class ChatSignals
     {
         lock (_gate)
         {
-            if (!_waiting.TryGetValue(chat, out TaskCompletionSource? next))
+            TaskCompletionSource? next = _waiting.GetValueOrDefault(chat);
+            if (next is null)
             {
                 next = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 _waiting[chat] = next;

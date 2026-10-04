@@ -20,7 +20,7 @@ internal sealed class MachineConnections
         RemoteSandboxProvider? replaced;
         lock (_gate)
         {
-            _connected.TryGetValue(machine, out replaced);
+            replaced = _connected.GetValueOrDefault(machine);
             _connected[machine] = connection;
         }
 
@@ -32,7 +32,8 @@ internal sealed class MachineConnections
     {
         lock (_gate)
         {
-            if (_connected.TryGetValue(machine, out RemoteSandboxProvider? current) && current == connection)
+            RemoteSandboxProvider? current = _connected.GetValueOrDefault(machine);
+            if (current == connection)
             {
                 _connected.Remove(machine);
             }

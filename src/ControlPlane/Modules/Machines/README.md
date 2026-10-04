@@ -32,9 +32,15 @@ trades its code for a token, then connects with it. `MachineProvider` names the 
 the location format: a machine's ID.
 
 ```csharp
-MachineRegistration added = (await machines.AddAsync(owner, new AddMachine(workspaceId, "hetzner-1"), ct)).Value;
-// The owner runs on the computer: sloth machine connect https://… <added.Code>, then sloth machine run.
-// Nooks then create on provider "machine:<added.Machine.Id>".
+Result<MachineRegistration> added = await machines.AddAsync(owner, new AddMachine(workspaceId, "hetzner-1"), ct);
+if (added.Failed)
+{
+    return new Result(added.Error);
+}
+
+MachineRegistration registration = added.Output;
+// The owner runs on the computer: sloth machine connect https://… <registration.Code>, then sloth machine run.
+// Nooks then create on provider "machine:<registration.Machine.Id>".
 ```
 
 ## Asks

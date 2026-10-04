@@ -26,6 +26,7 @@ internal sealed partial class NooksApi(
     IEnumerable<ISandboxProvider> providers,
     DaemonConnections daemons,
     NookReconciler reconciler,
+    NooksSettings settings,
     TimeProvider time) : INooksApi, INookDaemonsApi
 {
     // How long a call waits for a nook's daemon, such as a new nook's first connection.
@@ -41,19 +42,25 @@ internal sealed partial class NooksApi(
             return null;
         }
 
-        bool allowed = actor switch
+        switch (actor)
         {
-            UserActor => await workspaces.GetRoleAsync(actor, nook.WorkspaceId, ct) is not null,
-            SystemActor => true,
-            AnonymousActor => false,
-        };
-        return allowed ? nook : null;
+            case UserActor:
+                WorkspaceRole? role = await workspaces.GetRoleAsync(actor, nook.WorkspaceId, ct);
+                return role is null ? null : nook;
+            case SystemActor:
+                return nook;
+            case AnonymousActor:
+                return null;
+        }
+
+        throw new InvalidOperationException("The actor has no kind.");
     }
 
     // The process, if the actor may use its nook.
     private async Task<Result<Process>> FindProcessAsync(Actor actor, NookId nookId, ProcessId processId, CancellationToken ct)
     {
-        if (await FindNookAsync(actor, nookId, ct) is null)
+        Nook? nook = await FindNookAsync(actor, nookId, ct);
+        if (nook is null)
         {
             return new Result<Process>(NooksErrors.NotFound);
         }
@@ -66,6 +73,11 @@ internal sealed partial class NooksApi(
     private async Task<DaemonConnection?> ConnectionAsync(NookId nookId, CancellationToken ct)
     {
         NookStatus status = await db.Nooks.Where(nook => nook.Id == nookId).Select(nook => nook.Status).SingleAsync(ct);
-        return status is NookStatus.Failed or NookStatus.Deleting ? null : await daemons.WaitAsync(nookId, ReadyTimeout, ct);
+        if (status is NookStatus.Failed or NookStatus.Deleting)
+        {
+            return null;
+        }
+
+        return await daemons.WaitAsync(nookId, ReadyTimeout, ct);
     }
 }

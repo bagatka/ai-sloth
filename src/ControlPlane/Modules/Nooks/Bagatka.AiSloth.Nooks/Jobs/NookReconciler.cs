@@ -122,17 +122,26 @@ internal sealed class NookReconciler(
             return;
         }
 
+        // A harness the deployment stopped offering has no image to start from.
+        string? image = nook.Harness is null ? settings.Image : settings.HarnessImages.GetValueOrDefault(nook.Harness);
+        if (image is null)
+        {
+            await FailAsync(db, nook, "The deployment no longer offers its harness.", ct);
+            return;
+        }
+
         // Saved first, so the daemon of the sandbox about to exist can prove itself.
         string token = nook.IssueDaemonToken();
-        if ((await db.SaveAsync(ct)).IsError(out _))
+        Result saved = await db.SaveAsync(ct);
+        if (saved.Failed)
         {
             return;
         }
 
-        Result<SandboxObservation> created = await provider.CreateAsync(Spec(nook, token), ct);
-        if (!created.TryGetValue(out _, out Error? error))
+        Result<SandboxObservation> created = await provider.CreateAsync(Spec(nook, image, token), ct);
+        if (created.Failed)
         {
-            await FailAsync(db, nook, error.Message, ct);
+            await FailAsync(db, nook, created.Error.Message, ct);
         }
     }
 
@@ -143,7 +152,8 @@ internal sealed class NookReconciler(
         // A deleted nook's processes have no rules left to protect, so they go in bulk.
         await db.Processes.Where(process => process.NookId == nook.Id).ExecuteDeleteAsync(ct);
         db.Nooks.Remove(nook);
-        if (!(await db.SaveAsync(ct)).IsError(out _))
+        Result saved = await db.SaveAsync(ct);
+        if (!saved.Failed)
         {
             Log.NookDeleted(logger, nook.Id.Value);
         }
@@ -152,17 +162,18 @@ internal sealed class NookReconciler(
     private async Task FailAsync(NooksDbContext db, Nook nook, string reason, CancellationToken ct)
     {
         nook.Fail();
-        if (!(await db.SaveAsync(ct)).IsError(out _))
+        Result saved = await db.SaveAsync(ct);
+        if (!saved.Failed)
         {
             Log.NookFailed(logger, nook.Id.Value, reason);
         }
     }
 
-    private SandboxSpec Spec(Nook nook, string token)
+    private SandboxSpec Spec(Nook nook, string image, string token)
     {
         return new SandboxSpec(
             SandboxKey.From(nook.Id.Value),
-            new SandboxSource(new SandboxImage(settings.Image)),
+            new SandboxSource(new SandboxImage(image)),
             new SandboxResources(settings.CpuMillicores, settings.MemoryMebibytes),
             new Dictionary<string, string>(StringComparer.Ordinal)
             {

@@ -21,8 +21,9 @@ service ControlPlane {
   rpc Connect(stream DaemonEvent) returns (stream DaemonInstruction);
 
   // One call per WatchOutput instruction, carrying bulk output on its own HTTP/2 stream, so a busy
-  // process never delays instructions. The first message is the header; the call ends when the
-  // process has exited and its output is delivered, or when the control plane cancels it.
+  // process never delays instructions. The first message is the header, then the output, then the
+  // process's exit once it has exited and all its output is sent. An upload that ends without the
+  // exit broke off, and the control plane watches again from where it stopped.
   rpc UploadOutput(stream OutputUploadMessage) returns (OutputUploadResult);
 }
 
@@ -52,7 +53,8 @@ message RunningProcess {
 }
 
 // Always the last thing reported about a process. A program that couldn't start exits with 127
-// and says why on standard error.
+// and says why on standard error. An upload for a process the daemon doesn't know, because the
+// daemon restarted since and the process ended with it, ends with exit code -1.
 message ProcessExited {
   string process_id = 1;
   int32 exit_code = 2;
@@ -110,7 +112,8 @@ message SendInput {
 }
 
 // Open an UploadOutput call for this watch and send the process's output from the offset: first
-// what was kept, then live. An offset that is no longer kept starts at the earliest byte kept.
+// what was kept, then live, then its exit. An offset that is no longer kept starts at the earliest
+// byte kept.
 message WatchOutput {
   string watch_id = 1;
   string process_id = 2;
@@ -126,6 +129,7 @@ message OutputUploadMessage {
   oneof part {
     OutputUploadHeader header = 1;
     ProcessOutput output = 2;
+    ProcessExited exited = 3;
   }
 }
 

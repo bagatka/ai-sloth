@@ -29,7 +29,7 @@ internal sealed class User
 
     public DateTimeOffset CreatedAt { get; private set; }
 
-    public static Result<User> Register(SignIn identity, TimeProvider time)
+    public static Result<User> Register(VerifiedIdentity identity, TimeProvider time)
     {
         if (identity.Issuer.Length is 0 or > MaxIssuerLength)
         {

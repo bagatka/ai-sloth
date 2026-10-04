@@ -15,7 +15,13 @@ internal sealed partial class MachinesApi
     public async Task<Result> RemoveAsync(Actor actor, MachineId id, CancellationToken ct)
     {
         Machine? machine = await db.Machines.SingleOrDefaultAsync(found => found.Id == id, ct);
-        switch (machine is null ? null : await workspaces.GetRoleAsync(actor, machine.WorkspaceId, ct))
+        if (machine is null)
+        {
+            return new Result(MachinesErrors.NotFound);
+        }
+
+        WorkspaceRole? role = await workspaces.GetRoleAsync(actor, machine.WorkspaceId, ct);
+        switch (role)
         {
             case null:
                 return new Result(MachinesErrors.NotFound);
@@ -27,7 +33,7 @@ internal sealed partial class MachinesApi
 
         // A removed machine's sandboxes live nowhere AiSloth can reach, so their placements go with it.
         await db.Placements.Where(placement => placement.MachineId == id).ExecuteDeleteAsync(ct);
-        db.Machines.Remove(machine!);
+        db.Machines.Remove(machine);
         Result removed = await db.SaveAsync(ct);
         connections.Disconnect(id);
         return removed;

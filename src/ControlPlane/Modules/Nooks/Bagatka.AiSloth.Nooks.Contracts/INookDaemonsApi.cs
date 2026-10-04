@@ -29,14 +29,15 @@ public interface INookDaemonsApi
         CancellationToken ct);
 
     /// <summary>
-    /// The output a daemon uploads for one <see cref="WatchOutputInstruction"/>. Returns when the
-    /// upload ends: the process exited and all its output was delivered, or the watcher left and
-    /// <paramref name="ct"/> was cancelled.
+    /// What a daemon uploads for one <see cref="WatchOutputInstruction"/>: the process's output, then
+    /// its exit once all output is delivered. Returns when the upload ends, or when the watcher left and
+    /// <paramref name="ct"/> was cancelled. An upload that ends without the exit broke off; the watch
+    /// asks again on the daemon's next connection.
     /// </summary>
     /// <returns>Success; unauthorized for a wrong token; or not found when the watch already ended.</returns>
     public Task<Result> AcceptOutputAsync(
         Actor actor,
         OutputUpload upload,
-        IAsyncEnumerable<ProcessOutput> output,
+        IAsyncEnumerable<ProcessEvent> events,
         CancellationToken ct);
 }

@@ -53,8 +53,12 @@ internal sealed class FakeIssuer : IAsyncDisposable
         app.MapGet("/.well-known/openid-configuration", issuer.Discovery);
         app.MapGet("/jwks", issuer.Keys);
         await app.StartAsync();
-        IServerAddressesFeature addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()
-            ?? throw new InvalidOperationException("Kestrel reported no addresses.");
+        IServerAddressesFeature? addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
+        if (addresses is null)
+        {
+            throw new InvalidOperationException("Kestrel reported no addresses.");
+        }
+
         issuer.Issuer = addresses.Addresses.Single();
         return issuer;
     }

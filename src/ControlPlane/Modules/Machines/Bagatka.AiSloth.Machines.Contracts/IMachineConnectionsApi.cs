@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.Foundation;
-using Bagatka.Sandboxing.Remote.V1;
+using Wire = Bagatka.Sandboxing.Remote.V1;
 
 namespace Bagatka.AiSloth.Machines.Contracts;
 
@@ -23,9 +23,9 @@ public interface IMachineConnectionsApi
     /// machine replaces an older one.
     /// </summary>
     /// <returns>The calls to run; or unauthorized when the token doesn't match the machine.</returns>
-    public Task<Result<IAsyncEnumerable<SandboxCall>>> ConnectAsync(
+    public Task<Result<IAsyncEnumerable<Wire.SandboxCall>>> ConnectAsync(
         Actor actor,
         ConnectMachine command,
-        IAsyncEnumerable<SandboxCallResult> results,
+        IAsyncEnumerable<Wire.SandboxCallResult> results,
         CancellationToken ct);
 }

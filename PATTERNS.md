@@ -25,14 +25,14 @@ should be able to read any file and see every conversion, registration, and defa
 
 - **No implicit conversions.**
   - Results and other union values are created with `new`: `new Result<UserProfile>(profile)`,
-    `new Result(error)`. Unions allow an implicit conversion from each case; don't use it.
+    `new Result(error)`. Unions allow an implicit conversion from each case; BAG0006 refuses it.
   - Typed IDs are created with `New()` and `From(...)`.
   - No type declares an `implicit operator`.
 - **No assembly scanning.** Every DI registration, EF configuration, type conversion, reaction,
   and endpoint group is a visible line in the code.
 - **Types are written out.**
   - No `var`.
-  - Object creation names its type: `new RenameUser(...)`, not `new(...)`.
+  - Object creation names its type: `new RenameUser(...)`, not `new(...)` (BAG0005).
 - **Accessibility is always written,** including `public` on interface members.
 - **Implicit usings are off.** Each file lists its own `using` directives, and unused ones fail
   the build.
@@ -46,6 +46,33 @@ should be able to read any file and see every conversion, registration, and defa
   - Culture and time zone are always explicit (entries 2 and 19).
 - **No hidden runtime behavior.** No `dynamic`, and no reflection-driven behavior in production
   code beyond what the framework itself requires.
+- **One step per statement.** A statement awaits, calls, saves, or decides; not several at once.
+  Canonical example: `src/ControlPlane/Modules/Users/Bagatka.AiSloth.Users/Features/UsersApi.SignIn.cs`.
+  - An `await` is its statement's whole expression (BAG0001): `await X;`, `T x = await X;`,
+    `x = await X;`, `return await X;`, or `=> await X`. Never inside a condition, an argument, a
+    `foreach` header, a switch arm, or a larger expression: await into a local, then use it.
+  - Conditions only read values computed before them: no save or other side effect inside an
+    `if`, `switch`, or ternary condition.
+  - Name conditions that don't read as a sentence on their own:
+    `bool otherSignInWon = saved.Error == ModuleDbContextExtensions.AlreadyExists;`. Conditions
+    like `user is null` and `result.Failed` stay inline.
+  - Check `result.Failed` itself in the `if`, not a bool computed from it: nullable analysis
+    doesn't see through a local bool, so `Output` and `Error` would no longer compile unchecked
+    (entry 11).
+  - A `while` condition may read the next item: `while (await stream.MoveNextAsync())`,
+    `while (reader.TryRead(out T item))`. Prefer `await foreach` where the source offers it
+    (`ReadAllAsync` on channels and gRPC streams).
+- **No `out` in our own APIs.** A method returns a nullable when absence is the only other
+  outcome (`MachineProvider.ParseLocation` returns `MachineId?`), a `Result` when it can fail for
+  reasons, and a bool only when the outcome is just whether it happened (`OutputJournal.TryAppend`).
+  - Our methods declare no `out` parameters (BAG0003), except where an override, an interface,
+    or `Deconstruct` dictates the signature.
+  - A platform `Try…(out …)` call is its own statement (BAG0002):
+    `bool parsed = Guid.TryParse(text, CultureInfo.InvariantCulture, out Guid id);`. When several
+    places need it, a helper returns a nullable instead (`Json.Property` in `Bagatka.Harnesses`).
+  - Dictionary lookups use `GetValueOrDefault`, and membership uses `ContainsKey` (BAG0007).
+- **No local functions** (BAG0004), except in top-level programs (`Program.cs`, `AppHost.cs`). A
+  helper is a private method, even when only one method calls it.
 - **One deliberate exception: global query filters** for tenant isolation and soft delete,
   because forgetting them is a security bug. Opting out with `IgnoreQueryFilters()` requires a
   comment explaining why.
@@ -160,8 +187,12 @@ public sealed record UserProfile(UserId Id, string DisplayName, DateTimeOffset C
 - **One interface per module.** `I<Module>Api` lists every feature, and every caller uses it.
 - **Signature shape.** `Actor` first, `CancellationToken ct` last, always async.
 - **Inputs.**
-  - State-changing features take one command record named after the feature.
-  - Commands carry raw input. Parsing into value types happens inside the module.
+  - State-changing features take one input record.
+  - A command, a request the module may refuse, is named verb plus object, after the feature:
+    `RenameUser`, `StartChat`. A fact the caller already established is named for what it is:
+    `SignInAsync` takes a `VerifiedIdentity`, which a token proved. Never a bare verb such as
+    `SignIn`, which doesn't say whether it is an action, an input, or an outcome.
+  - Inputs carry raw values. Parsing into value types happens inside the module.
 - **Outputs.**
   - Anything that can fail in an expected way returns `Result` or `Result<T>`.
   - Anything shown in lists gets a batch read or a `Page<T>`.
@@ -226,10 +257,11 @@ internal sealed partial class UsersApi
             return new Result(Error.Forbidden);
         }
 
-        // 2. Parse input: after this check the compiler knows `name` is set
-        if (!DisplayName.Parse(command.DisplayName).TryGetValue(out DisplayName? name, out Error? invalid))
+        // 2. Parse input: after the Failed check the compiler knows Output is set
+        Result<DisplayName> name = DisplayName.Parse(command.DisplayName);
+        if (name.Failed)
         {
-            return new Result(invalid);
+            return new Result(name.Error);
         }
 
         // 3. Load
@@ -240,8 +272,8 @@ internal sealed partial class UsersApi
         }
 
         // 4. Decide: the entity owns the rule and adds its event to the outbox
-        Result renamed = user.Rename(name, db.Outbox);
-        if (renamed.IsError(out _))
+        Result renamed = user.Rename(name.Output, db.Outbox);
+        if (renamed.Failed)
         {
             return renamed;
         }
@@ -262,7 +294,7 @@ Canonical examples: `Features/WorkspacesApi.CreateWorkspace.cs` and the query he
 - **No rules in features.** A feature that needs an `if` about business meaning is holding a
   rule that belongs in an entity or value type.
 - **Helpers.**
-  - A helper used by one feature is a local function inside that feature's method.
+  - A helper used by one feature is a private method in that feature's file.
   - A helper shared by several features is a private method in `<Module>Api.cs`.
 - **No state.** `<Module>Api` holds nothing beyond its constructor dependencies. A growing
   constructor means the module is doing too much.
@@ -345,9 +377,13 @@ internal sealed class DisplayNameConverter() : ValueConverter<DisplayName, strin
 {
     private static DisplayName FromStored(string value)
     {
-        return DisplayName.Parse(value).TryGetValue(out DisplayName? name, out Error? invalid)
-            ? name
-            : throw new InvalidOperationException("Stored display name is invalid: " + invalid.Message);
+        Result<DisplayName> parsed = DisplayName.Parse(value);
+        if (parsed.Failed)
+        {
+            throw new InvalidOperationException("A stored display name is invalid: " + parsed.Error.Message);
+        }
+
+        return parsed.Output;
     }
 }
 ```
@@ -363,10 +399,11 @@ module.
   field. `Result.Combine` isn't implemented yet; add it to Foundation with the first feature
   that parses several inputs, in this shape:
   ```csharp
-  if (!Result.Combine(DisplayName.Parse(command.DisplayName), EmailAddress.Parse(command.Email))
-          .TryGetValue(out (DisplayName Name, EmailAddress Email) inputs, out Error? invalid))
+  Result<(DisplayName Name, EmailAddress Email)> inputs =
+      Result.Combine(DisplayName.Parse(command.DisplayName), EmailAddress.Parse(command.Email));
+  if (inputs.Failed)
   {
-      return new Result(invalid);
+      return new Result(inputs.Error);
   }
   ```
 - **Never silently truncate or "fix" input.** Reject it with a clear message. If shortening is a
@@ -453,24 +490,23 @@ Result failed = new Result(UsersErrors.NotFound);
 Result<UserProfile> found = new Result<UserProfile>(profile);
 Result<UserProfile> missing = new Result<UserProfile>(UsersErrors.NotFound);
 
-// Inside a module: continue only on success. The compiler knows which out value is set.
-if (!found.TryGetValue(out UserProfile? value, out Error? error))
+// Check Failed, then read Error inside the branch and Output after it.
+if (found.Failed)
 {
-    return new Result(error);
+    return new Result(found.Error);
 }
 
-// At an edge: switch over both cases. Forgetting one fails the build.
-Results<Ok<UserProfile>, ProblemHttpResult> response = found switch
-{
-    UserProfile profile => TypedResults.Ok(profile),
-    Error failure => failure.ToProblem(),
-};
+UserProfile profile = found.Output;
 ```
 
 - **Created with `new`.** `new Result(new Success())`, `new Result(error)`,
   `new Result<T>(value)`. No factories, no implicit conversions.
-- **Read through the compiler.** Use `TryGetValue` (or `IsError` for `Result`) inside modules
-  and an exhaustive `switch` at edges. There is no `.Value` that throws when you forget to check.
+- **Read with `Failed`, everywhere.** Modules and edges alike check `result.Failed` directly in
+  an `if`, then read `Error` in the branch and `Output` after it.
+  - The compiler tracks the check: reading `Output` or `Error` without it is a nullable warning,
+    so the build fails. It doesn't track a check stored in another bool, so test `Failed` itself.
+  - `Output` throws on a failed or default result. For a value-type `T` the compiler can't warn,
+    so that throw is the only guard.
 - **Values vs exceptions.** Expected outcomes (invalid input, not found, conflict, forbidden)
   are `Error` values. Exceptions are for bugs and infrastructure failures.
 - **What an `Error` carries.** A `Kind`, a stable `Code`, a developer-facing English `Message`,
@@ -612,6 +648,12 @@ arrives with the first integration event.
   them only for maintenance on data without rules, with a comment saying why.
 - **Raw SQL.** Only through EF's parameterized APIs (`FromSql`, `SqlQuery`), and only for a
   measured need. Never concatenate SQL.
+- **Secrets at rest.** A secret a module must keep, such as an agent account's key, is stored
+  sealed with AES-256-GCM under a key from the module's settings, bound to its row's ID so it can't
+  be moved to another row. It is decrypted only to hand to whoever uses it, in a record whose text
+  form leaves it out, and never logged. A secret the module only checks, such as a daemon's or a
+  machine's token, is stored as its SHA-256 hash instead. Canonical example:
+  `src/ControlPlane/Modules/AgentAccounts/Bagatka.AiSloth.AgentAccounts/Model/SecretBox.cs`.
 - **Concurrency.** Entities that can be edited concurrently get a concurrency token in their
   configuration.
 
@@ -701,7 +743,7 @@ internal sealed partial class WorkspacesApi
 
         // Decide on our own data only; the entity checks the actor's role
         Result added = workspace.AddMember(user.Id, actor, db.Outbox);
-        if (added.IsError(out _))
+        if (added.Failed)
         {
             return added;
         }
@@ -1025,21 +1067,24 @@ The build files are the specification; this entry says what each one owns.
 | `dotnet-tools.json` | The pinned Aspire CLI (`dotnet aspire update` upgrades it with the AppHost) and `dotnet-ef` |
 | `NuGet.Config` | The only package source, with every package mapped to it |
 | `tests/Directory.Build.props` | The shape of every test project |
+| `analyzers/Bagatka.Analyzers` | Our own rules, `BAG0001`–`BAG0007`: the code shape of entry 1 that no off-the-shelf analyzer checks. Every project gets it through `Directory.Build.props`; each rule has a test in `tests/Bagatka.Analyzers.Tests` |
 
 - **Rules are turned off only in `.editorconfig`,** with a one-line reason, scoped to a path when
   only some files need it. Never `#pragma` or `[SuppressMessage]`.
-- **Not caught by the compiler yet:** target-typed `new(...)` and implicit union conversions. No
-  off-the-shelf analyzer covers them; reviews do. If they keep slipping through, write a small
-  analyzer in this repository.
 - **New packages need clear net value.** Call them out in the change summary.
-- **Repeated mistakes become bans.** When a mistake repeats, ban the API or raise an analyzer
-  rule rather than adding another paragraph here.
+- **Repeated mistakes become bans.** When a mistake repeats, ban the API, raise an analyzer rule,
+  or add a `BAG` rule with its test, rather than adding another paragraph here.
 
 ## 28. Files and naming
 
 - **One top-level type per file,** and the file is named after it: `UserId.cs`. Generic types use
   braces: `Result{T}.cs`. Partial types add a suffix: `UsersApi.RenameUser.cs`. MA0048 enforces
   this.
+- **Generated protocol types go through an alias in the control plane:**
+  `using Wire = Bagatka.AiSloth.DaemonProtocol.V1;`, then `Wire.Hello`. Generated messages share
+  names with our own types (`Error`, `Hello`, `ProcessExited`), and the alias keeps both readable. A
+  second protocol in the same file gets an alias named for its messages (`Calls` in
+  `MachineEndpoint`). The daemon and the CLI speak their protocols natively and import them directly.
 - **Nested types stay nested** only when they belong to their parent alone, such as an endpoint's
   request record.
 

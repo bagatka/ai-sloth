@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\Daemon\Bagatka.AiSloth.DaemonProtocol\Bagatka.AiSloth.DaemonProtocol.csproj" />
     <ProjectReference Include="..\..\Foundation\Bagatka.Foundation.Web\Bagatka.Foundation.Web.csproj" />
     <ProjectReference Include="..\..\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
+    <ProjectReference Include="..\Modules\AgentAccounts\Bagatka.AiSloth.AgentAccounts\Bagatka.AiSloth.AgentAccounts.csproj" />
     <ProjectReference Include="..\Modules\Chats\Bagatka.AiSloth.Chats\Bagatka.AiSloth.Chats.csproj" />
     <ProjectReference Include="..\Modules\Machines\Bagatka.AiSloth.Machines\Bagatka.AiSloth.Machines.csproj" />
     <ProjectReference Include="..\Modules\Nooks\Bagatka.AiSloth.Nooks\Bagatka.AiSloth.Nooks.csproj" />

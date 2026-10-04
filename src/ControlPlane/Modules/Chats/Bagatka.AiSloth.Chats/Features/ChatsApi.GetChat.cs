@@ -11,8 +11,12 @@ internal sealed partial class ChatsApi
     public async Task<Result<ChatSummary>> GetAsync(Actor actor, ChatId id, CancellationToken ct)
     {
         Chat? chat = await FindChatAsync(actor, id, ct);
-        return chat is null
-            ? new Result<ChatSummary>(ChatsErrors.NotFound)
-            : new Result<ChatSummary>(chat.ToSummary(await MessagesWaitingAsync(id, ct)));
+        if (chat is null)
+        {
+            return new Result<ChatSummary>(ChatsErrors.NotFound);
+        }
+
+        ChatSummary summary = await SummaryAsync(chat, ct);
+        return new Result<ChatSummary>(summary);
     }
 }

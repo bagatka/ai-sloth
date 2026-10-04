@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Chats.Data;
 using Bagatka.AiSloth.Chats.Harness;
@@ -19,6 +22,7 @@ internal sealed partial class ChatsApi(
     IDbContextFactory<ChatsDbContext> databases,
     IWorkspacesApi workspaces,
     INooksApi nooks,
+    IAgentAccountsApi accounts,
     ChatRunners runners,
     ChatSignals signals,
     TimeProvider time) : IChatsApi, IChatHarnessesApi
@@ -27,12 +31,20 @@ internal sealed partial class ChatsApi(
     private async Task<Chat?> FindChatAsync(Actor actor, ChatId id, CancellationToken ct)
     {
         Chat? chat = await db.Chats.AsNoTracking().SingleOrDefaultAsync(found => found.Id == id, ct);
-        return chat is not null && await workspaces.GetRoleAsync(actor, chat.WorkspaceId, ct) is not null ? chat : null;
+        if (chat is null)
+        {
+            return null;
+        }
+
+        WorkspaceRole? role = await workspaces.GetRoleAsync(actor, chat.WorkspaceId, ct);
+        return role is null ? null : chat;
     }
 
-    private async Task<bool> MessagesWaitingAsync(ChatId id, CancellationToken ct)
+    private async Task<ChatSummary> SummaryAsync(Chat chat, CancellationToken ct)
     {
-        return await db.Messages.AnyAsync(message => message.ChatId == id
+        bool waiting = await db.Messages.AnyAsync(message => message.ChatId == chat.Id
             && (message.State == MessageState.New || message.State == MessageState.Queued || message.State == MessageState.Steering), ct);
+        List<UserId> letIn = await db.Senders.Where(sender => sender.ChatId == chat.Id).OrderBy(sender => sender.UserId).Select(sender => sender.UserId).ToListAsync(ct);
+        return chat.ToSummary(waiting, letIn);
     }
 }

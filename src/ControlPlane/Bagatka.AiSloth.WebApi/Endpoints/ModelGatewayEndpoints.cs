@@ -13,10 +13,10 @@ using Microsoft.Extensions.Primitives;
 namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 /// <summary>
-/// The model gateway: agents in nooks call the model provider through it, and it adds the
-/// deployment's key, so no nook ever holds one. A call must carry its chat's token, as a bearer token
-/// or an API key; Chats decides whether it does. Everything else passes through unchanged, streams
-/// included.
+/// The model gateway: agents in nooks call the model provider through it, and it adds the key of
+/// their chat's agent account, so no nook ever holds one. A call must carry its chat's token, as a
+/// bearer token or an API key; Chats says which key that token stands for. Everything else passes
+/// through unchanged, streams included.
 /// </summary>
 internal static class ModelGatewayEndpoints
 {
@@ -41,10 +41,17 @@ internal static class ModelGatewayEndpoints
         [FromServices] IHttpClientFactory clients)
     {
         HttpRequest request = context.Request;
-        string? token = request.Headers.Authorization.ToString() is { } authorization && authorization.StartsWith("Bearer ", StringComparison.Ordinal)
-            ? authorization["Bearer ".Length..]
-            : request.Headers["X-Api-Key"].ToString();
-        if (string.IsNullOrEmpty(token) || (await chats.AuthorizeModelCallAsync(Actor.Anonymous, token, context.RequestAborted)).IsError(out _))
+        string authorization = request.Headers.Authorization.ToString();
+        bool bearer = authorization.StartsWith("Bearer ", StringComparison.Ordinal);
+        string token = bearer ? authorization["Bearer ".Length..] : request.Headers["X-Api-Key"].ToString();
+        if (token.Length == 0)
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        Result<string> key = await chats.GetModelKeyAsync(Actor.Anonymous, token, context.RequestAborted);
+        if (key.Failed)
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return;
@@ -58,13 +65,20 @@ internal static class ModelGatewayEndpoints
 
         foreach (KeyValuePair<string, StringValues> header in request.Headers)
         {
-            if (!NotForwarded.Contains(header.Key) && !forwarded.Headers.TryAddWithoutValidation(header.Key, (IEnumerable<string?>)header.Value))
+            if (NotForwarded.Contains(header.Key))
             {
-                forwarded.Content?.Headers.TryAddWithoutValidation(header.Key, (IEnumerable<string?>)header.Value);
+                continue;
+            }
+
+            IEnumerable<string?> values = header.Value;
+            bool isRequestHeader = forwarded.Headers.TryAddWithoutValidation(header.Key, values);
+            if (!isRequestHeader)
+            {
+                forwarded.Content?.Headers.TryAddWithoutValidation(header.Key, values);
             }
         }
 
-        forwarded.Headers.Add("X-Api-Key", settings.ApiKey);
+        forwarded.Headers.Add("X-Api-Key", key.Output);
 
         using HttpResponseMessage response = await clients.CreateClient(HttpClientName)
             .SendAsync(forwarded, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);

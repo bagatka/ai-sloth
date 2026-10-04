@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Foundation\Bagatka.Foundation\Bagatka.Foundation.csproj" />
+    <ProjectReference Include="..\..\AgentAccounts\Bagatka.AiSloth.AgentAccounts.Contracts\Bagatka.AiSloth.AgentAccounts.Contracts.csproj" />
     <ProjectReference Include="..\..\Nooks\Bagatka.AiSloth.Nooks.Contracts\Bagatka.AiSloth.Nooks.Contracts.csproj" />
     <ProjectReference Include="..\..\Workspaces\Bagatka.AiSloth.Workspaces.Contracts\Bagatka.AiSloth.Workspaces.Contracts.csproj" />
   </ItemGroup>

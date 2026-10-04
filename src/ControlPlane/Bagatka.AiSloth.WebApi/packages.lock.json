@@ -93,15 +93,6 @@
           "Microsoft.CodeAnalysis.Analyzers": "5.3.0-2.25625.1"
         }
       },
-      "Microsoft.CodeAnalysis.CSharp": {
-        "type": "Transitive",
-        "resolved": "5.3.0",
-        "contentHash": "SQFNGQF4f7UfDXKxMzzGNMr3fjrPDIjLfmRvvVgDCw+dyvEHDaRfHuKA5q0Pr0/JW0Gcw89TxrxrS/MjwBvluQ==",
-        "dependencies": {
-          "Microsoft.CodeAnalysis.Analyzers": "5.3.0-2.25625.1",
-          "Microsoft.CodeAnalysis.Common": "[5.3.0]"
-        }
-      },
       "Microsoft.CodeAnalysis.CSharp.Workspaces": {
         "type": "Transitive",
         "resolved": "5.3.0",
@@ -321,16 +312,32 @@
           "Microsoft.IdentityModel.Tokens": "8.19.2"
         }
       },
+      "bagatka.aisloth.agentaccounts": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.AgentAccounts.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation.Modules": "[1.0.0, )"
+        }
+      },
+      "bagatka.aisloth.agentaccounts.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
       "bagatka.aisloth.chats": {
         "type": "Project",
         "dependencies": {
           "Bagatka.AiSloth.Chats.Contracts": "[1.0.0, )",
-          "Bagatka.Foundation.Modules": "[1.0.0, )"
+          "Bagatka.Foundation.Modules": "[1.0.0, )",
+          "Bagatka.Harnesses": "[1.0.0, )"
         }
       },
       "bagatka.aisloth.chats.contracts": {
         "type": "Project",
         "dependencies": {
+          "Bagatka.AiSloth.AgentAccounts.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Nooks.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
           "Bagatka.Foundation": "[1.0.0, )"
@@ -425,6 +432,9 @@
           "Bagatka.Foundation": "[1.0.0, )"
         }
       },
+      "bagatka.harnesses": {
+        "type": "Project"
+      },
       "bagatka.sandboxing": {
         "type": "Project",
         "dependencies": {
@@ -483,6 +493,16 @@
         "requested": "[2.84.0, )",
         "resolved": "2.84.0",
         "contentHash": "p2SOMl6q/GZ4/5MLkgboC/z55g4zKUEruRn/g46QgppjQBVnsLZVBU/9VO7n60ll38G3Eo8Zu9b7x+W01GKFVg=="
+      },
+      "Microsoft.CodeAnalysis.CSharp": {
+        "type": "CentralTransitive",
+        "requested": "[5.9.0, )",
+        "resolved": "5.3.0",
+        "contentHash": "SQFNGQF4f7UfDXKxMzzGNMr3fjrPDIjLfmRvvVgDCw+dyvEHDaRfHuKA5q0Pr0/JW0Gcw89TxrxrS/MjwBvluQ==",
+        "dependencies": {
+          "Microsoft.CodeAnalysis.Analyzers": "5.3.0-2.25625.1",
+          "Microsoft.CodeAnalysis.Common": "[5.3.0]"
+        }
       },
       "Microsoft.Extensions.ServiceDiscovery": {
         "type": "CentralTransitive",

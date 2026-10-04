@@ -14,20 +14,22 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<Page<ProcessSummary>>> ListProcessesAsync(Actor actor, NookId nookId, PageRequest page, CancellationToken ct)
     {
-        if (await FindNookAsync(actor, nookId, ct) is null)
+        Nook? nook = await FindNookAsync(actor, nookId, ct);
+        if (nook is null)
         {
             return new Result<Page<ProcessSummary>>(NooksErrors.NotFound);
         }
 
-        if (!db.Processes.AsNoTracking()
-                .Where(process => process.NookId == nookId)
-                .TakePage(process => process.Id, KeysetOrder.NewestFirst, page)
-                .TryGetValue(out IQueryable<Process>? query, out Error? invalid))
+        Result<IQueryable<Process>> paged = db.Processes.AsNoTracking()
+            .Where(process => process.NookId == nookId)
+            .TakePage(process => process.Id, KeysetOrder.NewestFirst, page);
+        if (paged.Failed)
         {
-            return new Result<Page<ProcessSummary>>(invalid);
+            return new Result<Page<ProcessSummary>>(paged.Error);
         }
 
-        List<ProcessSummary> fetched = (await query.ToListAsync(ct)).Select(process => process.ToSummary()).ToList();
+        List<Process> processes = await paged.Output.ToListAsync(ct);
+        List<ProcessSummary> fetched = processes.Select(process => process.ToSummary()).ToList();
         return new Result<Page<ProcessSummary>>(Keyset.ToPage(fetched, page, process => process.Id.Value));
     }
 }

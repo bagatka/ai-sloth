@@ -17,7 +17,7 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261004134811_AddNookLocation";
+    public override string LastMigrationId => "20261004164339_AddNookHarness";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -50,6 +50,11 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
                 b.Property<long?>("DiskTotalBytes")
                     .HasColumnType("bigint")
                     .HasColumnName("disk_total_bytes");
+
+                b.Property<string>("Harness")
+                    .HasMaxLength(32)
+                    .HasColumnType("character varying(32)")
+                    .HasColumnName("harness");
 
                 b.Property<string>("Location")
                     .HasMaxLength(64)

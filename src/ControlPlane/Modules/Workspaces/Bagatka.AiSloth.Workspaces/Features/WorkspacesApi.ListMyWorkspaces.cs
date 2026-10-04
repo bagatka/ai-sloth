@@ -18,12 +18,13 @@ internal sealed partial class WorkspacesApi
             return new Result<Page<WorkspaceSummary>>(Error.Unauthorized);
         }
 
-        if (!MembershipsOf(user.UserId).TakePage(membership => membership.Id, KeysetOrder.OldestFirst, page).TryGetValue(out IQueryable<Membership>? query, out Error? invalid))
+        Result<IQueryable<Membership>> paged = MembershipsOf(user.UserId).TakePage(membership => membership.Id, KeysetOrder.OldestFirst, page);
+        if (paged.Failed)
         {
-            return new Result<Page<WorkspaceSummary>>(invalid);
+            return new Result<Page<WorkspaceSummary>>(paged.Error);
         }
 
-        List<WorkspaceSummary> fetched = await query
+        List<WorkspaceSummary> fetched = await paged.Output
             .Select(membership => new WorkspaceSummary(membership.Id, membership.Name.Value, membership.Role))
             .ToListAsync(ct);
         return new Result<Page<WorkspaceSummary>>(Keyset.ToPage(fetched, page, workspace => workspace.Id.Value));

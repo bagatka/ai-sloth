@@ -66,13 +66,14 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
             return Repeated(existing, specHash);
         }
 
-        if (!(await ResolveImageAsync(spec.Source, ct)).TryGetValue(out string? image, out Error? missing))
+        Result<string> image = await ResolveImageAsync(spec.Source, ct);
+        if (image.Failed)
         {
-            return new Result<SandboxObservation>(missing);
+            return new Result<SandboxObservation>(image.Error);
         }
 
         ContainerConfiguration configuration = new ContainerConfiguration(
-            image,
+            image.Output,
             spec.Environment.Select(variable => variable.Key + "=" + variable.Value).ToList(),
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -84,15 +85,23 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
             MemoryBytes: spec.Resources.MemoryMebibytes * 1024L * 1024L,
             ExtraHosts);
 
-        if (!(await docker.CreateContainerAsync(name, configuration, ct)).TryGetValue(out string? id, out Error? failed))
+        Result<string> created = await docker.CreateContainerAsync(name, configuration, ct);
+        if (created.Failed)
         {
             // A concurrent call may have created it first; answer as for a repeated call.
-            ContainerDetails? raced = failed.Kind == ErrorKind.Conflict ? await docker.InspectContainerAsync(name, ct) : null;
-            return raced is not null ? Repeated(raced, specHash) : new Result<SandboxObservation>(failed);
+            bool nameTaken = created.Error.Kind == ErrorKind.Conflict;
+            ContainerDetails? raced = null;
+            if (nameTaken)
+            {
+                raced = await docker.InspectContainerAsync(name, ct);
+            }
+
+            return raced is null ? new Result<SandboxObservation>(created.Error) : Repeated(raced, specHash);
         }
 
-        await docker.StartContainerAsync(id, ct);
-        return new Result<SandboxObservation>(Observe(await InspectRequiredAsync(id, ct)));
+        await docker.StartContainerAsync(created.Output, ct);
+        ContainerDetails started = await InspectRequiredAsync(created.Output, ct);
+        return new Result<SandboxObservation>(Observe(started));
     }
 
     public async Task<Result<SandboxObservation>> SuspendAsync(SandboxKey key, CancellationToken ct)
@@ -191,8 +200,12 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
             return new Result<SnapshotObservation>(SandboxNotFound);
         }
 
-        ImageDetails image = await docker.InspectImageAsync(container.ImageId, ct)
-            ?? throw new InvalidOperationException("The image of sandbox " + Format(sandbox.Value) + " is missing.");
+        ImageDetails? image = await docker.InspectImageAsync(container.ImageId, ct);
+        if (image is null)
+        {
+            throw new InvalidOperationException("The image of sandbox " + Format(sandbox.Value) + " is missing.");
+        }
+
         CommitConfiguration configuration = new CommitConfiguration(
             WithoutSandboxValues(container.Environment, image.Environment),
             new Dictionary<string, string>(StringComparer.Ordinal)
@@ -203,8 +216,12 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
             });
 
         await docker.CommitContainerAsync(container.Id, SnapshotRepository, Format(snapshot.Value), configuration, ct);
-        ImageListItem committed = await FindSnapshotAsync(snapshot, ct)
-            ?? throw new InvalidOperationException("Snapshot " + Format(snapshot.Value) + " was committed but isn't listed.");
+        ImageListItem? committed = await FindSnapshotAsync(snapshot, ct);
+        if (committed is null)
+        {
+            throw new InvalidOperationException("Snapshot " + Format(snapshot.Value) + " was committed but isn't listed.");
+        }
+
         return new Result<SnapshotObservation>(ObserveSnapshot(committed));
     }
 
@@ -236,24 +253,39 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
 
     private static SandboxObservation Observe(ContainerDetails container)
     {
-        Guid key = ParseKey(container.Labels, KeyLabel)
-            ?? throw new InvalidOperationException("Container " + container.Name + " has no sandbox key label.");
+        Guid? key = ParseKey(container.Labels, KeyLabel);
+        if (key is null)
+        {
+            throw new InvalidOperationException("Container " + container.Name + " has no sandbox key label.");
+        }
+
         SandboxState state = StateOf(container.Status);
-        string? reason = state == SandboxState.Failed
-            ? container.Error.Length > 0
+        string? reason = null;
+        if (state == SandboxState.Failed)
+        {
+            reason = container.Error.Length > 0
                 ? container.Error
-                : string.Create(CultureInfo.InvariantCulture, $"Docker reports the container '{container.Status}' with exit code {container.ExitCode}.")
-            : null;
-        return new SandboxObservation(SandboxKey.From(key), state, container.Created, reason);
+                : string.Create(CultureInfo.InvariantCulture, $"Docker reports the container '{container.Status}' with exit code {container.ExitCode}.");
+        }
+
+        return new SandboxObservation(SandboxKey.From(key.Value), state, container.Created, reason);
     }
 
     private static SnapshotObservation ObserveSnapshot(ImageListItem image)
     {
-        Guid snapshot = ParseKey(image.Labels, SnapshotLabel)
-            ?? throw new InvalidOperationException("Image " + image.Id + " has no snapshot key label.");
-        Guid source = ParseKey(image.Labels, SourceLabel)
-            ?? throw new InvalidOperationException("Image " + image.Id + " has no source label.");
-        return new SnapshotObservation(SnapshotKey.From(snapshot), SandboxKey.From(source), image.Created);
+        Guid? snapshot = ParseKey(image.Labels, SnapshotLabel);
+        if (snapshot is null)
+        {
+            throw new InvalidOperationException("Image " + image.Id + " has no snapshot key label.");
+        }
+
+        Guid? source = ParseKey(image.Labels, SourceLabel);
+        if (source is null)
+        {
+            throw new InvalidOperationException("Image " + image.Id + " has no source label.");
+        }
+
+        return new SnapshotObservation(SnapshotKey.From(snapshot.Value), SandboxKey.From(source.Value), image.Created);
     }
 
     private static SandboxState StateOf(string status)
@@ -313,12 +345,13 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
 
     private static string? Label(IReadOnlyDictionary<string, string> labels, string name)
     {
-        return labels.TryGetValue(name, out string? value) ? value : null;
+        return labels.GetValueOrDefault(name);
     }
 
     private static Guid? ParseKey(IReadOnlyDictionary<string, string> labels, string name)
     {
-        return Guid.TryParseExact(Label(labels, name), "N", out Guid key) ? key : null;
+        bool parsed = Guid.TryParseExact(Label(labels, name), "N", out Guid key);
+        return parsed ? key : null;
     }
 
     private static string Format(Guid value)
@@ -331,16 +364,18 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
         switch (source.Value)
         {
             case SandboxImage image:
-                if (await docker.InspectImageAsync(image.Reference, ct) is null)
+                ImageDetails? pulled = await docker.InspectImageAsync(image.Reference, ct);
+                if (pulled is null)
                 {
                     await docker.PullImageAsync(image.Reference, ct);
                 }
 
                 return new Result<string>(image.Reference);
             case SnapshotKey snapshot:
-                return await FindSnapshotAsync(snapshot, ct) is not null
-                    ? new Result<string>(SnapshotReference(snapshot))
-                    : new Result<string>(Error.NotFound("sandboxing.snapshot_not_found", "The snapshot doesn't exist."));
+                ImageListItem? saved = await FindSnapshotAsync(snapshot, ct);
+                return saved is null
+                    ? new Result<string>(Error.NotFound("sandboxing.snapshot_not_found", "The snapshot doesn't exist."))
+                    : new Result<string>(SnapshotReference(snapshot));
             default:
                 throw new InvalidOperationException("The sandbox source is default.");
         }
@@ -356,8 +391,13 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
     {
         // Not handled: another caller deleting the sandbox between two calls of one operation;
         // answering not found instead would need every caller of this method to return a result.
-        return await docker.InspectContainerAsync(id, ct)
-            ?? throw new InvalidOperationException("Container " + id + " disappeared while being changed.");
+        ContainerDetails? container = await docker.InspectContainerAsync(id, ct);
+        if (container is null)
+        {
+            throw new InvalidOperationException("Container " + id + " disappeared while being changed.");
+        }
+
+        return container;
     }
 
     private string ContainerName(SandboxKey key)

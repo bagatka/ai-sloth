@@ -13,7 +13,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Module | A capability with one contract, its own data, and an internal implementation | `src/ControlPlane/Modules/<Module>` | service (until extracted), component, domain |
 | Contract | A module's public interface `I<Module>Api` and its records | `<Module>.Contracts` | facade, client, port |
 | Feature | One contract method, implemented in one file | `Features/<Module>Api.<Feature>.cs` | use case, handler, command handler |
-| Command | Record carrying input to a state-changing feature | Contracts | request, DTO |
+| Command | Record carrying input to a state-changing feature, named verb plus object (`RenameUser`) | Contracts | request, DTO |
 | DTO | Record a contract returns | Contracts | model, view model, response |
 | Request | HTTP input record in the WebApi | `Endpoints/` | command |
 | WebApi | The HTTP host and composition root of the control plane | `Bagatka.AiSloth.WebApi` | gateway, API layer, BFF, controllers |
@@ -46,7 +46,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Turn | One message in a chat and everything the agent did in reply, ending with a stop reason | Chats | step, exchange |
 | Steering | A message sent during a turn going into that turn, so the agent reads it while it works | Chats | interrupt, injection |
 | Stop | Ending the running turn at once; messages the agent hasn't received are cancelled | Chats | cancel (in the product), abort, interrupt |
-| Model gateway | The WebApi endpoint agents call the model provider through; it adds the deployment's key, so no nook holds one | WebApi, Chats | LLM proxy, API proxy |
+| Model gateway | The WebApi endpoint agents call the model provider through; it adds their chat's agent account's key, so no nook holds an API key | WebApi, Chats | LLM proxy, API proxy |
 | Checkpoint | A nook's source files saved at one moment, such as after a turn | Nooks (planned) | snapshot, backup |
 | Fork | A new nook started from a checkpoint, with the chat resumed up to that point | Nooks, Chats (planned) | clone, copy, branch |
 | Source | Where some of a nook's files come from, mounted at `/work/<name>`: a repository or a folder | Sources (planned) | repo (for both kinds), mount |
@@ -57,8 +57,10 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Template | A snapshot of a nook right after its recipes ran, used to start new nooks fast | Nooks (planned) | image, cache, warm pool |
 | Project | An optional group of nooks, chats, and sources for a team working toward one goal | Projects (planned) | space, board, workspace |
 | Harness | The program that runs a coding agent, such as Claude Code or Codex; in a nook, through its ACP adapter | Chats | agent (that's what it runs), CLI, client |
-| Harness profile | Where one harness keeps state between sessions, and which parts AiSloth saves | Chats (planned) | adapter, plugin |
-| Harness state | The files a harness keeps between sessions, such as its memory, saved and restored by AiSloth | Chats (planned) | memory (ours), context |
+| Harness profile | What AiSloth knows about one harness: how to start it, which credentials it takes and how, and later where it keeps state | `Bagatka.Harnesses` | adapter, plugin |
+| Harness state | The files a harness keeps between sessions, such as its memory and skills, saved per person and restored into their new nooks | Chats (planned) | memory (ours), context |
+| Agent account | An account at an agent vendor that pays for agents' work, such as an Anthropic API key or a Copilot plan: a workspace's, which every member uses, or a person's own | AgentAccounts | subscription (for API keys), credential, account (alone) |
+| Sender | Someone who may message a chat: every member on a workspace's account; on a personal one, its owner and whoever they let in | Chats | participant |
 | Paused | A nook whose compute is released with memory and files kept; it resumes in about a second and processes continue | Nooks | hibernated, sleeping, hot |
 | Stopped | A nook whose compute is released with files kept; it resumes in seconds and processes start again | Nooks | archived, cold, shut down |
 | Process | A program the daemon runs in a nook until it exits or is stopped, independent of the control plane. Agents, setup scripts, and one-off commands are all processes. | Nooks | job, task, command |
@@ -67,7 +69,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Daemon | `slothd`, the process in every nook that dials the control plane and runs processes for it | `src/Daemon` | agent, sidecar, runner |
 | Daemon token | The secret a daemon proves its nook with; issued by Nooks, stored only as a hash | Nooks | API key, password |
 | Daemon endpoint | The WebApi's HTTP/2-only gRPC endpoint that daemons and machines dial | WebApi | agent API, callback |
-| Nook image | The image every nook starts from: `slothd` under tini, on Ubuntu with git | `src/Daemon/Dockerfile` | base image, runner image |
+| Nook image | An image nooks start from: `slothd` under tini, on Ubuntu 26.04 with git, alone or with one harness; a nook's harness is chosen when it is created and never changes | `src/Daemon/Dockerfile` | base image, runner image |
 | Disk reserve | Space a daemon holds in a file and releases when the disk fills, so output and cleanup keep working | `src/Daemon` | ballast, buffer |
 | Reconciler | The Nooks job that makes providers match the records: it creates the sandboxes of new nooks and deletes those of deleted ones | Nooks | sync job, worker |
 | Instruction | A message from the control plane telling a daemon what to do | Nooks, `daemon.proto` | command, request |

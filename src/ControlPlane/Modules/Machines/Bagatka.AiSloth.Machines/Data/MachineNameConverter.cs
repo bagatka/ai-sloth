@@ -12,8 +12,12 @@ internal sealed class MachineNameConverter() : ValueConverter<MachineName, strin
 {
     private static MachineName FromStored(string value)
     {
-        return MachineName.Parse(value).TryGetValue(out MachineName? name, out Error? invalid)
-            ? name
-            : throw new InvalidOperationException("A stored machine name is invalid: " + invalid.Message);
+        Result<MachineName> parsed = MachineName.Parse(value);
+        if (parsed.Failed)
+        {
+            throw new InvalidOperationException("A stored machine name is invalid: " + parsed.Error.Message);
+        }
+
+        return parsed.Output;
     }
 }

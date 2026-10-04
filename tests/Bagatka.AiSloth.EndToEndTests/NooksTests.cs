@@ -35,11 +35,12 @@ public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
 
         ProcessSummary process = await StartAsync(nook, "sh", "-c", "echo hello; echo oops >&2; exit 3");
         Run run = await WatchToExitAsync(nook, process, fromOffset: 0);
+        NookSummary after = await GetAsync(nook);
 
         Assert.Equal("hello\n", run.StandardOutput);
         Assert.Equal("oops\n", run.StandardError);
         Assert.Equal(3, run.ExitCode);
-        Assert.Equal(NookStatus.Running, (await GetAsync(nook)).Status);
+        Assert.Equal(NookStatus.Running, after.Status);
     }
 
     [Fact]
@@ -48,7 +49,11 @@ public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
         NookSummary nook = await CreateNookAsync();
         await StartAsync(nook, "true");
 
-        DiskUsage disk = await Api.EventuallyAsync(async () => (await GetAsync(nook)).Disk);
+        DiskUsage disk = await Api.EventuallyAsync(async () =>
+        {
+            NookSummary current = await GetAsync(nook);
+            return current.Disk;
+        });
 
         Assert.InRange(disk.AvailableBytes, 0, disk.TotalBytes);
     }
@@ -60,13 +65,15 @@ public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
         ProcessSummary process = await StartAsync(nook, "cat");
         await using IAsyncEnumerator<ProcessEvent> watching = WatchAsync(nook, process, fromOffset: 0, Ct).GetAsyncEnumerator(Ct);
 
-        await Api.ExpectAsync(await _alice.SendPostAsync(PathOf(nook, process) + "/input", new { data = Encoding.UTF8.GetBytes("ping\n") }), HttpStatusCode.NoContent);
-        Assert.True(await watching.MoveNextAsync());
-        ProcessOutput echoed = Assert.IsType<ProcessOutput>(watching.Current.Value);
-        await Api.ExpectAsync(await _alice.SendPostAsync(PathOf(nook, process) + "/stop", new { }), HttpStatusCode.NoContent);
-        Assert.True(await watching.MoveNextAsync());
+        await Api.ExpectAsync(_alice.SendPostAsync(PathOf(nook, process) + "/input", new { data = Encoding.UTF8.GetBytes("ping\n") }), HttpStatusCode.NoContent);
+        bool echoArrived = await watching.MoveNextAsync();
+        ProcessEvent echo = watching.Current;
+        await Api.ExpectAsync(_alice.SendPostAsync(PathOf(nook, process) + "/stop", new { }), HttpStatusCode.NoContent);
+        bool exitArrived = await watching.MoveNextAsync();
 
-        Assert.Equal("ping\n", Encoding.UTF8.GetString(echoed.Data.Span));
+        Assert.True(echoArrived);
+        Assert.Equal("ping\n", Encoding.UTF8.GetString(Assert.IsType<ProcessOutput>(echo.Value).Data.Span));
+        Assert.True(exitArrived);
         Assert.Equal(143, Assert.IsType<ProcessExited>(watching.Current.Value).ExitCode);
     }
 
@@ -90,7 +97,7 @@ public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
         ProcessSummary first = await StartAsync(nook, "true");
         ProcessSummary second = await StartAsync(nook, "true");
 
-        Page<ProcessSummary> page = await Api.ReadAsync<Page<ProcessSummary>>(await _alice.SendGetAsync(PathOf(nook) + "/processes"), HttpStatusCode.OK);
+        Page<ProcessSummary> page = await Api.ReadAsync<Page<ProcessSummary>>(_alice.SendGetAsync(PathOf(nook) + "/processes"), HttpStatusCode.OK);
 
         Assert.Equal([second.Id, first.Id], page.Items.Select(process => process.Id));
     }
@@ -101,10 +108,10 @@ public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
         NookSummary nook = await CreateNookAsync();
         using HttpClient bob = controlPlane.ClientFor("bob-" + Guid.CreateVersion7());
 
-        Problem get = await Api.ProblemAsync(await bob.SendGetAsync(PathOf(nook)), HttpStatusCode.NotFound);
-        Problem start = await Api.ProblemAsync(await bob.SendPostAsync(PathOf(nook) + "/processes", new { command = "true" }), HttpStatusCode.NotFound);
-        Problem list = await Api.ProblemAsync(await bob.SendGetAsync(WorkspaceNooksPath(nook.WorkspaceId)), HttpStatusCode.NotFound);
-        Problem create = await Api.ProblemAsync(await bob.SendPostAsync(WorkspaceNooksPath(nook.WorkspaceId), new { provider = "docker" }), HttpStatusCode.NotFound);
+        Problem get = await Api.ProblemAsync(bob.SendGetAsync(PathOf(nook)), HttpStatusCode.NotFound);
+        Problem start = await Api.ProblemAsync(bob.SendPostAsync(PathOf(nook) + "/processes", new { command = "true" }), HttpStatusCode.NotFound);
+        Problem list = await Api.ProblemAsync(bob.SendGetAsync(WorkspaceNooksPath(nook.WorkspaceId)), HttpStatusCode.NotFound);
+        Problem create = await Api.ProblemAsync(bob.SendPostAsync(WorkspaceNooksPath(nook.WorkspaceId), new { provider = "docker" }), HttpStatusCode.NotFound);
 
         Assert.Equal(NooksErrors.NotFound.Code, get.Code);
         Assert.Equal(NooksErrors.NotFound.Code, start.Code);
@@ -117,8 +124,8 @@ public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
     {
         NookSummary nook = await CreateNookAsync();
 
-        Problem unknownProvider = await Api.ProblemAsync(await _alice.SendPostAsync(WorkspaceNooksPath(nook.WorkspaceId), new { provider = "nowhere" }), HttpStatusCode.BadRequest);
-        Problem noCommand = await Api.ProblemAsync(await _alice.SendPostAsync(PathOf(nook) + "/processes", new { command = "" }), HttpStatusCode.BadRequest);
+        Problem unknownProvider = await Api.ProblemAsync(_alice.SendPostAsync(WorkspaceNooksPath(nook.WorkspaceId), new { provider = "nowhere" }), HttpStatusCode.BadRequest);
+        Problem noCommand = await Api.ProblemAsync(_alice.SendPostAsync(PathOf(nook) + "/processes", new { command = "" }), HttpStatusCode.BadRequest);
 
         Assert.True(unknownProvider.Errors?.ContainsKey("provider"));
         Assert.True(noCommand.Errors?.ContainsKey("command"));
@@ -130,10 +137,12 @@ public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
         NookSummary nook = await CreateNookAsync();
         await StartAsync(nook, "true");
 
-        HttpResponseMessage deleted = await _alice.DeleteAsync(new Uri(PathOf(nook), UriKind.Relative), Ct);
-
-        await Api.ExpectAsync(deleted, HttpStatusCode.NoContent);
-        await Api.EventuallyAsync(async () => (await _alice.SendGetAsync(PathOf(nook))).StatusCode == HttpStatusCode.NotFound ? "gone" : null);
+        await Api.ExpectAsync(_alice.DeleteAsync(new Uri(PathOf(nook), UriKind.Relative), Ct), HttpStatusCode.NoContent);
+        await Api.EventuallyAsync(async () =>
+        {
+            HttpResponseMessage found = await _alice.SendGetAsync(PathOf(nook));
+            return found.StatusCode == HttpStatusCode.NotFound ? "gone" : null;
+        });
     }
 
     public void Dispose()
@@ -158,19 +167,19 @@ public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
 
     private async Task<NookSummary> CreateNookAsync()
     {
-        WorkspaceSummary workspace = await Api.ReadAsync<WorkspaceSummary>(await _alice.SendPostAsync("/workspaces", new { name = "Acme" }), HttpStatusCode.Created);
-        return await Api.ReadAsync<NookSummary>(await _alice.SendPostAsync(WorkspaceNooksPath(workspace.Id), new { provider = "docker" }), HttpStatusCode.Created);
+        WorkspaceSummary workspace = await Api.ReadAsync<WorkspaceSummary>(_alice.SendPostAsync("/workspaces", new { name = "Acme" }), HttpStatusCode.Created);
+        return await Api.ReadAsync<NookSummary>(_alice.SendPostAsync(WorkspaceNooksPath(workspace.Id), new { provider = "docker" }), HttpStatusCode.Created);
     }
 
     private async Task<NookSummary> GetAsync(NookSummary nook)
     {
-        return await Api.ReadAsync<NookSummary>(await _alice.SendGetAsync(PathOf(nook)), HttpStatusCode.OK);
+        return await Api.ReadAsync<NookSummary>(_alice.SendGetAsync(PathOf(nook)), HttpStatusCode.OK);
     }
 
     // Waits for the nook's daemon on the first call.
     private async Task<ProcessSummary> StartAsync(NookSummary nook, string command, params string[] arguments)
     {
-        return await Api.ReadAsync<ProcessSummary>(await _alice.SendPostAsync(PathOf(nook) + "/processes", new { command, arguments }), HttpStatusCode.OK);
+        return await Api.ReadAsync<ProcessSummary>(_alice.SendPostAsync(PathOf(nook) + "/processes", new { command, arguments }), HttpStatusCode.OK);
     }
 
     // The process's events, read from the server-sent events stream.

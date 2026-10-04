@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Bagatka.AiSloth.Chats.Data.Migrations;
 
 /// <inheritdoc />
-public partial class _20261004152155_Initial : Migration
+public partial class _20261004163156_Initial : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -24,6 +24,9 @@ public partial class _20261004152155_Initial : Migration
                 workspace_id = table.Column<Guid>(type: "uuid", nullable: false),
                 started_by = table.Column<Guid>(type: "uuid", nullable: false),
                 started_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                harness = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                agent_account_id = table.Column<Guid>(type: "uuid", nullable: false),
+                account_owner_id = table.Column<Guid>(type: "uuid", nullable: true),
                 harness_process_id = table.Column<Guid>(type: "uuid", nullable: true),
                 harness_token_hash = table.Column<byte[]>(type: "bytea", nullable: true),
                 output_offset = table.Column<long>(type: "bigint", nullable: false),
@@ -71,6 +74,19 @@ public partial class _20261004152155_Initial : Migration
                 table.PrimaryKey("pk_messages", x => x.id);
             });
 
+        migrationBuilder.CreateTable(
+            name: "senders",
+            schema: "chats",
+            columns: table => new
+            {
+                chat_id = table.Column<Guid>(type: "uuid", nullable: false),
+                user_id = table.Column<Guid>(type: "uuid", nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("pk_senders", x => new { x.chat_id, x.user_id });
+            });
+
         migrationBuilder.CreateIndex(
             name: "ix_chats_harness_token_hash",
             schema: "chats",
@@ -104,6 +120,10 @@ public partial class _20261004152155_Initial : Migration
 
         migrationBuilder.DropTable(
             name: "messages",
+            schema: "chats");
+
+        migrationBuilder.DropTable(
+            name: "senders",
             schema: "chats");
     }
 }

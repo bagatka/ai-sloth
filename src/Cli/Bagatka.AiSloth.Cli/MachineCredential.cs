@@ -23,8 +23,13 @@ internal sealed record MachineCredential(Uri ControlPlaneUrl, Guid MachineId, st
         }
 
         await using FileStream file = File.OpenRead(path);
-        return await JsonSerializer.DeserializeAsync(file, CliJsonContext.Default.MachineCredential, ct)
-            ?? throw new InvalidDataException(path + " is empty.");
+        MachineCredential? credential = await JsonSerializer.DeserializeAsync(file, CliJsonContext.Default.MachineCredential, ct);
+        if (credential is null)
+        {
+            throw new InvalidDataException(path + " is empty.");
+        }
+
+        return credential;
     }
 
     // Written beside the old file and moved over it, so a crash never leaves half a credential.

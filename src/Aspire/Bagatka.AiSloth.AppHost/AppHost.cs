@@ -1,21 +1,27 @@
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 string repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", ".."));
 const string NookImage = "aisloth-nook:dev";
+// The harnesses a nook can carry: the profiles in src/Harnesses, one image each.
+string[] harnesses = ["claude-code", "copilot"];
 
 // Sign-in: the OpenID Connect provider whose tokens the WebApi accepts, such as a WorkOS staging
 // environment. Set them as user secrets of this project, or when the dashboard asks.
 IResourceBuilder<ParameterResource> issuer = builder.AddParameter("authentication-issuer");
 IResourceBuilder<ParameterResource> audience = builder.AddParameter("authentication-audience");
 
-// The model provider agents call through the WebApi's model gateway, and the deployment's key for it,
-// which never enters a nook. Set the key as a user secret of this project, or when the dashboard asks.
+// The model provider agents call through the WebApi's model gateway; each call carries its chat's
+// agent account's key, which never enters a nook.
 IResourceBuilder<ParameterResource> modelUpstream = builder.AddParameter("model-upstream", builder.Configuration["Parameters:model-upstream"] ?? "https://api.anthropic.com");
-IResourceBuilder<ParameterResource> modelKey = builder.AddParameter("anthropic-api-key", secret: true);
+
+// Encrypts agent accounts' secrets at rest; generated once and kept in this project's user secrets.
+IResourceBuilder<ParameterResource> agentAccountsKey = builder.AddParameter(
+    "agent-accounts-key", new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
 
 // The Docker scope nooks run in, so test runs never touch a developer's nooks. A parameter given a
 // value can't be overridden, so the default is applied here.
@@ -25,9 +31,13 @@ IResourceBuilder<PostgresDatabaseResource> database = builder.AddPostgres("postg
     .WithImageTag("18")
     .AddDatabase("aisloth");
 
-// The image every nook starts from. Docker's cache makes a rebuild without changes take seconds.
+// The images nooks start from: the base, and one per harness on top of it. Docker's cache makes a
+// rebuild without changes take seconds.
 IResourceBuilder<ExecutableResource> nookImage = builder.AddExecutable(
-    "nook-image", "docker", repositoryRoot, "build", "--file", "src/Daemon/Dockerfile", "--tag", NookImage, ".");
+    "nook-image", "docker", repositoryRoot, "build", "--file", "src/Daemon/Dockerfile", "--target", "nook", "--tag", NookImage, ".");
+IResourceBuilder<ExecutableResource>[] harnessImages = [.. harnesses.Select(harness => builder.AddExecutable(
+        "nook-image-" + harness, "docker", repositoryRoot, "build", "--file", "src/Daemon/Dockerfile", "--target", harness, "--tag", HarnessImage(harness), ".")
+    .WaitForCompletion(nookImage))];
 
 IResourceBuilder<ProjectResource> webApi = builder.AddProject<Projects.Bagatka_AiSloth_WebApi>("webapi")
     .WithHttpHealthCheck("/health", endpointName: "Http");
@@ -51,10 +61,18 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         .WithEnvironment("Modules__Nooks__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Chats__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Chats__ModelGatewayUrl", ReferenceExpression.Create($"http://host.docker.internal:{modelsEndpoint.Property(EndpointProperty.Port)}/models"))
+        .WithEnvironment("Modules__AgentAccounts__ConnectionString", database.Resource.ConnectionStringExpression)
+        .WithEnvironment("Modules__AgentAccounts__EncryptionKey", agentAccountsKey)
         .WithEnvironment("ModelGateway__Upstream", modelUpstream)
-        .WithEnvironment("ModelGateway__ApiKey", modelKey)
         .WithEnvironment("Modules__Nooks__DaemonUrl", ReferenceExpression.Create($"http://host.docker.internal:{daemonEndpoint.Property(EndpointProperty.Port)}"))
         .WithEnvironment("Modules__Nooks__Image", NookImage)
+        .WithEnvironment(environment =>
+        {
+            foreach (string harness in harnesses)
+            {
+                environment.EnvironmentVariables["Modules__Nooks__HarnessImages__" + harness] = HarnessImage(harness);
+            }
+        })
         .WithEnvironment("Modules__Nooks__CpuMillicores", "2000")
         .WithEnvironment("Modules__Nooks__MemoryMebibytes", "4096")
         .WithEnvironment("Sandboxing__Docker__Endpoint", "unix:///var/run/docker.sock")
@@ -62,9 +80,18 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
 }
 
 webApi.WaitForCompletion(migrations).WaitForCompletion(nookImage);
+foreach (IResourceBuilder<ExecutableResource> harnessImage in harnessImages)
+{
+    webApi.WaitForCompletion(harnessImage);
+}
 
 using DistributedApplication app = builder.Build();
 app.Run();
+
+static string HarnessImage(string harness)
+{
+    return "aisloth-nook-" + harness + ":dev";
+}
 
 // Nooks are containers that reach these endpoints through the Docker host's gateway. On Linux the
 // gateway isn't localhost, where Aspire's proxy and Kestrel would listen, so the WebApi listens on

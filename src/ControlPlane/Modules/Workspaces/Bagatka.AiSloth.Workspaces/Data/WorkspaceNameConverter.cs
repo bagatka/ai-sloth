@@ -12,8 +12,12 @@ internal sealed class WorkspaceNameConverter() : ValueConverter<WorkspaceName, s
 {
     private static WorkspaceName FromStored(string value)
     {
-        return WorkspaceName.Parse(value).TryGetValue(out WorkspaceName? name, out Error? invalid)
-            ? name
-            : throw new InvalidOperationException("A stored workspace name is invalid: " + invalid.Message);
+        Result<WorkspaceName> parsed = WorkspaceName.Parse(value);
+        if (parsed.Failed)
+        {
+            throw new InvalidOperationException("A stored workspace name is invalid: " + parsed.Error.Message);
+        }
+
+        return parsed.Output;
     }
 }

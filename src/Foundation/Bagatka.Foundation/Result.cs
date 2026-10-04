@@ -1,4 +1,3 @@
-using System;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Bagatka.Foundation;
@@ -8,24 +7,13 @@ namespace Bagatka.Foundation;
 /// expected <see cref="Error"/>. Create it explicitly with <c>new Result(new Success())</c> or
 /// <c>new Result(error)</c>.
 /// </summary>
+/// <remarks>Check <see cref="Failed"/> before reading <see cref="Error"/>; the compiler refuses it until then.</remarks>
 public union Result(Success, Error)
 {
-    /// <summary>
-    /// Returns <see langword="true"/> and the error when this result failed.
-    /// </summary>
-    /// <exception cref="InvalidOperationException">The result is <c>default</c>, which is a bug.</exception>
-    public bool IsError([NotNullWhen(true)] out Error? error)
-    {
-        switch (Value)
-        {
-            case Success:
-                error = null;
-                return false;
-            case Error failed:
-                error = failed;
-                return true;
-            default:
-                throw new InvalidOperationException("Result is default; create it with new Result(...).");
-        }
-    }
+    /// <summary>Whether the operation failed: then <see cref="Error"/> is set.</summary>
+    [MemberNotNullWhen(true, nameof(Error))]
+    public bool Failed => Value is Error;
+
+    /// <summary>The error, when the operation failed; otherwise <see langword="null"/>.</summary>
+    public Error? Error => Value as Error;
 }

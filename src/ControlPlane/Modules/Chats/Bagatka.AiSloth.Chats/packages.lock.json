@@ -63,9 +63,17 @@
         "resolved": "10.0.3",
         "contentHash": "7nb5YzXuvWWJxB0J8DiyL3we+X4FOctZrt0fIBnucOIaIevFEEwGQVZKtiu9olXdlNAK1eNgqSral6r/jlhI4w=="
       },
+      "bagatka.aisloth.agentaccounts.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
       "bagatka.aisloth.chats.contracts": {
         "type": "Project",
         "dependencies": {
+          "Bagatka.AiSloth.AgentAccounts.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Nooks.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
           "Bagatka.Foundation": "[1.0.0, )"
@@ -94,6 +102,9 @@
           "EFCore.NamingConventions": "[10.0.1, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[11.0.0-rc.1.1, )"
         }
+      },
+      "bagatka.harnesses": {
+        "type": "Project"
       },
       "EFCore.NamingConventions": {
         "type": "CentralTransitive",

@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Threading;
+using Bagatka.AiSloth.AgentAccounts;
 using Bagatka.AiSloth.Chats;
 using Bagatka.AiSloth.Machines;
 using Bagatka.AiSloth.Nooks;
@@ -44,6 +45,7 @@ UsersSettings users = builder.Configuration.GetRequired<UsersSettings>("Modules:
 WorkspacesSettings workspaces = builder.Configuration.GetRequired<WorkspacesSettings>("Modules:Workspaces");
 MachinesSettings machines = builder.Configuration.GetRequired<MachinesSettings>("Modules:Machines");
 NooksSettings nooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
+AgentAccountsSettings agentAccounts = builder.Configuration.GetRequired<AgentAccountsSettings>("Modules:AgentAccounts");
 ChatsSettings chats = builder.Configuration.GetRequired<ChatsSettings>("Modules:Chats");
 ModelGatewaySettings modelGateway = builder.Configuration.GetRequired<ModelGatewaySettings>("ModelGateway");
 
@@ -80,6 +82,7 @@ builder.Services
     .AddWorkspacesModule(workspaces)
     .AddMachinesModule(machines)
     .AddNooksModule(nooks)
+    .AddAgentAccountsModule(agentAccounts)
     .AddChatsModule(chats);
 
 await using WebApplication app = builder.Build();
@@ -103,6 +106,7 @@ app.MapUsersEndpoints();
 app.MapWorkspacesEndpoints();
 app.MapMachinesEndpoints();
 app.MapNooksEndpoints();
+app.MapAgentAccountsEndpoints();
 app.MapChatsEndpoints();
 
 // Agents in nooks reach the model gateway on Kestrel's "Models" endpoint (appsettings.json); a call

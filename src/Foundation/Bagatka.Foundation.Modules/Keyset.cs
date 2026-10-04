@@ -33,7 +33,8 @@ public static class Keyset
 
         if (page.Cursor is not null)
         {
-            if (!Guid.TryParseExact(page.Cursor, "N", out Guid last))
+            bool parsed = Guid.TryParseExact(page.Cursor, "N", out Guid last);
+            if (!parsed)
             {
                 return new Result<IQueryable<T>>(InvalidCursor);
             }

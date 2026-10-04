@@ -22,14 +22,15 @@ public sealed class SandboxProviderConformanceTests
         await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);
         SandboxSpec spec = Spec();
 
-        SandboxObservation created = TestResults.Value(await under.Provider.CreateAsync(spec, Ct));
-        SandboxObservation repeated = TestResults.Value(await under.Provider.CreateAsync(spec, Ct));
+        SandboxObservation created = await TestResults.ValueAsync(under.Provider.CreateAsync(spec, Ct));
+        SandboxObservation repeated = await TestResults.ValueAsync(under.Provider.CreateAsync(spec, Ct));
         SandboxObservation running = await WaitForAsync(under.Provider, spec.Key, SandboxState.Running);
+        List<SandboxObservation> listed = await ListAsync(under.Provider);
 
         Assert.Equal(spec.Key, created.Key);
         Assert.Equal(spec.Key, repeated.Key);
         Assert.Equal(spec.Key, running.Key);
-        Assert.Contains(await ListAsync(under.Provider), sandbox => sandbox.Key == spec.Key);
+        Assert.Contains(listed, sandbox => sandbox.Key == spec.Key);
     }
 
     [Theory]
@@ -38,10 +39,10 @@ public sealed class SandboxProviderConformanceTests
     {
         await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);
         SandboxSpec spec = Spec();
-        TestResults.Value(await under.Provider.CreateAsync(spec, Ct));
+        await TestResults.ValueAsync(under.Provider.CreateAsync(spec, Ct));
 
         SandboxSpec different = spec with { Environment = Environment("GREETING", "goodbye") };
-        Error error = TestResults.ErrorOf(await under.Provider.CreateAsync(different, Ct));
+        Error error = await TestResults.ErrorOfAsync(under.Provider.CreateAsync(different, Ct));
 
         Assert.Equal(ErrorKind.Conflict, error.Kind);
     }
@@ -53,10 +54,11 @@ public sealed class SandboxProviderConformanceTests
         await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);
         SandboxSpec spec = Spec() with { Location = "nowhere" };
 
-        Error error = TestResults.ErrorOf(await under.Provider.CreateAsync(spec, Ct));
+        Error error = await TestResults.ErrorOfAsync(under.Provider.CreateAsync(spec, Ct));
+        SandboxObservation? observed = await under.Provider.ObserveAsync(spec.Key, Ct);
 
         Assert.Equal(ErrorKind.Validation, error.Kind);
-        Assert.Null(await under.Provider.ObserveAsync(spec.Key, Ct));
+        Assert.Null(observed);
     }
 
     [Theory]
@@ -66,10 +68,11 @@ public sealed class SandboxProviderConformanceTests
         await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);
         SandboxSpec spec = Spec() with { Resources = new SandboxResources(CpuMillicores: 0, MemoryMebibytes: 64) };
 
-        Error error = TestResults.ErrorOf(await under.Provider.CreateAsync(spec, Ct));
+        Error error = await TestResults.ErrorOfAsync(under.Provider.CreateAsync(spec, Ct));
+        SandboxObservation? observed = await under.Provider.ObserveAsync(spec.Key, Ct);
 
         Assert.Equal(ErrorKind.Validation, error.Kind);
-        Assert.Null(await under.Provider.ObserveAsync(spec.Key, Ct));
+        Assert.Null(observed);
     }
 
     [Theory]
@@ -78,14 +81,14 @@ public sealed class SandboxProviderConformanceTests
     {
         await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);
         SandboxSpec spec = Spec();
-        TestResults.Value(await under.Provider.CreateAsync(spec, Ct));
+        await TestResults.ValueAsync(under.Provider.CreateAsync(spec, Ct));
         await WaitForAsync(under.Provider, spec.Key, SandboxState.Running);
 
-        SandboxObservation suspended = TestResults.Value(await under.Provider.SuspendAsync(spec.Key, Ct));
-        SandboxObservation suspendedAgain = TestResults.Value(await under.Provider.SuspendAsync(spec.Key, Ct));
-        TestResults.Value(await under.Provider.ResumeAsync(spec.Key, Ct));
+        SandboxObservation suspended = await TestResults.ValueAsync(under.Provider.SuspendAsync(spec.Key, Ct));
+        SandboxObservation suspendedAgain = await TestResults.ValueAsync(under.Provider.SuspendAsync(spec.Key, Ct));
+        await TestResults.ValueAsync(under.Provider.ResumeAsync(spec.Key, Ct));
         SandboxObservation resumed = await WaitForAsync(under.Provider, spec.Key, SandboxState.Running);
-        SandboxObservation resumedAgain = TestResults.Value(await under.Provider.ResumeAsync(spec.Key, Ct));
+        SandboxObservation resumedAgain = await TestResults.ValueAsync(under.Provider.ResumeAsync(spec.Key, Ct));
 
         Assert.Contains(suspended.State, new[] { SandboxState.Paused, SandboxState.Stopped });
         Assert.Equal(suspended.State, suspendedAgain.State);
@@ -101,10 +104,15 @@ public sealed class SandboxProviderConformanceTests
         SandboxKey missing = SandboxKey.From(Guid.CreateVersion7());
         SnapshotKey snapshot = SnapshotKey.From(Guid.CreateVersion7());
 
-        Assert.Equal(ErrorKind.NotFound, TestResults.ErrorOf(await under.Provider.SuspendAsync(missing, Ct)).Kind);
-        Assert.Equal(ErrorKind.NotFound, TestResults.ErrorOf(await under.Provider.ResumeAsync(missing, Ct)).Kind);
-        Assert.Equal(ErrorKind.NotFound, TestResults.ErrorOf(await under.Provider.SnapshotAsync(missing, snapshot, Ct)).Kind);
-        Assert.Null(await under.Provider.ObserveAsync(missing, Ct));
+        Error suspended = await TestResults.ErrorOfAsync(under.Provider.SuspendAsync(missing, Ct));
+        Error resumed = await TestResults.ErrorOfAsync(under.Provider.ResumeAsync(missing, Ct));
+        Error snapshotted = await TestResults.ErrorOfAsync(under.Provider.SnapshotAsync(missing, snapshot, Ct));
+        SandboxObservation? observed = await under.Provider.ObserveAsync(missing, Ct);
+
+        Assert.Equal(ErrorKind.NotFound, suspended.Kind);
+        Assert.Equal(ErrorKind.NotFound, resumed.Kind);
+        Assert.Equal(ErrorKind.NotFound, snapshotted.Kind);
+        Assert.Null(observed);
     }
 
     [Theory]
@@ -113,13 +121,15 @@ public sealed class SandboxProviderConformanceTests
     {
         await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);
         SandboxSpec spec = Spec();
-        TestResults.Value(await under.Provider.CreateAsync(spec, Ct));
+        await TestResults.ValueAsync(under.Provider.CreateAsync(spec, Ct));
 
         await under.Provider.DeleteAsync(spec.Key, Ct);
         await under.Provider.DeleteAsync(spec.Key, Ct);
+        SandboxObservation? observed = await under.Provider.ObserveAsync(spec.Key, Ct);
+        List<SandboxObservation> listed = await ListAsync(under.Provider);
 
-        Assert.Null(await under.Provider.ObserveAsync(spec.Key, Ct));
-        Assert.DoesNotContain(await ListAsync(under.Provider), sandbox => sandbox.Key == spec.Key);
+        Assert.Null(observed);
+        Assert.DoesNotContain(listed, sandbox => sandbox.Key == spec.Key);
     }
 
     [Theory]
@@ -128,24 +138,26 @@ public sealed class SandboxProviderConformanceTests
     {
         await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);
         SandboxSpec source = Spec();
-        TestResults.Value(await under.Provider.CreateAsync(source, Ct));
+        await TestResults.ValueAsync(under.Provider.CreateAsync(source, Ct));
         await WaitForAsync(under.Provider, source.Key, SandboxState.Running);
         SnapshotKey snapshot = SnapshotKey.From(Guid.CreateVersion7());
 
-        SnapshotObservation taken = TestResults.Value(await under.Provider.SnapshotAsync(source.Key, snapshot, Ct));
-        SnapshotObservation repeated = TestResults.Value(await under.Provider.SnapshotAsync(source.Key, snapshot, Ct));
+        SnapshotObservation taken = await TestResults.ValueAsync(under.Provider.SnapshotAsync(source.Key, snapshot, Ct));
+        SnapshotObservation repeated = await TestResults.ValueAsync(under.Provider.SnapshotAsync(source.Key, snapshot, Ct));
         SandboxSpec fork = Spec(new SandboxSource(snapshot));
-        TestResults.Value(await under.Provider.CreateAsync(fork, Ct));
+        await TestResults.ValueAsync(under.Provider.CreateAsync(fork, Ct));
         await WaitForAsync(under.Provider, fork.Key, SandboxState.Running);
         List<SnapshotObservation> beforeDeletion = await ListSnapshotsAsync(under.Provider);
         await under.Provider.DeleteSnapshotAsync(snapshot, Ct);
         await under.Provider.DeleteSnapshotAsync(snapshot, Ct);
+        List<SnapshotObservation> afterDeletion = await ListSnapshotsAsync(under.Provider);
+        SandboxObservation? forked = await under.Provider.ObserveAsync(fork.Key, Ct);
 
         Assert.Equal(source.Key, taken.Source);
         Assert.Equal(taken.Key, repeated.Key);
         Assert.Contains(beforeDeletion, listed => listed.Key == snapshot);
-        Assert.DoesNotContain(await ListSnapshotsAsync(under.Provider), listed => listed.Key == snapshot);
-        Assert.Equal(SandboxState.Running, (await under.Provider.ObserveAsync(fork.Key, Ct))?.State);
+        Assert.DoesNotContain(afterDeletion, listed => listed.Key == snapshot);
+        Assert.Equal(SandboxState.Running, forked?.State);
     }
 
     [Theory]
@@ -155,12 +167,12 @@ public sealed class SandboxProviderConformanceTests
         await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);
         SandboxSpec first = Spec();
         SandboxSpec second = Spec();
-        TestResults.Value(await under.Provider.CreateAsync(first, Ct));
-        TestResults.Value(await under.Provider.CreateAsync(second, Ct));
+        await TestResults.ValueAsync(under.Provider.CreateAsync(first, Ct));
+        await TestResults.ValueAsync(under.Provider.CreateAsync(second, Ct));
         SnapshotKey snapshot = SnapshotKey.From(Guid.CreateVersion7());
-        TestResults.Value(await under.Provider.SnapshotAsync(first.Key, snapshot, Ct));
+        await TestResults.ValueAsync(under.Provider.SnapshotAsync(first.Key, snapshot, Ct));
 
-        Error error = TestResults.ErrorOf(await under.Provider.SnapshotAsync(second.Key, snapshot, Ct));
+        Error error = await TestResults.ErrorOfAsync(under.Provider.SnapshotAsync(second.Key, snapshot, Ct));
 
         Assert.Equal(ErrorKind.Conflict, error.Kind);
     }
@@ -172,7 +184,7 @@ public sealed class SandboxProviderConformanceTests
         await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);
         SandboxSpec spec = Spec(new SandboxSource(SnapshotKey.From(Guid.CreateVersion7())));
 
-        Error error = TestResults.ErrorOf(await under.Provider.CreateAsync(spec, Ct));
+        Error error = await TestResults.ErrorOfAsync(under.Provider.CreateAsync(spec, Ct));
 
         Assert.Equal(ErrorKind.NotFound, error.Kind);
     }
@@ -185,14 +197,15 @@ public sealed class SandboxProviderConformanceTests
         await using ProviderUnderTest theirs = ProvidersUnderTest.Create(provider);
         SandboxSpec myAsk = Spec();
         SandboxSpec theirAsk = Spec();
-        TestResults.Value(await mine.Provider.CreateAsync(myAsk, Ct));
-        TestResults.Value(await theirs.Provider.CreateAsync(theirAsk, Ct));
+        await TestResults.ValueAsync(mine.Provider.CreateAsync(myAsk, Ct));
+        await TestResults.ValueAsync(theirs.Provider.CreateAsync(theirAsk, Ct));
 
         List<SandboxObservation> listed = await ListAsync(mine.Provider);
+        SandboxObservation? observed = await mine.Provider.ObserveAsync(theirAsk.Key, Ct);
 
         Assert.Contains(listed, sandbox => sandbox.Key == myAsk.Key);
         Assert.DoesNotContain(listed, sandbox => sandbox.Key == theirAsk.Key);
-        Assert.Null(await mine.Provider.ObserveAsync(theirAsk.Key, Ct));
+        Assert.Null(observed);
     }
 
     private static SandboxSpec Spec(SandboxSource? source = null)

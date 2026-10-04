@@ -25,10 +25,10 @@ public sealed class DockerSandboxProviderTests
         await using ProviderUnderTest under = ProvidersUnderTest.Create("docker");
         DockerClient docker = under.Services.GetRequiredService<DockerClient>();
         SandboxSpec source = Spec(new Dictionary<string, string>(StringComparer.Ordinal) { ["SLOTHD_TOKEN"] = "secret-token" });
-        TestResults.Value(await under.Provider.CreateAsync(source, Ct));
+        await TestResults.ValueAsync(under.Provider.CreateAsync(source, Ct));
         SnapshotKey snapshot = SnapshotKey.From(Guid.CreateVersion7());
 
-        TestResults.Value(await under.Provider.SnapshotAsync(source.Key, snapshot, Ct));
+        await TestResults.ValueAsync(under.Provider.SnapshotAsync(source.Key, snapshot, Ct));
 
         ImageDetails image = await SnapshotImageAsync(docker, snapshot);
         Assert.Contains("SLOTHD_TOKEN=", image.Environment, StringComparer.Ordinal);
@@ -41,19 +41,20 @@ public sealed class DockerSandboxProviderTests
         await using ProviderUnderTest under = ProvidersUnderTest.Create("docker");
         DockerClient docker = under.Services.GetRequiredService<DockerClient>();
         SandboxSpec source = Spec(new Dictionary<string, string>(StringComparer.Ordinal));
-        TestResults.Value(await under.Provider.CreateAsync(source, Ct));
+        await TestResults.ValueAsync(under.Provider.CreateAsync(source, Ct));
         SnapshotKey snapshot = SnapshotKey.From(Guid.CreateVersion7());
-        TestResults.Value(await under.Provider.SnapshotAsync(source.Key, snapshot, Ct));
+        await TestResults.ValueAsync(under.Provider.SnapshotAsync(source.Key, snapshot, Ct));
         ImageDetails image = await SnapshotImageAsync(docker, snapshot);
         SandboxSpec fork = Spec(new Dictionary<string, string>(StringComparer.Ordinal)) with { Source = new SandboxSource(snapshot) };
-        TestResults.Value(await under.Provider.CreateAsync(fork, Ct));
+        await TestResults.ValueAsync(under.Provider.CreateAsync(fork, Ct));
 
         await under.Provider.DeleteSnapshotAsync(snapshot, Ct);
         ImageDetails? whileUsed = await docker.InspectImageAsync(image.Id, Ct);
         await under.Provider.DeleteAsync(fork.Key, Ct);
+        ImageDetails? afterUse = await docker.InspectImageAsync(image.Id, Ct);
 
         Assert.NotNull(whileUsed);
-        Assert.Null(await docker.InspectImageAsync(image.Id, Ct));
+        Assert.Null(afterUse);
     }
 
     private static SandboxSpec Spec(IReadOnlyDictionary<string, string> environment)
@@ -64,7 +65,8 @@ public sealed class DockerSandboxProviderTests
     private static async Task<ImageDetails> SnapshotImageAsync(DockerClient docker, SnapshotKey snapshot)
     {
         string label = SnapshotLabel + "=" + snapshot.Value.ToString("N", CultureInfo.InvariantCulture);
-        ImageListItem listed = Assert.Single(await docker.ListImagesAsync([label], Ct));
+        IReadOnlyList<ImageListItem> images = await docker.ListImagesAsync([label], Ct);
+        ImageListItem listed = Assert.Single(images);
         ImageDetails? image = await docker.InspectImageAsync(listed.Id, Ct);
         Assert.NotNull(image);
         return image;

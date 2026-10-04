@@ -20,7 +20,7 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class NooksEndpoints
 {
-    internal sealed record CreateNookRequest(string Provider);
+    internal sealed record CreateNookRequest(string Provider, string? Harness = null);
 
     internal sealed record StartProcessRequest(
         string Command,
@@ -49,7 +49,10 @@ internal static class NooksEndpoints
         return nooks;
     }
 
-    /// <summary>Creates a nook in the workspace on one of its providers, such as <c>docker</c>; it starts in the background.</summary>
+    /// <summary>
+    /// Creates a nook in the workspace on one of its providers, such as <c>docker</c>; it starts in the
+    /// background. A nook for chats carries a harness, one of <c>GET /harnesses</c>, which can't change later.
+    /// </summary>
     private static async Task<Results<Created<NookSummary>, ProblemHttpResult>> Create(
         [FromRoute] Guid workspaceId,
         [FromBody] CreateNookRequest request,
@@ -57,7 +60,7 @@ internal static class NooksEndpoints
         [FromServices] INooksApi api,
         CancellationToken ct)
     {
-        Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider), ct);
+        Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider, request.Harness), ct);
         return result.ToCreated(nook => string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Id.Value}"));
     }
 
@@ -158,9 +161,12 @@ internal static class NooksEndpoints
     {
         WatchProcess command = new WatchProcess(NookId.From(nookId), ProcessId.From(processId), fromOffset ?? 0);
         Result<IAsyncEnumerable<ProcessEvent>> result = await api.WatchProcessAsync(principal.ToActor(), command, ct);
-        return result.TryGetValue(out IAsyncEnumerable<ProcessEvent>? events, out Error? error)
-            ? TypedResults.ServerSentEvents(AsServerSentEvents(response, events, ct))
-            : error.ToProblem();
+        if (result.Failed)
+        {
+            return result.Error.ToProblem();
+        }
+
+        return TypedResults.ServerSentEvents(AsServerSentEvents(response, result.Output, ct));
     }
 
     /// <summary>Writes base64 <c>data</c>, at most 64 KiB, to a running process's standard input.</summary>

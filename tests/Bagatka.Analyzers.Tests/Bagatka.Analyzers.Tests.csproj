@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <ProjectReference Include="..\..\analyzers\Bagatka.Analyzers\Bagatka.Analyzers.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -21,6 +21,7 @@ public static class ChatsModule
         services.AddSingleton(settings);
         services.AddModuleDbContext<ChatsDbContext>(settings.ConnectionString, ChatsDbContext.Schema);
         services.AddSingleton<ChatSignals>();
+        services.AddSingleton<AgentProcess>();
         services.AddSingleton<ChatRunners>();
         services.AddHostedService(provider => provider.GetRequiredService<ChatRunners>());
         services.AddScoped<ChatsApi>();

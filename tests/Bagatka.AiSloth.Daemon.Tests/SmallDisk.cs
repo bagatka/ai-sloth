@@ -26,7 +26,8 @@ internal sealed class SmallDisk : IAsyncDisposable
         string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "slothd-disks", RandomNumberGenerator.GetHexString(12, lowercase: true));
         Directory.CreateDirectory(path);
         string size = string.Create(CultureInfo.InvariantCulture, $"size={mebibytes}m");
-        if (await RunAsync("mount", "-t", "tmpfs", "-o", size, "tmpfs", path) != 0)
+        int exitCode = await RunAsync("mount", "-t", "tmpfs", "-o", size, "tmpfs", path);
+        if (exitCode != 0)
         {
             Directory.Delete(path);
             Assert.Skip("Mounting a tmpfs needs root.");
@@ -61,8 +62,12 @@ internal sealed class SmallDisk : IAsyncDisposable
 
     private static async Task<int> RunAsync(string command, params string[] arguments)
     {
-        using Process process = Process.Start(new ProcessStartInfo(command, arguments) { UseShellExecute = false, RedirectStandardError = true })
-            ?? throw new InvalidOperationException(command + " didn't start.");
+        using Process? process = Process.Start(new ProcessStartInfo(command, arguments) { UseShellExecute = false, RedirectStandardError = true });
+        if (process is null)
+        {
+            throw new InvalidOperationException(command + " didn't start.");
+        }
+
         await process.WaitForExitAsync();
         return process.ExitCode;
     }

@@ -12,7 +12,8 @@ internal sealed partial class MachinesApi
 {
     public async Task<Result<MachineRegistration>> AddAsync(Actor actor, AddMachine command, CancellationToken ct)
     {
-        switch (await workspaces.GetRoleAsync(actor, command.WorkspaceId, ct))
+        WorkspaceRole? role = await workspaces.GetRoleAsync(actor, command.WorkspaceId, ct);
+        switch (role)
         {
             case null:
                 return new Result<MachineRegistration>(WorkspacesErrors.NotFound);
@@ -22,17 +23,19 @@ internal sealed partial class MachinesApi
                 break;
         }
 
-        if (!MachineName.Parse(command.Name).TryGetValue(out MachineName? name, out Error? invalid))
+        Result<MachineName> name = MachineName.Parse(command.Name);
+        if (name.Failed)
         {
-            return new Result<MachineRegistration>(invalid);
+            return new Result<MachineRegistration>(name.Error);
         }
 
-        Machine machine = Machine.Add(command.WorkspaceId, name, time);
+        Machine machine = Machine.Add(command.WorkspaceId, name.Output, time);
         string code = machine.IssueRegistrationCode(time);
         db.Machines.Add(machine);
-        if ((await db.SaveAsync(ct)).IsError(out Error? failed))
+        Result saved = await db.SaveAsync(ct);
+        if (saved.Failed)
         {
-            return new Result<MachineRegistration>(failed);
+            return new Result<MachineRegistration>(saved.Error);
         }
 
         return new Result<MachineRegistration>(new MachineRegistration(Summary(machine), code, machine.CodeExpiresAt!.Value));

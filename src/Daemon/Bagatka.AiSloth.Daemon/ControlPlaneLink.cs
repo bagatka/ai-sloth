@@ -23,6 +23,9 @@ namespace Bagatka.AiSloth.Daemon;
 internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable processes, NookDisk disk, TimeProvider time, ILogger<ControlPlaneLink> logger) : IDisposable
 {
     private const int MaxConcurrentUploads = 64;
+
+    // The exit an upload reports for a process this daemon doesn't know (daemon.proto, ProcessExited).
+    private const int UnknownExitCode = -1;
     private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan DiskReportInterval = TimeSpan.FromSeconds(30);
 
@@ -157,7 +160,8 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
 
                 if (exits.IsCompleted)
                 {
-                    if (!await exits)
+                    bool more = await exits;
+                    if (!more)
                     {
                         return;
                     }
@@ -199,8 +203,10 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
                 };
                 await call.RequestStream.WriteAsync(new OutputUploadMessage { Header = header }, ct);
 
-                // An unknown process gets an upload with no output.
-                if (processes.Find(watch.ProcessId) is NookProcess process)
+                // A process this daemon doesn't know ended with an earlier daemon, so its exit is unknown.
+                int exitCode = UnknownExitCode;
+                NookProcess? process = processes.Find(watch.ProcessId);
+                if (process is not null)
                 {
                     await foreach (OutputChunk chunk in process.Output.ReadAsync(watch.FromOffset, ct))
                     {
@@ -216,8 +222,13 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
                         await call.RequestStream.WriteAsync(new OutputUploadMessage { Output = output }, ct);
                         process.Output.MarkDelivered(chunk.Offset + chunk.Data.Length);
                     }
+
+                    // The output is complete once the process has exited, so its exit code is moments away.
+                    exitCode = await process.Exited;
                 }
 
+                ProcessExited exited = new ProcessExited { ProcessId = watch.ProcessId, ExitCode = exitCode };
+                await call.RequestStream.WriteAsync(new OutputUploadMessage { Exited = exited }, ct);
                 await call.RequestStream.CompleteAsync();
                 await call.ResponseAsync;
             }

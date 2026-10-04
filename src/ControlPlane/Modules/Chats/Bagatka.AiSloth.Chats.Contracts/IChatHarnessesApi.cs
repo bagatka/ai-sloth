@@ -12,8 +12,9 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 public interface IChatHarnessesApi
 {
     /// <summary>
-    /// Succeeds when the token belongs to a chat's running agent, whose model calls the gateway then
-    /// forwards; unauthorized otherwise.
+    /// The model provider's key to forward a call with, when the token belongs to a chat's running
+    /// agent: its agent account's secret. Unauthorized otherwise, or when the account was removed.
+    /// Never log or return the key.
     /// </summary>
-    public Task<Result> AuthorizeModelCallAsync(Actor actor, string token, CancellationToken ct);
+    public Task<Result<string>> GetModelKeyAsync(Actor actor, string token, CancellationToken ct);
 }

@@ -24,8 +24,13 @@ public static class ConfigurationExtensions
 
         try
         {
-            return found.Get<T>(binder => binder.ErrorOnUnknownConfiguration = true)
-                ?? throw new InvalidOperationException("Configuration section '" + section + "' is empty.");
+            T? settings = found.Get<T>(binder => binder.ErrorOnUnknownConfiguration = true);
+            if (settings is null)
+            {
+                throw new InvalidOperationException("Configuration section '" + section + "' is empty.");
+            }
+
+            return settings;
         }
         catch (Exception exception) when (exception is ArgumentException or FormatException or InvalidOperationException)
         {

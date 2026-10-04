@@ -37,11 +37,15 @@ public sealed class DaemonTests
 
         await connection.Instructions.Writer.WriteAsync(Start(process, "sh", "-c", "echo hello; echo oops >&2; exit 3"), ct);
         ProcessExited exited = await NextExitAsync(connection, process);
-        List<ProcessOutput> output = await WatchAsync(controlPlane, connection, process, fromOffset: 0);
+        string watch = NewId();
+        await connection.Instructions.Writer.WriteAsync(Watch(watch, process, fromOffset: 0), ct);
+        List<ProcessOutput> output = await controlPlane.Endpoint.Upload(watch).ReadAllAsync(ct).ToListAsync(ct);
+        ProcessExited? uploadEnd = await controlPlane.Endpoint.UploadExitAsync(watch);
 
         Assert.Equal("Bearer " + DaemonUnderTest.Token, connection.Authorization);
         Assert.Equal(DaemonUnderTest.NookId.ToString("D", CultureInfo.InvariantCulture), connection.Hello.NookId);
         Assert.Equal(3, exited.ExitCode);
+        Assert.Equal(3, uploadEnd?.ExitCode);
         Assert.Equal("hello\n", Text(output, OutputChannel.StandardOutput));
         Assert.Equal("oops\n", Text(output, OutputChannel.StandardError));
         Assert.Equal(0, output.Min(chunk => chunk.Offset));
@@ -125,6 +129,23 @@ public sealed class DaemonTests
         FakeControlPlane.Connection second = await controlPlane.Endpoint.NextConnectionAsync(ct);
 
         Assert.Contains(second.Hello.RunningProcesses, running => string.Equals(running.ProcessId, process, StringComparison.Ordinal));
+    }
+
+    [Fact(Timeout = Timeout)]
+    public async Task A_watch_of_a_process_the_daemon_does_not_know_ends_with_exit_code_minus_one()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await using FakeControlPlane controlPlane = await FakeControlPlane.StartAsync();
+        await using DaemonUnderTest daemon = DaemonUnderTest.Start(controlPlane.Url);
+        FakeControlPlane.Connection connection = await controlPlane.Endpoint.NextConnectionAsync(ct);
+        string watch = NewId();
+
+        await connection.Instructions.Writer.WriteAsync(Watch(watch, NewId(), fromOffset: 0), ct);
+        List<ProcessOutput> output = await controlPlane.Endpoint.Upload(watch).ReadAllAsync(ct).ToListAsync(ct);
+        ProcessExited? uploadEnd = await controlPlane.Endpoint.UploadExitAsync(watch);
+
+        Assert.Empty(output);
+        Assert.Equal(-1, uploadEnd?.ExitCode);
     }
 
     [Fact(Timeout = Timeout)]

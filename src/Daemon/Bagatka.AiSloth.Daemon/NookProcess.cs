@@ -94,8 +94,12 @@ internal sealed class NookProcess : IAsyncDisposable
 
         try
         {
-            Process process = Process.Start(start)
-                ?? throw new InvalidOperationException("The operating system started no process for " + instruction.Command + ".");
+            Process? process = Process.Start(start);
+            if (process is null)
+            {
+                throw new InvalidOperationException("The operating system started no process for " + instruction.Command + ".");
+            }
+
             return new NookProcess(instruction.ProcessId, output, process, chunkBytes, disk, exits);
         }
         catch (Win32Exception exception)
@@ -226,7 +230,8 @@ internal sealed class NookProcess : IAsyncDisposable
     private async Task StopAsync(Process process)
     {
         PosixSignals.Terminate(process.Id);
-        if (await Task.WhenAny(Exited, Task.Delay(StopGracePeriod, CancellationToken.None)) != Exited)
+        Task first = await Task.WhenAny(Exited, Task.Delay(StopGracePeriod, CancellationToken.None));
+        if (first != Exited)
         {
             process.Kill(entireProcessTree: true);
         }

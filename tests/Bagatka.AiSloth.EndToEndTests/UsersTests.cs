@@ -23,9 +23,9 @@ public sealed class UsersTests(ControlPlane controlPlane)
         using HttpClient laterVisit = controlPlane.ClientFor(subject);
         using HttpClient someoneElse = controlPlane.ClientFor("bob-" + Guid.CreateVersion7());
 
-        UserProfile first = await Api.ReadAsync<UserProfile>(await firstVisit.SendGetAsync("/users/me"), HttpStatusCode.OK);
-        UserProfile later = await Api.ReadAsync<UserProfile>(await laterVisit.SendGetAsync("/users/me"), HttpStatusCode.OK);
-        UserProfile other = await Api.ReadAsync<UserProfile>(await someoneElse.SendGetAsync("/users/me"), HttpStatusCode.OK);
+        UserProfile first = await Api.ReadAsync<UserProfile>(firstVisit.SendGetAsync("/users/me"), HttpStatusCode.OK);
+        UserProfile later = await Api.ReadAsync<UserProfile>(laterVisit.SendGetAsync("/users/me"), HttpStatusCode.OK);
+        UserProfile other = await Api.ReadAsync<UserProfile>(someoneElse.SendGetAsync("/users/me"), HttpStatusCode.OK);
 
         Assert.Equal(first, later);
         Assert.NotEqual(first.Id, other.Id);
@@ -36,7 +36,7 @@ public sealed class UsersTests(ControlPlane controlPlane)
     {
         using HttpClient anonymous = controlPlane.ClientWithToken(token: null);
 
-        await Api.ExpectAsync(await anonymous.SendGetAsync("/workspaces"), HttpStatusCode.Unauthorized);
+        await Api.ExpectAsync(anonymous.SendGetAsync("/workspaces"), HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class UsersTests(ControlPlane controlPlane)
         await using FakeIssuer impostor = await FakeIssuer.StartAsync();
         using HttpClient client = controlPlane.ClientWithToken(impostor.TokenFor("alice"));
 
-        await Api.ExpectAsync(await client.SendGetAsync("/users/me"), HttpStatusCode.Unauthorized);
+        await Api.ExpectAsync(client.SendGetAsync("/users/me"), HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -56,6 +56,7 @@ public sealed class UsersTests(ControlPlane controlPlane)
         HttpResponseMessage response = await anonymous.SendGetAsync("/openapi/v1.json");
 
         await Api.ExpectAsync(response, HttpStatusCode.OK);
-        Assert.Contains("/workspaces/{workspaceId}/nooks", await response.Content.ReadAsStringAsync(Ct), StringComparison.Ordinal);
+        string document = await response.Content.ReadAsStringAsync(Ct);
+        Assert.Contains("/workspaces/{workspaceId}/nooks", document, StringComparison.Ordinal);
     }
 }

@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/analyzers/">
+    <Project Path="analyzers/Bagatka.Analyzers/Bagatka.Analyzers.csproj" />
+  </Folder>
   <Folder Name="/src/" />
   <Folder Name="/src/Aspire/">
     <Project Path="src/Aspire/Bagatka.AiSloth.AppHost/Bagatka.AiSloth.AppHost.csproj" />
@@ -8,6 +11,11 @@
     <Project Path="src/ControlPlane/Bagatka.AiSloth.WebApi/Bagatka.AiSloth.WebApi.csproj" />
   </Folder>
   <Folder Name="/src/ControlPlane/Modules/" />
+  <Folder Name="/src/ControlPlane/Modules/AgentAccounts/">
+    <File Path="src/ControlPlane/Modules/AgentAccounts/README.md" />
+    <Project Path="src/ControlPlane/Modules/AgentAccounts/Bagatka.AiSloth.AgentAccounts.Contracts/Bagatka.AiSloth.AgentAccounts.Contracts.csproj" />
+    <Project Path="src/ControlPlane/Modules/AgentAccounts/Bagatka.AiSloth.AgentAccounts/Bagatka.AiSloth.AgentAccounts.csproj" />
+  </Folder>
   <Folder Name="/src/ControlPlane/Modules/Chats/">
     <File Path="src/ControlPlane/Modules/Chats/README.md" />
     <Project Path="src/ControlPlane/Modules/Chats/Bagatka.AiSloth.Chats.Contracts/Bagatka.AiSloth.Chats.Contracts.csproj" />
@@ -53,6 +61,10 @@
     <Project Path="src/Foundation/Bagatka.Foundation.Web/Bagatka.Foundation.Web.csproj" />
     <Project Path="src/Foundation/Bagatka.Foundation/Bagatka.Foundation.csproj" />
   </Folder>
+  <Folder Name="/src/Harnesses/">
+    <File Path="src/Harnesses/README.md" />
+    <Project Path="src/Harnesses/Bagatka.Harnesses/Bagatka.Harnesses.csproj" />
+  </Folder>
   <Folder Name="/src/Sandboxing/">
     <File Path="src/Sandboxing/README.md" />
     <Project Path="src/Sandboxing/Bagatka.Sandboxing.Docker/Bagatka.Sandboxing.Docker.csproj" />
@@ -65,9 +77,11 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Bagatka.AiSloth.ArchitectureTests/Bagatka.AiSloth.ArchitectureTests.csproj" />
+    <Project Path="tests/Bagatka.Analyzers.Tests/Bagatka.Analyzers.Tests.csproj" />
     <Project Path="tests/Bagatka.AiSloth.Daemon.Tests/Bagatka.AiSloth.Daemon.Tests.csproj" />
     <Project Path="tests/Bagatka.AiSloth.EndToEndTests/Bagatka.AiSloth.EndToEndTests.csproj" />
     <Project Path="tests/Bagatka.Foundation.Tests/Bagatka.Foundation.Tests.csproj" />
+    <Project Path="tests/Bagatka.Harnesses.Tests/Bagatka.Harnesses.Tests.csproj" />
     <Project Path="tests/Bagatka.Sandboxing.ConformanceTests/Bagatka.Sandboxing.ConformanceTests.csproj" />
   </Folder>
 </Solution>

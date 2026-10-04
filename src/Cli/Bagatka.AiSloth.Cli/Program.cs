@@ -32,16 +32,18 @@ string credentialPath = Path.Combine(
     "sloth",
     "machine.json");
 
-return args switch
+Task<int> command = args switch
 {
-    ["machine", "connect", string url, string code] => await ConnectAsync(url, code),
-    ["machine", "run"] => await RunAsync(),
-    _ => await UsageAsync(),
+    ["machine", "connect", string url, string code] => ConnectAsync(url, code),
+    ["machine", "run"] => RunAsync(),
+    _ => UsageAsync(),
 };
+return await command;
 
 async Task<int> ConnectAsync(string url, string code)
 {
-    if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? controlPlaneUrl) || controlPlaneUrl.Scheme is not ("https" or "http"))
+    Uri? controlPlaneUrl = ParseUrl(url);
+    if (controlPlaneUrl is null || controlPlaneUrl.Scheme is not ("https" or "http"))
     {
         await Console.Error.WriteLineAsync("sloth: the control plane URL must be an absolute http or https URL.");
         return 2;
@@ -103,7 +105,8 @@ async Task<int> RunAsync()
 
     await using ServiceProvider services = new ServiceCollection().AddDockerSandboxProvider(docker).BuildServiceProvider();
     ISandboxProvider local = services.GetRequiredService<ISandboxProvider>();
-    if (await DockerProblemAsync(local, shutdown.Token) is string problem)
+    string? problem = await DockerProblemAsync(local, shutdown.Token);
+    if (problem is not null)
     {
         await Console.Error.WriteLineAsync("sloth: couldn't reach the Docker Engine at " + dockerEndpoint + ": " + problem);
         return 1;
@@ -128,6 +131,12 @@ async Task<int> RunAsync()
 
     await Console.Error.WriteLineAsync("sloth: the control plane no longer accepts this machine; it was removed from its workspace.");
     return 1;
+}
+
+static Uri? ParseUrl(string text)
+{
+    bool parsed = Uri.TryCreate(text, UriKind.Absolute, out Uri? url);
+    return parsed ? url : null;
 }
 
 // Listing proves the engine answers before the control plane sends calls that would fail.

@@ -6,9 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Machines.Contracts;
 using Bagatka.Foundation;
-using Bagatka.Sandboxing.Remote.V1;
 using Grpc.Core;
-using Error = Bagatka.Foundation.Error;
+using Calls = Bagatka.Sandboxing.Remote.V1;
 using Wire = Bagatka.AiSloth.MachineProtocol.V1;
 
 namespace Bagatka.AiSloth.WebApi.Endpoints;
@@ -22,32 +21,35 @@ internal sealed class MachineEndpoint(IMachineConnectionsApi machines) : Wire.Ma
     public override async Task<Wire.RegisterResponse> Register(Wire.RegisterRequest request, ServerCallContext context)
     {
         Result<MachineCredential> registered = await machines.RegisterAsync(Actor.Anonymous, new RegisterMachine(request.Code, request.SlothVersion), context.CancellationToken);
-        if (!registered.TryGetValue(out MachineCredential? credential, out Error? rejected))
+        if (registered.Failed)
         {
-            throw GrpcCalls.Rejection(rejected);
+            throw GrpcCalls.Rejection(registered.Error);
         }
 
+        MachineCredential credential = registered.Output;
         return new Wire.RegisterResponse { MachineId = GrpcCalls.FormatId(credential.MachineId.Value), Token = credential.Token };
     }
 
-    public override async Task Connect(IAsyncStreamReader<Wire.MachineMessage> requestStream, IServerStreamWriter<SandboxCall> responseStream, ServerCallContext context)
+    public override async Task Connect(IAsyncStreamReader<Wire.MachineMessage> requestStream, IServerStreamWriter<Calls.SandboxCall> responseStream, ServerCallContext context)
     {
         CancellationToken ct = context.CancellationToken;
-        if (!await requestStream.MoveNext(ct) || requestStream.Current.Hello is not Wire.Hello hello)
+        bool opened = await requestStream.MoveNext(ct);
+        Wire.Hello? hello = opened ? requestStream.Current.Hello : null;
+        if (hello is null)
         {
             throw new RpcException(new Status(StatusCode.InvalidArgument, "The first message must be Hello."));
         }
 
         ConnectMachine command = new ConnectMachine(MachineId.From(GrpcCalls.ParseId(hello.MachineId)), GrpcCalls.BearerToken(context), hello.SlothVersion);
-        Result<IAsyncEnumerable<SandboxCall>> connected = await machines.ConnectAsync(Actor.Anonymous, command, ResultsAsync(requestStream, ct), ct);
-        if (!connected.TryGetValue(out IAsyncEnumerable<SandboxCall>? calls, out Error? rejected))
+        Result<IAsyncEnumerable<Calls.SandboxCall>> connected = await machines.ConnectAsync(Actor.Anonymous, command, ResultsAsync(requestStream, ct), ct);
+        if (connected.Failed)
         {
-            throw GrpcCalls.Rejection(rejected);
+            throw GrpcCalls.Rejection(connected.Error);
         }
 
         try
         {
-            await foreach (SandboxCall call in calls.WithCancellation(ct))
+            await foreach (Calls.SandboxCall call in connected.Output.WithCancellation(ct))
             {
                 await responseStream.WriteAsync(call, ct);
             }
@@ -59,7 +61,7 @@ internal sealed class MachineEndpoint(IMachineConnectionsApi machines) : Wire.Ma
     }
 
     // The results after Hello, until the machine leaves however it leaves.
-    private static async IAsyncEnumerable<SandboxCallResult> ResultsAsync(IAsyncStreamReader<Wire.MachineMessage> messages, [EnumeratorCancellation] CancellationToken ct)
+    private static async IAsyncEnumerable<Calls.SandboxCallResult> ResultsAsync(IAsyncStreamReader<Wire.MachineMessage> messages, [EnumeratorCancellation] CancellationToken ct)
     {
         while (true)
         {

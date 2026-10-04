@@ -22,7 +22,8 @@ internal sealed partial class MachinesApi
         }
 
         // Two registrations racing with one code: the other one won.
-        if ((await db.SaveAsync(ct)).IsError(out _))
+        Result saved = await db.SaveAsync(ct);
+        if (saved.Failed)
         {
             return new Result<MachineCredential>(Error.Unauthorized);
         }

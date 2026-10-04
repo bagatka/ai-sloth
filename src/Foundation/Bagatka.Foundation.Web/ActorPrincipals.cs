@@ -26,8 +26,12 @@ public static class ActorPrincipals
     {
         ArgumentNullException.ThrowIfNull(principal);
         Claim? user = principal.FindFirst(claim => string.Equals(claim.Type, UserIdClaim, StringComparison.Ordinal) && string.Equals(claim.Issuer, ClaimIssuer, StringComparison.Ordinal));
-        return user is not null && Guid.TryParse(user.Value, CultureInfo.InvariantCulture, out Guid userId)
-            ? Actor.ForUser(UserId.From(userId))
-            : Actor.Anonymous;
+        if (user is null)
+        {
+            return Actor.Anonymous;
+        }
+
+        bool parsed = Guid.TryParse(user.Value, CultureInfo.InvariantCulture, out Guid userId);
+        return parsed ? Actor.ForUser(UserId.From(userId)) : Actor.Anonymous;
     }
 }
