@@ -158,7 +158,8 @@ public static class ServiceDefaultsExtensions
 
         healthChecks
             .CacheOutput("HealthChecks")
-            .WithRequestTimeout("HealthChecks");
+            .WithRequestTimeout("HealthChecks")
+            .AllowAnonymous();
 
         healthChecks.MapHealthChecks("/health");
 

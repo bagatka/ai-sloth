@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- The fake OpenID Connect provider is a small ASP.NET Core app. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Aspire\Bagatka.AiSloth.AppHost\Bagatka.AiSloth.AppHost.csproj" />
+    <ProjectReference Include="..\..\src\ControlPlane\Modules\Nooks\Bagatka.AiSloth.Nooks.Contracts\Bagatka.AiSloth.Nooks.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\ControlPlane\Modules\Users\Bagatka.AiSloth.Users.Contracts\Bagatka.AiSloth.Users.Contracts.csproj" />
+    <!-- Deletes whatever nooks a failed run left in its Docker scope. -->
+    <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -2,11 +2,16 @@ using System;
 using System.Globalization;
 using System.Threading;
 using Bagatka.AiSloth.Nooks;
+using Bagatka.AiSloth.Users;
+using Bagatka.AiSloth.WebApi;
 using Bagatka.AiSloth.WebApi.Endpoints;
 using Bagatka.AiSloth.Workspaces;
+using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.Sandboxing.Docker;
 using Bagatka.ServiceDefaults;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -31,14 +36,38 @@ builder.Host.UseDefaultServiceProvider(provider =>
 builder.Services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddSource("Npgsql"));
 
 // The only place that reads configuration (PATTERNS.md, entry 20).
+AuthenticationSettings authentication = builder.Configuration.GetRequired<AuthenticationSettings>("Authentication");
 DockerSandboxSettings docker = builder.Configuration.GetRequired<DockerSandboxSettings>("Sandboxing:Docker");
+UsersSettings users = builder.Configuration.GetRequired<UsersSettings>("Modules:Users");
 WorkspacesSettings workspaces = builder.Configuration.GetRequired<WorkspacesSettings>("Modules:Workspaces");
 NooksSettings nooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
 
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.ConfigureHttpJsonOptions(json => FoundationJson.Configure(json.SerializerOptions));
+builder.Services.AddProblemDetails();
+builder.Services.AddOpenApi();
 builder.Services.AddGrpc();
+
+// Tokens from the configured OpenID Connect provider; who the token's subject is, Users decides.
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(jwt =>
+    {
+        jwt.Authority = authentication.Issuer.AbsoluteUri;
+        jwt.Audience = authentication.Audience;
+        jwt.RequireHttpsMetadata = string.Equals(authentication.Issuer.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal);
+
+        // Claims keep the token's names, such as "sub".
+        jwt.MapInboundClaims = false;
+        jwt.Events = new JwtBearerEvents { OnTokenValidated = TokenSignIn.RecordUserAsync };
+    });
+
+// Every endpoint requires a signed-in user unless it says AllowAnonymous().
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+
 builder.Services
     .AddDockerSandboxProvider(docker)
+    .AddUsersModule(users)
     .AddWorkspacesModule(workspaces)
     .AddNooksModule(nooks);
 
@@ -52,9 +81,19 @@ if (args is ["migrate"])
     return;
 }
 
-app.MapDefaultEndpoints();
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+app.UseAuthentication();
+app.UseAuthorization();
 
-// Daemons dial Kestrel's HTTP/2-only "Daemon" endpoint (appsettings.json).
-app.MapGrpcService<DaemonEndpoint>();
+app.MapDefaultEndpoints();
+app.MapOpenApi().AllowAnonymous();
+app.MapUsersEndpoints();
+app.MapWorkspacesEndpoints();
+app.MapNooksEndpoints();
+
+// Daemons dial Kestrel's HTTP/2-only "Daemon" endpoint (appsettings.json) and prove themselves with
+// their nook's token instead of a user's.
+app.MapGrpcService<DaemonEndpoint>().AllowAnonymous();
 
 await app.RunAsync();

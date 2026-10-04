@@ -14,7 +14,8 @@ jobs:
   validate-dotnet-solution:
     name: .NET solution / Build, audit, style & test
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The end-to-end tests pull PostgreSQL and build the nook image (SDK image and an AOT compile).
+    timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

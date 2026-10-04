@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Bagatka.AiSloth.Users.Contracts\Bagatka.AiSloth.Users.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\..\Foundation\Bagatka.Foundation.Modules\Bagatka.Foundation.Modules.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -25,6 +25,11 @@
   <Folder Name="/src/ControlPlane/Modules/Sources/">
     <File Path="src/ControlPlane/Modules/Sources/README.md" />
   </Folder>
+  <Folder Name="/src/ControlPlane/Modules/Users/">
+    <File Path="src/ControlPlane/Modules/Users/README.md" />
+    <Project Path="src/ControlPlane/Modules/Users/Bagatka.AiSloth.Users.Contracts/Bagatka.AiSloth.Users.Contracts.csproj" />
+    <Project Path="src/ControlPlane/Modules/Users/Bagatka.AiSloth.Users/Bagatka.AiSloth.Users.csproj" />
+  </Folder>
   <Folder Name="/src/ControlPlane/Modules/Workspaces/">
     <File Path="src/ControlPlane/Modules/Workspaces/README.md" />
     <Project Path="src/ControlPlane/Modules/Workspaces/Bagatka.AiSloth.Workspaces.Contracts/Bagatka.AiSloth.Workspaces.Contracts.csproj" />
@@ -37,6 +42,7 @@
   </Folder>
   <Folder Name="/src/Foundation/">
     <Project Path="src/Foundation/Bagatka.Foundation.Modules/Bagatka.Foundation.Modules.csproj" />
+    <Project Path="src/Foundation/Bagatka.Foundation.Web/Bagatka.Foundation.Web.csproj" />
     <Project Path="src/Foundation/Bagatka.Foundation/Bagatka.Foundation.csproj" />
   </Folder>
   <Folder Name="/src/Sandboxing/">
@@ -51,6 +57,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Bagatka.AiSloth.ArchitectureTests/Bagatka.AiSloth.ArchitectureTests.csproj" />
     <Project Path="tests/Bagatka.AiSloth.Daemon.Tests/Bagatka.AiSloth.Daemon.Tests.csproj" />
+    <Project Path="tests/Bagatka.AiSloth.EndToEndTests/Bagatka.AiSloth.EndToEndTests.csproj" />
     <Project Path="tests/Bagatka.Foundation.Tests/Bagatka.Foundation.Tests.csproj" />
     <Project Path="tests/Bagatka.Sandboxing.ConformanceTests/Bagatka.Sandboxing.ConformanceTests.csproj" />
   </Folder>
