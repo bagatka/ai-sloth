@@ -13,6 +13,8 @@
     <ProjectReference Include="..\..\src\ControlPlane\Modules\AgentAccounts\Bagatka.AiSloth.AgentAccounts\Bagatka.AiSloth.AgentAccounts.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Chats\Bagatka.AiSloth.Chats.Contracts\Bagatka.AiSloth.Chats.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Chats\Bagatka.AiSloth.Chats\Bagatka.AiSloth.Chats.csproj" />
+    <ProjectReference Include="..\..\src\ControlPlane\Modules\Secrets\Bagatka.AiSloth.Secrets.Contracts\Bagatka.AiSloth.Secrets.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\ControlPlane\Modules\Secrets\Bagatka.AiSloth.Secrets\Bagatka.AiSloth.Secrets.csproj" />
     <ProjectReference Include="..\..\src\Cli\Bagatka.AiSloth.MachineProtocol\Bagatka.AiSloth.MachineProtocol.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Machines\Bagatka.AiSloth.Machines.Contracts\Bagatka.AiSloth.Machines.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Machines\Bagatka.AiSloth.Machines\Bagatka.AiSloth.Machines.csproj" />

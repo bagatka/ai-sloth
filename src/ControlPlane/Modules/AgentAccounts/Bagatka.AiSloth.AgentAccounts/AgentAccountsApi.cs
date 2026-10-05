@@ -1,9 +1,10 @@
 using System;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Data;
-using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.Foundation.Modules;
 using Bagatka.Sdk.OpenAI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Bagatka.AiSloth.AgentAccounts;
@@ -12,7 +13,7 @@ namespace Bagatka.AiSloth.AgentAccounts;
 internal sealed partial class AgentAccountsApi(
     AgentAccountsDbContext db,
     IWorkspacesApi workspaces,
-    SecretBox box,
+    [FromKeyedServices(AgentAccountsDbContext.Schema)] SecretBox box,
     AgentAccountsSettings settings,
     ChatGptSignInClient chatGpt,
     TimeProvider time,

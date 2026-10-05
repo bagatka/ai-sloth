@@ -66,6 +66,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Start script | A harness image's `harness` command: it reads the same three variables for every harness and configures and runs its harness | `src/Harnesses/start` | wrapper, entrypoint |
 | Harness state | The files a harness keeps between sessions, such as its memory and skills, saved per person and restored into their new nooks | Chats (planned) | memory (ours), context |
 | Agent account | An account at an agent vendor that pays for agents' work, such as an OpenAI API key or a ChatGPT plan: a workspace's, which every member uses, or a person's own | AgentAccounts | subscription (for API keys), credential, account (alone) |
+| Secret | An environment variable a workspace gives to every process in its nooks, agents included, such as `GH_TOKEN`; readable by everyone who may write in a nook | Secrets | env var (alone), credential, key |
 | Endpoint | The base URL of the API an API key is for, when it isn't the vendor's own, such as OpenRouter's for OpenAI's API | AgentAccounts | base URL, provider, upstream |
 | Plan | A person's subscription at a vendor that pays for agents' work, such as a ChatGPT, Claude, or Copilot plan; always personal | AgentAccounts | subscription (for API keys), seat |
 | Sign-in | Adding a plan by signing in at its vendor in a browser, which AiSloth finishes with the address the browser returns to | AgentAccounts | OAuth flow, login, connect |

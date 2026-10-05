@@ -2,12 +2,16 @@ using System;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Bagatka.AiSloth.AgentAccounts.Model;
+namespace Bagatka.Foundation.Modules;
 
-// Encrypts secrets at rest with AES-256-GCM (PATTERNS.md, "Secrets at rest"). The ID of the row that
-// holds a secret is authenticated with it, so a secret copied onto another row doesn't open.
-// Not handled: rotating the key; a new key makes every stored secret unreadable.
-internal sealed class SecretBox(string encryptionKey)
+/// <summary>
+/// Encrypts secrets a module keeps at rest with AES-256-GCM under a key from its settings (PATTERNS.md,
+/// "Secrets at rest"). The ID of the row that holds a secret is authenticated with it, so a secret
+/// copied onto another row doesn't open. Thread-safe.
+/// </summary>
+/// <remarks>Not handled: rotating the key; a new key makes every stored secret unreadable.</remarks>
+/// <param name="encryptionKey">The module's encryption key, at least 32 random characters.</param>
+public sealed class SecretBox(string encryptionKey)
 {
     private const byte Format = 1;
     private const int NonceSize = 12;
@@ -15,7 +19,7 @@ internal sealed class SecretBox(string encryptionKey)
 
     private readonly byte[] _key = SHA256.HashData(Encoding.UTF8.GetBytes(encryptionKey));
 
-    // Format byte, nonce, tag, then the ciphertext.
+    /// <summary>Seals <paramref name="secret"/> for the row with ID <paramref name="row"/>: a format byte, the nonce, the tag, then the ciphertext.</summary>
     public byte[] Seal(string secret, Guid row)
     {
         byte[] plaintext = Encoding.UTF8.GetBytes(secret);
@@ -28,6 +32,7 @@ internal sealed class SecretBox(string encryptionKey)
         return box;
     }
 
+    /// <summary>Opens what <see cref="Seal"/> sealed for the same row; throws for anything else.</summary>
     public string Open(byte[] box, Guid row)
     {
         if (box.Length < 1 + NonceSize + TagSize || box[0] != Format)
@@ -41,8 +46,10 @@ internal sealed class SecretBox(string encryptionKey)
         return Encoding.UTF8.GetString(plaintext);
     }
 
-    // A stable identifier for this deployment, for one purpose, derived from the key: it reveals
-    // nothing about the key and changes only with it. Formatted as a UUID (version 8, custom).
+    /// <summary>
+    /// A stable identifier for this deployment, for one purpose, derived from the key: it reveals
+    /// nothing about the key and changes only with it. Formatted as a UUID (version 8, custom).
+    /// </summary>
     public Guid DeriveId(string purpose)
     {
         byte[] hash = HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes(purpose));

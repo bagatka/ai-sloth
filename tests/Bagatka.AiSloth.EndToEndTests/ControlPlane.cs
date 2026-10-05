@@ -115,6 +115,7 @@ public sealed class ControlPlane : IAsyncLifetime
                 "Parameters:chatgpt-authority=" + _chatGpt.Url,
                 "Parameters:chatgpt-api=" + _model.OpenAIUrl,
                 "Parameters:agent-accounts-key=" + RandomNumberGenerator.GetHexString(64),
+                "Parameters:secrets-key=" + RandomNumberGenerator.GetHexString(64),
                 "DaemonPort=" + _daemonPort.ToString(CultureInfo.InvariantCulture),
                 "ModelsPort=" + _modelsPort.ToString(CultureInfo.InvariantCulture),
             ],

@@ -616,6 +616,13 @@
           "Bagatka.Foundation": "[1.0.0, )"
         }
       },
+      "bagatka.aisloth.secrets.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
       "bagatka.aisloth.users.contracts": {
         "type": "Project",
         "dependencies": {

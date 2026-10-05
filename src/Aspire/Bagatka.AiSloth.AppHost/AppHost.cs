@@ -32,6 +32,10 @@ string? chatGptApi = builder.Configuration["Parameters:chatgpt-api"];
 IResourceBuilder<ParameterResource> agentAccountsKey = builder.AddParameter(
     "agent-accounts-key", new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
 
+// Encrypts secrets' values at rest; generated once and kept in this project's user secrets.
+IResourceBuilder<ParameterResource> secretsKey = builder.AddParameter(
+    "secrets-key", new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
+
 // The Docker scope nooks run in, so test runs never touch a developer's nooks. A parameter given a
 // value can't be overridden, so the default is applied here.
 IResourceBuilder<ParameterResource> sandboxScope = builder.AddParameter("sandbox-scope", builder.Configuration["Parameters:sandbox-scope"] ?? "dev");
@@ -73,6 +77,8 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         .WithEnvironment("Modules__AgentAccounts__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__AgentAccounts__EncryptionKey", agentAccountsKey)
         .WithEnvironment("Modules__AgentAccounts__AllowChatGptPlans", allowChatGptPlans)
+        .WithEnvironment("Modules__Secrets__ConnectionString", database.Resource.ConnectionStringExpression)
+        .WithEnvironment("Modules__Secrets__EncryptionKey", secretsKey)
         .WithEnvironment("ModelGateway__AllowPrivateNetworks", modelPrivateNetworks)
         .WithEnvironment("Modules__Nooks__DaemonUrl", ReferenceExpression.Create($"http://host.docker.internal:{daemonEndpoint.Property(EndpointProperty.Port)}"))
         .WithEnvironment("Modules__Nooks__Image", NookImage)

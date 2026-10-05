@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.Foundation;
+using Bagatka.Foundation.Modules;
 using Bagatka.Sdk.OpenAI;
 
 namespace Bagatka.AiSloth.AgentAccounts.Model;

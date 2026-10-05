@@ -45,7 +45,8 @@ A provider ID names where a nook runs: a provider the deployment runs for every 
 
 Workspaces (`GetAccessAsync`), on every call made for a user, and `AddResourceAsync` when creating a
 nook; Machines (`ListAsync`, `GetAsync`), for
-the workspace's machines when listing providers and creating a nook on one; Sources (planned), for
+the workspace's machines when listing providers and creating a nook on one; Secrets
+(`ResolveAsync`), for the workspace's secrets whenever it starts a process; Sources (planned), for
 what to mount and how to set it up.
 
 ## Publishes
@@ -119,6 +120,8 @@ and memory. The idle period before suspension comes with suspension.
 
 ## Decisions and constraints
 
+- **Every process gets the workspace's secrets** (Secrets), as they are when it starts, under its
+  own variables, which win on a clash. They reach the daemon and are never stored here.
 - **Every provider is the same to a nook.** A nook stores a provider name and an optional location,
   the place within the provider, such as a machine; the reconciler passes the location in the
   sandbox spec. The one difference between providers is who may use them: the deployment's serve

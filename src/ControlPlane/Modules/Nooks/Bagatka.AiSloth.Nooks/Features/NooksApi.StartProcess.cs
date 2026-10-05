@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using System.Threading;
 using System;
+using System.Collections.Generic;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Daemons;
 using Bagatka.AiSloth.Nooks.Model;
@@ -28,6 +29,19 @@ internal sealed partial class NooksApi
 
         Process process = started.Output;
 
+        // Every process gets the workspace's secrets, as they are now; its own variables win.
+        Result<IReadOnlyDictionary<string, string>> resolved = await secrets.ResolveAsync(SystemActors.Processes, nook.Output.WorkspaceId, ct);
+        if (resolved.Failed)
+        {
+            throw new InvalidOperationException("Resolving the secrets of nook " + command.NookId.Value + "'s workspace failed: " + resolved.Error.Message);
+        }
+
+        Dictionary<string, string> environment = new Dictionary<string, string>(resolved.Output, StringComparer.Ordinal);
+        foreach (KeyValuePair<string, string> variable in command.Environment)
+        {
+            environment[variable.Key] = variable.Value;
+        }
+
         DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
         if (connection is null)
         {
@@ -44,7 +58,7 @@ internal sealed partial class NooksApi
         // Not handled: the connection ending between the commit and the send, which leaves the
         // process recorded as running. Handling it would mean comparing recorded processes with the
         // daemon's hello when it reconnects.
-        bool sent = await connection.SendAsync(new DaemonInstruction(process.ToInstruction(command.Environment)), ct);
+        bool sent = await connection.SendAsync(new DaemonInstruction(process.ToInstruction(environment)), ct);
         if (!sent)
         {
             throw new InvalidOperationException("Nook " + command.NookId.Value + "'s daemon disconnected before process " + process.Id.Value + " was sent.");

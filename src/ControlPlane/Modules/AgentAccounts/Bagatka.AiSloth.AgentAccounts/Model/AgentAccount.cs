@@ -5,6 +5,7 @@ using System.Text.Json;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
+using Bagatka.Foundation.Modules;
 
 namespace Bagatka.AiSloth.AgentAccounts.Model;
 

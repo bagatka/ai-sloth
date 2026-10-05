@@ -27,7 +27,7 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 - **Sources:** where a nook's files come from: repositories (any git remote) and folders AiSloth
   keeps. A nook mounts any number of them at `/work/<name>`.
 - **Agent accounts and secrets:** an agent account pays for an agent's model and never enters a
-  nook; secrets are environment variables a person or a workspace gives to nooks for the agent's
+  nook; secrets are environment variables a workspace gives to every process in its nooks for the agent's
   tools.
 - **Projects:** optional groups of nooks, chats, and sources for a team working toward one goal,
   with shared context and a project chat. Nothing depends on them.
@@ -84,7 +84,7 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 | Part | Projects | Purpose | Status |
 |---|---|---|---|
 | WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Sign-in, public API for users, workspaces, machines, nooks, agent accounts, and chats, the gRPC endpoint daemons and machines dial, the model gateway, `migrate` |
-| Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, Machines, Nooks, AgentAccounts, and Chats built |
+| Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, Machines, Nooks, Secrets, AgentAccounts, and Chats built |
 | Harnesses | `Bagatka.Harnesses` | The programs that run coding agents, how to start and pay for each, and the client's side of ACP | Claude Code, Codex, pi, and GitHub Copilot |
 | Sandboxing | `Bagatka.Sandboxing` + `.<Provider>`, `.Remote` | Provider contract, conformance tests, one project per compute backend, remote calls | Contract, Docker provider, remote calls |
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |
@@ -455,7 +455,8 @@ this table in the same change.
 | Module | Owns | Asks | Reacts to | Schema |
 |---|---|---|---|---|
 | Workspaces (contract only) | Workspaces, and who may do what with them and their nooks: access levels, invites | — | — | `workspaces` |
-| Nooks (contract only) | Nooks, where each runs, their lifecycle, processes, templates, checkpoints, daemon connections | Workspaces, Sources, Machines | — | `nooks` |
+| Nooks (contract only) | Nooks, where each runs, their lifecycle, processes, templates, checkpoints, daemon connections | Workspaces, Sources, Machines, Secrets | — | `nooks` |
+| Secrets | Workspaces' environment variables for every process in their nooks, their sealed values | Workspaces | — | `secrets` |
 | Sources (planned) | Repositories and folders, their recipes, delivery, push policy | Workspaces | — | `sources` |
 | AgentAccounts | Accounts at agent vendors that pay for agents: a workspace's and people's own, their sealed secrets | Workspaces | — | `agent_accounts` |
 | Chats | ACP conversations in nooks, their messages, proposals, and events, the agents' runners; harness state (planned) | Nooks, AgentAccounts, Workspaces | — | `chats` |

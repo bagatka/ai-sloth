@@ -34,6 +34,11 @@
   <Folder Name="/src/ControlPlane/Modules/Projects/">
     <File Path="src/ControlPlane/Modules/Projects/README.md" />
   </Folder>
+  <Folder Name="/src/ControlPlane/Modules/Secrets/">
+    <File Path="src/ControlPlane/Modules/Secrets/README.md" />
+    <Project Path="src/ControlPlane/Modules/Secrets/Bagatka.AiSloth.Secrets.Contracts/Bagatka.AiSloth.Secrets.Contracts.csproj" />
+    <Project Path="src/ControlPlane/Modules/Secrets/Bagatka.AiSloth.Secrets/Bagatka.AiSloth.Secrets.csproj" />
+  </Folder>
   <Folder Name="/src/ControlPlane/Modules/Sources/">
     <File Path="src/ControlPlane/Modules/Sources/README.md" />
   </Folder>

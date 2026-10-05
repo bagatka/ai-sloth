@@ -6,6 +6,7 @@ using Bagatka.AiSloth.AgentAccounts;
 using Bagatka.AiSloth.Chats;
 using Bagatka.AiSloth.Machines;
 using Bagatka.AiSloth.Nooks;
+using Bagatka.AiSloth.Secrets;
 using Bagatka.AiSloth.Users;
 using Bagatka.AiSloth.WebApi;
 using Bagatka.AiSloth.WebApi.Endpoints;
@@ -48,6 +49,7 @@ WorkspacesSettings workspaces = builder.Configuration.GetRequired<WorkspacesSett
 MachinesSettings machines = builder.Configuration.GetRequired<MachinesSettings>("Modules:Machines");
 NooksSettings nooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
 AgentAccountsSettings agentAccounts = builder.Configuration.GetRequired<AgentAccountsSettings>("Modules:AgentAccounts");
+SecretsSettings secrets = builder.Configuration.GetRequired<SecretsSettings>("Modules:Secrets");
 ChatsSettings chats = builder.Configuration.GetRequired<ChatsSettings>("Modules:Chats");
 ModelGatewaySettings modelGateway = builder.Configuration.GetRequired<ModelGatewaySettings>("ModelGateway");
 
@@ -90,6 +92,7 @@ builder.Services
     .AddUsersModule(users)
     .AddWorkspacesModule(workspaces)
     .AddMachinesModule(machines)
+    .AddSecretsModule(secrets)
     .AddNooksModule(nooks)
     .AddAgentAccountsModule(agentAccounts)
     .AddChatsModule(chats);
@@ -117,6 +120,7 @@ app.MapAccessEndpoints();
 app.MapMachinesEndpoints();
 app.MapNooksEndpoints();
 app.MapAgentAccountsEndpoints();
+app.MapSecretsEndpoints();
 app.MapChatsEndpoints();
 
 // Agents in nooks reach the model gateway on Kestrel's "Models" endpoint (appsettings.json); a call

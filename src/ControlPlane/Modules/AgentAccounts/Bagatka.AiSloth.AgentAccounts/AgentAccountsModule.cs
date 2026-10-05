@@ -1,6 +1,5 @@
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Data;
-using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.Foundation.Modules;
 using Bagatka.Sdk.OpenAI;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +15,7 @@ public static class AgentAccountsModule
     public static IServiceCollection AddAgentAccountsModule(this IServiceCollection services, AgentAccountsSettings settings)
     {
         services.AddSingleton(settings);
-        services.AddSingleton(new SecretBox(settings.EncryptionKey));
+        services.AddKeyedSingleton(AgentAccountsDbContext.Schema, new SecretBox(settings.EncryptionKey));
         services.AddChatGptSignInClient(settings.ChatGptSignIn);
         services.AddModuleDbContext<AgentAccountsDbContext>(settings.ConnectionString, AgentAccountsDbContext.Schema);
         services.AddScoped<IAgentAccountsApi, AgentAccountsApi>();

@@ -543,11 +543,26 @@
         "dependencies": {
           "Bagatka.AiSloth.Machines.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Nooks.Contracts": "[1.0.0, )",
+          "Bagatka.AiSloth.Secrets.Contracts": "[1.0.0, )",
           "Bagatka.Foundation.Modules": "[1.0.0, )",
           "Bagatka.Sandboxing": "[1.0.0, )"
         }
       },
       "bagatka.aisloth.nooks.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
+      "bagatka.aisloth.secrets": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Secrets.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation.Modules": "[1.0.0, )"
+        }
+      },
+      "bagatka.aisloth.secrets.contracts": {
         "type": "Project",
         "dependencies": {
           "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
@@ -576,6 +591,7 @@
           "Bagatka.AiSloth.MachineProtocol": "[1.0.0, )",
           "Bagatka.AiSloth.Machines": "[1.0.0, )",
           "Bagatka.AiSloth.Nooks": "[1.0.0, )",
+          "Bagatka.AiSloth.Secrets": "[1.0.0, )",
           "Bagatka.AiSloth.Users": "[1.0.0, )",
           "Bagatka.AiSloth.Workspaces": "[1.0.0, )",
           "Bagatka.Foundation.Web": "[1.0.0, )",

@@ -659,8 +659,11 @@ arrives with the first integration event.
   sealed with AES-256-GCM under a key from the module's settings, bound to its row's ID so it can't
   be moved to another row. It is decrypted only to hand to whoever uses it, in a record whose text
   form leaves it out, and never logged. A secret the module only checks, such as a daemon's or a
-  machine's token, is stored as its SHA-256 hash instead. Canonical example:
-  `src/ControlPlane/Modules/AgentAccounts/Bagatka.AiSloth.AgentAccounts/Model/SecretBox.cs`.
+  machine's token, is stored as its SHA-256 hash instead. `SecretBox` (`Bagatka.Foundation.Modules`)
+  seals and opens; each module registers its own, keyed by its schema, so no module ever opens with
+  another's key: `services.AddKeyedSingleton(SecretsDbContext.Schema, new SecretBox(settings.EncryptionKey))`
+  and `[FromKeyedServices(SecretsDbContext.Schema)] SecretBox box`. Canonical example: the Secrets
+  module (`src/ControlPlane/Modules/Secrets`).
   Codes people pass on once, such as a machine's registration code or an invite, come from
   `OneTimeCode` (Foundation) and are kept only as its hash.
 - **Concurrency.** Entities that can be edited concurrently get a concurrency token in their

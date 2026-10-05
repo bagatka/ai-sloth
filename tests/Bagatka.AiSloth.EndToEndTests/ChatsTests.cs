@@ -34,7 +34,7 @@ public sealed class ChatsTests(ControlPlane controlPlane) : IDisposable
 
         ChatMessage sent = await SendAsync(chat, "Please write hello.txt for me");
         JsonElement ended = await watch.NextAsync("turn-ended");
-        int? found = await ExitCodeAsync(chat.NookId, "grep", "-q", "hi from the fake model", "/work/hello.txt");
+        int? found = await NookProcesses.ExitCodeAsync(_alice, chat.NookId, "grep", "-q", "hi from the fake model", "/work/hello.txt");
 
         Assert.Equal(["message-sent", "turn-started"], watch.Seen.Take(2).Select(seen => seen.Type), StringComparer.Ordinal);
         Assert.Equal(sent.Id.Value, watch.Seen[0].Event.GetProperty("messageId").GetGuid());
@@ -282,17 +282,5 @@ public sealed class ChatsTests(ControlPlane controlPlane) : IDisposable
     private async Task<ChatMessage> SendAsync(ChatSummary chat, string text)
     {
         return await Api.ReadAsync<ChatMessage>(_alice.SendPostAsync(PathOf(chat) + "/messages", new { text }), HttpStatusCode.OK);
-    }
-
-    private async Task<int?> ExitCodeAsync(NookId nook, string command, params string[] arguments)
-    {
-        string processes = string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Value}/processes");
-        ProcessSummary process = await Api.ReadAsync<ProcessSummary>(_alice.SendPostAsync(processes, new { command, arguments }), HttpStatusCode.OK);
-        ProcessSummary exited = await Api.EventuallyAsync(async () =>
-        {
-            Page<ProcessSummary> listed = await Api.ReadAsync<Page<ProcessSummary>>(_alice.SendGetAsync(processes), HttpStatusCode.OK);
-            return listed.Items.SingleOrDefault(found => found.Id == process.Id && found.ExitCode is not null);
-        });
-        return exited.ExitCode;
     }
 }
