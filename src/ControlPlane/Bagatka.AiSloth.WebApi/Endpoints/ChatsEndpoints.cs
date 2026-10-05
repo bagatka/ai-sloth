@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
-using Bagatka.AiSloth.Nooks.Contracts;
+using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Web;
 using Microsoft.AspNetCore.Builder;
@@ -21,7 +21,7 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class ChatsEndpoints
 {
-    internal sealed record StartChatRequest(AgentAccountId Account);
+    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account);
 
     internal sealed record SendMessageRequest(string Text, MessageId? Proposal = null);
 
@@ -33,9 +33,9 @@ internal static class ChatsEndpoints
     {
         app.MapGet("/harnesses", ListHarnesses).WithTags("Chats");
 
-        RouteGroupBuilder nookChats = app.MapGroup("/nooks/{nookId:guid}/chats").WithTags("Chats");
-        nookChats.MapPost("/", Start);
-        nookChats.MapGet("/", List);
+        RouteGroupBuilder workspaceChats = app.MapGroup("/workspaces/{workspaceId:guid}/chats").WithTags("Chats");
+        workspaceChats.MapPost("/", Start);
+        workspaceChats.MapGet("/", List);
 
         RouteGroupBuilder chats = app.MapGroup("/chats").WithTags("Chats");
         chats.MapGet("/{id:guid}", Get);
@@ -45,7 +45,7 @@ internal static class ChatsEndpoints
         return chats;
     }
 
-    /// <summary>The harnesses chats can run, and the kinds of agent account each takes; a nook carries one, chosen when it is created.</summary>
+    /// <summary>The harnesses chats can run, and the kinds of agent account each takes.</summary>
     private static async Task<Ok<IReadOnlyList<HarnessSummary>>> ListHarnesses(
         ClaimsPrincipal principal,
         [FromServices] IChatsApi api,
@@ -56,31 +56,33 @@ internal static class ChatsEndpoints
     }
 
     /// <summary>
-    /// Starts a chat with a coding agent in the nook, run by the nook's harness on an agent account:
-    /// the workspace's, or the caller's own. The agent starts with the first message.
+    /// Starts a chat with a coding agent, and creates the nook it works in: on a provider from
+    /// <c>GET /workspaces/{id}/providers</c>, with a harness from <c>GET /harnesses</c>, on an agent
+    /// account (the workspace's, or the caller's own). One chat per nook, so agents never work on each
+    /// other's files. The agent starts with the first message; others join through the nook's access.
     /// </summary>
     private static async Task<Results<Created<ChatSummary>, ProblemHttpResult>> Start(
-        [FromRoute] Guid nookId,
+        [FromRoute] Guid workspaceId,
         [FromBody] StartChatRequest request,
         ClaimsPrincipal principal,
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        StartChat command = new StartChat(NookId.From(nookId), request.Account);
+        StartChat command = new StartChat(WorkspaceId.From(workspaceId), request.Provider, request.Harness, request.Account);
         Result<ChatSummary> result = await api.StartAsync(principal.ToActor(), command, ct);
         return result.ToCreated(chat => string.Create(CultureInfo.InvariantCulture, $"/chats/{chat.Id.Value}"));
     }
 
-    /// <summary>The nook's chats, newest first, and whether each agent is working.</summary>
+    /// <summary>The workspace's chats, newest first, and whether each agent is working.</summary>
     private static async Task<Results<Ok<Page<ChatSummary>>, ProblemHttpResult>> List(
-        [FromRoute] Guid nookId,
+        [FromRoute] Guid workspaceId,
         [FromQuery] string? cursor,
         [FromQuery] int? limit,
         ClaimsPrincipal principal,
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        Result<Page<ChatSummary>> result = await api.ListAsync(principal.ToActor(), NookId.From(nookId), Paging.Request(cursor, limit), ct);
+        Result<Page<ChatSummary>> result = await api.ListAsync(principal.ToActor(), WorkspaceId.From(workspaceId), Paging.Request(cursor, limit), ct);
         return result.ToOk();
     }
 

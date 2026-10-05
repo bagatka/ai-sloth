@@ -18,10 +18,12 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
                                               └────────── gRPC, dialed out by slothd ◀────┘
 ```
 
-- **Nook and chats:** the basic unit. A nook is where agents work: an isolated machine with its
-  files and processes, owned by a workspace. Its chats are conversations between people and a
-  coding agent in it. Underneath, a nook is a provider's sandbox; "sandbox" is a technical term that
-  never reaches the product.
+- **Chat and its nook:** the basic unit. A chat is a conversation between people and one coding
+  agent; starting it creates its nook, the isolated machine with files and processes where the
+  agent works, owned by a workspace. One chat, one nook, one agent, so agents never work on each
+  other's files; people share a chat through its nook's access, and parallel work is more chats.
+  A nook without a chat runs processes only. Underneath, a nook is a provider's sandbox; "sandbox" is
+  a technical term that never reaches the product.
 - **Sources:** where a nook's files come from: repositories (any git remote) and folders AiSloth
   keeps. A nook mounts any number of them at `/work/<name>`.
 - **Agent accounts and secrets:** an agent account pays for an agent's model and never enters a
@@ -71,7 +73,7 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
   through a full disk, a crash, or a deletion, costs at most the turn in progress. Risks we can see
   coming, such as a nearly full disk, pause new work until a person confirms, with the risk
   explained.
-- **Small units, optional groups.** A nook and its chats work on their own; a project groups them
+- **Small units, optional groups.** A chat and its nook work on their own; a project groups them
   without anything else knowing about projects. Every capability is general-purpose: removing a
   grouping leaves the units working.
 - **Return on effort decides scope.** A feature that buys a little and slows every later change is
@@ -83,13 +85,13 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 |---|---|---|---|
 | WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Sign-in, public API for users, workspaces, machines, nooks, agent accounts, and chats, the gRPC endpoint daemons and machines dial, the model gateway, `migrate` |
 | Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, Machines, Nooks, AgentAccounts, and Chats built |
-| Harnesses | `Bagatka.Harnesses` | The programs that run coding agents, how to start and pay for each, and the client's side of ACP | Claude Code and GitHub Copilot |
+| Harnesses | `Bagatka.Harnesses` | The programs that run coding agents, how to start and pay for each, and the client's side of ACP | Claude Code, Codex, pi, and GitHub Copilot |
 | Sandboxing | `Bagatka.Sandboxing` + `.<Provider>`, `.Remote` | Provider contract, conformance tests, one project per compute backend, remote calls | Contract, Docker provider, remote calls |
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |
 | CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API; its machine mode runs nooks on people's own computers | Machine mode built; the rest planned |
 | Foundation | `Bagatka.Foundation` (+ `.Modules`, `.Web`) | Plumbing: results, errors, actors, typed IDs | Built |
 | Object storage | `Bagatka.ObjectStorage` + `.<Backend>` | Store and read objects by key: folder versions, checkpoints, harness state | Planned |
-| Sdk | `Bagatka.Sdk.<Vendor>` | Clients for vendor APIs without an official .NET SDK | Docker Engine |
+| Sdk | `Bagatka.Sdk.<Vendor>` | Clients for vendor APIs without an official .NET SDK | Docker Engine, Sign in with ChatGPT |
 | Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration; defaults every service host shares | Built |
 
 The web and mobile apps are not in this repository. They use the same public HTTP API as the CLI.
@@ -185,8 +187,10 @@ The HTTP host of the control plane and its composition root. It has four jobs:
 It owns no business rules and touches no database. It references module projects only to call
 their registration in `Program.cs`. Everything else in a module is `internal` and unreachable.
 It also hosts an HTTP/2-only gRPC endpoint that every nook's daemon and every machine dial, the
-model gateway agents in nooks call the model provider through (on its own plain HTTP endpoint,
-adding the key of the chat's agent account, so no nook holds an API key), and will host the MCP endpoint, which exposes the same public operations as HTTP. Run with the single argument
+model gateway agents in nooks call their model through (on its own plain HTTP endpoint, forwarding
+each call to the chat's agent account's endpoint with the headers that pay for it, so no nook holds a
+key or a plan's token; endpoints are people's choice, so it reaches only public ones unless the
+deployment allows private networks, PATTERNS.md entry 30), and will host the MCP endpoint, which exposes the same public operations as HTTP. Run with the single argument
 `migrate`, it applies every module's migrations and exits. Canonical example:
 `src/ControlPlane/Bagatka.AiSloth.WebApi/Program.cs`.
 

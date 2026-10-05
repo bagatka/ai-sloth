@@ -46,10 +46,10 @@ public sealed class AccessTests(ControlPlane controlPlane) : IDisposable
     public async Task A_viewer_sees_everything_and_changes_nothing()
     {
         WorkspaceSummary workspace = await CreateWorkspaceAsync();
-        NookSummary nook = await CreateNookAsync(_alice, workspace, harness: "claude-code");
         AgentAccountSummary account = await Api.ReadAsync<AgentAccountSummary>(
-            _alice.SendPostAsync(PathOf(workspace) + "/agent-accounts", new { kind = "AnthropicApiKey", name = "Team key", secret = FakeModel.ApiKey }), HttpStatusCode.Created);
-        ChatSummary chat = await Api.ReadAsync<ChatSummary>(_alice.SendPostAsync(PathOf(nook) + "/chats", new { account = account.Id }), HttpStatusCode.Created);
+            _alice.SendPostAsync(PathOf(workspace) + "/agent-accounts", new { kind = "AnthropicApiKey", name = "Team key", secret = FakeModel.ApiKey, endpoint = controlPlane.Model.Url }), HttpStatusCode.Created);
+        ChatSummary chat = await StartChatAsync(workspace, account);
+        NookSummary nook = await Api.ReadAsync<NookSummary>(_alice.SendGetAsync(PathOf(chat.NookId)), HttpStatusCode.OK);
         Invite invite = await InviteAsync(PathOf(workspace), AccessLevel.Read);
         await AcceptAsync(_bob, invite.Code);
 
@@ -59,7 +59,7 @@ public sealed class AccessTests(ControlPlane controlPlane) : IDisposable
         await Api.ExpectAsync(_bob.SendPostAsync(PathOf(workspace) + "/nooks", new { provider = "docker" }), HttpStatusCode.Forbidden);
         await Api.ExpectAsync(_bob.DeleteAsync(new Uri(PathOf(nook), UriKind.Relative), Ct), HttpStatusCode.Forbidden);
         await Api.ExpectAsync(_bob.SendPostAsync(PathOf(nook) + "/processes", new { command = "true" }), HttpStatusCode.Forbidden);
-        await Api.ExpectAsync(_bob.SendPostAsync(PathOf(nook) + "/chats", new { account = account.Id }), HttpStatusCode.Forbidden);
+        await Api.ExpectAsync(_bob.SendPostAsync(PathOf(workspace) + "/chats", new { provider = "docker", harness = "claude-code", account = account.Id }), HttpStatusCode.Forbidden);
         await Api.ExpectAsync(_bob.SendPostAsync(PathOf(chat) + "/messages", new { text = "hi" }), HttpStatusCode.Forbidden);
         await Api.ExpectAsync(_bob.SendPostAsync(PathOf(chat) + "/stop", new { }), HttpStatusCode.Forbidden);
         await Api.ExpectAsync(_bob.SendPostAsync(PathOf(workspace) + "/invites", new { access = "Read" }), HttpStatusCode.Forbidden);
@@ -73,11 +73,11 @@ public sealed class AccessTests(ControlPlane controlPlane) : IDisposable
     public async Task A_nooks_guest_sees_only_that_nook_and_proposes_on_the_workspaces_account()
     {
         WorkspaceSummary workspace = await CreateWorkspaceAsync();
-        NookSummary nook = await CreateNookAsync(_alice, workspace, harness: "claude-code");
         NookSummary other = await CreateNookAsync(_alice, workspace);
         AgentAccountSummary account = await Api.ReadAsync<AgentAccountSummary>(
-            _alice.SendPostAsync(PathOf(workspace) + "/agent-accounts", new { kind = "AnthropicApiKey", name = "Team key", secret = FakeModel.ApiKey }), HttpStatusCode.Created);
-        ChatSummary chat = await Api.ReadAsync<ChatSummary>(_alice.SendPostAsync(PathOf(nook) + "/chats", new { account = account.Id }), HttpStatusCode.Created);
+            _alice.SendPostAsync(PathOf(workspace) + "/agent-accounts", new { kind = "AnthropicApiKey", name = "Team key", secret = FakeModel.ApiKey, endpoint = controlPlane.Model.Url }), HttpStatusCode.Created);
+        ChatSummary chat = await StartChatAsync(workspace, account);
+        NookSummary nook = await Api.ReadAsync<NookSummary>(_alice.SendGetAsync(PathOf(chat.NookId)), HttpStatusCode.OK);
         Invite invite = await InviteAsync(PathOf(nook), AccessLevel.Write);
 
         Resource joined = await AcceptAsync(_bob, invite.Code);
@@ -132,6 +132,11 @@ public sealed class AccessTests(ControlPlane controlPlane) : IDisposable
         return string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Id.Value}");
     }
 
+    private static string PathOf(NookId nook)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Value}");
+    }
+
     private static string PathOf(ChatSummary chat)
     {
         return string.Create(CultureInfo.InvariantCulture, $"/chats/{chat.Id.Value}");
@@ -147,9 +152,16 @@ public sealed class AccessTests(ControlPlane controlPlane) : IDisposable
         return await Api.ReadAsync<WorkspaceSummary>(_alice.SendPostAsync("/workspaces", new { name = "Acme" }), HttpStatusCode.Created);
     }
 
-    private static async Task<NookSummary> CreateNookAsync(HttpClient client, WorkspaceSummary workspace, string? harness = null)
+    private static async Task<NookSummary> CreateNookAsync(HttpClient client, WorkspaceSummary workspace)
     {
-        return await Api.ReadAsync<NookSummary>(client.SendPostAsync(PathOf(workspace) + "/nooks", new { provider = "docker", harness }), HttpStatusCode.Created);
+        return await Api.ReadAsync<NookSummary>(client.SendPostAsync(PathOf(workspace) + "/nooks", new { provider = "docker" }), HttpStatusCode.Created);
+    }
+
+    // A chat with Claude Code, in a nook of its own.
+    private async Task<ChatSummary> StartChatAsync(WorkspaceSummary workspace, AgentAccountSummary account)
+    {
+        return await Api.ReadAsync<ChatSummary>(
+            _alice.SendPostAsync(PathOf(workspace) + "/chats", new { provider = "docker", harness = "claude-code", account = account.Id }), HttpStatusCode.Created);
     }
 
     private async Task<Invite> InviteAsync(string resourcePath, AccessLevel access)

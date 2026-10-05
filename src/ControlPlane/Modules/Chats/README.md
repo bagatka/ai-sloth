@@ -1,12 +1,14 @@
 # Chats
 
-A chat is a conversation with a coding agent working in one nook, run by the harness the nook
-carries on an agent account that pays for its work. A chat is as open as its nook: whoever may read
+A chat is a conversation with one coding agent, working in a nook the chat creates for it, run by a
+harness on an agent account that pays for its work. One chat, one nook, one agent: agents never work
+on each other's files, and parallel work is more chats. A chat is as open as its nook: whoever may read
 the nook reads it, and whoever may write writes in it. A message reaches the agent when its sender
 may use the chat's account; anyone else's is a proposal, which someone who may use it sends on, as is
 or edited.
 Each message shows who sent it. The agent works only inside its nook. Any harness that speaks
-the Agent Client Protocol (ACP) can run a chat (`src/Harnesses`); today Claude Code and GitHub Copilot.
+the Agent Client Protocol (ACP) can run a chat (`src/Harnesses`); today Claude Code, Codex, pi, and
+GitHub Copilot.
 
 ## Owns
 
@@ -23,20 +25,21 @@ the Agent Client Protocol (ACP) can run a chat (`src/Harnesses`); today Claude C
 ## Does not own
 
 - Nooks and processes: Nooks. A chat's agent is an ordinary process in its nook.
-- Agent accounts and their secrets: AgentAccounts. This module asks for a chat's secret when its
-  agent starts, and when the model gateway forwards a call.
+- Agent accounts and their secrets: AgentAccounts. This module asks what a chat's account takes when
+  its agent starts, and where to forward each call through the model gateway
+  (`GetModelEndpointAsync`).
 - Harness profiles and the protocol: `Bagatka.Harnesses`.
 - What the agent can do in AiSloth itself: the public API, through MCP (not built yet).
 
 ## Contract
 
-`IChatsApi` in `Bagatka.AiSloth.Chats.Contracts`: members list the harnesses, start chats in a nook
-on its harness and an agent account, send messages (or send a proposal on), stop the agent, and watch
+`IChatsApi` in `Bagatka.AiSloth.Chats.Contracts`: members list the harnesses, start chats (each
+creating its nook, on a provider, with a harness and an agent account), list a workspace's chats, send messages (or send a proposal on), stop the agent, and watch
 a chat's events from any sequence number.
 `IChatHarnessesApi` is the model gateway's side, never a public route or a tool.
 
 ```csharp
-Result<ChatSummary> started = await chats.StartAsync(alice, new StartChat(nookId, teamAccountId), ct); // the nook carries claude-code
+Result<ChatSummary> started = await chats.StartAsync(alice, new StartChat(workspaceId, "docker", "codex", teamAccountId), ct); // creates its nook
 if (started.Failed)
 {
     return new Result(started.Error);
@@ -59,8 +62,9 @@ await foreach (ChatEvent e in watch.Output)
 
 ## Asks
 
-Workspaces (`GetAccessAsync`, on the chat's nook), on every call made for a user; Nooks, to check a
-nook and to start, feed, watch, and stop the agent's process; AgentAccounts, for the account a chat
+Workspaces (`GetAccessAsync`, on the workspace when a chat starts and on the chat's nook after), on
+every call made for a user; Nooks, to create a chat's nook and to start, feed, watch, and stop the
+agent's process; AgentAccounts, for the account a chat
 runs on and who may use it (`MayUseAsync`).
 
 ## Publishes
@@ -73,7 +77,7 @@ Nothing yet. Once nooks publish `NookDeleted`, their chats go with them.
 
 ## Data
 
-Schema `chats`. Tables `chats` (nook, workspace, who started it, the harness, the agent account and
+Schema `chats`. Tables `chats` (nook, unique: one chat per nook; workspace, who started it, the harness, the agent account and
 its owner when personal; the agent's process, token hash,
 session, and how far its output is read; the turn in progress; the last sequence number; `xmin`
 as concurrency token), `messages` (text, sender, the proposal it sends on, and where each is on its
@@ -96,6 +100,10 @@ gateway's URL as an agent in a nook reaches it.
 
 ## Decisions and constraints
 
+- **One chat, one nook, one agent.** Starting a chat creates its nook, so no two agents ever work on
+  the same files. Nooks may still exist without a chat, for processes only, but a chat never joins a
+  nook that exists. Should saving a chat fail after its nook was created, the nook stays, without an
+  agent, until someone deletes it.
 - **ACP over the process primitive.** The agent is a nook process with `Complete` output retention;
   its standard input and output carry ACP, one JSON-RPC message per line, and this module is the
   client. The daemon never knows about agents, and a control-plane deploy only pauses a chat for
@@ -109,10 +117,13 @@ gateway's URL as an agent in a nook reaches it.
 - **The agent acts without asking inside its nook.** Its permission requests get their broadest
   allow: the nook is isolated, and asking would stop unattended runs. Sensitive AiSloth operations
   will still need a person's confirmation once agents reach the public API.
-- **No API key in a nook.** For an Anthropic API key, the agent gets the model gateway's URL and a
-  random token for this chat (only its hash is kept), and the gateway adds the account's key. A
-  plan's token, such as Copilot's, goes to the harness itself: Copilot calls GitHub directly, and the
-  token's only permission is Copilot requests.
+- **No key or plan of a model API in a nook.** For an API key or a ChatGPT plan, the agent gets the
+  model gateway's URL and a random token for this chat (only its hash is kept), and the gateway
+  forwards each call to the account's endpoint with the headers that pay for it. Every harness starts
+  the same way, with the gateway's URL and the token in the same variables (`src/Harnesses`). A plan's
+  token tied to one harness, such as Copilot's, goes to the harness itself: Copilot calls GitHub
+  directly, and the token's only permission is Copilot requests.
+- **Agents name this client** `aisloth` when they initialize, which Codex passes on to OpenAI.
 - **Proposals instead of shared accounts.** Writing in a chat follows the nook; spending an account
   doesn't. Everyone who may write proposes, and only someone who may use the account sends to the
   agent: a workspace's account serves people with Write on the workspace, so a nook's guest proposes

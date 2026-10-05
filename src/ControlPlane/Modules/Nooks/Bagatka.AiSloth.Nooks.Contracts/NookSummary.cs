@@ -12,7 +12,7 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// <param name="Status">Where it is in its lifecycle.</param>
 /// <param name="CreatedAt">When it was recorded.</param>
 /// <param name="Disk">How full its disk was at the daemon's last report, or <see langword="null"/> before the first.</param>
-/// <param name="Harness">The harness it carries for its chats' agents, or <see langword="null"/> for none.</param>
+/// <param name="Harness">The harness it carries for its chat's agent, or <see langword="null"/> for none.</param>
 public sealed record NookSummary(
     NookId Id,
     WorkspaceId WorkspaceId,

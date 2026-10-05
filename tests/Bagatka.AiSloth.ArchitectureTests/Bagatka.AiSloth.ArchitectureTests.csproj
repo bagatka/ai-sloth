@@ -27,6 +27,7 @@
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Remote\Bagatka.Sandboxing.Remote.csproj" />
     <ProjectReference Include="..\..\src\Sdk\Bagatka.Sdk.Docker\Bagatka.Sdk.Docker.csproj" />
+    <ProjectReference Include="..\..\src\Sdk\Bagatka.Sdk.OpenAI\Bagatka.Sdk.OpenAI.csproj" />
   </ItemGroup>
 
 </Project>

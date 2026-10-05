@@ -1,14 +1,15 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Bagatka.AiSloth.Nooks.Contracts;
+using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Chats.Contracts;
 
 /// <summary>
-/// Chats: conversations with a coding agent working in a nook. A chat is as open as its nook: Read
-/// reads it, Write writes in it. A message reaches the agent when its sender may use the chat's
+/// Chats: conversations with a coding agent working in a nook of its own. One chat, one nook, one
+/// agent, so agents never work on each other's files. A chat is as open as its nook: Read reads it,
+/// Write writes in it. A message reaches the agent when its sender may use the chat's
 /// account, and is a proposal otherwise. Each message shows who sent it. The agent works only inside
 /// its nook, and acts there without asking.
 /// </summary>
@@ -18,21 +19,26 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// </remarks>
 public interface IChatsApi
 {
-    /// <summary>The harnesses chats can run, and the agent accounts each takes. A nook carries one, chosen when it is created.</summary>
+    /// <summary>The harnesses chats can run, and the agent accounts each takes.</summary>
     public Task<IReadOnlyList<HarnessSummary>> ListHarnessesAsync(Actor actor, CancellationToken ct);
 
-    /// <summary>Starts a chat in the nook, run by the nook's harness on the account. The agent starts with the first message.</summary>
+    /// <summary>
+    /// Starts a chat and creates the nook its agent works in, on the provider, carrying the harness;
+    /// the agent runs on the account, and starts with the first message. Other people reach the chat
+    /// through its nook's access.
+    /// </summary>
     /// <returns>
-    /// The chat; a validation error for a nook without a harness, or an account the actor can't use or
-    /// the harness doesn't take; forbidden without Write on the nook; or not found when the nook doesn't exist or the actor has no access to it.
+    /// The chat, with its nook; a validation error for an unknown harness or provider, or an account the
+    /// actor can't use or the harness doesn't take; forbidden without Write on the workspace; or not found
+    /// when the actor has no access to it.
     /// </returns>
     public Task<Result<ChatSummary>> StartAsync(Actor actor, StartChat command, CancellationToken ct);
 
     /// <summary>The chat. Not found when it doesn't exist or the actor has no access to its nook.</summary>
     public Task<Result<ChatSummary>> GetAsync(Actor actor, ChatId id, CancellationToken ct);
 
-    /// <summary>The nook's chats, newest first. Not found when the actor may not use the nook.</summary>
-    public Task<Result<Page<ChatSummary>>> ListAsync(Actor actor, NookId nookId, PageRequest page, CancellationToken ct);
+    /// <summary>The workspace's chats, newest first. Not found for anyone without access to the workspace, such as a nook's guest.</summary>
+    public Task<Result<Page<ChatSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, PageRequest page, CancellationToken ct);
 
     /// <summary>
     /// Sends a message; it needs Write on the chat's nook. The message reaches the agent when the

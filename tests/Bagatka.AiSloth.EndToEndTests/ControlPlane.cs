@@ -30,6 +30,7 @@ public sealed class ControlPlane : IAsyncLifetime
     private readonly int _modelsPort = FreePort();
     private FakeIssuer? _issuer;
     private FakeModel? _model;
+    private FakeChatGpt? _chatGpt;
     private DistributedApplication? _app;
 
     /// <summary>What <c>sloth machine connect</c> takes: the endpoint daemons and machines dial.</summary>
@@ -52,6 +53,20 @@ public sealed class ControlPlane : IAsyncLifetime
             }
 
             return _model;
+        }
+    }
+
+    /// <summary>Sign in with ChatGPT, and the server ChatGPT plans' calls go to (<see cref="Model"/>).</summary>
+    internal FakeChatGpt ChatGpt
+    {
+        get
+        {
+            if (_chatGpt is null)
+            {
+                throw new InvalidOperationException("ChatGPT hasn't started.");
+            }
+
+            return _chatGpt;
         }
     }
 
@@ -89,12 +104,16 @@ public sealed class ControlPlane : IAsyncLifetime
         CancellationToken ct = TestContext.Current.CancellationToken;
         _issuer = await FakeIssuer.StartAsync();
         _model = await FakeModel.StartAsync();
+        _chatGpt = await FakeChatGpt.StartAsync();
         IDistributedApplicationTestingBuilder appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Bagatka_AiSloth_AppHost>(
             [
                 "Parameters:authentication-issuer=" + _issuer.Issuer,
                 "Parameters:authentication-audience=" + FakeIssuer.Audience,
                 "Parameters:sandbox-scope=" + Scope,
-                "Parameters:model-upstream=" + _model.Url,
+                "Parameters:model-private-networks=true",
+                "Parameters:allow-chatgpt-plans=true",
+                "Parameters:chatgpt-authority=" + _chatGpt.Url,
+                "Parameters:chatgpt-api=" + _model.OpenAIUrl,
                 "Parameters:agent-accounts-key=" + RandomNumberGenerator.GetHexString(64),
                 "DaemonPort=" + _daemonPort.ToString(CultureInfo.InvariantCulture),
                 "ModelsPort=" + _modelsPort.ToString(CultureInfo.InvariantCulture),
@@ -150,6 +169,11 @@ public sealed class ControlPlane : IAsyncLifetime
         if (_model is not null)
         {
             await _model.DisposeAsync();
+        }
+
+        if (_chatGpt is not null)
+        {
+            await _chatGpt.DisposeAsync();
         }
     }
 

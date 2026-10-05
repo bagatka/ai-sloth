@@ -1133,3 +1133,20 @@ The build files are the specification; this entry says what each one owns.
 ### Add an external API client
 
 Follow `src/Sdk/README.md`.
+
+## 30. Addresses people supply
+
+The control plane calls URLs people choose: an agent account's endpoint today, git remotes and
+webhooks later. Unguarded, anyone could make it reach this host, its private network, or a cloud's
+metadata service, and read the answer.
+
+- **The shape is checked where the data is owned.** The owner parses the URL into a value type
+  (`ApiEndpoint` in AgentAccounts): absolute, http or https, no credentials, query, or fragment.
+- **The network is checked where the call is made.** The HTTP client's handler connects through
+  `PublicNetworks.ConnectAsync` (`Bagatka.Foundation.Web`), which resolves the name and connects only
+  to a public address, for every connection. The caller requires https and doesn't follow redirects.
+- **Private networks are a deployment's choice:** a setting of the caller that turns the guard off,
+  for a company's own endpoint inside its network, a model on the same machine, or tests.
+- **Canonical example:** the model gateway's client in
+  `src/ControlPlane/Bagatka.AiSloth.WebApi/Program.cs`, with `ModelGatewaySettings` and
+  `Endpoints/ModelGatewayEndpoints.cs`.

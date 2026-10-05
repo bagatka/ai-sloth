@@ -35,7 +35,7 @@ internal sealed class Nook
 
     public string? Location { get; private set; }
 
-    // The harness its image carries for chats' agents; it never changes, because the image doesn't.
+    // The harness its image carries for its chat's agent; it never changes, because the image doesn't.
     public string? Harness { get; private set; }
 
     public NookStatus Status { get; private set; }

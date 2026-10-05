@@ -14,10 +14,17 @@ namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 /// <param name="WorkspaceId">The workspace whose people with Write use it, for a workspace's account.</param>
 /// <param name="OwnerId">The person it belongs to, for a personal account.</param>
 /// <param name="AddedAt">When it was added.</param>
+/// <param name="Endpoint">The API's base URL for an API key at another endpoint than the vendor's; otherwise <see langword="null"/>.</param>
+/// <param name="NeedsSignIn">
+/// Whether the account's sign-in ended, such as a ChatGPT plan whose owner disconnected the app in
+/// ChatGPT: it runs no agents until it is removed and added again.
+/// </param>
 public sealed record AgentAccountSummary(
     AgentAccountId Id,
     AgentAccountKind Kind,
     string Name,
     WorkspaceId? WorkspaceId,
     UserId? OwnerId,
-    DateTimeOffset AddedAt);
+    DateTimeOffset AddedAt,
+    Uri? Endpoint,
+    bool NeedsSignIn);

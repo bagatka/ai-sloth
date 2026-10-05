@@ -26,6 +26,9 @@ and record why in the client's README.
     resilience handler.
   - For a local socket, such as the Docker Engine's, the client may own one `HttpClient` and skip
     retries.
+  - A client whose every call changes state at the vendor, such as OAuth token requests, retries
+    nothing, so it may own one `HttpClient` with a pooled connection lifetime too
+    (`Bagatka.Sdk.OpenAI`).
   - Nothing outside the client retries vendor calls.
   - Retry only idempotent requests, or requests carrying a vendor idempotency key.
 - **Settings.** One immutable settings record that validates itself in its constructor, passed by

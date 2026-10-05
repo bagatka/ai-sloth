@@ -43,8 +43,20 @@ internal sealed partial class AgentAccountsApi
             return new Result<AgentAccountSummary>(name.Error);
         }
 
+        ApiEndpoint? endpoint = null;
+        if (command.Endpoint is not null)
+        {
+            Result<ApiEndpoint> parsed = ApiEndpoint.Parse(command.Endpoint);
+            if (parsed.Failed)
+            {
+                return new Result<AgentAccountSummary>(parsed.Error);
+            }
+
+            endpoint = parsed.Output;
+        }
+
         UserId? ownerId = command.WorkspaceId is null ? user.UserId : null;
-        Result<AgentAccount> added = AgentAccount.Add(command.WorkspaceId, ownerId, command.Kind, name.Output, command.Secret, box, time);
+        Result<AgentAccount> added = AgentAccount.Add(command.WorkspaceId, ownerId, command.Kind, name.Output, command.Secret, endpoint, box, time);
         if (added.Failed)
         {
             return new Result<AgentAccountSummary>(added.Error);
@@ -61,16 +73,19 @@ internal sealed partial class AgentAccountsApi
         return new Result<AgentAccountSummary>(account.ToSummary());
     }
 
-    // Plans are for one person, and Claude subscriptions need the deployment's permission.
+    // Plans are for one person, Claude subscriptions need the deployment's permission, and ChatGPT
+    // plans are added by signing in.
     private Error? Refusal(AddAgentAccount command)
     {
         return command.Kind switch
         {
+            AgentAccountKind.ChatGptPlan =>
+                Error.Validation("kind", "A ChatGPT plan is added by signing in with ChatGPT."),
             AgentAccountKind.ClaudeSubscription when !settings.AllowClaudeSubscriptions =>
                 Error.Validation("kind", "This deployment doesn't allow Claude subscriptions."),
             AgentAccountKind.GitHubCopilotToken or AgentAccountKind.ClaudeSubscription when command.WorkspaceId is not null =>
                 Error.Validation("kind", "A plan is for one person: add it as your own account."),
-            AgentAccountKind.AnthropicApiKey or AgentAccountKind.GitHubCopilotToken or AgentAccountKind.ClaudeSubscription => null,
+            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.GitHubCopilotToken or AgentAccountKind.ClaudeSubscription => null,
             _ => Error.Validation("kind", "Unknown kind of account."),
         };
     }

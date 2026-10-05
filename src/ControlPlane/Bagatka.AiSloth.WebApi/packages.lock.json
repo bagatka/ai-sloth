@@ -316,7 +316,8 @@
         "type": "Project",
         "dependencies": {
           "Bagatka.AiSloth.AgentAccounts.Contracts": "[1.0.0, )",
-          "Bagatka.Foundation.Modules": "[1.0.0, )"
+          "Bagatka.Foundation.Modules": "[1.0.0, )",
+          "Bagatka.Sdk.OpenAI": "[1.0.0, )"
         }
       },
       "bagatka.aisloth.agentaccounts.contracts": {
@@ -456,6 +457,12 @@
         }
       },
       "bagatka.sdk.docker": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
+      "bagatka.sdk.openai": {
         "type": "Project",
         "dependencies": {
           "Bagatka.Foundation": "[1.0.0, )"

@@ -8,16 +8,25 @@ IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(ar
 string repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", ".."));
 const string NookImage = "aisloth-nook:dev";
 // The harnesses a nook can carry: the profiles in src/Harnesses, one image each.
-string[] harnesses = ["claude-code", "copilot"];
+string[] harnesses = ["claude-code", "codex", "pi", "copilot"];
 
 // Sign-in: the OpenID Connect provider whose tokens the WebApi accepts, such as a WorkOS staging
 // environment. Set them as user secrets of this project, or when the dashboard asks.
 IResourceBuilder<ParameterResource> issuer = builder.AddParameter("authentication-issuer");
 IResourceBuilder<ParameterResource> audience = builder.AddParameter("authentication-audience");
 
-// The model provider agents call through the WebApi's model gateway; each call carries its chat's
-// agent account's key, which never enters a nook.
-IResourceBuilder<ParameterResource> modelUpstream = builder.AddParameter("model-upstream", builder.Configuration["Parameters:model-upstream"] ?? "https://api.anthropic.com");
+// Agents call their models through the WebApi's model gateway, which forwards each call to its chat's
+// agent account's endpoint. Endpoints must be public https ones unless private networks are allowed,
+// for a model running on this machine, or tests.
+IResourceBuilder<ParameterResource> modelPrivateNetworks = builder.AddParameter(
+    "model-private-networks", builder.Configuration["Parameters:model-private-networks"] ?? "false");
+
+// Running AiSloth for yourself is the self-hosted use OpenAI allows ChatGPT plans for. Tests point
+// Sign in with ChatGPT and the plans' API at fakes.
+IResourceBuilder<ParameterResource> allowChatGptPlans = builder.AddParameter(
+    "allow-chatgpt-plans", builder.Configuration["Parameters:allow-chatgpt-plans"] ?? "true");
+string? chatGptAuthority = builder.Configuration["Parameters:chatgpt-authority"];
+string? chatGptApi = builder.Configuration["Parameters:chatgpt-api"];
 
 // Encrypts agent accounts' secrets at rest; generated once and kept in this project's user secrets.
 IResourceBuilder<ParameterResource> agentAccountsKey = builder.AddParameter(
@@ -63,7 +72,8 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         .WithEnvironment("Modules__Chats__ModelGatewayUrl", ReferenceExpression.Create($"http://host.docker.internal:{modelsEndpoint.Property(EndpointProperty.Port)}/models"))
         .WithEnvironment("Modules__AgentAccounts__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__AgentAccounts__EncryptionKey", agentAccountsKey)
-        .WithEnvironment("ModelGateway__Upstream", modelUpstream)
+        .WithEnvironment("Modules__AgentAccounts__AllowChatGptPlans", allowChatGptPlans)
+        .WithEnvironment("ModelGateway__AllowPrivateNetworks", modelPrivateNetworks)
         .WithEnvironment("Modules__Nooks__DaemonUrl", ReferenceExpression.Create($"http://host.docker.internal:{daemonEndpoint.Property(EndpointProperty.Port)}"))
         .WithEnvironment("Modules__Nooks__Image", NookImage)
         .WithEnvironment(environment =>
@@ -71,6 +81,16 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
             foreach (string harness in harnesses)
             {
                 environment.EnvironmentVariables["Modules__Nooks__HarnessImages__" + harness] = HarnessImage(harness);
+            }
+
+            if (chatGptAuthority is not null)
+            {
+                environment.EnvironmentVariables["Modules__AgentAccounts__ChatGptAuthority"] = chatGptAuthority;
+            }
+
+            if (chatGptApi is not null)
+            {
+                environment.EnvironmentVariables["Modules__AgentAccounts__ChatGptApi"] = chatGptApi;
             }
         })
         .WithEnvironment("Modules__Nooks__CpuMillicores", "2000")

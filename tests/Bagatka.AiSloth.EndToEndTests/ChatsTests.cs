@@ -97,12 +97,12 @@ public sealed class ChatsTests(ControlPlane controlPlane) : IDisposable
         Problem get = await Api.ProblemAsync(bob.SendGetAsync(PathOf(chat)), HttpStatusCode.NotFound);
         Problem send = await Api.ProblemAsync(bob.SendPostAsync(PathOf(chat) + "/messages", new { text = "hi" }), HttpStatusCode.NotFound);
         Problem watch = await Api.ProblemAsync(bob.SendGetAsync(PathOf(chat) + "/events"), HttpStatusCode.NotFound);
-        Problem start = await Api.ProblemAsync(bob.SendPostAsync(NookChatsPath(chat.NookId), new { account = chat.Account }), HttpStatusCode.NotFound);
+        Problem start = await Api.ProblemAsync(bob.SendPostAsync(ChatsPath(chat.WorkspaceId), new { provider = "docker", harness = "claude-code", account = chat.Account }), HttpStatusCode.NotFound);
 
         Assert.Equal(ChatsErrors.NotFound.Code, get.Code);
         Assert.Equal(ChatsErrors.NotFound.Code, send.Code);
         Assert.Equal(ChatsErrors.NotFound.Code, watch.Code);
-        Assert.Equal(NooksErrors.NotFound.Code, start.Code);
+        Assert.Equal(WorkspacesErrors.NotFound.Code, start.Code);
     }
 
     [Fact]
@@ -120,30 +120,45 @@ public sealed class ChatsTests(ControlPlane controlPlane) : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, alsoRefused.StatusCode);
     }
 
+    // One chat, one nook, one agent: agents never work on each other's files.
     [Fact]
-    public async Task A_chat_needs_a_nook_with_a_harness_that_takes_its_account()
+    public async Task Every_chat_creates_a_nook_of_its_own()
     {
-        (NookSummary plain, AgentAccountSummary team) = await NookWithAccountAsync(harness: null);
-        (NookSummary copilot, AgentAccountSummary other) = await NookWithAccountAsync(harness: "copilot");
+        (WorkspaceSummary workspace, AgentAccountSummary account) = await WorkspaceWithAccountAsync();
 
-        Problem noHarness = await Api.ProblemAsync(_alice.SendPostAsync(NookChatsPath(plain.Id), new { account = team.Id }), HttpStatusCode.BadRequest);
-        Problem wrongAccount = await Api.ProblemAsync(_alice.SendPostAsync(NookChatsPath(copilot.Id), new { account = other.Id }), HttpStatusCode.BadRequest);
-        Problem unknownHarness = await Api.ProblemAsync(_alice.SendPostAsync(NooksPath(plain.WorkspaceId), new { provider = "docker", harness = "nowhere" }), HttpStatusCode.BadRequest);
+        ChatSummary first = await StartChatAsync(workspace, account);
+        ChatSummary second = await StartChatAsync(workspace, account);
+        NookSummary nook = await Api.ReadAsync<NookSummary>(_alice.SendGetAsync(NookPath(first.NookId)), HttpStatusCode.OK);
+        Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(_alice.SendGetAsync(ChatsPath(workspace.Id)), HttpStatusCode.OK);
 
-        Assert.Null(plain.Harness);
-        Assert.Equal("copilot", copilot.Harness);
-        Assert.True(noHarness.Errors?.ContainsKey("nookId"));
+        Assert.NotEqual(first.NookId, second.NookId);
+        Assert.Equal("claude-code", nook.Harness);
+        Assert.Equal([second.Id, first.Id], chats.Items.Select(chat => chat.Id));
+    }
+
+    [Fact]
+    public async Task A_chat_needs_a_harness_that_takes_its_account_and_a_refused_one_leaves_no_nook()
+    {
+        (WorkspaceSummary workspace, AgentAccountSummary team) = await WorkspaceWithAccountAsync();
+
+        Problem wrongAccount = await Api.ProblemAsync(
+            _alice.SendPostAsync(ChatsPath(workspace.Id), new { provider = "docker", harness = "copilot", account = team.Id }), HttpStatusCode.BadRequest);
+        Problem unknownHarness = await Api.ProblemAsync(
+            _alice.SendPostAsync(ChatsPath(workspace.Id), new { provider = "docker", harness = "nowhere", account = team.Id }), HttpStatusCode.BadRequest);
+        Page<NookSummary> nooks = await Api.ReadAsync<Page<NookSummary>>(_alice.SendGetAsync(NooksPath(workspace.Id)), HttpStatusCode.OK);
+
         Assert.True(wrongAccount.Errors?.ContainsKey("account"));
         Assert.True(unknownHarness.Errors?.ContainsKey("harness"));
+        Assert.Empty(nooks.Items);
     }
 
     [Fact]
     public async Task A_copilot_chat_whose_token_is_refused_answers_with_the_reason()
     {
-        (NookSummary nook, _) = await NookWithAccountAsync(harness: "copilot");
+        (WorkspaceSummary workspace, _) = await WorkspaceWithAccountAsync();
         AgentAccountSummary own = await Api.ReadAsync<AgentAccountSummary>(
             _alice.SendPostAsync("/agent-accounts", new { kind = "GitHubCopilotToken", name = "Mine", secret = "github_pat_not_a_real_token" }), HttpStatusCode.Created);
-        ChatSummary chat = await Api.ReadAsync<ChatSummary>(_alice.SendPostAsync(NookChatsPath(nook.Id), new { account = own.Id }), HttpStatusCode.Created);
+        ChatSummary chat = await StartChatAsync(workspace, own, "copilot");
         await using ChatWatch watch = await ChatWatch.OpenAsync(_alice, chat);
 
         await SendAsync(chat, "hello");
@@ -156,10 +171,10 @@ public sealed class ChatsTests(ControlPlane controlPlane) : IDisposable
     [Fact]
     public async Task On_a_personal_account_the_owners_messages_reach_the_agent()
     {
-        (NookSummary nook, _) = await NookWithAccountAsync();
+        (WorkspaceSummary workspace, _) = await WorkspaceWithAccountAsync();
         AgentAccountSummary own = await Api.ReadAsync<AgentAccountSummary>(
-            _alice.SendPostAsync("/agent-accounts", new { kind = "AnthropicApiKey", name = "Mine", secret = FakeModel.ApiKey }), HttpStatusCode.Created);
-        ChatSummary chat = await Api.ReadAsync<ChatSummary>(_alice.SendPostAsync(NookChatsPath(nook.Id), new { account = own.Id }), HttpStatusCode.Created);
+            _alice.SendPostAsync("/agent-accounts", new { kind = "AnthropicApiKey", name = "Mine", secret = FakeModel.ApiKey, endpoint = controlPlane.Model.Url }), HttpStatusCode.Created);
+        ChatSummary chat = await StartChatAsync(workspace, own);
         await using ChatWatch watch = await ChatWatch.OpenAsync(_alice, chat);
 
         ChatMessage sent = await SendAsync(chat, "say hello");
@@ -176,12 +191,12 @@ public sealed class ChatsTests(ControlPlane controlPlane) : IDisposable
     [Fact]
     public async Task A_message_from_someone_who_may_not_use_the_account_is_a_proposal_its_owner_sends_on()
     {
-        (NookSummary nook, _) = await NookWithAccountAsync();
+        (WorkspaceSummary workspace, _) = await WorkspaceWithAccountAsync();
         AgentAccountSummary own = await Api.ReadAsync<AgentAccountSummary>(
-            _alice.SendPostAsync("/agent-accounts", new { kind = "AnthropicApiKey", name = "Mine", secret = FakeModel.ApiKey }), HttpStatusCode.Created);
-        ChatSummary chat = await Api.ReadAsync<ChatSummary>(_alice.SendPostAsync(NookChatsPath(nook.Id), new { account = own.Id }), HttpStatusCode.Created);
+            _alice.SendPostAsync("/agent-accounts", new { kind = "AnthropicApiKey", name = "Mine", secret = FakeModel.ApiKey, endpoint = controlPlane.Model.Url }), HttpStatusCode.Created);
+        ChatSummary chat = await StartChatAsync(workspace, own);
         using HttpClient bob = controlPlane.ClientFor("bob-" + Guid.CreateVersion7());
-        string invites = string.Create(CultureInfo.InvariantCulture, $"/workspaces/{nook.WorkspaceId.Value}/invites");
+        string invites = string.Create(CultureInfo.InvariantCulture, $"/workspaces/{workspace.Id.Value}/invites");
         Invite invite = await Api.ReadAsync<Invite>(_alice.SendPostAsync(invites, new { access = "Write" }), HttpStatusCode.OK);
         await Api.ExpectAsync(bob.SendPostAsync("/invites/accept", new { code = invite.Code }), HttpStatusCode.OK);
         string messages = PathOf(chat) + "/messages";
@@ -232,26 +247,36 @@ public sealed class ChatsTests(ControlPlane controlPlane) : IDisposable
         return string.Create(CultureInfo.InvariantCulture, $"/workspaces/{workspace.Value}/nooks");
     }
 
-    private static string NookChatsPath(NookId nook)
+    private static string NookPath(NookId nook)
     {
-        return string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Value}/chats");
+        return string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Value}");
     }
 
-    // A nook carrying the harness, in a new workspace whose Anthropic account carries the fake model's key.
-    private async Task<(NookSummary Nook, AgentAccountSummary Account)> NookWithAccountAsync(string? harness = "claude-code")
+    private static string ChatsPath(WorkspaceId workspace)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"/workspaces/{workspace.Value}/chats");
+    }
+
+    // A new workspace whose Anthropic account carries the fake model's key.
+    private async Task<(WorkspaceSummary Workspace, AgentAccountSummary Account)> WorkspaceWithAccountAsync()
     {
         WorkspaceSummary workspace = await Api.ReadAsync<WorkspaceSummary>(_alice.SendPostAsync("/workspaces", new { name = "Acme" }), HttpStatusCode.Created);
         string accounts = string.Create(CultureInfo.InvariantCulture, $"/workspaces/{workspace.Id.Value}/agent-accounts");
         AgentAccountSummary account = await Api.ReadAsync<AgentAccountSummary>(
-            _alice.SendPostAsync(accounts, new { kind = "AnthropicApiKey", name = "Team key", secret = FakeModel.ApiKey }), HttpStatusCode.Created);
-        NookSummary nook = await Api.ReadAsync<NookSummary>(_alice.SendPostAsync(NooksPath(workspace.Id), new { provider = "docker", harness }), HttpStatusCode.Created);
-        return (nook, account);
+            _alice.SendPostAsync(accounts, new { kind = "AnthropicApiKey", name = "Team key", secret = FakeModel.ApiKey, endpoint = controlPlane.Model.Url }), HttpStatusCode.Created);
+        return (workspace, account);
     }
 
     private async Task<ChatSummary> StartChatAsync()
     {
-        (NookSummary nook, AgentAccountSummary account) = await NookWithAccountAsync();
-        return await Api.ReadAsync<ChatSummary>(_alice.SendPostAsync(NookChatsPath(nook.Id), new { account = account.Id }), HttpStatusCode.Created);
+        (WorkspaceSummary workspace, AgentAccountSummary account) = await WorkspaceWithAccountAsync();
+        return await StartChatAsync(workspace, account);
+    }
+
+    private async Task<ChatSummary> StartChatAsync(WorkspaceSummary workspace, AgentAccountSummary account, string harness = "claude-code")
+    {
+        return await Api.ReadAsync<ChatSummary>(
+            _alice.SendPostAsync(ChatsPath(workspace.Id), new { provider = "docker", harness, account = account.Id }), HttpStatusCode.Created);
     }
 
     private async Task<ChatMessage> SendAsync(ChatSummary chat, string text)

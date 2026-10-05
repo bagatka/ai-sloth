@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
+using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Chats.Contracts;
@@ -12,9 +13,13 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 public interface IChatHarnessesApi
 {
     /// <summary>
-    /// The model provider's key to forward a call with, when the token belongs to a chat's running
-    /// agent: its agent account's secret. Unauthorized otherwise, or when the account was removed.
-    /// Never log or return the key.
+    /// Where to forward a call, and the headers that pay for it, when the token belongs to a chat's
+    /// running agent: its agent account's endpoint (<see cref="IAgentAccountsApi.UseAsync"/>). Never log
+    /// or return the headers.
     /// </summary>
-    public Task<Result<string>> GetModelKeyAsync(Actor actor, string token, CancellationToken ct);
+    /// <returns>
+    /// The endpoint; unauthorized for a token no chat's agent holds; or the account's error when it can't
+    /// be used, such as not found after it was removed, or <see cref="AgentAccountsErrors.SignInEnded"/>.
+    /// </returns>
+    public Task<Result<ModelEndpoint>> GetModelEndpointAsync(Actor actor, string token, CancellationToken ct);
 }

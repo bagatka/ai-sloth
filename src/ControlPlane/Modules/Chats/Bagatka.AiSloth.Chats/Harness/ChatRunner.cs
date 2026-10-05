@@ -35,6 +35,10 @@ internal sealed class ChatRunner(
 {
     private const int MaxBatch = 200;
 
+    // How agents' model calls name this client, for their providers' attribution.
+    private const string ClientName = "aisloth";
+    private const string ClientTitle = "AiSloth";
+
     private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(5);
 
     private readonly Channel<RunnerInput> _inputs = Channel.CreateBounded<RunnerInput>(
@@ -46,6 +50,8 @@ internal sealed class ChatRunner(
     private int _stopRequested;
 
     public ChatId ChatId => chatId;
+
+    private static string ClientVersion => typeof(ChatRunner).Assembly.GetName().Version?.ToString() ?? "0";
 
     public bool HasInput => _inputs.Reader.Count > 0 || Volatile.Read(ref _stopRequested) == 1;
 
@@ -277,14 +283,22 @@ internal sealed class ChatRunner(
 
         AgentAccountCredential account = used.Output;
 
-        // A secret that stays behind the model gateway is replaced by a token for this chat, saved
-        // first so the agent's first model call finds it.
+        // A model API stays behind the model gateway: the agent gets a token for this chat instead,
+        // saved first so its first model call finds it. A plan's token tied to the harness goes to it.
         CredentialKind kind = AccountCredentials.KindOf(account.Kind);
-        string credential = harness.UsesGateway(kind) ? chat.IssueHarnessToken() : account.Secret;
+        IReadOnlyDictionary<string, string> environment;
+        if (account.Access is HarnessToken token)
+        {
+            environment = HarnessProfile.EnvironmentFor(kind, token.Value, gateway: null);
+        }
+        else
+        {
+            environment = HarnessProfile.EnvironmentFor(kind, chat.IssueHarnessToken(), settings.ModelGatewayUrl);
+        }
+
         await SaveAsync(db, ct);
 
-        IReadOnlyDictionary<string, string> environment = harness.EnvironmentFor(kind, credential, settings.ModelGatewayUrl);
-        Result<ProcessId> started = await agent.StartAsync(chat.NookId, harness, environment, ct);
+        Result<ProcessId> started = await agent.StartAsync(chat.NookId, environment, ct);
         if (started.Failed)
         {
             Fail(db, chat, first, "The agent couldn't start: " + started.Error.Message);
@@ -292,7 +306,7 @@ internal sealed class ChatRunner(
         }
 
         chat.HarnessStarted(started.Output);
-        outgoing.Add(Acp.Initialize());
+        outgoing.Add(Acp.Initialize(ClientName, ClientTitle, ClientVersion));
     }
 
     // Returns true when the agent's process ended.

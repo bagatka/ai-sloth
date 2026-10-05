@@ -14,8 +14,10 @@ internal sealed class ChatConfiguration : IEntityTypeConfiguration<Chat>
         builder.Property(chat => chat.Harness).HasMaxLength(Chat.MaxHarnessLength);
 
 
-        // Lists a nook's chats, and finds the chat a model call's token belongs to.
-        builder.HasIndex(chat => new { chat.NookId, chat.Id });
+        // One chat per nook: its agent is the only one working on the nook's files. Lists a
+        // workspace's chats, and finds the chat a model call's token belongs to.
+        builder.HasIndex(chat => chat.NookId).IsUnique();
+        builder.HasIndex(chat => new { chat.WorkspaceId, chat.Id });
         builder.HasIndex(chat => chat.HarnessTokenHash).IsUnique();
     }
 }

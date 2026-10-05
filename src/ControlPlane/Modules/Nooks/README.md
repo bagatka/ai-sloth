@@ -1,8 +1,9 @@
 # Nooks
 
 Nooks are where agents work: isolated machines with their files and processes, created on the
-provider someone who works in a workspace chooses. A nook and its chats are AiSloth's basic unit; a project may
-group nooks, but a nook never needs one. This module tracks nooks' lifecycle, starts them fast from
+provider someone who works in a workspace chooses. A chat and the nook it creates are AiSloth's basic
+unit, one agent per nook; a nook without a chat runs processes only. A project may group nooks, but a
+nook never needs one. This module tracks nooks' lifecycle, starts them fast from
 templates, runs processes in them through their daemons, and checkpoints and forks them.
 
 ## Owns

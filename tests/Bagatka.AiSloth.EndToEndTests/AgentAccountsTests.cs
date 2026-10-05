@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Microsoft.AspNetCore.WebUtilities;
 using Xunit;
 
 namespace Bagatka.AiSloth.EndToEndTests;
@@ -16,6 +17,9 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// </summary>
 public sealed class AgentAccountsTests(ControlPlane controlPlane) : IDisposable
 {
+    // Where ChatGPT sends the browser back; a client such as sloth listens there.
+    internal const string Callback = "http://127.0.0.1:1455/auth/callback";
+
     private readonly HttpClient _alice = controlPlane.ClientFor("alice-" + Guid.CreateVersion7());
 
     [Fact]
@@ -89,9 +93,87 @@ public sealed class AgentAccountsTests(ControlPlane controlPlane) : IDisposable
         Assert.Empty(remaining);
     }
 
+    [Fact]
+    public async Task An_api_key_may_name_another_endpoint_and_nothing_else_does()
+    {
+        Uri openRouter = new Uri("https://openrouter.ai/api/v1");
+
+        AgentAccountSummary key = await Api.ReadAsync<AgentAccountSummary>(
+            _alice.SendPostAsync("/agent-accounts", new { kind = "OpenAIApiKey", name = "OpenRouter", secret = "sk-or-example", endpoint = openRouter }), HttpStatusCode.Created);
+        Problem copilot = await Api.ProblemAsync(
+            _alice.SendPostAsync("/agent-accounts", new { kind = "GitHubCopilotToken", name = "Mine", secret = "github_pat_example", endpoint = openRouter }), HttpStatusCode.BadRequest);
+        Problem withQuery = await Api.ProblemAsync(
+            _alice.SendPostAsync("/agent-accounts", new { kind = "OpenAIApiKey", name = "Mine", secret = "sk", endpoint = "https://example.com/v1?key=secret" }), HttpStatusCode.BadRequest);
+
+        Assert.Equal(AgentAccountKind.OpenAIApiKey, key.Kind);
+        Assert.Equal(openRouter, key.Endpoint);
+        Assert.True(copilot.Errors?.ContainsKey("endpoint"));
+        Assert.True(withQuery.Errors?.ContainsKey("endpoint"));
+    }
+
+    [Fact]
+    public async Task A_chatgpt_plan_is_added_by_signing_in_with_chatgpt()
+    {
+        WorkspaceSummary workspace = await CreateWorkspaceAsync(_alice);
+
+        SignInStarted started = await StartSignInAsync(_alice);
+        Uri returnedTo = await FakeChatGpt.FollowAsync(started.Url);
+        AgentAccountSummary account = await Api.ReadAsync<AgentAccountSummary>(_alice.SendPostAsync(CompletePath(started), new { returnedTo }), HttpStatusCode.Created);
+        IReadOnlyList<AgentAccountSummary> listed = await ListAsync(_alice, workspace);
+        Problem again = await Api.ProblemAsync(_alice.SendPostAsync(CompletePath(started), new { returnedTo }), HttpStatusCode.NotFound);
+        Problem withSecret = await Api.ProblemAsync(
+            _alice.SendPostAsync("/agent-accounts", new { kind = "ChatGptPlan", name = "Mine", secret = "a-token" }), HttpStatusCode.BadRequest);
+        Problem elsewhere = await Api.ProblemAsync(
+            _alice.SendPostAsync("/agent-accounts/sign-ins", new { kind = "ChatGptPlan", name = "Mine", callback = "https://example.com/auth/callback" }), HttpStatusCode.BadRequest);
+
+        Assert.Equal(AgentAccountKind.ChatGptPlan, account.Kind);
+        Assert.Equal("My ChatGPT", account.Name);
+        Assert.NotNull(account.OwnerId);
+        Assert.False(account.NeedsSignIn);
+        Assert.Contains(listed, found => found.Id == account.Id);
+        Assert.Equal(AgentAccountsErrors.SignInNotFound.Code, again.Code);
+        Assert.True(withSecret.Errors?.ContainsKey("kind"));
+        Assert.True(elsewhere.Errors?.ContainsKey("callback"));
+    }
+
+    [Fact]
+    public async Task A_declined_foreign_or_planless_sign_in_adds_nothing()
+    {
+        using HttpClient bob = controlPlane.ClientFor("bob-" + Guid.CreateVersion7());
+        SignInStarted started = await StartSignInAsync(_alice);
+        string state = QueryHelpers.ParseQuery(started.Url.Query)["state"].ToString();
+        SignInStarted planless = await StartSignInAsync(_alice);
+        Uri withoutPlan = new Uri(planless.Url.AbsoluteUri.Replace("%20chatgpt.tokens.use.direct", string.Empty, StringComparison.Ordinal));
+
+        Problem declined = await Api.ProblemAsync(
+            _alice.SendPostAsync(CompletePath(started), new { returnedTo = Callback + "?error=access_denied&state=" + state }), HttpStatusCode.BadRequest);
+        Problem foreign = await Api.ProblemAsync(
+            _alice.SendPostAsync(CompletePath(started), new { returnedTo = Callback + "?code=stolen&client_id=oaiapp_x&state=another" }), HttpStatusCode.BadRequest);
+        Uri alicesAnswer = await FakeChatGpt.FollowAsync(started.Url);
+        Problem bobs = await Api.ProblemAsync(bob.SendPostAsync(CompletePath(started), new { returnedTo = alicesAnswer }), HttpStatusCode.NotFound);
+        Uri planlessAnswer = await FakeChatGpt.FollowAsync(withoutPlan);
+        Problem noPlan = await Api.ProblemAsync(_alice.SendPostAsync(CompletePath(planless), new { returnedTo = planlessAnswer }), HttpStatusCode.BadRequest);
+
+        Assert.Equal("The sign-in was declined.", declined.Errors?.GetValueOrDefault("returnedTo")?.Single());
+        Assert.Equal("This answer belongs to another sign-in.", foreign.Errors?.GetValueOrDefault("returnedTo")?.Single());
+        Assert.Equal(AgentAccountsErrors.SignInNotFound.Code, bobs.Code);
+        Assert.True(noPlan.Errors?.ContainsKey("returnedTo"));
+    }
+
     public void Dispose()
     {
         _alice.Dispose();
+    }
+
+    internal static async Task<SignInStarted> StartSignInAsync(HttpClient client)
+    {
+        return await Api.ReadAsync<SignInStarted>(
+            client.SendPostAsync("/agent-accounts/sign-ins", new { kind = "ChatGptPlan", name = "My ChatGPT", callback = Callback }), HttpStatusCode.OK);
+    }
+
+    internal static string CompletePath(SignInStarted started)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"/agent-accounts/sign-ins/{started.Id.Value}/complete");
     }
 
     private static string AccountsPath(WorkspaceSummary workspace)

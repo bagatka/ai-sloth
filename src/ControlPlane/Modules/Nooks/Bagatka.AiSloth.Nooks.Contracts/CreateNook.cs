@@ -11,7 +11,7 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// <c>docker</c> or <c>machine:0199b3a4-2f0c-7c4e-9a51-3d2f8e6b1c07</c>.
 /// </param>
 /// <param name="Harness">
-/// The harness the nook carries for its chats' agents, such as <c>claude-code</c>, or
-/// <see langword="null"/> for a nook without chats. It can't change later.
+/// The harness the nook carries for its chat's agent, such as <c>claude-code</c>, or
+/// <see langword="null"/> for a nook without a chat. It can't change later.
 /// </param>
 public sealed record CreateNook(WorkspaceId WorkspaceId, string Provider, string? Harness);

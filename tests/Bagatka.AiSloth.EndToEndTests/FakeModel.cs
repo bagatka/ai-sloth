@@ -19,10 +19,11 @@ using Microsoft.Extensions.Logging;
 namespace Bagatka.AiSloth.EndToEndTests;
 
 /// <summary>
-/// A model provider at the HTTP boundary, speaking the Anthropic Messages API well enough for Claude
-/// Code: the real agent runs in a real nook, only the model is fake. It answers by the last user
+/// A model provider at the HTTP boundary: the real agent runs in a real nook, only the model is fake.
+/// It speaks the Anthropic Messages API well enough for Claude Code, answering by the last user
 /// message's latest text: a tool result ends the turn, "write hello" asks to write <c>/work/hello.txt</c>, "wait"
-/// holds the answer until <see cref="Release"/>, and anything else gets a short text.
+/// holds the answer until <see cref="Release"/>, and anything else gets a short text. It speaks
+/// OpenAI's Responses API well enough for Codex and pi, answering every call with a short text.
 /// </summary>
 internal sealed class FakeModel : IAsyncDisposable
 {
@@ -38,8 +39,11 @@ internal sealed class FakeModel : IAsyncDisposable
         _app = app;
     }
 
-    /// <summary>Where the model gateway forwards to, such as <c>http://127.0.0.1:41235</c>.</summary>
+    /// <summary>Its Anthropic API, as an account names it: the root, such as <c>http://127.0.0.1:41235/</c>.</summary>
     public Uri Url { get; private set; } = new Uri("http://localhost");
+
+    /// <summary>Its OpenAI API, as an account names it: <c>…/v1</c>.</summary>
+    public Uri OpenAIUrl => new Uri(Url, "v1");
 
     /// <summary>One item for every call that started holding, so a test knows the agent's turn is running.</summary>
     public ChannelReader<bool> Holds => _holds.Reader;
@@ -52,8 +56,11 @@ internal sealed class FakeModel : IAsyncDisposable
         }
     }
 
-    /// <summary>The credentials each message call carried, as the gateway forwarded them.</summary>
+    /// <summary>The credentials each Anthropic message call carried, as the gateway forwarded them.</summary>
     public ConcurrentQueue<(string? ApiKey, string? Authorization)> Credentials { get; } = new ConcurrentQueue<(string? ApiKey, string? Authorization)>();
+
+    /// <summary>The Authorization header each OpenAI responses call carried, as the gateway forwarded it.</summary>
+    public ConcurrentQueue<string?> OpenAIAuthorizations { get; } = new ConcurrentQueue<string?>();
 
     public static async Task<FakeModel> StartAsync()
     {
@@ -65,6 +72,7 @@ internal sealed class FakeModel : IAsyncDisposable
         app.MapMethods("/api/hello", ["GET", "HEAD"], () => Results.Ok());
         app.MapPost("/v1/messages/count_tokens", () => Results.Json(new { input_tokens = 10 }));
         app.MapPost("/v1/messages", model.MessagesAsync);
+        app.MapPost("/v1/responses", model.ResponsesAsync);
         await app.StartAsync();
         IServerAddressesFeature? addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
         if (addresses is null)
@@ -137,6 +145,50 @@ internal sealed class FakeModel : IAsyncDisposable
         }
     }
 
+    // A streamed response with one short message, as OpenAI's Responses API streams it. Codex and pi
+    // read the item events and end the call at response.completed.
+    private async Task ResponsesAsync(HttpContext context)
+    {
+        OpenAIAuthorizations.Enqueue(context.Request.Headers.Authorization.FirstOrDefault());
+        JsonNode? request = await JsonNode.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted);
+        string? modelName = (string?)request?["model"];
+        JsonObject content = new JsonObject { ["type"] = "output_text", ["text"] = "Hello.", ["annotations"] = new JsonArray() };
+        JsonObject item = new JsonObject { ["id"] = "msg_e2e", ["type"] = "message", ["role"] = "assistant", ["status"] = "completed", ["content"] = new JsonArray(content) };
+        JsonObject started = new JsonObject { ["id"] = "resp_e2e", ["object"] = "response", ["status"] = "in_progress", ["model"] = modelName, ["output"] = new JsonArray() };
+        JsonObject completed = new JsonObject
+        {
+            ["id"] = "resp_e2e",
+            ["object"] = "response",
+            ["status"] = "completed",
+            ["model"] = modelName,
+            ["output"] = new JsonArray(item.DeepClone()),
+            ["usage"] = new JsonObject
+            {
+                ["input_tokens"] = 10,
+                ["input_tokens_details"] = new JsonObject { ["cached_tokens"] = 0 },
+                ["output_tokens"] = 3,
+                ["output_tokens_details"] = new JsonObject { ["reasoning_tokens"] = 0 },
+                ["total_tokens"] = 13,
+            },
+        };
+        JsonObject added = (JsonObject)item.DeepClone();
+        added["status"] = "in_progress";
+        added["content"] = new JsonArray();
+        JsonObject[] events =
+        [
+            new JsonObject { ["type"] = "response.created", ["response"] = started },
+            new JsonObject { ["type"] = "response.output_item.added", ["output_index"] = 0, ["item"] = added },
+            new JsonObject { ["type"] = "response.content_part.added", ["item_id"] = "msg_e2e", ["output_index"] = 0, ["content_index"] = 0, ["part"] = new JsonObject { ["type"] = "output_text", ["text"] = string.Empty, ["annotations"] = new JsonArray() } },
+            new JsonObject { ["type"] = "response.output_text.delta", ["item_id"] = "msg_e2e", ["output_index"] = 0, ["content_index"] = 0, ["delta"] = "Hello." },
+            new JsonObject { ["type"] = "response.output_text.done", ["item_id"] = "msg_e2e", ["output_index"] = 0, ["content_index"] = 0, ["text"] = "Hello." },
+            new JsonObject { ["type"] = "response.content_part.done", ["item_id"] = "msg_e2e", ["output_index"] = 0, ["content_index"] = 0, ["part"] = content.DeepClone() },
+            new JsonObject { ["type"] = "response.output_item.done", ["output_index"] = 0, ["item"] = item },
+            new JsonObject { ["type"] = "response.completed", ["response"] = completed },
+        ];
+        context.Response.ContentType = "text/event-stream";
+        await context.Response.WriteAsync(EventStream(events), context.RequestAborted);
+    }
+
     private static JsonObject Text(string text)
     {
         return new JsonObject { ["type"] = "text", ["text"] = text };
@@ -195,6 +247,12 @@ internal sealed class FakeModel : IAsyncDisposable
 
         events.Add(new JsonObject { ["type"] = "message_delta", ["delta"] = new JsonObject { ["stop_reason"] = stopReason, ["stop_sequence"] = null }, ["usage"] = new JsonObject { ["output_tokens"] = 3 } });
         events.Add(new JsonObject { ["type"] = "message_stop" });
+        return EventStream([.. events]);
+    }
+
+    // Server-sent events, each named by its type.
+    private static string EventStream(JsonObject[] events)
+    {
         StringBuilder stream = new StringBuilder();
         foreach (JsonObject item in events)
         {

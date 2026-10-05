@@ -3,6 +3,8 @@ using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Data;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.Sdk.OpenAI;
+using Microsoft.Extensions.Logging;
 
 namespace Bagatka.AiSloth.AgentAccounts;
 
@@ -12,6 +14,8 @@ internal sealed partial class AgentAccountsApi(
     IWorkspacesApi workspaces,
     SecretBox box,
     AgentAccountsSettings settings,
-    TimeProvider time) : IAgentAccountsApi
+    ChatGptSignInClient chatGpt,
+    TimeProvider time,
+    ILogger<AgentAccountsApi> logger) : IAgentAccountsApi
 {
 }

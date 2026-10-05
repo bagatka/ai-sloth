@@ -4,6 +4,8 @@
 # Build from the repository root:
 #   docker build -f src/Daemon/Dockerfile --target nook -t aisloth-nook .
 #   docker build -f src/Daemon/Dockerfile --target claude-code -t aisloth-nook-claude-code .
+#   docker build -f src/Daemon/Dockerfile --target codex -t aisloth-nook-codex .
+#   docker build -f src/Daemon/Dockerfile --target pi -t aisloth-nook-pi .
 #   docker build -f src/Daemon/Dockerfile --target copilot -t aisloth-nook-copilot .
 
 # slothd is published as Native AOT inside the SDK that global.json pins.
@@ -19,9 +21,17 @@ RUN dotnet publish src/Daemon/Bagatka.AiSloth.Daemon -c Release --no-restore -o 
     -r linux-$(if [ "$TARGETARCH" = arm64 ]; then echo arm64; else echo x64; fi)
 
 # Harnesses are installed in stages of their own, so npm never reaches a nook. Their versions are
-# pinned here, matching the profiles in src/Harnesses; Chats starts them by command name.
+# pinned here, matching their start scripts in src/Harnesses/start, which each image installs as
+# `harness`: Chats starts every harness that way.
 FROM node:22-slim AS claude-code-install
 RUN npm install --global --prefix /opt/harness @agentclientprotocol/claude-agent-acp@0.85.1
+
+FROM node:22-slim AS codex-install
+RUN npm install --global --prefix /opt/harness @agentclientprotocol/codex-acp@2.1.1
+
+# pi asks not to run install scripts; it needs none.
+FROM node:22-slim AS pi-install
+RUN npm install --global --prefix /opt/harness --ignore-scripts @earendil-works/pi-coding-agent@1.0.3 pi-acp@0.0.34
 
 FROM node:22-slim AS copilot-install
 RUN npm install --global --prefix /opt/harness @github/copilot@1.0.91
@@ -46,9 +56,19 @@ ENV PATH=/opt/harness/bin:$PATH
 
 FROM node AS claude-code
 COPY --from=claude-code-install /opt/harness /opt/harness
+COPY --chmod=755 src/Harnesses/start/claude-code.sh /usr/local/bin/harness
+
+FROM node AS codex
+COPY --from=codex-install /opt/harness /opt/harness
+COPY --chmod=755 src/Harnesses/start/codex.sh /usr/local/bin/harness
+
+FROM node AS pi
+COPY --from=pi-install /opt/harness /opt/harness
+COPY --chmod=755 src/Harnesses/start/pi.sh /usr/local/bin/harness
 
 FROM node AS copilot
 COPY --from=copilot-install /opt/harness /opt/harness
+COPY --chmod=755 src/Harnesses/start/copilot.sh /usr/local/bin/harness
 
 # Without --target, the base image.
 FROM nook

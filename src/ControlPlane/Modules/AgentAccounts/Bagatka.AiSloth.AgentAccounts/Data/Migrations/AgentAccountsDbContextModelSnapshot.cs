@@ -16,7 +16,7 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261004163154_Initial";
+    public override string LastMigrationId => "20261005090835_ChatGptPlans";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -37,6 +37,11 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
                 b.Property<DateTimeOffset>("AddedAt")
                     .HasColumnType("timestamp with time zone")
                     .HasColumnName("added_at");
+
+                b.Property<string>("Endpoint")
+                    .HasMaxLength(2048)
+                    .HasColumnType("character varying(2048)")
+                    .HasColumnName("endpoint");
 
                 b.Property<string>("Kind")
                     .IsRequired()
@@ -59,6 +64,10 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("bytea")
                     .HasColumnName("sealed_secret");
 
+                b.Property<DateTimeOffset?>("SignInEndedAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("sign_in_ended_at");
+
                 b.Property<Guid?>("WorkspaceId")
                     .HasColumnType("uuid")
                     .HasColumnName("workspace_id");
@@ -76,6 +85,64 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
                     {
                         t.HasCheckConstraint("ck_accounts_one_owner", "(workspace_id IS NULL) <> (owner_id IS NULL)");
                     });
+            });
+
+        modelBuilder.Entity("Bagatka.AiSloth.AgentAccounts.Model.SignIn", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("uuid")
+                    .HasColumnName("id");
+
+                b.Property<string>("Callback")
+                    .IsRequired()
+                    .HasMaxLength(2048)
+                    .HasColumnType("character varying(2048)")
+                    .HasColumnName("callback");
+
+                b.Property<DateTimeOffset>("ExpiresAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("expires_at");
+
+                b.Property<string>("Kind")
+                    .IsRequired()
+                    .HasMaxLength(32)
+                    .HasColumnType("character varying(32)")
+                    .HasColumnName("kind");
+
+                b.Property<string>("Name")
+                    .IsRequired()
+                    .HasMaxLength(64)
+                    .HasColumnType("character varying(64)")
+                    .HasColumnName("name");
+
+                b.Property<string>("Nonce")
+                    .IsRequired()
+                    .HasMaxLength(64)
+                    .HasColumnType("character varying(64)")
+                    .HasColumnName("nonce");
+
+                b.Property<byte[]>("SealedVerifier")
+                    .IsRequired()
+                    .HasColumnType("bytea")
+                    .HasColumnName("sealed_verifier");
+
+                b.Property<string>("State")
+                    .IsRequired()
+                    .HasMaxLength(64)
+                    .HasColumnType("character varying(64)")
+                    .HasColumnName("state");
+
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("user_id");
+
+                b.HasKey("Id")
+                    .HasName("pk_sign_ins");
+
+                b.HasIndex("UserId", "ExpiresAt")
+                    .HasDatabaseName("ix_sign_ins_user_id_expires_at");
+
+                b.ToTable("sign_ins", "agent_accounts");
             });
 #pragma warning restore 612, 618
     }

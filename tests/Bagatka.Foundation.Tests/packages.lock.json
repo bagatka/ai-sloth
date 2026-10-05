@@ -135,6 +135,12 @@
       },
       "bagatka.foundation": {
         "type": "Project"
+      },
+      "bagatka.foundation.web": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
       }
     }
   }

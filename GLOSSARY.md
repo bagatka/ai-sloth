@@ -46,12 +46,12 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Grant | One person's access level on one resource, given directly | Workspaces | membership, ACL entry |
 | Invite | A one-time code that gives whoever accepts it first an access level on a resource, for 7 days | Workspaces | invitation, link |
 | Guest | Someone with access to a nook but not to its workspace | Workspaces | external user |
-| Nook | Where agents work: an isolated machine with its files and processes, owned by a workspace. With its chats, the basic unit. A provider's sandbox underneath. | Nooks | sandbox, orb, VM, container, environment, workspace |
-| Chat | A conversation between people and a coding agent working in one nook | Chats | thread, session, conversation |
+| Nook | Where an agent works: an isolated machine with its files and processes, owned by a workspace, created by its chat; with it, the basic unit. A nook without a chat runs processes only. A provider's sandbox underneath. | Nooks | sandbox, orb, VM, container, environment, workspace |
+| Chat | A conversation between people and one coding agent, in the nook the chat creates for it; one chat per nook | Chats | thread, session, conversation |
 | Turn | One message in a chat and everything the agent did in reply, ending with a stop reason | Chats | step, exchange |
 | Steering | A message sent during a turn going into that turn, so the agent reads it while it works | Chats | interrupt, injection |
 | Stop | Ending the running turn at once; messages the agent hasn't received are cancelled | Chats | cancel (in the product), abort, interrupt |
-| Model gateway | The WebApi endpoint agents call the model provider through; it adds their chat's agent account's key, so no nook holds an API key | WebApi, Chats | LLM proxy, API proxy |
+| Model gateway | The WebApi endpoint agents call their model through; it forwards each call to their chat's agent account's endpoint with the headers that pay for it, so no nook holds a key or a plan's token | WebApi, Chats | LLM proxy, API proxy |
 | Checkpoint | A nook's source files saved at one moment, such as after a turn | Nooks (planned) | snapshot, backup |
 | Fork | A new nook started from a checkpoint, with the chat resumed up to that point | Nooks, Chats (planned) | clone, copy, branch |
 | Source | Where some of a nook's files come from, mounted at `/work/<name>`: a repository or a folder | Sources (planned) | repo (for both kinds), mount |
@@ -62,9 +62,13 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Template | A snapshot of a nook right after its recipes ran, used to start new nooks fast | Nooks (planned) | image, cache, warm pool |
 | Project | An optional group of nooks, chats, and sources for a team working toward one goal | Projects (planned) | space, board, workspace |
 | Harness | The program that runs a coding agent, such as Claude Code or Codex; in a nook, through its ACP adapter | Chats | agent (that's what it runs), CLI, client |
-| Harness profile | What AiSloth knows about one harness: how to start it, which credentials it takes and how, and later where it keeps state | `Bagatka.Harnesses` | adapter, plugin |
+| Harness profile | What AiSloth knows about one harness: its ID, name, and the credentials it takes, and later where it keeps state; its image's start script configures it | `Bagatka.Harnesses` | adapter, plugin |
+| Start script | A harness image's `harness` command: it reads the same three variables for every harness and configures and runs its harness | `src/Harnesses/start` | wrapper, entrypoint |
 | Harness state | The files a harness keeps between sessions, such as its memory and skills, saved per person and restored into their new nooks | Chats (planned) | memory (ours), context |
-| Agent account | An account at an agent vendor that pays for agents' work, such as an Anthropic API key or a Copilot plan: a workspace's, which every member uses, or a person's own | AgentAccounts | subscription (for API keys), credential, account (alone) |
+| Agent account | An account at an agent vendor that pays for agents' work, such as an OpenAI API key or a ChatGPT plan: a workspace's, which every member uses, or a person's own | AgentAccounts | subscription (for API keys), credential, account (alone) |
+| Endpoint | The base URL of the API an API key is for, when it isn't the vendor's own, such as OpenRouter's for OpenAI's API | AgentAccounts | base URL, provider, upstream |
+| Plan | A person's subscription at a vendor that pays for agents' work, such as a ChatGPT, Claude, or Copilot plan; always personal | AgentAccounts | subscription (for API keys), seat |
+| Sign-in | Adding a plan by signing in at its vendor in a browser, which AiSloth finishes with the address the browser returns to | AgentAccounts | OAuth flow, login, connect |
 | Proposal | A message in a chat from someone who may not use its account; it never reaches the agent until the account's owner sends it on, as is or edited | Chats | suggestion, draft |
 | Paused | A nook whose compute is released with memory and files kept; it resumes in about a second and processes continue | Nooks | hibernated, sleeping, hot |
 | Stopped | A nook whose compute is released with files kept; it resumes in seconds and processes start again | Nooks | archived, cold, shut down |

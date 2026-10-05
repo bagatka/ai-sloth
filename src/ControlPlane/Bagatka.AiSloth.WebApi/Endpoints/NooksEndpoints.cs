@@ -20,7 +20,7 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class NooksEndpoints
 {
-    internal sealed record CreateNookRequest(string Provider, string? Harness = null);
+    internal sealed record CreateNookRequest(string Provider);
 
     internal sealed record StartProcessRequest(
         string Command,
@@ -50,8 +50,9 @@ internal static class NooksEndpoints
     }
 
     /// <summary>
-    /// Creates a nook in the workspace on one of its providers, such as <c>docker</c>; it starts in the
-    /// background. A nook for chats carries a harness, one of <c>GET /harnesses</c>, which can't change later.
+    /// Creates a nook without an agent in the workspace on one of its providers, such as <c>docker</c>,
+    /// for running processes; it starts in the background. A chat creates a nook of its own instead
+    /// (<c>POST /workspaces/{id}/chats</c>).
     /// </summary>
     private static async Task<Results<Created<NookSummary>, ProblemHttpResult>> Create(
         [FromRoute] Guid workspaceId,
@@ -60,7 +61,7 @@ internal static class NooksEndpoints
         [FromServices] INooksApi api,
         CancellationToken ct)
     {
-        Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider, request.Harness), ct);
+        Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider, Harness: null), ct);
         return result.ToCreated(nook => string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Id.Value}"));
     }
 

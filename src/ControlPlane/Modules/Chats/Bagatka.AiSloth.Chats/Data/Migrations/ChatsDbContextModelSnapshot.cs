@@ -16,7 +16,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261004200554_Initial";
+    public override string LastMigrationId => "20261005093623_OneChatPerNook";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -106,8 +106,12 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .IsUnique()
                     .HasDatabaseName("ix_chats_harness_token_hash");
 
-                b.HasIndex("NookId", "Id")
-                    .HasDatabaseName("ix_chats_nook_id_id");
+                b.HasIndex("NookId")
+                    .IsUnique()
+                    .HasDatabaseName("ix_chats_nook_id");
+
+                b.HasIndex("WorkspaceId", "Id")
+                    .HasDatabaseName("ix_chats_workspace_id_id");
 
                 b.ToTable("chats", "chats");
             });

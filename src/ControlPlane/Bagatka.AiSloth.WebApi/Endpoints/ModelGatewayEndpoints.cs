@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.Foundation;
 using Microsoft.AspNetCore.Builder;
@@ -13,10 +14,11 @@ using Microsoft.Extensions.Primitives;
 namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 /// <summary>
-/// The model gateway: agents in nooks call the model provider through it, and it adds the key of
-/// their chat's agent account, so no nook ever holds one. A call must carry its chat's token, as a
-/// bearer token or an API key; Chats says which key that token stands for. Everything else passes
-/// through unchanged, streams included.
+/// The model gateway: agents in nooks call their model through it, and it forwards each call to the
+/// endpoint of their chat's agent account with the headers that pay for it, so no nook ever holds a
+/// key or a plan's token. A call carries its chat's token, as a bearer token or an API key, and its
+/// path follows the gateway's URL as it would follow the endpoint's. Everything else passes through
+/// unchanged, streams included. Refusals answer in the shape OpenAI's and Anthropic's clients show.
 /// </summary>
 internal static class ModelGatewayEndpoints
 {
@@ -46,18 +48,52 @@ internal static class ModelGatewayEndpoints
         string token = bearer ? authorization["Bearer ".Length..] : request.Headers["X-Api-Key"].ToString();
         if (token.Length == 0)
         {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await RefuseAsync(context, StatusCodes.Status401Unauthorized, "This call carries no chat's token.");
             return;
         }
 
-        Result<string> key = await chats.GetModelKeyAsync(Actor.Anonymous, token, context.RequestAborted);
-        if (key.Failed)
+        Result<ModelEndpoint> found = await chats.GetModelEndpointAsync(Actor.Anonymous, token, context.RequestAborted);
+        if (found.Failed)
         {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            string message = found.Error == Error.Unauthorized ? "This call carries no chat's token." : found.Error.Message;
+            await RefuseAsync(context, StatusCodes.Status401Unauthorized, message);
             return;
         }
 
-        using HttpRequestMessage forwarded = new HttpRequestMessage(new HttpMethod(request.Method), new Uri(settings.Upstream, path + request.QueryString));
+        ModelEndpoint endpoint = found.Output;
+        bool plainHttpRefused = !settings.AllowPrivateNetworks && !string.Equals(endpoint.Url.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal);
+        if (plainHttpRefused)
+        {
+            await RefuseAsync(context, StatusCodes.Status502BadGateway, "The agent account's endpoint must use https.");
+            return;
+        }
+
+        using HttpRequestMessage forwarded = Forwarded(request, endpoint, path);
+        using HttpResponseMessage response = await clients.CreateClient(HttpClientName)
+            .SendAsync(forwarded, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+        context.Response.StatusCode = (int)response.StatusCode;
+        foreach (KeyValuePair<string, IEnumerable<string>> header in response.Headers)
+        {
+            if (!NotForwarded.Contains(header.Key))
+            {
+                context.Response.Headers[header.Key] = new StringValues([.. header.Value]);
+            }
+        }
+
+        foreach (KeyValuePair<string, IEnumerable<string>> header in response.Content.Headers)
+        {
+            context.Response.Headers[header.Key] = new StringValues([.. header.Value]);
+        }
+
+        await response.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
+    }
+
+    // The agent's call as it goes to the endpoint: the same method, path, query, body, and headers,
+    // with the account's headers in place of the chat's token.
+    private static HttpRequestMessage Forwarded(HttpRequest request, ModelEndpoint endpoint, string? path)
+    {
+        Uri target = new Uri(endpoint.Url.AbsoluteUri.TrimEnd('/') + "/" + path + request.QueryString);
+        HttpRequestMessage forwarded = new HttpRequestMessage(new HttpMethod(request.Method), target);
         if (request.ContentLength > 0 || request.Headers.TransferEncoding.Count > 0)
         {
             forwarded.Content = new StreamContent(request.Body);
@@ -78,24 +114,23 @@ internal static class ModelGatewayEndpoints
             }
         }
 
-        forwarded.Headers.Add("X-Api-Key", key.Output);
-
-        using HttpResponseMessage response = await clients.CreateClient(HttpClientName)
-            .SendAsync(forwarded, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
-        context.Response.StatusCode = (int)response.StatusCode;
-        foreach (KeyValuePair<string, IEnumerable<string>> header in response.Headers)
+        foreach (KeyValuePair<string, string> header in endpoint.Headers)
         {
-            if (!NotForwarded.Contains(header.Key))
-            {
-                context.Response.Headers[header.Key] = new StringValues([.. header.Value]);
-            }
+            forwarded.Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
 
-        foreach (KeyValuePair<string, IEnumerable<string>> header in response.Content.Headers)
-        {
-            context.Response.Headers[header.Key] = new StringValues([.. header.Value]);
-        }
-
-        await response.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
+        return forwarded;
     }
+
+    private static async Task RefuseAsync(HttpContext context, int status, string message)
+    {
+        string type = status == StatusCodes.Status401Unauthorized ? "authentication_error" : "api_error";
+        context.Response.StatusCode = status;
+        await context.Response.WriteAsJsonAsync(new GatewayRefusal("error", new GatewayRefusalDetail(type, message)), context.RequestAborted);
+    }
+
+    // OpenAI's clients read error.message, Anthropic's type and error.message.
+    internal sealed record GatewayRefusal(string Type, GatewayRefusalDetail Error);
+
+    internal sealed record GatewayRefusalDetail(string Type, string Message);
 }

@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Bagatka.AiSloth.AgentAccounts.Contracts\Bagatka.AiSloth.AgentAccounts.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\Foundation\Bagatka.Foundation.Modules\Bagatka.Foundation.Modules.csproj" />
+    <ProjectReference Include="..\..\..\..\Sdk\Bagatka.Sdk.OpenAI\Bagatka.Sdk.OpenAI.csproj" />
   </ItemGroup>
 
 </Project>

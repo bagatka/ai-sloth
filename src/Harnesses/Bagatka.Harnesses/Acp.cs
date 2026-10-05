@@ -13,12 +13,17 @@ namespace Bagatka.Harnesses;
 /// </summary>
 public static class Acp
 {
-    /// <summary>The first request: negotiates the protocol. This client offers no file system or terminal methods, so agents use their own tools.</summary>
-    public static string Initialize()
+    /// <summary>
+    /// The first request: negotiates the protocol and names the client, which some agents pass on to
+    /// their model provider, such as <c>aisloth</c>. This client offers no file system or terminal
+    /// methods, so agents use their own tools.
+    /// </summary>
+    public static string Initialize(string clientName, string clientTitle, string clientVersion)
     {
         return Request(RequestIds.Initialize, "initialize", new JsonObject
         {
             ["protocolVersion"] = 1,
+            ["clientInfo"] = new JsonObject { ["name"] = clientName, ["title"] = clientTitle, ["version"] = clientVersion },
             ["clientCapabilities"] = new JsonObject
             {
                 ["fs"] = new JsonObject { ["readTextFile"] = false, ["writeTextFile"] = false },

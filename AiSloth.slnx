@@ -74,6 +74,7 @@
   <Folder Name="/src/Sdk/">
     <File Path="src/Sdk/README.md" />
     <Project Path="src/Sdk/Bagatka.Sdk.Docker/Bagatka.Sdk.Docker.csproj" />
+    <Project Path="src/Sdk/Bagatka.Sdk.OpenAI/Bagatka.Sdk.OpenAI.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Bagatka.AiSloth.ArchitectureTests/Bagatka.AiSloth.ArchitectureTests.csproj" />

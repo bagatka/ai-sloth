@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Chats.Model;
-using Bagatka.AiSloth.Nooks.Contracts;
+using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
@@ -13,16 +13,17 @@ namespace Bagatka.AiSloth.Chats;
 
 internal sealed partial class ChatsApi
 {
-    public async Task<Result<Page<ChatSummary>>> ListAsync(Actor actor, NookId nookId, PageRequest page, CancellationToken ct)
+    public async Task<Result<Page<ChatSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, PageRequest page, CancellationToken ct)
     {
-        Result<NookSummary> nook = await nooks.GetAsync(actor, nookId, ct);
-        if (nook.Failed)
+        // A nook's guest doesn't see the workspace's other chats.
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(workspaceId), ct);
+        if (access is null)
         {
-            return new Result<Page<ChatSummary>>(nook.Error);
+            return new Result<Page<ChatSummary>>(WorkspacesErrors.NotFound);
         }
 
         Result<IQueryable<Chat>> paged = db.Chats.AsNoTracking()
-            .Where(chat => chat.NookId == nookId)
+            .Where(chat => chat.WorkspaceId == workspaceId)
             .TakePage(chat => chat.Id, KeysetOrder.NewestFirst, page);
         if (paged.Failed)
         {

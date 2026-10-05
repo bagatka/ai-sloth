@@ -1,29 +1,21 @@
-using System;
-
 namespace Bagatka.AiSloth.WebApi;
 
 /// <summary>
-/// Where the model gateway forwards agents' calls. The key each call carries is its chat's agent account's.
+/// Which networks the model gateway may forward agents' calls to. Each call goes to its chat's agent
+/// account's endpoint, which people may choose, so by default only public https endpoints are reached.
 /// </summary>
 internal sealed record ModelGatewaySettings
 {
     /// <summary>Creates the settings.</summary>
-    /// <param name="upstream">The model provider's API, such as <c>https://api.anthropic.com</c>; plain HTTP only on this machine, for tests.</param>
-    public ModelGatewaySettings(Uri upstream)
+    /// <param name="allowPrivateNetworks">
+    /// Whether endpoints may also be on this host or a private network, and use plain HTTP: for a
+    /// company's own model endpoint inside its network, a local model, or tests. Off by default.
+    /// </param>
+    public ModelGatewaySettings(bool allowPrivateNetworks = false)
     {
-        ArgumentNullException.ThrowIfNull(upstream);
-        bool secure = upstream.IsAbsoluteUri
-            && (string.Equals(upstream.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal)
-                || (string.Equals(upstream.Scheme, Uri.UriSchemeHttp, StringComparison.Ordinal) && upstream.IsLoopback));
-        if (!secure)
-        {
-            throw new ArgumentException("The upstream must be an https URL, or http on this machine.", nameof(upstream));
-        }
-
-        // A trailing slash makes the forwarded paths relative to it.
-        Upstream = upstream.AbsoluteUri.EndsWith('/', StringComparison.Ordinal) ? upstream : new Uri(upstream.AbsoluteUri + "/");
+        AllowPrivateNetworks = allowPrivateNetworks;
     }
 
-    /// <summary>The model provider's API, ending with a slash.</summary>
-    public Uri Upstream { get; }
+    /// <summary>Whether endpoints may be on this host or a private network, and use plain HTTP.</summary>
+    public bool AllowPrivateNetworks { get; }
 }

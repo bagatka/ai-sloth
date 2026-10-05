@@ -11,7 +11,8 @@ internal static class AccountCredentials
     {
         return kind switch
         {
-            AgentAccountKind.AnthropicApiKey => CredentialKind.AnthropicApiKey,
+            AgentAccountKind.AnthropicApiKey => CredentialKind.AnthropicApi,
+            AgentAccountKind.OpenAIApiKey or AgentAccountKind.ChatGptPlan => CredentialKind.OpenAIApi,
             AgentAccountKind.GitHubCopilotToken => CredentialKind.GitHubToken,
             AgentAccountKind.ClaudeSubscription => CredentialKind.ClaudeOAuthToken,
         };

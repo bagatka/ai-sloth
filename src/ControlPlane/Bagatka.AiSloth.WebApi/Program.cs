@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Net.Http;
 using System.Threading;
 using Bagatka.AiSloth.AgentAccounts;
 using Bagatka.AiSloth.Chats;
@@ -11,6 +12,7 @@ using Bagatka.AiSloth.WebApi.Endpoints;
 using Bagatka.AiSloth.Workspaces;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
+using Bagatka.Foundation.Web;
 using Bagatka.Sandboxing.Docker;
 using Bagatka.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -57,7 +59,14 @@ builder.Services.AddGrpc();
 builder.Services.AddSingleton(modelGateway);
 
 // Model calls stream for as long as the agent's turn needs; the agent cancels, never a timeout here.
-builder.Services.AddHttpClient(ModelGatewayEndpoints.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan);
+// Endpoints are people's choice, so connections reach only the public internet unless the deployment
+// allows private networks, and redirects go back to the agent instead of being followed.
+builder.Services.AddHttpClient(ModelGatewayEndpoints.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        ConnectCallback = modelGateway.AllowPrivateNetworks ? null : PublicNetworks.ConnectAsync,
+    });
 
 // Tokens from the configured OpenID Connect provider; who the token's subject is, Users decides.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

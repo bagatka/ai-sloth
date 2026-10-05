@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
@@ -36,6 +37,21 @@ internal sealed partial class AgentAccountsApi
             if (access < AccessLevel.Manage)
             {
                 return new Result(Error.Forbidden);
+            }
+        }
+
+        // Signing out ends the session at the vendor. When the vendor can't be reached, the account goes
+        // anyway: its tokens are gone with it, and the person can disconnect the app at the vendor.
+        PlanSession? session = account.Session(box);
+        if (session is not null)
+        {
+            try
+            {
+                await chatGpt.RevokeAsync(session.ClientId, session.RefreshToken, ct);
+            }
+            catch (HttpRequestException exception)
+            {
+                Log.SignInNotEnded(logger, exception, account.Id.Value);
             }
         }
 

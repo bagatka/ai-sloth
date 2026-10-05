@@ -1,12 +1,11 @@
 using System;
 using System.Security.Cryptography;
 using System.Text;
-using Bagatka.AiSloth.AgentAccounts.Contracts;
 
 namespace Bagatka.AiSloth.AgentAccounts.Model;
 
-// Encrypts accounts' secrets at rest with AES-256-GCM (PATTERNS.md, "Secrets at rest"). The account's
-// ID is authenticated with each secret, so a secret copied onto another row doesn't open.
+// Encrypts secrets at rest with AES-256-GCM (PATTERNS.md, "Secrets at rest"). The ID of the row that
+// holds a secret is authenticated with it, so a secret copied onto another row doesn't open.
 // Not handled: rotating the key; a new key makes every stored secret unreadable.
 internal sealed class SecretBox(string encryptionKey)
 {
@@ -17,7 +16,7 @@ internal sealed class SecretBox(string encryptionKey)
     private readonly byte[] _key = SHA256.HashData(Encoding.UTF8.GetBytes(encryptionKey));
 
     // Format byte, nonce, tag, then the ciphertext.
-    public byte[] Seal(string secret, AgentAccountId account)
+    public byte[] Seal(string secret, Guid row)
     {
         byte[] plaintext = Encoding.UTF8.GetBytes(secret);
         byte[] box = new byte[1 + NonceSize + TagSize + plaintext.Length];
@@ -25,20 +24,31 @@ internal sealed class SecretBox(string encryptionKey)
         Span<byte> nonce = box.AsSpan(1, NonceSize);
         RandomNumberGenerator.Fill(nonce);
         using AesGcm aes = new AesGcm(_key, TagSize);
-        aes.Encrypt(nonce, plaintext, box.AsSpan(1 + NonceSize + TagSize), box.AsSpan(1 + NonceSize, TagSize), account.Value.ToByteArray());
+        aes.Encrypt(nonce, plaintext, box.AsSpan(1 + NonceSize + TagSize), box.AsSpan(1 + NonceSize, TagSize), row.ToByteArray());
         return box;
     }
 
-    public string Open(byte[] box, AgentAccountId account)
+    public string Open(byte[] box, Guid row)
     {
         if (box.Length < 1 + NonceSize + TagSize || box[0] != Format)
         {
-            throw new InvalidOperationException("Agent account " + account.Value + " has a secret in an unknown format.");
+            throw new InvalidOperationException("Row " + row + " has a secret in an unknown format.");
         }
 
         byte[] plaintext = new byte[box.Length - 1 - NonceSize - TagSize];
         using AesGcm aes = new AesGcm(_key, TagSize);
-        aes.Decrypt(box.AsSpan(1, NonceSize), box.AsSpan(1 + NonceSize + TagSize), box.AsSpan(1 + NonceSize, TagSize), plaintext, account.Value.ToByteArray());
+        aes.Decrypt(box.AsSpan(1, NonceSize), box.AsSpan(1 + NonceSize + TagSize), box.AsSpan(1 + NonceSize, TagSize), plaintext, row.ToByteArray());
         return Encoding.UTF8.GetString(plaintext);
+    }
+
+    // A stable identifier for this deployment, for one purpose, derived from the key: it reveals
+    // nothing about the key and changes only with it. Formatted as a UUID (version 8, custom).
+    public Guid DeriveId(string purpose)
+    {
+        byte[] hash = HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes(purpose));
+        byte[] id = hash[..16];
+        id[6] = (byte)((id[6] & 0x0F) | 0x80);
+        id[8] = (byte)((id[8] & 0x3F) | 0x80);
+        return new Guid(id, bigEndian: true);
     }
 }

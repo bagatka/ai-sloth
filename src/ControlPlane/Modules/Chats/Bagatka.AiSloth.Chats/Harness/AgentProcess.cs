@@ -25,9 +25,10 @@ internal sealed class AgentProcess(IServiceScopeFactory scopes)
     private const int MaxLineBytes = 32 * 1024 * 1024;
 
     // Keeps all the output, so reading can resume from any offset after a restart.
-    public async Task<Result<ProcessId>> StartAsync(NookId nookId, HarnessProfile harness, IReadOnlyDictionary<string, string> environment, CancellationToken ct)
+    // Every nook image with a harness starts it the same way (HarnessProfile.Command).
+    public async Task<Result<ProcessId>> StartAsync(NookId nookId, IReadOnlyDictionary<string, string> environment, CancellationToken ct)
     {
-        StartProcess start = new StartProcess(nookId, harness.Command, harness.Arguments, WorkingDirectory, OutputRetention.Complete, environment);
+        StartProcess start = new StartProcess(nookId, HarnessProfile.Command, [], WorkingDirectory, OutputRetention.Complete, environment);
         await using AsyncServiceScope scope = scopes.CreateAsyncScope();
         Result<ProcessSummary> started = await scope.ServiceProvider.GetRequiredService<INooksApi>().StartProcessAsync(SystemActors.Harness, start, ct);
         if (started.Failed)
