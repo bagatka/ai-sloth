@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
@@ -7,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.Sandboxing;
 using Bagatka.Sandboxing.Docker;
+using Bagatka.Sdk.Docker;
 using Grpc.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -86,10 +89,10 @@ internal sealed partial class Sloth
 
         await using ServiceProvider services = new ServiceCollection().AddDockerSandboxProvider(docker).BuildServiceProvider();
         ISandboxProvider local = services.GetRequiredService<ISandboxProvider>();
-        string? problem = await DockerProblemAsync(local, ct);
+        string? problem = await DockerProblemAsync(services.GetRequiredService<DockerClient>(), dockerEndpoint, ct);
         if (problem is not null)
         {
-            await terminal.FailAsync("Couldn't reach the Docker Engine at " + dockerEndpoint + ": " + problem);
+            await terminal.FailAsync(problem);
             return 1;
         }
 
@@ -136,21 +139,24 @@ internal sealed partial class Sloth
         return credential;
     }
 
-    // Listing proves the engine answers before the control plane sends calls that would fail.
-    private static async Task<string?> DockerProblemAsync(ISandboxProvider local, CancellationToken ct)
+    // Why the engine can't run nooks, found before the control plane sends calls that would fail, or
+    // null when it can.
+    private static async Task<string?> DockerProblemAsync(DockerClient docker, Uri endpoint, CancellationToken ct)
     {
+        IReadOnlyList<string> runtimes;
         try
         {
-            await foreach (SandboxObservation _ in local.ListAsync(ct))
-            {
-                break;
-            }
-
-            return null;
+            runtimes = await docker.ListRuntimesAsync(ct);
         }
         catch (HttpRequestException exception)
         {
-            return exception.Message;
+            return "Couldn't reach the Docker Engine at " + endpoint + ": " + exception.Message;
         }
+
+        // Nooks run Docker of their own, which takes Sysbox to do without privileges on this machine.
+        return runtimes.Contains(DockerSandboxSettings.Runtime, StringComparer.Ordinal)
+            ? null
+            : "The Docker Engine at " + endpoint + " has no Sysbox runtime (" + DockerSandboxSettings.Runtime
+                + "), which nooks run under. Install Sysbox (https://github.com/nestybox/sysbox), or set DOCKER_HOST to an engine that has it.";
     }
 }

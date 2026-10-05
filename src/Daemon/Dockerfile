@@ -1,6 +1,7 @@
-# The images nooks start from, as targets: `nook` is slothd under tini, on Ubuntu 26.04 with git; each
-# harness target adds Node.js and one harness for chats' agents. A nook carries at most one harness,
-# so a host pulls only the images its nooks use, and the layers below a harness are shared.
+# The images nooks start from, as targets: `nook` is slothd under tini, on Ubuntu 26.04 with git and
+# the Docker engine, with Compose and Buildx, for a project's own containers; each harness target adds
+# Node.js and one harness for chats' agents. A nook carries at most one harness, so a host pulls only
+# the images its nooks use, and the layers below a harness are shared.
 # Build from the repository root:
 #   docker build -f src/Daemon/Dockerfile --target nook -t aisloth-nook .
 #   docker build -f src/Daemon/Dockerfile --target claude-code -t aisloth-nook-claude-code .
@@ -38,14 +39,18 @@ RUN npm install --global --prefix /opt/harness @github/copilot@1.0.91
 
 # Plain Ubuntu: slothd needs only libc, and OpenSSL with the CA certificates for TLS to the control
 # plane; it runs without ICU. tini runs as PID 1 and reaps the orphaned processes agents leave behind.
+# Docker is Ubuntu's; it runs without privileges because providers run nooks under Sysbox or in VMs.
+# systemd is there only for systemd-socket-activate, which starts Docker on first use; tini stays init.
 FROM ubuntu:26.04 AS nook
 RUN apt-get update \
     && apt-get install -y --no-install-recommends tini git ca-certificates curl libssl3t64 \
+        docker.io docker-compose-v2 docker-buildx systemd \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/Bagatka.AiSloth.Daemon /usr/local/bin/slothd
+COPY --chmod=755 src/Daemon/start-nook.sh /usr/local/bin/start-nook
 RUN mkdir -p /work /var/lib/slothd
 WORKDIR /work
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/slothd"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/start-nook"]
 
 # Harnesses run on Node.js; every harness image shares this layer.
 FROM nook AS node

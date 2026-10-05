@@ -11,10 +11,12 @@ namespace Bagatka.Sdk.Docker;
 /// <param name="NanoCpus">CPU quota in billionths of a CPU.</param>
 /// <param name="MemoryBytes">Memory limit in bytes.</param>
 /// <param name="ExtraHosts">Extra <c>/etc/hosts</c> entries as <c>name:address</c>.</param>
+/// <param name="Runtime">The OCI runtime to run it with, one the engine lists in <see cref="DockerClient.ListRuntimesAsync"/>.</param>
 public sealed record ContainerConfiguration(
     string Image,
     IReadOnlyList<string> Environment,
     IReadOnlyDictionary<string, string> Labels,
     long NanoCpus,
     long MemoryBytes,
-    IReadOnlyList<string> ExtraHosts);
+    IReadOnlyList<string> ExtraHosts,
+    string Runtime);

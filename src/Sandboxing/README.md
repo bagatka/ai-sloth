@@ -44,16 +44,17 @@ flight, as an unreachable backend would.
 - **Stay in scope.** List and touch only resources tagged with your own scope.
 - **Exact resources.** Run the requested resources or reject the spec; never round silently.
 - **No inbound networking.** The sandbox dials out; never open ports into it.
+- **Containers inside, no privileges outside.** A sandbox can run containers of its own, as a
+  project's Docker does: give it its own kernel, as a microVM, or a runtime that makes that safe in
+  a container, as Docker does with Sysbox. Never a privileged container.
 - **Secrets.** `SandboxSpec.Environment` may hold secrets; never log it.
 
 ## Providers
 
 | Provider | Status | Suspends to | Notes |
 |---|---|---|---|
-| Docker | Built | `Paused` (`docker pause`) | Local development, CI, single-machine deployments, and machines. Snapshots are committed images, with the sandbox's environment values kept out. Sandboxes can reach the host as `host.docker.internal`. |
-| Azure Container Apps Sandboxes | Planned | `Paused` | Memory and disk snapshots with sub-second restore |
-| Cloudflare | After a spike | `Stopped` | Files to R2, no memory; containers are controlled from Workers, so the provider probably includes a small Worker |
-| AWS | After a spike | To be measured | |
+| Docker | Built | `Paused` (`docker pause`) | Local development, CI, single-machine deployments, and machines. Runs sandboxes under Sysbox (`sysbox-runc`), which the engine must have; creating fails with `sandboxing.sysbox_missing` otherwise. Snapshots are committed images, with the sandbox's environment values kept out. Sandboxes can reach the host as `host.docker.internal`. |
+| Azure Container Apps Sandboxes | Planned | `Paused` | The official host. MicroVMs with Docker inside; memory snapshots restore in under a second once warm |
 | macOS virtual machines | After a spike | To be measured | On people's Macs only, through machines (`src/ControlPlane/Modules/Machines`), for iOS and macOS work; Apple's Virtualization.framework through Tart |
 
 ## Tests

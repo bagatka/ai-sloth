@@ -64,9 +64,10 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
   and out itself, as git bundles, with each person's GitHub connection. Secrets are the exception
   people choose: they exist for
   the agent's tools, and everyone who may write in a nook can use the secrets in it.
-- **Starting is nearly instant.** A nook starts from a template of its folders with their
-  dependencies installed, cached where it runs, and catches up from there; no start waits for a
-  rebuild. The time from Send to the agent's first action is measured and kept low.
+- **Starting is nearly instant.** A project's own setup prepares a nook, and a nook whose setup took
+  a while leaves a ready copy that the next nooks start from and catch up; where the provider keeps
+  memory, the copy's services are already running. Agents start when their chat does, before the
+  first message. The time from Send to the agent's first action is measured and kept low.
 - **Running work never stops for us.** Deploys, restarts, and network blips never stop a process in
   a nook; agents may run for days. Suspension is invisible to callers.
 - **Nothing delivered is lost.** A nook is disposable, so what people can't afford to lose lives
@@ -263,8 +264,12 @@ These decisions are fixed:
   Files survive until deletion on every provider; memory is kept where the backend can. Any
   operation resumes a suspended nook first, so callers only notice latency.
 - **Providers do lifecycle only.** Every operation is safe to repeat, and every provider passes the
-  same conformance suite. `Bagatka.Sandboxing.Docker` comes first: it serves local development, CI,
-  single-machine deployments, and machines.
+  same conformance suite. `Bagatka.Sandboxing.Docker` serves local development, CI, single-machine
+  deployments, and machines; the official host runs nooks on Azure Container Apps Sandboxes,
+  microVMs that keep memory when suspended and in snapshots. Self-hosting stays on any provider.
+- **Every Linux nook runs Docker,** so projects use compose, Testcontainers, and builds as on a
+  laptop. A provider gives each nook its own kernel or a runtime that makes Docker safe inside a
+  container (Sysbox for the Docker provider); nothing grants a nook privileges on its host.
 - **Machines are a provider.** A workspace's own computers are one provider, `machine`, whose places
   are the machines. `sloth machine run` dials out and runs the provider calls it receives on the
   computer's Docker Engine, so a machine needs no inbound networking either.

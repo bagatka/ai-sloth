@@ -20,6 +20,9 @@ public static class ProvidersUnderTest
 
     internal static SandboxResources Resources => new SandboxResources(CpuMillicores: 250, MemoryMebibytes: 64);
 
+    /// <summary>The Docker Engine, which has Sysbox: DOCKER_HOST's, as for the docker command, or the default one.</summary>
+    internal static Uri DockerEndpoint { get; } = new Uri(Environment.GetEnvironmentVariable("DOCKER_HOST") is { Length: > 0 } host ? host : "unix:///var/run/docker.sock");
+
     /// <summary>
     /// Creates the named provider in a scope of its own, so tests run in parallel without seeing each
     /// other's sandboxes.
@@ -28,7 +31,7 @@ public static class ProvidersUnderTest
     {
         string scope = "conformance-" + RandomNumberGenerator.GetHexString(12, lowercase: true);
         ServiceCollection services = new ServiceCollection();
-        services.AddDockerSandboxProvider(new DockerSandboxSettings(new Uri("unix:///var/run/docker.sock"), scope));
+        services.AddDockerSandboxProvider(new DockerSandboxSettings(DockerEndpoint, scope));
         ServiceProvider built = services.BuildServiceProvider();
         return name switch
         {

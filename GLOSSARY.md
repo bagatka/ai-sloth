@@ -92,7 +92,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Daemon | `slothd`, the process in every nook that dials the control plane and runs processes for it | `src/Daemon` | agent, sidecar, runner |
 | Daemon token | The secret a daemon proves its nook with; issued by Nooks, stored only as a hash | Nooks | API key, password |
 | Daemon endpoint | The WebApi's HTTP/2-only gRPC endpoint that daemons and machines dial | WebApi | agent API, callback |
-| Nook image | An image nooks start from: `slothd` under tini, on Ubuntu 26.04 with git, alone or with one harness; a nook's harness is chosen when it is created and never changes | `src/Daemon/Dockerfile` | base image, runner image |
+| Nook image | An image nooks start from: `slothd` under tini, on Ubuntu 26.04 with git and the Docker engine, alone or with one harness; a nook's harness is chosen when it is created and never changes | `src/Daemon/Dockerfile` | base image, runner image |
 | Disk reserve | Space a daemon holds in a file and releases when the disk fills, so output and cleanup keep working | `src/Daemon` | ballast, buffer |
 | Reconciler | The Nooks job that makes providers match the records: it creates the sandboxes of new nooks and deletes those of deleted ones | Nooks | sync job, worker |
 | Instruction | A message from the control plane telling a daemon what to do | Nooks, `daemon.proto` | command, request |

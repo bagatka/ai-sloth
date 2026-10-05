@@ -85,11 +85,13 @@ None. A connection lives as long as its gRPC call.
   backend does, and the reconciler retries.
 - **The same providers, elsewhere.** Machine mode runs the providers the cloud uses, and the
   conformance suite runs every provider through `Bagatka.Sandboxing.Remote` too. The Docker provider
-  works with any Docker-compatible engine on a Unix socket: Docker, OrbStack, Colima, or Podman.
-  Each machine works in its own Docker scope, `m-<machine ID>`.
-- **Nooks never run directly on a machine's own operating system.** Linux nooks are containers; on a
-  Mac, the container engine already runs them inside a Linux VM. macOS nooks, for iOS work, will be
-  macOS virtual machines on Apple's Virtualization.framework (through Tart, after a spike).
+  works with a Docker Engine on a Unix socket that has Sysbox, so nooks run Docker of their own
+  without privileges on the machine; `sloth machine run` checks for it first. Each machine works in
+  its own Docker scope, `m-<machine ID>`.
+- **Nooks never run directly on a machine's own operating system.** Linux nooks are containers under
+  Sysbox; on a Mac, the container engine already runs them inside a Linux VM. macOS nooks, for iOS
+  work, will be macOS virtual machines on Apple's Virtualization.framework (through Tart, after a
+  spike).
 - **Lifecycle only.** The protocol carries sandbox lifecycle calls. A machine never accepts a
   command to run on its own operating system.
 - **One active instance for now**, as for daemons: connections live in the instance they dialed.

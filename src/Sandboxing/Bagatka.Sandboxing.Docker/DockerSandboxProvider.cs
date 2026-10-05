@@ -13,9 +13,10 @@ using Bagatka.Sdk.Docker;
 namespace Bagatka.Sandboxing.Docker;
 
 /// <summary>
-/// Runs each sandbox as a container on a Docker Engine. Suspending pauses the container, which keeps
-/// its memory, so a suspended sandbox is <see cref="SandboxState.Paused"/>. Snapshots are images
-/// committed from containers.
+/// Runs each sandbox as a container on a Docker Engine, under Sysbox, so that it can run containers of
+/// its own without privileges on the host. Suspending pauses the container, which keeps its memory, so
+/// a suspended sandbox is <see cref="SandboxState.Paused"/>. Snapshots are images committed from
+/// containers.
 /// </summary>
 internal sealed class DockerSandboxProvider(DockerClient docker, string scope) : ISandboxProvider
 {
@@ -34,6 +35,10 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
 
     private static readonly Error SandboxNotFound =
         Error.NotFound("sandboxing.sandbox_not_found", "The sandbox doesn't exist.");
+
+    private static readonly Error NoSysbox = Error.Conflict(
+        "sandboxing.sysbox_missing",
+        "The Docker Engine has no " + DockerSandboxSettings.Runtime + " runtime, which sandboxes run under; install Sysbox (https://github.com/nestybox/sysbox) on its host.");
 
     private string ScopeFilter => ScopeLabel + "=" + scope;
 
@@ -66,26 +71,19 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
             return Repeated(existing, specHash);
         }
 
+        IReadOnlyList<string> runtimes = await docker.ListRuntimesAsync(ct);
+        if (!runtimes.Contains(DockerSandboxSettings.Runtime, StringComparer.Ordinal))
+        {
+            return new Result<SandboxObservation>(NoSysbox);
+        }
+
         Result<string> image = await ResolveImageAsync(spec.Source, ct);
         if (image.Failed)
         {
             return new Result<SandboxObservation>(image.Error);
         }
 
-        ContainerConfiguration configuration = new ContainerConfiguration(
-            image.Output,
-            spec.Environment.Select(variable => variable.Key + "=" + variable.Value).ToList(),
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                [ScopeLabel] = scope,
-                [KeyLabel] = Format(spec.Key.Value),
-                [SpecLabel] = specHash,
-            },
-            NanoCpus: spec.Resources.CpuMillicores * 1_000_000L,
-            MemoryBytes: spec.Resources.MemoryMebibytes * 1024L * 1024L,
-            ExtraHosts);
-
-        Result<string> created = await docker.CreateContainerAsync(name, configuration, ct);
+        Result<string> created = await docker.CreateContainerAsync(name, Configuration(spec, image.Output, specHash), ct);
         if (created.Failed)
         {
             // A concurrent call may have created it first; answer as for a repeated call.
@@ -398,6 +396,23 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
         }
 
         return container;
+    }
+
+    private ContainerConfiguration Configuration(SandboxSpec spec, string image, string specHash)
+    {
+        return new ContainerConfiguration(
+            image,
+            spec.Environment.Select(variable => variable.Key + "=" + variable.Value).ToList(),
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [ScopeLabel] = scope,
+                [KeyLabel] = Format(spec.Key.Value),
+                [SpecLabel] = specHash,
+            },
+            NanoCpus: spec.Resources.CpuMillicores * 1_000_000L,
+            MemoryBytes: spec.Resources.MemoryMebibytes * 1024L * 1024L,
+            ExtraHosts,
+            DockerSandboxSettings.Runtime);
     }
 
     private string ContainerName(SandboxKey key)

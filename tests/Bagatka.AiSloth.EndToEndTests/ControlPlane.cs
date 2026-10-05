@@ -42,6 +42,10 @@ public sealed partial class ControlPlane : IAsyncLifetime
     /// <summary>What <c>sloth machine connect</c> takes: the endpoint daemons and machines dial.</summary>
     public Uri MachinesUrl => new Uri(string.Create(CultureInfo.InvariantCulture, $"http://localhost:{_daemonPort}"));
 
+    // The Docker Engine nooks run in, which has Sysbox: DOCKER_HOST's, as for the docker command, or
+    // the default one.
+    private static Uri DockerEndpoint { get; } = new Uri(Environment.GetEnvironmentVariable("DOCKER_HOST") is { Length: > 0 } host ? host : "unix:///var/run/docker.sock");
+
     // This run's nooks live in Docker scopes of their own, away from a developer's: one for the
     // docker provider, one for every machine the tests run.
     private string Scope { get; } = "e2e-" + RandomNumberGenerator.GetHexString(12, lowercase: true);
@@ -156,6 +160,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
                 "Parameters:secrets-key=" + RandomNumberGenerator.GetHexString(64),
                 "DaemonPort=" + _daemonPort.ToString(CultureInfo.InvariantCulture),
                 "ModelsPort=" + _modelsPort.ToString(CultureInfo.InvariantCulture),
+                "DOCKER_HOST=" + DockerEndpoint,
             ],
             ct);
         _app = await appHost.BuildAsync(ct);
@@ -209,7 +214,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
         foreach (string scope in new[] { Scope, MachineScope })
         {
             ServiceCollection services = new ServiceCollection();
-            services.AddDockerSandboxProvider(new DockerSandboxSettings(new Uri("unix:///var/run/docker.sock"), scope));
+            services.AddDockerSandboxProvider(new DockerSandboxSettings(DockerEndpoint, scope));
             await using ServiceProvider provider = services.BuildServiceProvider();
             await provider.GetRequiredService<ISandboxProvider>().DeleteAsync(SandboxKey.From(nookId), CancellationToken.None);
         }
@@ -218,7 +223,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
     /// <summary>Runs machine mode in this process, as <c>sloth machine run</c> would.</summary>
     internal RunningMachine StartMachine(MachineCredential credential)
     {
-        return new RunningMachine(credential, new DockerSandboxSettings(new Uri("unix:///var/run/docker.sock"), MachineScope));
+        return new RunningMachine(credential, new DockerSandboxSettings(DockerEndpoint, MachineScope));
     }
 
     public async ValueTask DisposeAsync()
@@ -293,7 +298,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
     private static async Task DeleteSandboxesAsync(string scope)
     {
         ServiceCollection services = new ServiceCollection();
-        services.AddDockerSandboxProvider(new DockerSandboxSettings(new Uri("unix:///var/run/docker.sock"), scope));
+        services.AddDockerSandboxProvider(new DockerSandboxSettings(DockerEndpoint, scope));
         await using ServiceProvider provider = services.BuildServiceProvider();
         ISandboxProvider docker = provider.GetRequiredService<ISandboxProvider>();
         await foreach (SandboxObservation sandbox in docker.ListAsync(CancellationToken.None))

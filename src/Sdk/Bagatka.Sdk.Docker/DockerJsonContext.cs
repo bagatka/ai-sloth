@@ -14,6 +14,7 @@ namespace Bagatka.Sdk.Docker;
 [JsonSerializable(typeof(DockerWire.ImageInspect))]
 [JsonSerializable(typeof(IReadOnlyList<DockerWire.ImageSummary>))]
 [JsonSerializable(typeof(DockerWire.Commit))]
+[JsonSerializable(typeof(DockerWire.SystemInfo))]
 [JsonSerializable(typeof(DockerWire.ErrorResponse))]
 [JsonSerializable(typeof(DockerWire.PullProgress))]
 [JsonSerializable(typeof(Dictionary<string, IReadOnlyList<string>>))]

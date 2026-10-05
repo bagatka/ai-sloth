@@ -75,7 +75,11 @@ once at startup; a missing or invalid value prints one line to standard error an
 
 The daemon lives as long as its nook. `SIGTERM` or `SIGINT`, as when the nook stops, kills its
 processes and deletes their output; a daemon that starts again starts with none. The nook image runs
-it under `tini`, which reaps the orphaned processes that agents leave behind.
+it under `tini`, which reaps the orphaned processes that agents leave behind. Its entry point,
+`start-nook.sh`, has the Docker engine for the project's own containers start on first use: Docker's
+socket listens from the start, and the first connection starts `dockerd` on it, about 0.4 seconds
+before it answers. A nook that never uses Docker pays nothing for it; `/var/log/dockerd.log` says
+what the engine did.
 
 ## Build and test
 
@@ -86,8 +90,9 @@ restoring; restoring during a publish for a runtime would rewrite the protocol p
     dotnet publish src/Daemon/Bagatka.AiSloth.Daemon -c Release -r linux-x64 --no-restore
 
 The nook images (`Dockerfile`) do the same inside the SDK image that `global.json` pins. The `nook`
-target installs the binary as `/usr/local/bin/slothd` under tini, on plain Ubuntu 26.04 with git,
-for nooks without chats; the daemon needs only libc and OpenSSL, and runs without ICU. Each harness target adds Node.js and one harness, at the version the profiles in
+target installs the binary as `/usr/local/bin/slothd` under tini, on plain Ubuntu 26.04 with git and
+Ubuntu's Docker engine, Compose, and Buildx, for nooks without chats; the daemon needs only libc and
+OpenSSL, and runs without ICU. Each harness target adds Node.js and one harness, at the version the profiles in
 `src/Harnesses` are written for: `claude-code` (Claude Code's ACP adapter) and `copilot` (GitHub
 Copilot CLI). A nook carries one, so a host pulls only what its nooks use; each harness's own files
 make most of its image's size. Build one from the repository root with

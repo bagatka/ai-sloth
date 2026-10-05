@@ -46,6 +46,14 @@ public sealed class DockerClient : IDisposable
         };
     }
 
+    /// <summary>The names of the OCI runtimes the engine can run containers with, such as <c>runc</c>.</summary>
+    public async Task<IReadOnlyList<string>> ListRuntimesAsync(CancellationToken ct)
+    {
+        using HttpResponseMessage response = await _http.GetAsync(new Uri("info", UriKind.Relative), ct).ConfigureAwait(false);
+        DockerWire.SystemInfo body = await ReadAsync(response, DockerJsonContext.Default.SystemInfo, ct).ConfigureAwait(false);
+        return body.Runtimes?.Keys.ToList() ?? [];
+    }
+
     /// <summary>The container, or <see langword="null"/> when no container has that name or ID.</summary>
     public async Task<ContainerDetails?> InspectContainerAsync(string nameOrId, CancellationToken ct)
     {
@@ -77,7 +85,7 @@ public sealed class DockerClient : IDisposable
             configuration.Image,
             configuration.Environment,
             configuration.Labels,
-            new DockerWire.HostConfig(configuration.NanoCpus, configuration.MemoryBytes, configuration.ExtraHosts));
+            new DockerWire.HostConfig(configuration.NanoCpus, configuration.MemoryBytes, configuration.ExtraHosts, configuration.Runtime));
 
         using JsonContent content = JsonContent.Create(body, DockerJsonContext.Default.ContainerCreate);
         using HttpResponseMessage response = await _http.PostAsync(Path("containers/create?name=", name, string.Empty), content, ct).ConfigureAwait(false);

@@ -64,6 +64,10 @@ IResourceBuilder<ParameterResource> nearlyFullDisk = builder.AddParameter(
 // value can't be overridden, so the default is applied here.
 IResourceBuilder<ParameterResource> sandboxScope = builder.AddParameter("sandbox-scope", builder.Configuration["Parameters:sandbox-scope"] ?? "dev");
 
+// The Docker Engine nooks run in and their images are built in: DOCKER_HOST's, as for the docker
+// command, or the default one. It needs Sysbox (src/Sandboxing/README.md).
+string dockerHost = builder.Configuration["DOCKER_HOST"] is { Length: > 0 } host ? host : "unix:///var/run/docker.sock";
+
 IResourceBuilder<PostgresDatabaseResource> database = builder.AddPostgres("postgres")
     .WithImageTag("18")
     .AddDatabase("aisloth");
@@ -71,9 +75,11 @@ IResourceBuilder<PostgresDatabaseResource> database = builder.AddPostgres("postg
 // The images nooks start from: the base, and one per harness on top of it. Docker's cache makes a
 // rebuild without changes take seconds.
 IResourceBuilder<ExecutableResource> nookImage = builder.AddExecutable(
-    "nook-image", "docker", repositoryRoot, "build", "--file", "src/Daemon/Dockerfile", "--target", "nook", "--tag", NookImage, ".");
+    "nook-image", "docker", repositoryRoot, "build", "--file", "src/Daemon/Dockerfile", "--target", "nook", "--tag", NookImage, ".")
+    .WithEnvironment("DOCKER_HOST", dockerHost);
 IResourceBuilder<ExecutableResource>[] harnessImages = [.. harnesses.Select(harness => builder.AddExecutable(
         "nook-image-" + harness, "docker", repositoryRoot, "build", "--file", "src/Daemon/Dockerfile", "--target", harness, "--tag", HarnessImage(harness), ".")
+    .WithEnvironment("DOCKER_HOST", dockerHost)
     .WaitForCompletion(nookImage))];
 
 IResourceBuilder<ProjectResource> webApi = builder.AddProject<Projects.Bagatka_AiSloth_WebApi>("webapi")
@@ -154,7 +160,7 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         })
         .WithEnvironment("Modules__Nooks__CpuMillicores", "2000")
         .WithEnvironment("Modules__Nooks__MemoryMebibytes", "4096")
-        .WithEnvironment("Sandboxing__Docker__Endpoint", "unix:///var/run/docker.sock")
+        .WithEnvironment("Sandboxing__Docker__Endpoint", dockerHost)
         .WithEnvironment("Sandboxing__Docker__Scope", sandboxScope);
 }
 

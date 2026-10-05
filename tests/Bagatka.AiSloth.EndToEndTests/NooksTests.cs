@@ -58,6 +58,43 @@ public sealed class NooksTests(ControlPlane controlPlane) : IDisposable
         Assert.InRange(disk.AvailableBytes, 0, disk.TotalBytes);
     }
 
+    // A project's containers run in its nook as on a laptop: an image built from a Dockerfile, a
+    // published port, and compose services reaching each other by name. busybox keeps it to one pull.
+    [Fact]
+    public async Task A_nook_runs_containers_of_its_own()
+    {
+        NookSummary nook = await CreateNookAsync();
+
+        ProcessSummary process = await StartAsync(nook, "sh", "-c", """
+            set -e
+            mkdir -p /tmp/app && cd /tmp/app
+            cat > Dockerfile <<'END'
+            FROM busybox
+            RUN echo built > /built
+            CMD ["cat", "/built"]
+            END
+            docker build --quiet --tag app . >/dev/null
+            docker run --rm app
+            docker run --detach --publish 8080:80 busybox sh -c 'echo published > /index.html && httpd -f -h /' >/dev/null
+            curl --silent --fail --retry 20 --retry-all-errors --retry-delay 1 http://localhost:8080/
+            cat > compose.yaml <<'END'
+            services:
+              web:
+                image: busybox
+                command: sh -c "echo served > /index.html && httpd -f -h /"
+              client:
+                image: busybox
+                depends_on: [web]
+                command: sh -c "for i in $$(seq 50); do wget -qO- http://web/ && exit 0; sleep 0.2; done; exit 1"
+            END
+            docker compose run --rm --no-TTY client
+            """);
+        Run run = await WatchToExitAsync(nook, process, fromOffset: 0);
+
+        Assert.True(run.ExitCode == 0, run.StandardError);
+        Assert.Equal("built\npublished\nserved\n", run.StandardOutput);
+    }
+
     [Fact]
     public async Task Input_reaches_a_running_process_and_stopping_ends_it_politely()
     {

@@ -16,9 +16,13 @@ as a WorkOS staging environment, give the AppHost `Parameters:sign-in-provider-i
 `dotnet user-secrets set <name> <value> --project src/Aspire/Bagatka.AiSloth.AppHost`. For chats
 to start with your GitHub repositories, make the host's GitHub App once with
 `... -- github create-app`, turn on its device flow at GitHub as it says, and give the AppHost
-`Parameters:github-app-client-id`, `-client-secret`, and `-slug` the same way. Anything that runs containers,
-including the tests, needs a Docker engine, which Nix can't provide: use Docker Desktop (with WSL
-integration on Windows), OrbStack, Colima, or a system `dockerd`.
+`Parameters:github-app-client-id`, `-client-secret`, and `-slug` the same way. Anything that runs nooks,
+including the tests, needs a Docker engine with [Sysbox](https://github.com/nestybox/sysbox), which
+Nix can't provide: nooks run Docker of their own, and Sysbox lets them do it without privileges on
+the host. On Linux, install Docker and Sysbox's package; on Windows, run a `dockerd` with Sysbox
+inside WSL, beside Docker Desktop, whose engine can't have it; on a Mac, the engine has to run in a
+Linux VM of your own (not tried yet). Point `DOCKER_HOST` at that engine when it isn't the default
+one: the AppHost, the tests, and `sloth machine run` use it, as the `docker` command does.
 
 Personal coding tools (Claude Code, Codex, etc.) are not managed by the flake.
 Install and update them using their own installers. `./dev` includes

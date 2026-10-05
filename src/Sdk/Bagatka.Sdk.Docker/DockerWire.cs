@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Bagatka.Sdk.Docker;
@@ -14,7 +15,9 @@ internal static class DockerWire
         IReadOnlyDictionary<string, string> Labels,
         HostConfig HostConfig);
 
-    internal sealed record HostConfig(long NanoCpus, long Memory, IReadOnlyList<string> ExtraHosts);
+    internal sealed record HostConfig(long NanoCpus, long Memory, IReadOnlyList<string> ExtraHosts, string Runtime);
+
+    internal sealed record SystemInfo(IReadOnlyDictionary<string, JsonElement>? Runtimes);
 
     internal sealed record IdResponse(string Id);
 
