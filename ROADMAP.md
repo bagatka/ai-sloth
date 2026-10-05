@@ -3,25 +3,31 @@
 What we build next, in order. A step leaves this list when it lands on main; what a module still
 lacks lives in its README's "Not built yet".
 
-Steps 1 and 2 give the first real use: a person signs in with the `sloth` CLI and works with an
-agent on a ChatGPT plan, with the control plane running locally and nooks in the local Docker
-Engine. Step 5 brings the same experience to a deployed control plane, with people's own computers
-as machines.
+Steps 1 to 8 are the first release: the product principles in `ARCHITECTURE.md` hold for every
+kind of customer, with few integrations of each kind. Everything after it adds entries to existing
+lists (a provider, an account kind, a harness) rather than new concepts.
 
-1. **Codex and pi harnesses.** Profiles and nook images for `codex-acp` and `pi-acp`; ChatGPT plans
-   as personal agent accounts, behind a setting like Claude subscriptions until OpenAI allows them
-   for hosted apps.
-2. **CLI.** `sloth` signs in and covers nooks, agent accounts, and chats: streamed output, steering,
-   queued messages, and stop. People's names, taken from sign-in, come with it.
-3. **Sources.** Repositories mounted at `/work/<name>`; agents push branches through the control
-   plane's git proxy.
-4. **Checkpoints.** Object storage; every turn saves the nook's files and the agent's session; a new
-   message at 90% disk needs confirmation; each person's harness state is saved and restored into
-   their new nooks.
-5. **Deploy.** The control plane on AWS or Azure, nook images in a registry, people's computers
-   registered as machines.
-6. **Forks and recovery.** Restart a conversation from any turn; survive a lost agent process.
-7. **Azure Container Apps.** A sandbox provider next to Docker and machines.
-8. **macOS VMs.** Nooks on Macs as virtual machines, starting with a spike.
+1. **Agent accounts and harnesses.** An account is a model endpoint and its key, in OpenAI's or
+   Anthropic's API format, or a plan someone signs in to (ChatGPT now). The model gateway adds it
+   to every call, so it never enters a nook. Codex and pi harnesses join Claude Code and Copilot.
+2. **Secrets.** Environment variables a person or a workspace gives to nooks, for the agent's tools
+   such as `gh`.
+3. **CLI.** `sloth` with hosts, sign-in, agent accounts, secrets, nooks, and chats. First real use:
+   a local control plane with nooks in the local Docker Engine.
+4. **Folders in and out.** A nook's folder starts empty, from a repository, or from another nook,
+   and leaves as a download or as a pushed branch or pull request. The control plane moves the code
+   with its own git credentials; nooks never hold them.
+5. **Checkpoints.** Every turn saves the nook's files and the agent's session in object storage; a
+   nook can start from another nook's checkpoint; a new message at 90% disk needs confirmation; each
+   person's harness state follows them into new nooks.
+6. **Fast start.** Templates (a snapshot taken after setup, refreshed in the background and cached
+   where nooks start), so no start waits for a clone or an install, and agents that are ready before
+   the message arrives. Measured from Send to the agent's first action.
+7. **Hosting.** The official host, hosted nooks isolated with gVisor, self-hosting packaged for a
+   VPS or a company network, machines connecting from anywhere, and a push-notification relay any
+   host can use.
+8. **Apps.** The web app, served by every host, and native iOS and Android apps that connect to any
+   number of hosts.
 
-Later, order not decided: the web app.
+Later, order not decided: forks from any turn and recovering a lost agent process, Azure Container
+Apps, macOS VMs, automated billing, Projects, and enterprise sign-in extras.

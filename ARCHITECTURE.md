@@ -6,9 +6,11 @@ details in its own `README.md`.
 
 ## Product
 
-AiSloth runs coding agents in on-demand nooks, on the cloud the customer chooses, for people and
-agents working together. It is sold as a hosted service first; the same code should later be
-deployable by customers on their own cloud.
+Your coding agents keep working when your laptop is closed, and you follow and steer them from any
+device: any harness, any agent account, running anywhere. AiSloth is open source. The official host
+runs nooks for people who pay for them; anyone can also self-host it on a VPS or inside a company
+network, or connect their own machines and use only the apps. The official apps connect to any
+number of hosts.
 
 ```
 web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle──▶ sandbox provider ──▶ nook
@@ -22,6 +24,9 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
   never reaches the product.
 - **Sources:** where a nook's files come from: repositories (any git remote) and folders AiSloth
   keeps. A nook mounts any number of them at `/work/<name>`.
+- **Agent accounts and secrets:** an agent account pays for an agent's model and never enters a
+  nook; secrets are environment variables a person or a workspace gives to nooks for the agent's
+  tools.
 - **Projects:** optional groups of nooks, chats, and sources for a team working toward one goal,
   with shared context and a project chat. Nothing depends on them.
 - **Control plane:** owns every piece of state and every decision. Today it is one deployable:
@@ -46,11 +51,18 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 - **Nooks never run directly on anyone's operating system.** In AiSloth's cloud and on people's own
   machines alike, a nook is a container or a virtual machine, so an agent can't damage the computer
   it runs on.
+- **One product for everyone.** Customers differ in only four ways: who runs AiSloth, where nooks
+  run, what pays for models, and where work goes. Each is a list or a setting, never a mode: a
+  person alone is a workspace of one, a company is one deployment, and the official host is one
+  deployment we run. Nothing branches on the kind of customer.
 - **Nooks are untrusted.** The agent, the repository, and its dependencies may be hostile, and they
-  can read anything inside a nook, including the daemon's token. Credentials that matter, such as
-  git write access and cloud keys, stay in the control plane, which acts for a nook under policy:
-  pushes, for example, go through a control-plane git proxy that allows only the agent's own
-  branches.
+  can read anything inside a nook, including the daemon's token. Shared credentials never enter a
+  nook: agent accounts reach models through the model gateway, and the control plane moves code in
+  and out with its own git credentials. Secrets are the exception people choose: they exist for
+  the agent's tools, and everyone who may write in a nook can use the secrets in it.
+- **Starting is nearly instant.** A nook starts from a template of its folders with their
+  dependencies installed, cached where it runs, and catches up from there; no start waits for a
+  rebuild. The time from Send to the agent's first action is measured and kept low.
 - **Running work never stops for us.** Deploys, restarts, and network blips never stop a process in
   a nook; agents may run for days. Suspension is invisible to callers.
 - **Nothing delivered is lost.** A nook is disposable, so what people can't afford to lose lives
