@@ -44,8 +44,8 @@ flight, as an unreachable backend would.
 - **Stay in scope.** List and touch only resources tagged with your own scope.
 - **Exact resources.** Run the requested resources or reject the spec; never round silently.
 - **No inbound networking.** The sandbox dials out; never open ports into it.
-- **Containers inside, no privileges outside.** A sandbox can run containers of its own, as a
-  project's Docker does: give it its own kernel, as a microVM, or a runtime that makes that safe in
+- **Containers inside, no privileges outside.** A sandbox can run containers of its own, as
+  code's Docker does: give it its own kernel, as a microVM, or a runtime that makes that safe in
   a container, as Docker does with Sysbox. Never a privileged container.
 - **Secrets.** `SandboxSpec.Environment` may hold secrets; never log it.
 

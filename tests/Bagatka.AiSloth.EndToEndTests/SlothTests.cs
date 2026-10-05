@@ -158,7 +158,7 @@ public sealed partial class SlothTests(ControlPlane controlPlane)
         Assert.StartsWith("   1  just now    after: Please write hello.txt for me\n", checkpoints, StringComparison.Ordinal);
         Assert.Equal(0, started);
         Assert.Contains(" · a copy of " + shortId + " at checkpoint 1\n", second, StringComparison.Ordinal);
-        Assert.Contains("\nTip: this project has no setup, so every new nook installs what it needs from scratch. Prepare it once: sloth chat prepare ", second, StringComparison.Ordinal);
+        Assert.Contains("\nTip: this chat's files have no setup, so every new nook installs what they need from scratch. Have the agent write one: sloth chat prepare ", second, StringComparison.Ordinal);
         Assert.Equal(0, restored);
     }
 
@@ -199,7 +199,7 @@ public sealed partial class SlothTests(ControlPlane controlPlane)
         string output = sloth.Output;
 
         Assert.Equal(0, prepared);
-        Assert.StartsWith("Asked the agent to prepare the project for fast starts.", output, StringComparison.Ordinal);
+        Assert.StartsWith("Asked the agent to write a setup for this chat's files, so new nooks start with everything installed.", output, StringComparison.Ordinal);
         Assert.Contains("\nTesting the setup in a fresh nook…\n", output, StringComparison.Ordinal);
         Assert.Matches("\nSetup failed in a fresh nook after [0-9]+s \\(exit 1\\):\n", output);
         Assert.Contains("\nSent to the agent to fix; it's tested again after its turn.\n", output, StringComparison.Ordinal);

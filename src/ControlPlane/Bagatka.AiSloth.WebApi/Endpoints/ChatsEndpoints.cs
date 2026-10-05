@@ -134,8 +134,8 @@ internal static class ChatsEndpoints
     }
 
     /// <summary>
-    /// Asks the agent to prepare the project for fast starts: to write its <c>.agents/setup</c> and
-    /// <c>.agents/resume</c> scripts, run them, and commit them. After that turn, they are tested in a
+    /// Asks the agent to prepare the chat for fast starts: to write a setup for its files, its
+    /// <c>.agents/setup</c> and <c>.agents/resume</c> scripts, run them, and commit them. After that turn, they are tested in a
     /// fresh nook with only the chat's files, and a failure goes back to the agent, for at most three
     /// tests; the chat's events tell how each went. Only someone who may use the chat's account may.
     /// While the nook's disk is nearly full, it is sent only with <c>confirmNearlyFullDisk</c>.

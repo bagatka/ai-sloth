@@ -35,7 +35,7 @@ internal sealed partial class ChatsApi
         }
 
         // Its turn's end calls for the first test of the setup.
-        Result<Message> sent = Message.Send(command.ChatId, user.UserId, ProjectSetups.PrepareRequest, isProposal: false, proposalId: null, setupTest: 1, time);
+        Result<Message> sent = Message.Send(command.ChatId, user.UserId, NookSetups.PrepareRequest, isProposal: false, proposalId: null, setupTest: 1, time);
         if (sent.Failed)
         {
             return new Result<ChatMessage>(sent.Error);

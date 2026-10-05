@@ -13,7 +13,7 @@ namespace Bagatka.AiSloth.Nooks;
 
 internal sealed partial class NooksApi
 {
-    // The project's setup scripts, relative to /work, in the order they run: every setup, then every
+    // The setup scripts in the nook's files, relative to /work, in the order they run: every setup, then every
     // resume; /work's own before each folder's directly in it, by name.
     private const string FindSetupScript = """
         export LC_ALL=C
@@ -65,7 +65,7 @@ internal sealed partial class NooksApi
         wait "$worker"
         """;
 
-    // Finds the project's setup scripts in the nook's files, just put in place, and starts them with
+    // Finds the setup scripts in the nook's files, just put in place, and starts them with
     // the workspace's secrets, without waiting for them. Returns the scripts, and the process running
     // them; none when there are no scripts.
     private async Task<Result<SetupStart>> StartSetupAsync(Nook nook, DaemonConnection connection, CancellationToken ct)
@@ -74,7 +74,7 @@ internal sealed partial class NooksApi
         ProcessRun listed = await RunAsync(connection, FindSetupScript, [], NoVariables, input: null, found, ct);
         if (!listed.Succeeded)
         {
-            return new Result<SetupStart>(SourcesFailed("Looking for the project's setup failed: " + listed.Errors));
+            return new Result<SetupStart>(SourcesFailed("Looking for the nook's setup failed: " + listed.Errors));
         }
 
         // Not handled: folders whose names hold a line break, which checkpoints refuse too.

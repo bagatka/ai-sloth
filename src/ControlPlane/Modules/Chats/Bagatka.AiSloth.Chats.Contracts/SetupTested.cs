@@ -3,7 +3,7 @@ using System;
 namespace Bagatka.AiSloth.Chats.Contracts;
 
 /// <summary>
-/// How testing the project's setup in a fresh nook ended: it ran from scratch, then again, as a ready
+/// How testing the setup the agent wrote in a fresh nook ended: it ran from scratch, then again, as a ready
 /// copy will run it. A failure goes back to the agent to fix, until the third test.
 /// </summary>
 /// <param name="Test">Which test this was, 1 to 3.</param>

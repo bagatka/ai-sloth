@@ -2,7 +2,7 @@
 
 `sloth`, a Native AOT command line over a host's public HTTP API: sign in to hosts, add agent
 accounts and secrets, connect GitHub and add repositories, start, follow, and steer chats, see
-and prepare their project's setup, push their changes or download their files, now or at any checkpoint, start
+and prepare the setup of their files, push their changes or download their files, now or at any checkpoint, start
 chats from another's checkpoint, set the instructions every agent gets, and see or forget harness state. Its machine mode runs a workspace's nooks on the computer it
 runs on, and `github create-app` makes a host's GitHub App for its operator.
 
@@ -49,7 +49,7 @@ mode 600.
 - **Checkpoints are `<chat>@<number>`** wherever a chat's files are named: `--from abc123@3`.
 - **A setup shows one line while it runs, and one when it ended;** a failed one adds the end of its
   output, and `sloth chat setup <id>` prints all of it, following it while it runs. A chat that
-  started with a project without setup suggests `sloth chat prepare <id>` after its first turn.
+  started with files without a setup suggests `sloth chat prepare <id>` after its first turn.
 - **`sloth chat prepare` follows until the setup's last test,** without taking input, and fails when
   the setup still fails; Ctrl+C leaves the agent working. `sloth chat open` follows and steers it.
 - **A nearly full disk is asked about** at the keyboard (y/N); otherwise the command fails with the

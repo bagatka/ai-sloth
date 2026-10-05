@@ -15,8 +15,8 @@ using Xunit;
 namespace Bagatka.AiSloth.EndToEndTests;
 
 /// <summary>
-/// Fast start: a chat's agent starts with the chat, after the project's own setup, which runs whenever
-/// a nook gets the project's files, here a copy of another chat's; and preparing that setup, which an
+/// Fast start: a chat's agent starts with the chat, after the setup that comes with its files, which
+/// runs whenever a nook gets them, here a copy of another chat's; and preparing that setup, which an
 /// agent writes and a fresh nook tests.
 /// </summary>
 public sealed class SetupTests(ControlPlane controlPlane) : IDisposable
@@ -24,7 +24,7 @@ public sealed class SetupTests(ControlPlane controlPlane) : IDisposable
     private readonly HttpClient _alice = controlPlane.ClientFor("alice-" + Guid.CreateVersion7());
 
     [Fact]
-    public async Task A_projects_setups_then_its_resumes_run_in_their_folders_before_its_agent_starts()
+    public async Task Setups_then_resumes_run_in_their_folders_before_the_agent_starts()
     {
         ChatSummary first = await StartChatAsync(copyOf: null);
         await WriteAsync(first, "/work/.agents/setup", "#!/bin/sh\necho \"setup in $(pwd)\" >> /tmp/ran\n", "755");
@@ -99,7 +99,7 @@ public sealed class SetupTests(ControlPlane controlPlane) : IDisposable
         Assert.Equal((1, 1, true), (failed.GetProperty("test").GetInt32(), failed.GetProperty("exitCode").GetInt32(), failed.GetProperty("agentFixes").GetBoolean()));
         Assert.Contains("==> .agents/setup failed with exit code 1", failed.GetProperty("output").GetString(), StringComparison.Ordinal);
         Assert.Contains(watch.Seen, seen => string.Equals(seen.Type, "message-sent", StringComparison.Ordinal)
-            && seen.Event.GetProperty("text").GetString()!.StartsWith("AiSloth ran the project's setup in a fresh nook", StringComparison.Ordinal));
+            && seen.Event.GetProperty("text").GetString()!.StartsWith("AiSloth ran the setup in a fresh nook", StringComparison.Ordinal));
         Assert.Equal((2, 0, false), (passed.GetProperty("test").GetInt32(), passed.GetProperty("exitCode").GetInt32(), passed.GetProperty("agentFixes").GetBoolean()));
         Assert.Equal(JsonValueKind.String, passed.GetProperty("again").ValueKind);
         Assert.All(nooks.Items.Where(nook => nook.Id != chat.NookId), nook => Assert.Equal(NookStatus.Deleting, nook.Status));

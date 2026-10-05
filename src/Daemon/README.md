@@ -76,7 +76,7 @@ once at startup; a missing or invalid value prints one line to standard error an
 The daemon lives as long as its nook. `SIGTERM` or `SIGINT`, as when the nook stops, kills its
 processes and deletes their output; a daemon that starts again starts with none. The nook image runs
 it under `tini`, which reaps the orphaned processes that agents leave behind. Its entry point,
-`start-nook.sh`, has the Docker engine for the project's own containers start on first use: Docker's
+`start-nook.sh`, has the Docker engine for the code's own containers start on first use: Docker's
 socket listens from the start, and the first connection starts `dockerd` on it, about 0.4 seconds
 before it answers. A nook that never uses Docker pays nothing for it; `/var/log/dockerd.log` says
 what the engine did.

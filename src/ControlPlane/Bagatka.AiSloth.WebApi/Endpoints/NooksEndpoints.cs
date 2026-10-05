@@ -191,7 +191,7 @@ internal static class NooksEndpoints
     }
 
     /// <summary>
-    /// The nook's setup: the project's <c>.agents/setup</c> and <c>.agents/resume</c> scripts, which run
+    /// The nook's setup: the <c>.agents/setup</c> and <c>.agents/resume</c> scripts in its files, which run
     /// whenever the nook gets its files, and their latest run, whose process's output says what they did.
     /// </summary>
     private static async Task<Results<Ok<NookSetup>, ProblemHttpResult>> GetSetup(

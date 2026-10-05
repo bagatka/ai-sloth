@@ -31,7 +31,7 @@ internal sealed class ChatRunner(
     AgentProcess agent,
     HarnessStates states,
     AgentInstructions instructions,
-    ProjectSetups setups,
+    NookSetups setups,
     ChatsMeter meter,
     ChatsSettings settings,
     ChatSignals signals,
@@ -474,7 +474,7 @@ internal sealed class ChatRunner(
             return;
         }
 
-        bool fixes = result.ExitCode > 0 && test < ProjectSetups.MaxTests;
+        bool fixes = result.ExitCode > 0 && test < NookSetups.MaxTests;
         db.Events.Add(chat.Record(new ChatEventBody(new SetupTested(test, result.ExitCode, result.FromScratch, result.Again, result.Output, fixes)), time));
         chat.SetupTestEnded();
         if (!fixes)
@@ -482,7 +482,7 @@ internal sealed class ChatRunner(
             return;
         }
 
-        Result<Message> fix = Message.Send(chat.Id, asked.SentBy, ProjectSetups.FixRequest(result.Output ?? string.Empty), isProposal: false, proposalId: null, test + 1, time);
+        Result<Message> fix = Message.Send(chat.Id, asked.SentBy, NookSetups.FixRequest(result.Output ?? string.Empty), isProposal: false, proposalId: null, test + 1, time);
         if (fix.Failed)
         {
             throw new InvalidOperationException("Asking chat " + chatId.Value + "'s agent to fix its setup failed: " + fix.Error.Message);

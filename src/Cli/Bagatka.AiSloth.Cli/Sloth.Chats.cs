@@ -286,7 +286,7 @@ internal sealed partial class Sloth
         return 0;
     }
 
-    // Saves the chat's files as a gzipped tar archive: one of its sources, or all of /work, as they
+    // Saves the chat's files as a gzipped tar archive: one of its sources, or all its files, as they
     // are or at a checkpoint.
     private async Task<int> DownloadChatAsync(string id, string[] words, CancellationToken ct)
     {

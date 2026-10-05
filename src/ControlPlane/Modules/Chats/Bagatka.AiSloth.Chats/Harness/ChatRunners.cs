@@ -22,7 +22,7 @@ internal sealed class ChatRunners(
     AgentProcess agent,
     HarnessStates states,
     AgentInstructions instructions,
-    ProjectSetups setups,
+    NookSetups setups,
     ChatsMeter meter,
     ChatsSettings settings,
     ChatSignals signals,

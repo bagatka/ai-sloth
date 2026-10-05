@@ -41,7 +41,7 @@ GitHub Copilot.
 `IChatsApi` in `Bagatka.AiSloth.Chats.Contracts`: members list the harnesses, start chats (each
 creating its nook, on a provider, with a harness and an agent account, and with the workspace's
 repositories or another chat's files, as they are or at one of its checkpoints, and starting its
-agent after the project's setup), prepare a chat's project (the agent writes its setup, and a fresh
+agent after its nook's setup), prepare a chat (the agent writes a setup for its files, and a fresh
 nook tests it), list a workspace's
 chats, send messages (or send a proposal on), stop the agent, watch a chat's events from any
 sequence number, set and read the instructions every agent gets, and list and forget a person's
@@ -110,7 +110,7 @@ concurrency token). Archives are in object storage under
 - **Runners** (`Harness/ChatRunners.cs`, `Harness/ChatRunner.cs`): one per chat with work, started
   by a new chat, a message, or a stop, ending when the chat is idle. At startup, chats that had work
   get their runner back. A runner starts the agent once the nook's setup ended, following the setup
-  run meanwhile, tests a setup the agent prepared (`Harness/ProjectSetups.cs`), delivers messages, answers the
+  run meanwhile, tests a setup the agent prepared (`Harness/NookSetups.cs`), delivers messages, answers the
   agent's requests, and saves each batch of updates with the offset of the agent's output it has
   read, so a restart continues exactly where it stopped. It reaches the agent's process only through
   `Harness/AgentProcess.cs`, which turns the process into lines of text. After each turn it takes
@@ -157,7 +157,7 @@ confirming (0.9 by default). The host also registers the object storage harness 
   anyone's to propose to: messages go through, and their turn fails with the reason.
 - **Events in ACP's own shape.** An agent update is stored and served unchanged, so a new harness
   or update kind needs no code here. The cost: ACP v1's shape is part of the stored data and the API.
-- **Agents start with their chat, after the project's setup.** Creating a chat starts its agent, so
+- **Agents start with their chat, after the nook's setup.** Creating a chat starts its agent, so
   it is ready while people write. It starts once the nook's setup ended (Nooks, "Setup"), which the
   chat tells (`SetupStarted`, `SetupEnded`); messages sent meanwhile wait, and the chat keeps taking
   them. A failed setup shows the end of its output, and the agent starts anyway, told in AiSloth's
@@ -165,7 +165,7 @@ confirming (0.9 by default). The host also registers the object storage harness 
   what they must do. A nook that gets its files again, after its sandbox was lost, runs its setup
   again, and the next agent waits for that run.
 - **Preparing is the agent's work, proven by AiSloth.** Preparing a chat sends the agent AiSloth's
-  request, as a message from the person, to write the project's setup, run it, and commit it. After
+  request, as a message from the person, to write a setup for the chat's files, run it, and commit it. After
   that turn's checkpoint, a fresh nook on the chat's provider, with its harness's image and the
   checkpoint's files, runs the setup from scratch, then again, as a ready copy will; it is deleted
   afterwards, and the next turn waits meanwhile. A failed test goes back to the agent as a message

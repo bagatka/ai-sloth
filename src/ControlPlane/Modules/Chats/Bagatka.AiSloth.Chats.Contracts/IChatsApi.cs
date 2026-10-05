@@ -14,7 +14,7 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// its nook, and acts there without asking.
 /// </summary>
 /// <remarks>
-/// The agent runs as a process in the nook, started with the chat once the project's setup ended,
+/// The agent runs as a process in the nook, started with the chat once the nook's setup ended,
 /// and kept running. Every
 /// event is saved as it arrives, so a chat outlives control-plane restarts and anyone can replay it.
 /// </remarks>
@@ -25,7 +25,7 @@ public interface IChatsApi
 
     /// <summary>
     /// Starts a chat and creates the nook its agent works in, on the provider, carrying the harness;
-    /// the agent runs on the account, and starts now, once the project's setup ended, while people
+    /// the agent runs on the account, and starts now, once the nook's setup ended, while people
     /// write. Other people reach the chat through its nook's access.
     /// </summary>
     /// <returns>
@@ -60,7 +60,7 @@ public interface IChatsApi
     public Task<Result<ChatMessage>> SendAsync(Actor actor, SendMessage command, CancellationToken ct);
 
     /// <summary>
-    /// Asks the agent to prepare the project for fast starts: to write its setup, the
+    /// Asks the agent to prepare the chat for fast starts: to write a setup for its files, the
     /// <c>.agents/setup</c> and <c>.agents/resume</c> scripts that new nooks run before their agent
     /// starts, run them, and commit them. A message from the actor carries AiSloth's instructions.
     /// After its turn, the setup is tested in a fresh nook with only the chat's files; a failure goes

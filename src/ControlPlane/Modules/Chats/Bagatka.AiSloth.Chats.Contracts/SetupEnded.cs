@@ -3,8 +3,8 @@ using System;
 namespace Bagatka.AiSloth.Chats.Contracts;
 
 /// <summary>
-/// The project's setup ended. The agent starts either way; after a failure it knows, and can read
-/// the whole output in <c>/var/log/aisloth/setup.log</c>.
+/// The setup of the chat's nook ended. The agent starts either way; after a failure it knows, and can
+/// read the whole output in the nook.
 /// </summary>
 /// <param name="ExitCode">0 when every script succeeded; otherwise the first failing script's, 124 for one that ran out of time.</param>
 /// <param name="Took">How long it ran.</param>

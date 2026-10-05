@@ -41,7 +41,7 @@ later starts them fast from templates.
 `INooksApi` in `Bagatka.AiSloth.Nooks.Contracts`: people with access and their agents list the
 providers they can use, create (with the workspace's repositories, or from one of another nook's
 checkpoints), list, and delete nooks, start, watch, feed, and stop processes in them, take and
-list checkpoints, see the project's setup and its latest run, run it again, download their files as they are or at a checkpoint, copy files out of and into
+list checkpoints, see their setup and its latest run, run it again, download their files as they are or at a checkpoint, copy files out of and into
 them, and export a source's changes for pushing. `INookDaemonsApi` is the daemon endpoint's side,
 never a public route or a tool.
 
@@ -125,10 +125,11 @@ object storage under `nooks/<nook ID>/checkpoints/<number>/`.
 
 ## Setup
 
-A project prepares its own nooks with scripts that live in its files, as Amp's do: `.agents/setup`
+Code prepares its own nooks with scripts that live in its files, as Amp's do: `.agents/setup`
 installs what it needs, and `.agents/resume` starts its services, such as `docker compose up -d`.
-They live in `/work` or a folder directly in it, so a repository, an upload, or a project an agent
-made all carry theirs, and so do checkpoints and copies. Whenever a nook gets its files, as a new
+They live in `/work` or a folder directly in it, so a repository, an upload, or code an agent wrote
+all carry theirs, and so do checkpoints and copies. People never see where: to them it is the setup
+of a chat's files. Whenever a nook gets its files, as a new
 nook, a copy, or one brought back after its sandbox was lost, the files go in, then every setup runs,
 then every resume: `/work`'s own before each folder's, by name, each in its own folder, with the
 workspace's secrets, 30 minutes for a setup and 5 for a resume. One process runs them all, so people
@@ -200,7 +201,7 @@ before suspension comes with suspension.
   with the creator's GitHub connection, cloned beside its folder and moved into place, with origin
   pointing at GitHub without credentials and git set to commit as the creator. Then `/work/AGENTS.md`
   tells agents each folder is its own repository with its own instructions. A nook from a checkpoint
-  gets the checkpoint's files instead, and git set to commit as its creator. Then the project's
+  gets the checkpoint's files instead, and git set to commit as its creator. Then its
   setup starts (see Setup), and nothing waits for it here: Chats holds its agent until it ended. One
   operation on a nook's files runs at a time per nook, preparation or checkpoint; a failure is
   returned and retried by the next call.

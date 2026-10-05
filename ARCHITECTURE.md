@@ -64,9 +64,9 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
   and out itself, as git bundles, with each person's GitHub connection. Secrets are the exception
   people choose: they exist for
   the agent's tools, and everyone who may write in a nook can use the secrets in it.
-- **Starting is nearly instant.** A project's own setup prepares a nook, and a nook whose setup took
-  a while leaves a ready copy that the next nooks start from and catch up; where the provider keeps
-  memory, the copy's services are already running. Agents start when their chat does, before the
+- **Starting is nearly instant.** The setup that comes with a chat's files prepares its nook, and a
+  nook whose setup took a while leaves a ready copy that the next nooks start from and catch up;
+  where the provider keeps memory, the copy's services are already running. Agents start when their chat does, before the
   first message. The time from Send to the agent's first action is measured and kept low.
 - **Running work never stops for us.** Deploys, restarts, and network blips never stop a process in
   a nook; agents may run for days. Suspension is invisible to callers.
@@ -254,7 +254,7 @@ A capability with one contract, `I<Module>Api`.
 ### Nooks, providers, and the daemon
 
 Built: the Docker provider, the daemon and its image, the Nooks module from creating a nook to
-deleting it, a project's setup, checkpoints and coming back from them, and machines, a workspace's
+deleting it, setups, checkpoints and coming back from them, and machines, a workspace's
 own computers as a provider. Suspension and ready copies are not built yet (`ROADMAP.md` has the
 order). The maps are `src/ControlPlane/Modules/Nooks/README.md`,
 `src/ControlPlane/Modules/Machines/README.md`, `src/Sandboxing/README.md`, and `src/Daemon/README.md`.
@@ -268,7 +268,7 @@ These decisions are fixed:
   same conformance suite. `Bagatka.Sandboxing.Docker` serves local development, CI, single-machine
   deployments, and machines; the official host runs nooks on Azure Container Apps Sandboxes,
   microVMs that keep memory when suspended and in snapshots. Self-hosting stays on any provider.
-- **Every Linux nook runs Docker,** so projects use compose, Testcontainers, and builds as on a
+- **Every Linux nook runs Docker,** so code uses compose, Testcontainers, and builds as on a
   laptop. A provider gives each nook its own kernel or a runtime that makes Docker safe inside a
   container (Sysbox for the Docker provider); nothing grants a nook privileges on its host.
 - **Machines are a provider.** A workspace's own computers are one provider, `machine`, whose places
@@ -473,7 +473,7 @@ this table in the same change.
 | Module | Owns | Asks | Reacts to | Schema |
 |---|---|---|---|---|
 | Workspaces (contract only) | Workspaces, and who may do what with them and their nooks: access levels, invites | — | — | `workspaces` |
-| Nooks | Nooks, where each runs, their lifecycle and recovery, processes, their copies of sources, running the project's setup, checkpoints, ready copies (planned), daemon connections | Workspaces, Sources, Machines, Secrets | — | `nooks` |
+| Nooks | Nooks, where each runs, their lifecycle and recovery, processes, their copies of sources, running setups, checkpoints, ready copies (planned), daemon connections | Workspaces, Sources, Machines, Secrets | — | `nooks` |
 | Secrets | Workspaces' environment variables for every process in their nooks, their sealed values | Workspaces | — | `secrets` |
 | Sources | GitHub repositories a workspace connected, people's GitHub connections and git settings, copying in and pushing out, push policy; folders (planned) | Workspaces | — | `sources` |
 | AgentAccounts | Accounts at agent vendors that pay for agents: a workspace's and people's own, their sealed secrets | Workspaces | — | `agent_accounts` |

@@ -10,9 +10,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Bagatka.AiSloth.Chats.Harness;
 
-// A project's setup as chats work with it (Nooks runs it): following a run to its end, testing the
-// setup in a fresh nook, and what an agent is asked to prepare it and to fix it.
-internal sealed class ProjectSetups(IServiceScopeFactory scopes, TimeProvider time, ILogger<ProjectSetups> logger)
+// A nook's setup as chats work with it (Nooks runs it): following a run to its end, testing the
+// setup in a fresh nook, and what an agent is asked to write it and to fix it. What people see in a
+// chat never names where files are in a nook.
+internal sealed class NookSetups(IServiceScopeFactory scopes, TimeProvider time, ILogger<NookSetups> logger)
 {
     // How much of a failed setup's output a chat shows: its end, where the failure is.
     public const int MaxOutput = 2000;
@@ -23,25 +24,25 @@ internal sealed class ProjectSetups(IServiceScopeFactory scopes, TimeProvider ti
     // How long a fresh nook may take to start, such as while its machine pulls the image.
     private static readonly TimeSpan StartPatience = TimeSpan.FromMinutes(10);
 
-    // What the agent is asked when someone prepares a chat's project.
+    // What the agent is asked when someone prepares a chat: people see it as their message.
     public const string PrepareRequest = """
-        Prepare this project so that new nooks start fast, with everything it needs installed and running.
+        Write a setup for the code in your working directory, so that new nooks start fast, with everything it needs installed and running.
 
-        Write a `.agents/setup` and a `.agents/resume` script, executable and starting with `#!/bin/sh` or `#!/bin/bash`, in each project folder directly in /work, or in /work itself for a project there:
+        A setup is a `.agents/setup` and a `.agents/resume` script, executable and starting with `#!/bin/sh` or `#!/bin/bash`, at the top of your working directory, or at the top of each repository in it:
 
-        - `.agents/setup` installs everything the project needs to build, test, and run: system packages, language runtimes and tools at the versions the project pins, and its dependencies. AiSloth runs it as root in the project's folder, with the workspace's secrets, whenever a nook gets the project's files, before its agent starts, and gives it 30 minutes.
-        - `.agents/resume` starts the services the project needs, such as databases with `docker compose up -d`, and returns once they are up. It runs after every setup, and gets 5 minutes.
+        - `.agents/setup` installs everything the code needs to build, test, and run: system packages, language runtimes and tools at the versions the code pins, and its dependencies. AiSloth runs it as root in its folder, with the workspace's secrets, whenever a nook gets these files, before its agent starts, and gives it 30 minutes.
+        - `.agents/resume` starts the services the code needs, such as databases with `docker compose up -d`, and returns once they are up. It runs after every setup, and gets 5 minutes.
         - Both must be safe to run again, and fast the second time: skip what is already installed, and install dependencies again only when their lockfiles changed.
         - A fresh nook is Ubuntu with Docker, git, and curl. Don't rely on anything installed by hand in this nook.
         - Never print or store secrets.
 
-        Run both scripts to check them, then commit them. AiSloth then tests them in a fresh nook with only the project's files, and tells you if they fail.
+        Run both scripts to check them, then commit them. AiSloth then tests them in a fresh nook with only these files, and tells you if they fail.
         """;
 
-    // What the agent is asked after a test failed: the failure, to fix.
+    // What the agent is asked after a test failed: the failure, to fix. People see it as a message.
     public static string FixRequest(string output)
     {
-        return "AiSloth ran the project's setup in a fresh nook, with only the project's files, and it failed:\n\n```\n" + output + "\n```\n\n"
+        return "AiSloth ran the setup in a fresh nook, with only this chat's files, and it failed:\n\n```\n" + output + "\n```\n\n"
             + "Fix `.agents/setup` and `.agents/resume` so they work from scratch and when run again, run them, and commit them. AiSloth tests them again after this.";
     }
 
@@ -114,7 +115,7 @@ internal sealed class ProjectSetups(IServiceScopeFactory scopes, TimeProvider ti
 
         if (first.Output.Run is not SetupRun firstRun)
         {
-            return SetupTestResult.CouldNotRun("The project has no .agents/setup or .agents/resume scripts, in /work or a folder directly in it.");
+            return SetupTestResult.CouldNotRun("The chat's files have no setup: no .agents/setup or .agents/resume scripts at their top or at the top of a repository in them.");
         }
 
         (SetupEnd firstEnd, TimeSpan fromScratch) = await EndOfAsync(nooks, person, nookId, firstRun, ct);

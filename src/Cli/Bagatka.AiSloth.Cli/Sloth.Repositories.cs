@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Bagatka.AiSloth.Cli;
 
-// A workspace's repositories: what its chats' nooks start with, each at /work/<name>.
+// A workspace's repositories: what its chats' nooks start with, each in a folder named after it.
 internal sealed partial class Sloth
 {
     private async Task<int> ListRepositoriesAsync(CancellationToken ct)

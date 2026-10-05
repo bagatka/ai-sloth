@@ -9,8 +9,8 @@ after it adds entries to existing lists (a provider, an account kind, a harness)
 concepts. Providers for now: local Docker, people's own machines, and Azure Container Apps
 Sandboxes for the official host.
 
-1. **Projects without a repository.** Publish a chat's project as a new GitHub repository, and start
-   a chat from an uploaded folder or archive.
+1. **New repositories and uploads.** Publish a chat's files as a new GitHub repository, and start a
+   chat from an uploaded folder or archive.
 2. **Azure provider and suspension.** Hosted nooks on Azure Container Apps Sandboxes, microVMs with
    memory snapshots; idle nooks suspend on every provider and resume without anyone noticing.
 3. **Fast start: ready copies.** A nook whose setup took a while leaves a copy of itself right after

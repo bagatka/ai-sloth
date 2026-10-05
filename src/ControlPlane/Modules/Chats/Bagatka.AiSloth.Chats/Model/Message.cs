@@ -42,7 +42,7 @@ internal sealed class Message
     // The proposal this message sends on, if any.
     public MessageId? ProposalId { get; private set; }
 
-    // Which test of the project's setup its turn's end calls for: 1 for a request to prepare it, the
+    // Which test of the nook's setup its turn's end calls for: 1 for a request to prepare it, the
     // next one for a fix after a failed test; none for other messages.
     public int? SetupTest { get; private set; }
 

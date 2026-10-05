@@ -55,7 +55,7 @@ internal sealed class Chat
 
     public int? SetupExitCode { get; private set; }
 
-    // The message whose turn calls for testing the project's setup in a fresh nook afterwards, until
+    // The message whose turn calls for testing the nook's setup in a fresh nook afterwards, until
     // the test ended; the next turn waits for it.
     public MessageId? SetupTestAfter { get; private set; }
 

@@ -10,8 +10,8 @@ using System.Threading.Tasks;
 
 namespace Bagatka.AiSloth.Cli;
 
-// A chat's project setup: its .agents/setup and .agents/resume scripts, which run whenever its nook
-// gets the project's files, before the agent starts; and preparing it.
+// The setup of a chat's files: their .agents/setup and .agents/resume scripts, which run whenever its
+// nook gets the files, before the agent starts; and preparing it.
 internal sealed partial class Sloth
 {
     // Prints the latest setup run's output from its start, following it while it runs; fails when
@@ -35,7 +35,7 @@ internal sealed partial class Sloth
         Wire.NookSetup setup = await api.GetAsync("/nooks/" + chat.NookId + "/setup", CliJsonContext.Default.NookSetup, ct);
         if (setup.Run is null)
         {
-            await terminal.WriteLineAsync("The project has no setup: .agents/setup and .agents/resume scripts, in /work or a folder directly in it.");
+            await terminal.WriteLineAsync("The chat's files have no setup: .agents/setup and .agents/resume scripts at their top, or at the top of a repository in them. Have the agent write one: sloth chat prepare " + ShortId(chat.Id));
             return 0;
         }
 
@@ -61,7 +61,7 @@ internal sealed partial class Sloth
         return 1;
     }
 
-    // Asks the agent to prepare the project, then follows the chat until the setup's last test ended,
+    // Asks the agent to prepare the chat, then follows the chat until the setup's last test ended,
     // without taking input: the setup is the point. Ctrl+C leaves it working.
     private async Task<int> PrepareChatAsync(string id, bool anyway, CancellationToken ct)
     {
@@ -81,7 +81,7 @@ internal sealed partial class Sloth
 
         Wire.SentMessage sent = await api.SendAsync(
             HttpMethod.Post, "/chats/" + chat.Id + "/prepare", new Wire.Prepare(anyway), CliJsonContext.Default.Prepare, CliJsonContext.Default.SentMessage, ct);
-        await terminal.WriteLineAsync("Asked the agent to prepare the project for fast starts. Ctrl+C leaves it working.");
+        await terminal.WriteLineAsync("Asked the agent to write a setup for this chat's files, so new nooks start with everything installed. Ctrl+C leaves it working.");
         ChatPrinter printer = new ChatPrinter(terminal, api, host.UserId, chat.Id, suggestPrepare: false);
         int tested;
         try

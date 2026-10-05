@@ -68,8 +68,8 @@ internal sealed partial class Sloth(
           sloth chat "<message>" [--harness <id>] [--account <name>] [--on <provider>]
                      [--repo <name>[@<branch>]]... [--from <chat>[@<checkpoint>]]
                                      Start a chat in a nook of its own, and follow it: with the
-                                     workspace's repositories at /work/<name>, or a copy of a chat's
-                                     files, as they are or at one of its checkpoints
+                                     workspace's repositories, or a copy of a chat's files, as
+                                     they are or at one of its checkpoints
           sloth chat list
           sloth chat open <id>       Follow a chat; type to write to the agent, /stop to stop it
           sloth chat send <id> "<message>" [--anyway]
@@ -79,11 +79,11 @@ internal sealed partial class Sloth(
                                      Push the chat's changes to GitHub, with a pull request each
           sloth chat checkpoints <id>
                                      The chat's files saved after each turn, newest first
-          sloth chat setup <id>      What the project's .agents/setup and .agents/resume printed
-                                     when they last ran, following them while they run
+          sloth chat setup <id>      What the setup of the chat's files printed when it last ran,
+                                     following it while it runs
           sloth chat prepare <id> [--anyway]
-                                     Have the agent write the project's setup, so new nooks start
-                                     with everything installed, and test it in a fresh nook
+                                     Have the agent write a setup for the chat's files, so new nooks
+                                     start with everything installed, and test it in a fresh nook
           sloth chat download <id> [--source <name>] [--checkpoint <n>] [--out <file>]
                                      Save the chat's files as a .tar.gz, now or at a checkpoint
           sloth instructions         What every agent of your chats is told, whatever its harness

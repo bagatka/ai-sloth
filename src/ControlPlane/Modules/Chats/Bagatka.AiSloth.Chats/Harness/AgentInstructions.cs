@@ -18,7 +18,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Bagatka.AiSloth.Chats.Harness;
 
 // The instructions every agent gets, whatever its harness: AiSloth's about its nook, with how the
-// project's setup ended when it failed, then its workspace's, then those of the person who started
+// nook's setup ended when it failed, then its workspace's, then those of the person who started
 // its chat. They are written, before the agent starts, to the file its harness reads its user's own
 // instructions from (HarnessProfile.InstructionsPath), outside /work, so they never meet a
 // repository's files and every session of the harness reads them.
@@ -49,20 +49,20 @@ internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databa
         return await scope.ServiceProvider.GetRequiredService<INooksApi>().CopyFilesInAsync(SystemActors.Harness, new CopyFilesIn(chat.NookId, Replacing: []), archive, ct);
     }
 
-    // What every agent knows about its nook: what it has, how the project's setup works, and how the
-    // setup ended when it failed.
+    // What every agent knows about its nook: what it has, how setups work, and how the nook's setup
+    // ended when it failed.
     private static string Nook(int? setupExitCode)
     {
-        string nook = "## Your nook\n\nYou work in a nook: a Linux machine of your own, with Docker. The project is in /work. "
-            + "Its `.agents/setup` scripts, in /work or a folder directly in it, install what it needs, and its `.agents/resume` "
-            + "scripts start its services; AiSloth runs them whenever a nook gets the project's files, before its agent starts. "
-            + "When you add a tool, a dependency, or a service the project needs, update them, and keep them safe to run again.";
+        string nook = "## Your nook\n\nYou work in a nook: a Linux machine of your own, with Docker. The code you work on is in /work. "
+            + "Its setup, `.agents/setup` scripts at the top of /work or of a repository in it, installs what it needs, and its `.agents/resume` "
+            + "scripts start its services; AiSloth runs them whenever a nook gets these files, before its agent starts. "
+            + "When you add a tool, a dependency, or a service the code needs, update them, and keep them safe to run again.";
         if (setupExitCode is not int exitCode || exitCode == 0)
         {
             return nook;
         }
 
-        return nook + string.Create(CultureInfo.InvariantCulture, $"\n\nBefore you started, the project's setup failed with exit code {exitCode}; ")
+        return nook + string.Create(CultureInfo.InvariantCulture, $"\n\nBefore you started, the setup failed with exit code {exitCode}; ")
             + "its output is in /var/log/aisloth/setup.log. Fix the cause where you can, in the scripts too. "
             + "When people must do something, such as add a secret with `sloth secret set <NAME>`, tell them.";
     }

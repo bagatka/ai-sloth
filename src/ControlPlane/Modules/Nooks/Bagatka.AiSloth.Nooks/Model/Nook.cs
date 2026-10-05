@@ -65,7 +65,7 @@ internal sealed class Nook
     // Nothing else runs in it before.
     public bool SourcesReady { get; private set; }
 
-    // The project's setup scripts found when its files arrived, relative to /work, and the process
+    // The setup scripts found when its files arrived, relative to /work, and the process
     // that runs them; none when it has no scripts.
     public List<string> SetupScripts { get; private set; } = [];
 

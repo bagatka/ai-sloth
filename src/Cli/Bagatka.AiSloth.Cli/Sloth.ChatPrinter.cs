@@ -10,9 +10,9 @@ namespace Bagatka.AiSloth.Cli;
 
 internal sealed partial class Sloth
 {
-    // Shows a chat's events as text as they arrive: people's messages, the project's setup and its
-    // tests, what the agent says and does, and how each turn ends. A chat whose project came with it
-    // and has no setup suggests preparing it, once, after its first turn. Between events it keeps whether a line is open, the agent's tool calls,
+    // Shows a chat's events as text as they arrive: people's messages, the setup of its nook and its
+    // tests, what the agent says and does, and how each turn ends. A chat that started with files
+    // without a setup suggests preparing it, once, after its first turn. Between events it keeps whether a line is open, the agent's tool calls,
     // people's names, and the messages typed here, which the terminal already shows. Agent updates
     // without a line here (thoughts, plans, the agent's commands and modes) aren't shown.
     private sealed class ChatPrinter(Terminal output, HostApi api, Guid me, Guid chat, bool suggestPrepare)
@@ -85,7 +85,7 @@ internal sealed partial class Sloth
             }
         }
 
-        // The project's setup: when it starts and ends, and the tests of one the agent prepared.
+        // The nook's setup: when it starts and ends, and the tests of one the agent wrote.
         private async Task PrintSetupAsync(string type, JsonElement body)
         {
             switch (type)
@@ -159,7 +159,7 @@ internal sealed partial class Sloth
             }
         }
 
-        // Once, after a turn, for a chat whose project has no setup.
+        // Once, after a turn, for a chat whose files have no setup.
         private async Task SuggestPrepareAsync()
         {
             if (!suggestPrepare || _setUp)
@@ -167,7 +167,7 @@ internal sealed partial class Sloth
                 return;
             }
 
-            await LineAsync("Tip: this project has no setup, so every new nook installs what it needs from scratch. Prepare it once: sloth chat prepare " + ShortId(chat));
+            await LineAsync("Tip: this chat's files have no setup, so every new nook installs what they need from scratch. Have the agent write one: sloth chat prepare " + ShortId(chat));
             _setUp = true;
         }
 

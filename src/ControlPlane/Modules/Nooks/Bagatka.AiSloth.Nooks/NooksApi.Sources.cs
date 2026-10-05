@@ -57,7 +57,7 @@ internal sealed partial class NooksApi
 
     // Puts the nook's sources in place before anything else runs in it: its repositories, copied in
     // with its creator's GitHub connection, with the guide that tells agents where they are; or a
-    // checkpoint's files. Then starts the project's setup. Done once, by whichever call comes first
+    // checkpoint's files. Then starts its setup. Done once, by whichever call comes first
     // while the others wait; a failure is returned, and the next call tries again.
     private async Task<Result> PrepareSourcesAsync(Nook nook, DaemonConnection connection, CancellationToken ct)
     {
