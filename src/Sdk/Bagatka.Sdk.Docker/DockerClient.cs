@@ -115,6 +115,20 @@ public sealed class DockerClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Stops a container: its entry point gets SIGTERM, and SIGKILL after <paramref name="grace"/>.
+    /// Stopping a stopped container does nothing.
+    /// </summary>
+    public async Task StopContainerAsync(string nameOrId, TimeSpan grace, CancellationToken ct)
+    {
+        string seconds = ((int)grace.TotalSeconds).ToString(CultureInfo.InvariantCulture);
+        using HttpResponseMessage response = await _http.PostAsync(Path("containers/", nameOrId, "/stop?t=" + seconds), content: null, ct).ConfigureAwait(false);
+        if (response.StatusCode != HttpStatusCode.NotModified)
+        {
+            await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Freezes a running container's processes, keeping their memory.</summary>
     public async Task PauseContainerAsync(string nameOrId, CancellationToken ct)
     {

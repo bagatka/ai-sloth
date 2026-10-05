@@ -46,6 +46,11 @@ internal sealed class ChatRunner(
 
     private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(5);
 
+    // A chat with work keeps its nook awake this long, renewing it this often, whatever the nook's own
+    // sleep period: its agent may think for minutes without a word.
+    private static readonly TimeSpan KeepAwakeFor = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan KeepAwakeEvery = TimeSpan.FromSeconds(10);
+
     private readonly Channel<RunnerInput> _inputs = Channel.CreateBounded<RunnerInput>(
         new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
 
@@ -56,6 +61,9 @@ internal sealed class ChatRunner(
 
     // When the message of the running turn was sent, until its agent first did something for it.
     private DateTimeOffset? _firstActionDue;
+
+    // When this runner last kept the chat's nook awake.
+    private DateTimeOffset _keptAwakeAt = DateTimeOffset.MinValue;
 
     public ChatId ChatId => chatId;
 
@@ -79,8 +87,9 @@ internal sealed class ChatRunner(
     // retried, reading the agent's output again from the last saved offset.
     public async Task RunAsync(Func<ChatRunner, bool> retire, CancellationToken ct)
     {
-        // What the chat waits for in the background is done only while the runner runs.
-        await using Waits waits = new Waits();
+        // What the chat waits for in the background is done only while the runner runs, and so is the
+        // tick that has it keep its nook awake while it has work.
+        await using Waits waits = new Waits(Wake, KeepAwakeEvery, time, ct);
         while (true)
         {
             bool retired = await RunOnceAsync(retire, waits, ct);
@@ -227,7 +236,30 @@ internal sealed class ChatRunner(
         await SendAsync(chat, outgoing, ct);
         bool idle = chat.TurnMessageId is null && !waiting.Any(message => message.Waiting) && !chat.StartsAgent
             && chat.SetupTestAfter is null && (chat.HarnessProcessId is null || chat.SessionId is not null);
+        if (!idle)
+        {
+            await KeepAwakeAsync(chat, ct);
+        }
+
         return new Progress(chat.NookId, chat.HarnessProcessId, chat.OutputOffset, idle);
+    }
+
+    // A chat with work keeps its nook from falling asleep, and wakes it when it sleeps. A nook that can't
+    // be woken now is woken by the next operation, which the chat's work makes anyway.
+    private async Task KeepAwakeAsync(Chat chat, CancellationToken ct)
+    {
+        DateTimeOffset now = time.GetUtcNow();
+        if (now - _keptAwakeAt < KeepAwakeEvery)
+        {
+            return;
+        }
+
+        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
+        Result kept = await scope.ServiceProvider.GetRequiredService<INooksApi>().WakeAsync(SystemActors.Harness, new WakeNook(chat.NookId, KeepAwakeFor), ct);
+        if (!kept.Failed)
+        {
+            _keptAwakeAt = now;
+        }
     }
 
     // Everyone in the chat sees a new message: one for the agent queues for it, and a proposal stays
@@ -786,9 +818,19 @@ internal sealed class ChatRunner(
     private sealed record Progress(NookId NookId, ProcessId? Harness, long OutputOffset, bool Idle);
 
     // What a runner waits for in the background, stopped when it stops: following the setup run its
-    // agent waits for, and testing a setup the agent prepared in a fresh nook.
+    // agent waits for, testing a setup the agent prepared in a fresh nook, and a regular tick that has
+    // the runner look at its chat again.
     private sealed class Waits : IAsyncDisposable
     {
+        private readonly CancellationTokenSource _stop;
+        private readonly Task _ticking;
+
+        public Waits(Action tick, TimeSpan every, TimeProvider time, CancellationToken ct)
+        {
+            _stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            _ticking = TickAsync(tick, every, time, _stop.Token);
+        }
+
         public Background<SetupEnd> SetupRun { get; } = new Background<SetupEnd>();
 
         public Background<SetupTestResult> SetupTest { get; } = new Background<SetupTestResult>();
@@ -797,6 +839,25 @@ internal sealed class ChatRunner(
         {
             await SetupRun.StopAsync();
             await SetupTest.StopAsync();
+            await _stop.CancelAsync();
+            await _ticking;
+            _stop.Dispose();
+        }
+
+        private static async Task TickAsync(Action tick, TimeSpan every, TimeProvider time, CancellationToken ct)
+        {
+            using PeriodicTimer timer = new PeriodicTimer(every, time);
+            try
+            {
+                while (await timer.WaitForNextTickAsync(ct))
+                {
+                    tick();
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // The runner stopped.
+            }
         }
     }
 

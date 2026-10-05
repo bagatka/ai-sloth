@@ -55,7 +55,9 @@ internal static class Wire
 
     internal sealed record Chat(Guid Id, Guid NookId, Guid StartedBy, DateTimeOffset StartedAt, bool Working, string Harness, Guid Account);
 
-    internal sealed record Nook(Guid Id, IReadOnlyList<NookSource> Sources);
+    internal sealed record Nook(Guid Id, string Status, IReadOnlyList<NookSource> Sources);
+
+    internal sealed record NookPage(IReadOnlyList<Nook> Items, string? NextCursor);
 
     internal sealed record NookSource(string Name, string? Branch, string? Commit);
 

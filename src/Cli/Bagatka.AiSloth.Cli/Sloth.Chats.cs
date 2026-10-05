@@ -155,11 +155,14 @@ internal sealed partial class Sloth
         }
 
         IReadOnlyList<Wire.Person> people = await api.GetAsync(PeoplePath(chats.Items.Select(chat => chat.StartedBy)), CliJsonContext.Default.IReadOnlyListPerson, ct);
+        Wire.NookPage nooks = await api.GetAsync("/workspaces/" + workspace + "/nooks?limit=200", CliJsonContext.Default.NookPage, ct);
         foreach (Wire.Chat chat in chats.Items)
         {
             string startedBy = chat.StartedBy == host.UserId ? "you" : people.FirstOrDefault(person => person.Id == chat.StartedBy)?.Name ?? "someone";
+            string? nookStatus = nooks.Items.FirstOrDefault(nook => nook.Id == chat.NookId)?.Status;
+            string state = chat.Working ? "working" : nookStatus is "Sleeping" or "Paused" or "Stopped" or "Evicted" ? "asleep " : "idle   ";
             await terminal.WriteLineAsync(
-                ShortId(chat.Id) + "  " + chat.Harness.PadRight(12) + "  " + (chat.Working ? "working" : "idle   ") + "  started " + Ago(chat.StartedAt) + " by " + startedBy);
+                ShortId(chat.Id) + "  " + chat.Harness.PadRight(12) + "  " + state + "  started " + Ago(chat.StartedAt) + " by " + startedBy);
         }
 
         return 0;
@@ -179,6 +182,17 @@ internal sealed partial class Sloth
         if (chat is null)
         {
             return 1;
+        }
+
+        // Opening a chat wakes its nook, so it's ready by the time a message is typed; the message would
+        // wake it anyway, so someone who may only read goes on without.
+        try
+        {
+            await api.CallAsync(HttpMethod.Post, "/nooks/" + chat.NookId + "/wake", ct);
+        }
+        catch (HttpRequestException)
+        {
+            // Read access only, or its provider can't be asked right now.
         }
 
         await terminal.WriteLineAsync("Chat " + ShortId(chat.Id) + " · " + chat.Harness + (chat.Working ? " · working" : string.Empty));

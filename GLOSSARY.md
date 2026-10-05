@@ -85,8 +85,10 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Sign-in | Proving who you are in a browser or with a code: to a host, which starts a session (Users), or at a plan's vendor, which adds the plan, finished with the address the browser returns to (AgentAccounts) | Users, AgentAccounts | OAuth flow, login, connect |
 | Account kind | What an agent account is at its vendor, named so vendors can't be confused: `chatgpt-plan`, `claude-plan`, `copilot-plan`, `openai-api-key`, `anthropic-api-key` | AgentAccounts | provider, type |
 | Proposal | A message in a chat from someone who may not use its account; it never reaches the agent until the account's owner sends it on, as is or edited | Chats | suggestion, draft |
-| Paused | A nook whose compute is released with memory and files kept; it resumes in about a second and processes continue | Nooks | hibernated, sleeping, hot |
-| Stopped | A nook whose compute is released with files kept; it resumes in seconds and processes start again | Nooks | archived, cold, shut down |
+| Sleep | A nook releasing its compute when nobody used it for its sleep period, two minutes by default: Sleeping while its provider does, then Paused or Stopped, and Evicted after a long sleep; any use wakes it. People see all of these as asleep | Nooks | suspend (in the product), hibernate, idle shutdown |
+| Paused | A sleeping nook whose compute is released with memory and files kept; it resumes in about a second and processes continue | Nooks | hibernated, hot |
+| Stopped | A sleeping nook whose compute is released with files kept; it resumes in seconds and processes start again | Nooks | archived, cold, shut down |
+| Evicted | A nook asleep so long, a day by default, that its sandbox was deleted; its files are in its latest checkpoint, and it starts again from there when used | Nooks | shelved, archived, deleted |
 | Process | A program the daemon runs in a nook until it exits or is stopped, independent of the control plane. Agents, setup scripts, and one-off commands are all processes. | Nooks | job, task, command |
 | Watch | Streaming a process's output from an offset, first what was kept and then live; any number per process | Nooks | subscription, tail |
 | Preview | A web server running in a nook, opened in a browser through the control plane | Nooks (planned) | port forward, tunnel |

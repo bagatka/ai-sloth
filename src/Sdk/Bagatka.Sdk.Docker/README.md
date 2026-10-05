@@ -5,7 +5,7 @@ needs only a dozen endpoints.
 
 - **API:** [Docker Engine API v1.47](https://docs.docker.com/reference/api/engine/version/v1.47/),
   pinned in every request path. Docker 27 and later serve it.
-- **Endpoints:** containers (create, inspect, list, start, pause, unpause, remove), images (pull,
+- **Endpoints:** containers (create, inspect, list, start, stop, pause, unpause, remove), images (pull,
   inspect, list, remove), commit, and the engine's runtimes (from `/info`).
 - **Transport and authentication:** the engine's Unix socket; access to the socket is the only
   authentication. Other transports are rejected by `DockerClientSettings`; on Windows, run inside

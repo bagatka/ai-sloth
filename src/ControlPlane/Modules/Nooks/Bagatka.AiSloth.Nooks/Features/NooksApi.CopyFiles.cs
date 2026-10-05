@@ -49,7 +49,7 @@ internal sealed partial class NooksApi
             return new Result(Error.Validation("paths", "At most 10 absolute paths, without . or .. parts."));
         }
 
-        DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
+        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
         if (connection is null)
         {
             return new Result(NooksErrors.NotReady);
@@ -74,7 +74,7 @@ internal sealed partial class NooksApi
             return new Result(Error.Validation("replacing", "At most 10 absolute paths, without . or .. parts."));
         }
 
-        DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
+        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
         if (connection is null)
         {
             return new Result(NooksErrors.NotReady);

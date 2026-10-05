@@ -27,6 +27,9 @@ public static class NooksModule
         services.AddSingleton<FileLocks>();
         services.AddSingleton<NookReconciler>();
         services.AddHostedService(provider => provider.GetRequiredService<NookReconciler>());
+        services.AddSingleton<NookActivity>();
+        services.AddSingleton<NookSleeper>();
+        services.AddHostedService(provider => provider.GetRequiredService<NookSleeper>());
         services.AddScoped<NooksApi>();
         services.AddScoped<INooksApi>(provider => provider.GetRequiredService<NooksApi>());
         services.AddScoped<INookDaemonsApi>(provider => provider.GetRequiredService<NooksApi>());

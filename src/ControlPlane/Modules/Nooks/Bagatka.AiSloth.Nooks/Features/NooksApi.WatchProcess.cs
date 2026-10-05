@@ -21,7 +21,7 @@ internal sealed partial class NooksApi
             return new Result<IAsyncEnumerable<ProcessEvent>>(found.Error);
         }
 
-        DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
+        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
         if (connection is null)
         {
             return new Result<IAsyncEnumerable<ProcessEvent>>(NooksErrors.NotReady);

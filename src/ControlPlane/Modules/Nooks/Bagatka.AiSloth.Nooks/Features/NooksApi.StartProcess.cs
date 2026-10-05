@@ -42,7 +42,7 @@ internal sealed partial class NooksApi
             environment[variable.Key] = variable.Value;
         }
 
-        DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
+        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
         if (connection is null)
         {
             return new Result<ProcessSummary>(NooksErrors.NotReady);

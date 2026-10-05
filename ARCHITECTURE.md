@@ -255,15 +255,16 @@ A capability with one contract, `I<Module>Api`.
 
 Built: the Docker provider, the daemon and its image, the Nooks module from creating a nook to
 deleting it, setups, checkpoints and coming back from them, and machines, a workspace's
-own computers as a provider. Suspension and ready copies are not built yet (`ROADMAP.md` has the
-order). The maps are `src/ControlPlane/Modules/Nooks/README.md`,
+own computers as a provider, and nooks that sleep when nobody uses them. Ready copies are not built
+yet (`ROADMAP.md` has the order). The maps are `src/ControlPlane/Modules/Nooks/README.md`,
 `src/ControlPlane/Modules/Machines/README.md`, `src/Sandboxing/README.md`, and `src/Daemon/README.md`.
 These decisions are fixed:
 
-- **Lifecycle.** A nook is Running, Paused (memory and files kept: it resumes in about a second and
-  processes continue), or Stopped (files kept: it resumes in seconds and processes start again).
-  Files survive until deletion on every provider; memory is kept where the backend can. Any
-  operation resumes a suspended nook first, so callers only notice latency.
+- **Lifecycle.** A nook nobody uses falls asleep after two minutes: Paused (memory and files kept:
+  it resumes in about a second and processes continue) where the backend can, otherwise Stopped
+  (files kept: it resumes in seconds and processes start again). After a day asleep its sandbox is
+  evicted, and it comes back from its latest checkpoint. Files survive until deletion; any operation
+  wakes a sleeping nook first, so callers only notice latency, and people see it only as asleep.
 - **Providers do lifecycle only.** Every operation is safe to repeat, and every provider passes the
   same conformance suite. `Bagatka.Sandboxing.Docker` serves local development, CI, single-machine
   deployments, and machines; the official host runs nooks on Azure Container Apps Sandboxes,

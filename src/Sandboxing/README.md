@@ -53,7 +53,7 @@ flight, as an unreachable backend would.
 
 | Provider | Status | Suspends to | Notes |
 |---|---|---|---|
-| Docker | Built | `Paused` (`docker pause`) | Local development, CI, single-machine deployments, and machines. Runs sandboxes under Sysbox (`sysbox-runc`), which the engine must have; creating fails with `sandboxing.sysbox_missing` otherwise. Snapshots are committed images, with the sandbox's environment values kept out. Sandboxes can reach the host as `host.docker.internal`. |
+| Docker | Built | `Stopped` (`docker stop`) | Local development, CI, single-machine deployments, and machines. Stopping frees a sandbox's memory, which matters on people's machines; a container whose entry point exited cleanly, as it does when asked to stop, is `Stopped`, and any other end is `Failed`. Runs sandboxes under Sysbox (`sysbox-runc`), which the engine must have; creating fails with `sandboxing.sysbox_missing` otherwise. Snapshots are committed images, with the sandbox's environment values kept out. Sandboxes can reach the host as `host.docker.internal`. |
 | Azure Container Apps Sandboxes | Planned | `Paused` | The official host. MicroVMs with Docker inside; memory snapshots restore in under a second once warm |
 | macOS virtual machines | After a spike | To be measured | On people's Macs only, through machines (`src/ControlPlane/Modules/Machines`), for iOS and macOS work; Apple's Virtualization.framework through Tart |
 

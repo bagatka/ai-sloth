@@ -60,6 +60,13 @@ IResourceBuilder<ParameterResource> objectStorage = builder.AddParameter(
 IResourceBuilder<ParameterResource> nearlyFullDisk = builder.AddParameter(
     "nearly-full-disk", builder.Configuration["Parameters:nearly-full-disk"] ?? "0.9");
 
+// How long a nook nobody uses stays awake, and how long it sleeps before its sandbox is deleted and
+// it would come back from its latest checkpoint. Tests give short ones.
+IResourceBuilder<ParameterResource> nookSleepAfter = builder.AddParameter(
+    "nook-sleep-after", builder.Configuration["Parameters:nook-sleep-after"] ?? "00:02:00");
+IResourceBuilder<ParameterResource> nookEvictAfter = builder.AddParameter(
+    "nook-evict-after", builder.Configuration["Parameters:nook-evict-after"] ?? "1.00:00:00");
+
 // The Docker scope nooks run in, so test runs never touch a developer's nooks. A parameter given a
 // value can't be overridden, so the default is applied here.
 IResourceBuilder<ParameterResource> sandboxScope = builder.AddParameter("sandbox-scope", builder.Configuration["Parameters:sandbox-scope"] ?? "dev");
@@ -160,6 +167,8 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         })
         .WithEnvironment("Modules__Nooks__CpuMillicores", "2000")
         .WithEnvironment("Modules__Nooks__MemoryMebibytes", "4096")
+        .WithEnvironment("Modules__Nooks__SleepAfter", nookSleepAfter)
+        .WithEnvironment("Modules__Nooks__EvictAfter", nookEvictAfter)
         .WithEnvironment("Sandboxing__Docker__Endpoint", dockerHost)
         .WithEnvironment("Sandboxing__Docker__Scope", sandboxScope);
 }

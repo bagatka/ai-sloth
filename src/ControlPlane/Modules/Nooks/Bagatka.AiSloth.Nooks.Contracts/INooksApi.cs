@@ -14,10 +14,12 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// access a nook is not found; with too little, forbidden.
 /// </summary>
 /// <remarks>
-/// Suspension is invisible to callers: an operation on a paused or stopped nook resumes it first, so
-/// callers only notice latency. A nook's files survive until it is deleted, except when its machine
-/// is lost: then it starts again from its latest checkpoint, and processes that ran there end with
-/// exit code -1.
+/// A nook nobody uses falls asleep after a while (<see cref="NookStatus"/>), which is invisible to
+/// callers: any operation wakes it first, so callers only notice latency. Processes keep running
+/// through a sleep where its provider keeps memory, and otherwise end with exit code -1. A nook's
+/// files survive until it is deleted, except when its machine is lost or it sleeps long enough to
+/// be evicted: then it starts again from its latest checkpoint, and processes that ran there end
+/// with exit code -1.
 /// </remarks>
 public interface INooksApi
 {
@@ -83,6 +85,15 @@ public interface INooksApi
     /// </summary>
     /// <returns>The setup with the new run; <see cref="NooksErrors.SetupRunning"/>; <see cref="NooksErrors.NotReady"/>; or not found or forbidden.</returns>
     public Task<Result<NookSetup>> RunSetupAsync(Actor actor, NookId id, CancellationToken ct);
+
+    /// <summary>
+    /// Wakes the nook when it sleeps, without waiting for it, and keeps it awake for a while: the sleep
+    /// period, as after any use, for someone about to use it, such as a person opening its chat; or as
+    /// long as asked, renewed by whatever keeps it busy, such as Chats while its agent works. People
+    /// with Write may.
+    /// </summary>
+    /// <returns>Success; <see cref="NooksErrors.NotReady"/> when its provider can't be asked; a validation error for longer than an hour; or not found or forbidden.</returns>
+    public Task<Result> WakeAsync(Actor actor, WakeNook command, CancellationToken ct);
 
     /// <summary>
     /// The nook's processes, newest first.

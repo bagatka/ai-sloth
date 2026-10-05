@@ -34,6 +34,8 @@ internal sealed partial class NooksApi(
     FileLocks fileLocks,
     IObjectStorage storage,
     NookReconciler reconciler,
+    NookSleeper sleeper,
+    NookActivity activity,
     NooksSettings settings,
     TimeProvider time) : INooksApi, INookDaemonsApi
 {
@@ -89,13 +91,32 @@ internal sealed partial class NooksApi(
         return process is null ? new Result<Process>(NooksErrors.ProcessNotFound) : new Result<Process>(process);
     }
 
-    // The nook's daemon connection, waiting for it to dial in; null when the nook can't run processes.
-    private async Task<DaemonConnection?> ConnectionAsync(NookId nookId, CancellationToken ct)
+    // The nook's daemon connection, waking the nook first when it sleeps and waiting for its daemon to
+    // dial in; null when the nook can't run processes, or can't be woken. A person reaching it uses it,
+    // which keeps it awake for the sleep period; the use counts before the status is read, so a nook
+    // about to fall asleep either sees it and stays awake, or is seen asleep and woken.
+    // Not handled: an operation in the instant between a nook's last idle check and its going to
+    // sleep reaches a daemon about to stop, and may need repeating.
+    private async Task<DaemonConnection?> ConnectionAsync(Actor actor, NookId nookId, CancellationToken ct)
     {
+        if (actor is UserActor)
+        {
+            activity.Used(nookId);
+        }
+
         NookStatus status = await db.Nooks.Where(nook => nook.Id == nookId).Select(nook => nook.Status).SingleAsync(ct);
         if (status is NookStatus.Failed or NookStatus.Deleting)
         {
             return null;
+        }
+
+        if (status is NookStatus.Sleeping or NookStatus.Paused or NookStatus.Stopped or NookStatus.Evicted)
+        {
+            bool woke = await sleeper.WakeAsync(nookId, ct);
+            if (!woke)
+            {
+                return null;
+            }
         }
 
         return await daemons.WaitAsync(nookId, ReadyTimeout, ct);

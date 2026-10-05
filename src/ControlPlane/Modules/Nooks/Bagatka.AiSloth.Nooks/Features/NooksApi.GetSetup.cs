@@ -20,7 +20,7 @@ internal sealed partial class NooksApi
             return new Result<NookSetup>(nook.Error);
         }
 
-        DaemonConnection? connection = await ConnectionAsync(id, ct);
+        DaemonConnection? connection = await ConnectionAsync(actor, id, ct);
         if (connection is null)
         {
             return new Result<NookSetup>(NooksErrors.NotReady);
@@ -45,7 +45,7 @@ internal sealed partial class NooksApi
             return new Result<NookSetup>(nook.Error);
         }
 
-        DaemonConnection? connection = await ConnectionAsync(id, ct);
+        DaemonConnection? connection = await ConnectionAsync(actor, id, ct);
         if (connection is null)
         {
             return new Result<NookSetup>(NooksErrors.NotReady);
@@ -66,7 +66,7 @@ internal sealed partial class NooksApi
             return new Result<NookSetup>(NooksErrors.SetupRunning);
         }
 
-        Result<SetupStart> started = await StartSetupAsync(nook.Output, connection, ct);
+        Result<SetupStart> started = await StartSetupAsync(nook.Output, connection, resumeOnly: false, ct);
         if (started.Failed)
         {
             return new Result<NookSetup>(started.Error);

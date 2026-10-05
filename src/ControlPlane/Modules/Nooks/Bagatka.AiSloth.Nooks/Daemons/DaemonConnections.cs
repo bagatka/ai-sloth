@@ -53,6 +53,23 @@ internal sealed class DaemonConnections(TimeProvider time)
         End(connection);
     }
 
+    // Ends the nook's connection, such as when it fell asleep: its daemon is frozen or gone, and dials
+    // in again when it wakes.
+    public void Drop(NookId nookId)
+    {
+        DaemonConnection? dropped;
+        lock (_gate)
+        {
+            dropped = _connections.GetValueOrDefault(nookId);
+            _connections.Remove(nookId);
+        }
+
+        if (dropped is not null)
+        {
+            End(dropped);
+        }
+    }
+
     public bool IsConnected(NookId nookId)
     {
         lock (_gate)

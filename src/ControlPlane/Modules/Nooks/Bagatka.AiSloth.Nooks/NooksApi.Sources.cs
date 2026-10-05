@@ -61,16 +61,28 @@ internal sealed partial class NooksApi
     // while the others wait; a failure is returned, and the next call tries again.
     private async Task<Result> PrepareSourcesAsync(Nook nook, DaemonConnection connection, CancellationToken ct)
     {
-        if (nook.SourcesReady)
+        if (nook.SourcesReady && !nook.ResumeDue)
         {
             return new Result(new Success());
         }
 
         using IDisposable held = await fileLocks.AcquireAsync(nook.Id, ct);
         await db.Entry(nook).ReloadAsync(ct);
-        if (nook.SourcesReady)
+        if (nook.SourcesReady && !nook.ResumeDue)
         {
             return new Result(new Success());
+        }
+
+        // A nook that woke with its files runs only its resume scripts.
+        if (nook.SourcesReady)
+        {
+            Result<SetupStart> resumed = await StartSetupAsync(nook, connection, resumeOnly: true, ct);
+            if (resumed.Failed)
+            {
+                return new Result(resumed.Error);
+            }
+
+            return await MarkPreparedAsync(nook, copiedCheckpoint: null, resumed.Output, ct);
         }
 
         List<SourceCopy> copies = await db.SourceCopies.Where(copy => copy.NookId == nook.Id).OrderBy(copy => copy.Name).ToListAsync(ct);
@@ -98,7 +110,7 @@ internal sealed partial class NooksApi
         Result<SetupStart> setup = new Result<SetupStart>(new SetupStart([], Process: null));
         if (copies.Count > 0 || copiedCheckpoint is not null)
         {
-            setup = await StartSetupAsync(nook, connection, ct);
+            setup = await StartSetupAsync(nook, connection, resumeOnly: false, ct);
         }
 
         if (setup.Failed)
@@ -277,7 +289,7 @@ internal sealed partial class NooksApi
         DaemonConnection? sourceConnection = null;
         if (source is not null)
         {
-            sourceConnection = await ConnectionAsync(sourceId, ct);
+            sourceConnection = await ConnectionAsync(SystemActors.Processes, sourceId, ct);
         }
 
         if (source is null || sourceConnection is null)
@@ -291,7 +303,7 @@ internal sealed partial class NooksApi
             return new Result<Checkpoint>(sourceReady.Error);
         }
 
-        return await SaveCheckpointAsync(source, sourceConnection, "Copied into a new nook", ct);
+        return await SaveCheckpointAsync(source, sourceConnection, "Copied into a new nook", onlyIfChanged: false, ct);
     }
 
     // What agents read first: where the repositories are, and that each has its own instructions.

@@ -27,7 +27,7 @@ internal sealed partial class NooksApi
             return new Result(Error.Validation("data", "Send at most 64 KiB at once."));
         }
 
-        DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
+        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
         if (connection is null)
         {
             return new Result(NooksErrors.NotReady);

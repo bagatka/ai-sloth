@@ -161,6 +161,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
                 "DaemonPort=" + _daemonPort.ToString(CultureInfo.InvariantCulture),
                 "ModelsPort=" + _modelsPort.ToString(CultureInfo.InvariantCulture),
                 "DOCKER_HOST=" + DockerEndpoint,
+                .. _settings,
             ],
             ct);
         _app = await appHost.BuildAsync(ct);
@@ -174,6 +175,20 @@ public sealed partial class ControlPlane : IAsyncLifetime
         using HttpClient anonymous = ClientWithToken(token: null);
         Owner = await Api.ReadAsync<SignInEndpointsShapes.SignedIn>(
             anonymous.SendPostAsync("/sign-in/code", new { code = SetupCode, name = "Owner", device = "e2e" }), HttpStatusCode.OK);
+    }
+
+    private readonly IReadOnlyList<string> _settings;
+
+    /// <summary>The app as it runs for most tests.</summary>
+    public ControlPlane()
+        : this([])
+    {
+    }
+
+    /// <summary>The app with settings of its own, as AppHost arguments, for tests that need them.</summary>
+    internal ControlPlane(IReadOnlyList<string> settings)
+    {
+        _settings = settings;
     }
 
     /// <summary>The setup code the host printed when nobody had signed up; its first person used it.</summary>

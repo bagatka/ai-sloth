@@ -50,6 +50,8 @@ mode 600.
 - **A setup shows one line while it runs, and one when it ended;** a failed one adds the end of its
   output, and `sloth chat setup <id>` prints all of it, following it while it runs. A chat that
   started with files without a setup suggests `sloth chat prepare <id>` after its first turn.
+- **Asleep is invisible but shown.** `sloth chat list` marks chats whose nook sleeps; `sloth chat
+  open` wakes the nook, so it's ready by the time a message is typed; any message wakes it anyway.
 - **`sloth chat prepare` follows until the setup's last test,** without taking input, and fails when
   the setup still fails; Ctrl+C leaves the agent working. `sloth chat open` follows and steers it.
 - **A nearly full disk is asked about** at the keyboard (y/N); otherwise the command fails with the

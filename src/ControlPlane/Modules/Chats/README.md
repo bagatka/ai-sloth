@@ -110,7 +110,8 @@ concurrency token). Archives are in object storage under
 - **Runners** (`Harness/ChatRunners.cs`, `Harness/ChatRunner.cs`): one per chat with work, started
   by a new chat, a message, or a stop, ending when the chat is idle. At startup, chats that had work
   get their runner back. A runner starts the agent once the nook's setup ended, following the setup
-  run meanwhile, tests a setup the agent prepared (`Harness/NookSetups.cs`), delivers messages, answers the
+  run meanwhile, keeps the nook awake while the chat has work, tests a setup the agent prepared
+  (`Harness/NookSetups.cs`), delivers messages, answers the
   agent's requests, and saves each batch of updates with the offset of the agent's output it has
   read, so a restart continues exactly where it stopped. It reaches the agent's process only through
   `Harness/AgentProcess.cs`, which turns the process into lines of text. After each turn it takes
@@ -172,6 +173,11 @@ confirming (0.9 by default). The host also registers the object storage harness 
   with the end of its output, and its turn is tested again, three tests at most. Only someone who
   may use the chat's account prepares, because the agent and the tests spend that person's account
   and compute. Stopping the agent stops the test.
+- **A chat with work keeps its nook awake.** While its agent's turn runs, messages wait, or its
+  agent starts, the chat's runner wakes its nook for 30 seconds every 10, however long the agent
+  thinks without a word; once idle, the nook falls asleep after its sleep period. A nook that
+  slept without its memory ended its agent, so the next message starts a new one, which loads the
+  conversation (`AgentRestarted`), after the nook's resume scripts.
 - **How long people wait is measured.** The meter `Bagatka.AiSloth.Chats` records
   `aisloth.chats.first_action`: seconds from a message sent to the first thing its agent does for it
   (thinking, answering, using a tool, or planning), with any nook, setup, and agent start before it,

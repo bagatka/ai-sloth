@@ -71,6 +71,12 @@ internal sealed class Nook
 
     public ProcessId? SetupProcessId { get; private set; }
 
+    // When it fell asleep, while it sleeps; and whether its resume scripts run again before anything
+    // else, because it woke.
+    public DateTimeOffset? SleptAt { get; private set; }
+
+    public bool ResumeDue { get; private set; }
+
     // The SHA-256 of the daemon's token; the token itself is never stored.
     public byte[]? DaemonTokenHash { get; private set; }
 
@@ -90,9 +96,62 @@ internal sealed class Nook
     public void SourcesPrepared(List<string> setupScripts, ProcessId? setupProcess)
     {
         SourcesReady = true;
+        ResumeDue = false;
         SetupScripts = setupScripts;
         SetupProcessId = setupProcess;
     }
+
+    // Nobody used it for a while, so its provider releases its compute. Returns whether it was awake.
+    public bool FallAsleep()
+    {
+        if (Status != NookStatus.Running)
+        {
+            return false;
+        }
+
+        Status = NookStatus.Sleeping;
+        return true;
+    }
+
+    // Its provider released its compute, keeping its memory (Paused) or only its files (Stopped).
+    public void FellAsleep(NookStatus asleep, TimeProvider time)
+    {
+        if (asleep is not (NookStatus.Paused or NookStatus.Stopped))
+        {
+            throw new ArgumentOutOfRangeException(nameof(asleep), asleep, "A nook sleeps Paused or Stopped.");
+        }
+
+        Status = asleep;
+        SleptAt = time.GetUtcNow();
+    }
+
+    // Its provider gave it compute again; its daemon connecting makes it Running, and its resume
+    // scripts run again first. One a failure left going to sleep counts as Stopped, so its daemon
+    // connecting wakes it too.
+    public void Woke()
+    {
+        if (Status == NookStatus.Sleeping)
+        {
+            Status = NookStatus.Stopped;
+        }
+
+        SleptAt = null;
+        ResumeDue = true;
+    }
+
+    // Asleep so long that its sandbox goes; it comes back from its latest checkpoint.
+    public void Evict()
+    {
+        Status = NookStatus.Evicted;
+        SleptAt = null;
+        ResumeDue = false;
+        SourcesReady = false;
+        SetupScripts = [];
+        SetupProcessId = null;
+        DaemonTokenHash = null;
+    }
+
+    public bool Asleep => Status is NookStatus.Sleeping or NookStatus.Paused or NookStatus.Stopped or NookStatus.Evicted;
 
     // The checkpoint of the nook it copies that its files come from, once taken.
     public void Copies(int checkpoint)
@@ -106,6 +165,8 @@ internal sealed class Nook
     {
         Status = NookStatus.Creating;
         SourcesReady = false;
+        ResumeDue = false;
+        SleptAt = null;
         SetupScripts = [];
         SetupProcessId = null;
         DaemonTokenHash = null;
@@ -130,14 +191,17 @@ internal sealed class Nook
         return DaemonTokenHash is not null && CryptographicOperations.FixedTimeEquals(DaemonTokenHash, Hash(token));
     }
 
-    // Its daemon dialed in, so the nook runs. A nook being deleted takes no more instructions.
+    // Its daemon dialed in, so the nook runs. A nook being deleted takes no more instructions, and one
+    // going to sleep stays so, its daemon about to be frozen or stopped.
     public bool DaemonConnected()
     {
         switch (Status)
         {
             case NookStatus.Deleting:
                 return false;
-            case NookStatus.Creating or NookStatus.Running or NookStatus.Paused or NookStatus.Stopped or NookStatus.Unreachable or NookStatus.Failed:
+            case NookStatus.Sleeping:
+                return true;
+            case NookStatus.Creating or NookStatus.Running or NookStatus.Paused or NookStatus.Stopped or NookStatus.Unreachable or NookStatus.Failed or NookStatus.Evicted:
                 Status = NookStatus.Running;
                 return true;
         }

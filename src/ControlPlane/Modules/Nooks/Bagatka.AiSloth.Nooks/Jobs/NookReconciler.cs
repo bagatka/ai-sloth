@@ -119,7 +119,7 @@ internal sealed class NookReconciler(
                 case NookStatus.Running or NookStatus.Unreachable when !daemons.IsConnected(nook.Id):
                     await RecoverAsync(db, provider, nook, ct);
                     break;
-                case NookStatus.Running or NookStatus.Paused or NookStatus.Stopped or NookStatus.Unreachable or NookStatus.Failed:
+                case NookStatus.Running or NookStatus.Paused or NookStatus.Stopped or NookStatus.Unreachable or NookStatus.Failed or NookStatus.Sleeping or NookStatus.Evicted:
                     break;
             }
         }
@@ -171,6 +171,22 @@ internal sealed class NookReconciler(
     // processes that ran in the old one end with exit code -1. A sandbox that is still there only
     // waits for its daemon. A provider that can't be asked, such as a machine that is offline, makes
     // the nook Unreachable, said once; its daemon coming back makes it Running.
+    // A sandbox suspended while its nook was awake, such as by its machine restarting, resumes, and its
+    // resume scripts run again; its processes ended unless it kept its memory.
+    private async Task ResumeAsync(NooksDbContext db, ISandboxProvider provider, Nook nook, SandboxState suspended, CancellationToken ct)
+    {
+        if (suspended == SandboxState.Stopped)
+        {
+            DateTimeOffset stoppedAt = time.GetUtcNow();
+            await db.Processes.Where(process => process.NookId == nook.Id && process.ExitCode == null)
+                .ExecuteUpdateAsync(set => set.SetProperty(process => process.ExitCode, ProcessExited.Lost).SetProperty(process => process.ExitedAt, stoppedAt), ct);
+        }
+
+        await provider.ResumeAsync(SandboxKey.From(nook.Id.Value), ct);
+        nook.Woke();
+        await db.SaveAsync(ct);
+    }
+
     private async Task RecoverAsync(NooksDbContext db, ISandboxProvider provider, Nook nook, CancellationToken ct)
     {
         SandboxKey key = SandboxKey.From(nook.Id.Value);
@@ -191,6 +207,12 @@ internal sealed class NookReconciler(
                 }
             }
 
+            return;
+        }
+
+        if (sandbox is { State: SandboxState.Stopped or SandboxState.Paused })
+        {
+            await ResumeAsync(db, provider, nook, sandbox.State, ct);
             return;
         }
 

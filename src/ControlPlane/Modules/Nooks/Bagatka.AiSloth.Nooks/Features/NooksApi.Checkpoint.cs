@@ -23,7 +23,7 @@ internal sealed partial class NooksApi
             return new Result<CheckpointSummary>(Error.Validation("note", "At most 200 characters."));
         }
 
-        DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
+        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
         if (connection is null)
         {
             return new Result<CheckpointSummary>(NooksErrors.NotReady);
@@ -35,7 +35,7 @@ internal sealed partial class NooksApi
             return new Result<CheckpointSummary>(prepared.Error);
         }
 
-        Result<Checkpoint> saved = await SaveCheckpointAsync(nook.Output, connection, command.Note, ct);
+        Result<Checkpoint> saved = await SaveCheckpointAsync(nook.Output, connection, command.Note, onlyIfChanged: false, ct);
         return saved.Failed ? new Result<CheckpointSummary>(saved.Error) : new Result<CheckpointSummary>(saved.Output.ToSummary());
     }
 }

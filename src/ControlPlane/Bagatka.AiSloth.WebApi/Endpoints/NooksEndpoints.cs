@@ -45,6 +45,7 @@ internal static class NooksEndpoints
         nooks.MapGet("/{id:guid}/download", Download);
         nooks.MapGet("/{nookId:guid}/checkpoints", ListCheckpoints);
         nooks.MapGet("/{nookId:guid}/setup", GetSetup);
+        nooks.MapPost("/{id:guid}/wake", Wake);
         nooks.MapPost("/{nookId:guid}/processes", StartProcess);
         nooks.MapGet("/{nookId:guid}/processes", ListProcesses);
         nooks.MapGet("/{nookId:guid}/processes/{processId:guid}/output", WatchProcess);
@@ -188,6 +189,21 @@ internal static class NooksEndpoints
     {
         Result<Page<ProcessSummary>> result = await api.ListProcessesAsync(principal.ToActor(), NookId.From(nookId), Paging.Request(cursor, limit), ct);
         return result.ToOk();
+    }
+
+    /// <summary>
+    /// Wakes the nook when it sleeps, without waiting for it, and keeps it awake for a while, as any use
+    /// does: for clients to call when someone is about to use it, such as when a person opens its chat
+    /// or starts typing. Asleep, a nook costs nothing; any operation wakes it anyway, only later.
+    /// </summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> Wake(
+        [FromRoute] Guid id,
+        ClaimsPrincipal principal,
+        [FromServices] INooksApi api,
+        CancellationToken ct)
+    {
+        Result result = await api.WakeAsync(principal.ToActor(), new WakeNook(NookId.From(id), KeepAwakeFor: null), ct);
+        return result.ToNoContent();
     }
 
     /// <summary>

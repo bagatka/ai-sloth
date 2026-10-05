@@ -15,7 +15,8 @@ later starts them fast from templates.
   nook, and its checkpoints, whose bundles are in object storage; templates later.
 - **Rules:** what each access level allows with a nook (Read sees it and watches its processes; Write
   starts, feeds, and stops processes and deletes it; the control plane's own processes, such as Chats
-  running an agent, may do anything), the lifecycle below, when an idle nook is suspended, and which
+  running an agent, may do anything), the lifecycle below, when a nook nobody uses falls asleep and
+  when a long sleep evicts it, and which
   providers a workspace's nooks may run on.
 - **Integrations:** sandbox providers (`src/Sandboxing`) and object storage (`src/Storage`),
   registered by the host.
@@ -42,7 +43,7 @@ later starts them fast from templates.
 providers they can use, create (with the workspace's repositories, or from one of another nook's
 checkpoints), list, and delete nooks, start, watch, feed, and stop processes in them, take and
 list checkpoints, see their setup and its latest run, run it again, download their files as they are or at a checkpoint, copy files out of and into
-them, and export a source's changes for pushing. `INookDaemonsApi` is the daemon endpoint's side,
+them, export a source's changes for pushing, and wake them ahead of use. `INookDaemonsApi` is the daemon endpoint's side,
 never a public route or a tool.
 
 ```csharp
@@ -79,31 +80,49 @@ Nothing yet. Once workspaces can be deleted, `WorkspaceDeleted` deletes their no
 
 ## Lifecycle
 
-Built so far: Creating, Running, Unreachable, Failed, and Deleting. Paused and Stopped come with
-suspension. A running nook whose daemon is away and whose sandbox is gone or failed goes back to
-Creating, and its new sandbox starts from its latest checkpoint; when its provider can't be asked,
-such as for a machine that is offline, it is Unreachable until its daemon or its provider answers.
+A running nook whose daemon is away and whose sandbox is gone or failed goes back to Creating, and
+its new sandbox starts from its latest checkpoint; when its provider can't be asked, such as for a
+machine that is offline, it is Unreachable until its daemon or its provider answers. A nook nobody
+uses falls asleep, and wakes when it is used (see Sleep).
 
 ```
 Creating ──daemon connects──▶ Running ──sandbox lost──▶ Creating (from the latest checkpoint)
                                  │
-                                 └──idle──▶ Paused or Stopped (the provider decides which)
-                                 ▲                           │
-                                 └──────any operation────────┘
+                                 └──nobody uses it──▶ Sleeping ──▶ Paused or Stopped (as the provider can)
+                                 ▲                                         │            │
+                                 └────────────────any use──────────────────┘   asleep for long
+                                                                                        ▼
+Creating (from the latest checkpoint) ◀──any use── Evicted ◀── sandbox deleted ─────────┘
 Running ──daemon away, provider can't be asked──▶ Unreachable ──daemon reconnects──▶ Running
 Unreachable ──provider says the sandbox is gone──▶ Creating (from the latest checkpoint)
 any ──provider reports failure──▶ Failed
 any ──user deletes──▶ Deleting ──provider confirms──▶ (record removed)
 ```
 
-A nook is idle when no process is running and nobody is watching. Processes never stop because a
-nook is suspended: a nook with running processes is never idle.
+## Sleep
+
+A nook stays awake for the sleep period, two minutes by default, after anything uses it: a person
+reaching it through any operation, or a wake. Chats keeps a chat's nook awake while the chat has
+work, its agent's turn included, by waking it for 30 seconds every 10. A nook also stays awake while
+its setup runs. Services left running don't keep it awake: they sleep with it.
+
+When nobody used it for that long, the nook keeps its files as a checkpoint if they changed since
+the latest, then is Sleeping while its provider releases its compute: Paused, with memory, where the
+provider keeps it, and otherwise Stopped, with files only, its processes ending with exit code -1.
+A nook asleep for the eviction period, a day by default, has its sandbox deleted and is Evicted.
+
+Any operation wakes a sleeping nook first, so callers only notice latency: a Paused or Stopped one
+resumes, and its resume scripts run again before anything else; an Evicted one starts again from
+its latest checkpoint, as a lost one does, with its setup. `WakeAsync` wakes a nook ahead of its
+use, such as when a person opens its chat. Going to sleep and waking hold the nook's file lock, so
+neither meets the other or a file operation halfway. People see every sleeping status as asleep.
 
 ## Data
 
 Schema `nooks`. Tables `nooks` (ID, workspace ID, provider name and location, status, created at and
 by, the nook and checkpoint it copies, its kept paths, whether its sources are in place, the setup
-scripts found then and the process running them, daemon token hash; a concurrency token), `source_copies` (nook ID and name, repository, branch, the commit
+scripts found then and the process running them, when it fell asleep, whether its resume scripts are
+due after waking, daemon token hash; a concurrency token), `source_copies` (nook ID and name, repository, branch, the commit
 it started from), `processes` (ID, nook ID, command, arguments, started at, exit code and when it came),
 `checkpoints` (ID, nook ID, number, taken at, note), and `checkpoint_parts` (checkpoint, the place it
 keeps, its snapshot commit, the commit its bundle builds on, the bundle's object key). Bundles are in
@@ -121,7 +140,9 @@ object storage under `nooks/<nook ID>/checkpoints/<number>/`.
   reported failed at the provider, or rejected by it: mark it `Failed`. Planned: deleting sandboxes
   without a record (after a grace period), by comparing with each provider's `ListAsync`; and
   claiming nooks atomically before several instances run it.
-- **Idle suspender** (planned): suspends nooks that stay idle longer than a setting.
+- **Sleeper** (`Jobs/NookSleeper.cs`): runs every 10 seconds, in bounded batches. Puts nooks nobody
+  used for the sleep period to sleep, finishes those a failed pass left Sleeping, and evicts those
+  asleep for the eviction period (see Sleep). It also wakes nooks for the operations that use them.
 
 ## Setup
 
@@ -160,9 +181,9 @@ before storing it.
 
 `NooksSettings`, passed by the host (`PATTERNS.md`, entry 20): the connection string, the URL
 daemons dial (the WebApi's daemon endpoint as a nook reaches it), the base nook image and the image
-for each harness a nook can carry, and each nook's CPU
-and memory. The host also registers the object storage checkpoints are kept in. The idle period
-before suspension comes with suspension.
+for each harness a nook can carry, each nook's CPU and memory, the sleep period (two minutes unless
+given), and the eviction period (a day unless given). The host also registers the object storage
+checkpoints are kept in.
 
 ## Decisions and constraints
 
@@ -174,8 +195,9 @@ before suspension comes with suspension.
   every workspace, and a machine serves only the workspace that added it.
 - **Record first, then create.** A nook is committed before its provider is called, so every
   sandbox at a provider has a record. Reconciliation finishes what a failed call left undone.
-- **Suspension is invisible.** Every operation on a paused or stopped nook resumes it first and
-  waits for its daemon, so callers only notice latency.
+- **Sleep is invisible.** Every operation on a sleeping nook wakes it first and waits for its
+  daemon, so callers only notice latency. How long a nook stays awake is in this instance's memory,
+  like daemon connections: after a restart, every nook gets a full sleep period.
 - **A nook carries at most one harness,** chosen when it is created: its image is the base image
   with that harness installed, so hosts pull only the harnesses their nooks use. Chats in the nook
   run that harness; switching harness means a new nook.
@@ -221,9 +243,11 @@ before suspension comes with suspension.
 
 ## Not built yet
 
-- **Suspension.** No nook is Paused or Stopped yet. A nook whose daemon stays away while its sandbox
-  runs still shows Running; calls to an away nook wait up to 60 seconds for it, then answer
-  `NotReady`.
+- **Daemons away from running sandboxes.** A nook whose daemon stays away while its sandbox runs
+  still shows Running; calls to it wait up to 60 seconds, then answer `NotReady`.
+- **Sleep's edges.** An operation in the instant between a nook's last idle check and its going to
+  sleep reaches a daemon about to stop, and may need repeating. A person's own long process keeps
+  no nook awake: it sleeps with the nook, and ends with it where the provider keeps only files.
 - **Handover.** A control-plane instance that shuts down doesn't send `ReconnectInstruction`;
   daemons notice the lost connection and reconnect with backoff, within about a second.
 - **Reconciler gaps.** Sandboxes without a record aren't deleted. Nooks aren't claimed atomically, so only one instance may run the job. Nooks
@@ -233,7 +257,7 @@ before suspension comes with suspension.
 - **Lost processes.** Processes a restarted daemon lost in the same sandbox never report an exit:
   watching one ends at once with exit code -1, but the process list still shows it running. Handling
   it means marking them exited on the daemon's next hello. A replaced sandbox's processes are marked.
-- **Ready copies,** and resuming a suspended nook's services with its resume scripts alone.
+- **Ready copies,** which would make waking an evicted nook as fast as a new one from a copy.
 - **What checkpoints leave out.** Ignored files; git's settings besides remotes, which a restored
   source gets again from its creator; tags; repositories deeper than directly in `/work`, and
   submodules' files. Folders whose names hold a tab or a line break fail the checkpoint, as do more

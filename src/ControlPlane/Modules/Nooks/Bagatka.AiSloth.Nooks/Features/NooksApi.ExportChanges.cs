@@ -35,7 +35,7 @@ internal sealed partial class NooksApi
             return new Result<ExportedChanges>(nook.Error);
         }
 
-        DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
+        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
         if (connection is null)
         {
             return new Result<ExportedChanges>(NooksErrors.NotReady);

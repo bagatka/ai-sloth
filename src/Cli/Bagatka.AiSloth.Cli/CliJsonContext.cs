@@ -47,6 +47,7 @@ namespace Bagatka.AiSloth.Cli;
 [JsonSerializable(typeof(IReadOnlyList<Wire.Person>))]
 [JsonSerializable(typeof(Wire.Problem))]
 [JsonSerializable(typeof(Wire.Nook))]
+[JsonSerializable(typeof(Wire.NookPage))]
 [JsonSerializable(typeof(Wire.GitHubConnectionStarted))]
 [JsonSerializable(typeof(Wire.GitHubConnectionProgress))]
 [JsonSerializable(typeof(Wire.GitHubAccount))]

@@ -14,8 +14,9 @@ namespace Bagatka.Sandboxing.Docker;
 
 /// <summary>
 /// Runs each sandbox as a container on a Docker Engine, under Sysbox, so that it can run containers of
-/// its own without privileges on the host. Suspending pauses the container, which keeps its memory, so
-/// a suspended sandbox is <see cref="SandboxState.Paused"/>. Snapshots are images committed from
+/// its own without privileges on the host. Suspending stops the container, which frees its memory and
+/// keeps its files, so a suspended sandbox is <see cref="SandboxState.Stopped"/>: a container whose
+/// entry point exited cleanly, as it does when asked to stop. Snapshots are images committed from
 /// containers.
 /// </summary>
 internal sealed class DockerSandboxProvider(DockerClient docker, string scope) : ISandboxProvider
@@ -29,6 +30,9 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
 
     // Docker refuses containers with less memory than this.
     private const int MinimumMemoryMebibytes = 6;
+
+    // How long a stopping sandbox's entry point has to end its processes before it is killed.
+    private static readonly TimeSpan StopGrace = TimeSpan.FromSeconds(30);
 
     // Lets a sandbox reach services on the Docker host, such as a control plane in development.
     private static readonly IReadOnlyList<string> ExtraHosts = ["host.docker.internal:host-gateway"];
@@ -112,7 +116,7 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
 
         if (string.Equals(container.Status, "running", StringComparison.Ordinal))
         {
-            await docker.PauseContainerAsync(container.Id, ct);
+            await docker.StopContainerAsync(container.Id, StopGrace, ct);
             container = await InspectRequiredAsync(container.Id, ct);
         }
 
@@ -132,7 +136,7 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
             await docker.UnpauseContainerAsync(container.Id, ct);
             container = await InspectRequiredAsync(container.Id, ct);
         }
-        else if (string.Equals(container.Status, "created", StringComparison.Ordinal))
+        else if (StateOf(container.Status, container.ExitCode) is SandboxState.Starting or SandboxState.Stopped)
         {
             await docker.StartContainerAsync(container.Id, ct);
             container = await InspectRequiredAsync(container.Id, ct);
@@ -152,9 +156,18 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
         IReadOnlyList<ContainerListItem> containers = await docker.ListContainersAsync([ScopeFilter], ct);
         foreach (ContainerListItem container in containers)
         {
-            if (ParseKey(container.Labels, KeyLabel) is Guid key)
+            // The list has no exit codes, which tell a stopped sandbox from a failed one.
+            if (string.Equals(container.State, "exited", StringComparison.Ordinal))
             {
-                SandboxState state = StateOf(container.State);
+                ContainerDetails? exited = await docker.InspectContainerAsync(container.Id, ct);
+                if (exited is not null && ParseKey(exited.Labels, KeyLabel) is not null)
+                {
+                    yield return Observe(exited);
+                }
+            }
+            else if (ParseKey(container.Labels, KeyLabel) is Guid key)
+            {
+                SandboxState state = StateOf(container.State, exitCode: 0);
                 string? reason = state == SandboxState.Failed ? container.Status : null;
                 yield return new SandboxObservation(SandboxKey.From(key), state, container.Created, reason);
             }
@@ -257,7 +270,7 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
             throw new InvalidOperationException("Container " + container.Name + " has no sandbox key label.");
         }
 
-        SandboxState state = StateOf(container.Status);
+        SandboxState state = StateOf(container.Status, container.ExitCode);
         string? reason = null;
         if (state == SandboxState.Failed)
         {
@@ -286,16 +299,19 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
         return new SnapshotObservation(SnapshotKey.From(snapshot.Value), SandboxKey.From(source.Value), image.Created);
     }
 
-    private static SandboxState StateOf(string status)
+    // An entry point exits cleanly only when asked to stop, so a clean exit is a stopped sandbox;
+    // any other end is a failure.
+    private static SandboxState StateOf(string status, int exitCode)
     {
         return status switch
         {
             "created" or "restarting" => SandboxState.Starting,
             "running" => SandboxState.Running,
             "paused" => SandboxState.Paused,
+            "exited" when exitCode == 0 => SandboxState.Stopped,
             "removing" => SandboxState.Deleting,
 
-            // "exited", "dead", or a status this provider doesn't know: the entry point isn't running.
+            // "exited" otherwise, "dead", or a status this provider doesn't know: the entry point isn't running.
             _ => SandboxState.Failed,
         };
     }

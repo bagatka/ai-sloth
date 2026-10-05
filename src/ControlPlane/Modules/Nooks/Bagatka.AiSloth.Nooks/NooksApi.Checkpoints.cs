@@ -169,9 +169,31 @@ internal sealed partial class NooksApi
         fi
         """;
 
-    // Saves the nook's files as its next checkpoint. Its sources must be in place, or the checkpoint
-    // would keep a nook without them.
-    private async Task<Result<Checkpoint>> SaveCheckpointAsync(Nook nook, DaemonConnection connection, string note, CancellationToken ct)
+    // Before a nook falls asleep, its files are kept as a checkpoint if they changed since the latest, so
+    // a sleep long enough to delete its sandbox loses nothing; agents' changes are kept after each turn
+    // already. A nook whose files never arrived has nothing to keep.
+    internal async Task<Result> CheckpointBeforeSleepAsync(NookId nookId, CancellationToken ct)
+    {
+        Nook? nook = await db.Nooks.SingleOrDefaultAsync(found => found.Id == nookId, ct);
+        if (nook is not { SourcesReady: true })
+        {
+            return new Result(new Success());
+        }
+
+        DaemonConnection? connection = await ConnectionAsync(SystemActors.Processes, nookId, ct);
+        if (connection is null)
+        {
+            return new Result(NooksErrors.NotReady);
+        }
+
+        Result<Checkpoint> kept = await SaveCheckpointAsync(nook, connection, "Before sleeping", onlyIfChanged: true, ct);
+        return kept.Failed ? new Result(kept.Error) : new Result(new Success());
+    }
+
+    // Saves the nook's files as its next checkpoint, or, when only a change matters, returns the latest
+    // if every place is as it was. Its sources must be in place, or the checkpoint would keep a nook
+    // without them.
+    private async Task<Result<Checkpoint>> SaveCheckpointAsync(Nook nook, DaemonConnection connection, string note, bool onlyIfChanged, CancellationToken ct)
     {
         using IDisposable held = await fileLocks.AcquireAsync(nook.Id, ct);
         Checkpoint? latest = await db.Checkpoints.AsNoTracking().Where(found => found.NookId == nook.Id).OrderByDescending(found => found.Number).FirstOrDefaultAsync(ct);
@@ -196,6 +218,14 @@ internal sealed partial class NooksApi
         if (stored.Failed)
         {
             return new Result<Checkpoint>(stored.Error);
+        }
+
+        // A place that didn't change makes the same commit and stores no bundle.
+        bool unchanged = stored.Output.Count == previous.Count
+            && stored.Output.All(part => previous.Exists(earlier => string.Equals(earlier.Path, part.Path, StringComparison.Ordinal) && string.Equals(earlier.Commit, part.Commit, StringComparison.Ordinal)));
+        if (onlyIfChanged && unchanged && latest is not null)
+        {
+            return new Result<Checkpoint>(latest);
         }
 
         db.Checkpoints.Add(checkpoint);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -66,9 +67,9 @@ internal sealed partial class NooksApi
         """;
 
     // Finds the setup scripts in the nook's files, just put in place, and starts them with
-    // the workspace's secrets, without waiting for them. Returns the scripts, and the process running
-    // them; none when there are no scripts.
-    private async Task<Result<SetupStart>> StartSetupAsync(Nook nook, DaemonConnection connection, CancellationToken ct)
+    // the workspace's secrets, without waiting for them; only the resume scripts for a nook that woke.
+    // Returns the scripts, and the process running them; none when there are no scripts.
+    private async Task<Result<SetupStart>> StartSetupAsync(Nook nook, DaemonConnection connection, bool resumeOnly, CancellationToken ct)
     {
         using MemoryStream found = new MemoryStream();
         ProcessRun listed = await RunAsync(connection, FindSetupScript, [], NoVariables, input: null, found, ct);
@@ -78,7 +79,8 @@ internal sealed partial class NooksApi
         }
 
         // Not handled: folders whose names hold a line break, which checkpoints refuse too.
-        List<string> scripts = [.. Encoding.UTF8.GetString(found.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries)];
+        List<string> scripts = [.. Encoding.UTF8.GetString(found.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Where(script => !resumeOnly || script.EndsWith("/resume", StringComparison.Ordinal))];
         if (scripts.Count == 0)
         {
             return new Result<SetupStart>(new SetupStart(scripts, Process: null));
