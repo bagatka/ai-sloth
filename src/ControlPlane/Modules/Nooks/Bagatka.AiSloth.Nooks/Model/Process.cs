@@ -41,6 +41,8 @@ internal sealed class Process
 
     public int? ExitCode { get; private set; }
 
+    public DateTimeOffset? ExitedAt { get; private set; }
+
     public static Result<Process> Start(StartProcess command, TimeProvider time)
     {
         string tooLong = string.Create(CultureInfo.InvariantCulture, $"Must be 1 to {MaxPathLength} characters without NUL characters.");
@@ -82,9 +84,13 @@ internal sealed class Process
     }
 
     // The daemon reports exits again after every reconnect; the first report counts.
-    public void Exited(int exitCode)
+    public void Exited(int exitCode, TimeProvider time)
     {
-        ExitCode ??= exitCode;
+        if (ExitCode is null)
+        {
+            ExitCode = exitCode;
+            ExitedAt = time.GetUtcNow();
+        }
     }
 
     // The environment is passed through, never kept: it may hold secrets.

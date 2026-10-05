@@ -65,6 +65,12 @@ internal sealed class Nook
     // Nothing else runs in it before.
     public bool SourcesReady { get; private set; }
 
+    // The project's setup scripts found when its files arrived, relative to /work, and the process
+    // that runs them; none when it has no scripts.
+    public List<string> SetupScripts { get; private set; } = [];
+
+    public ProcessId? SetupProcessId { get; private set; }
+
     // The SHA-256 of the daemon's token; the token itself is never stored.
     public byte[]? DaemonTokenHash { get; private set; }
 
@@ -80,9 +86,12 @@ internal sealed class Nook
         return new Nook(NookId.New(), workspaceId, provider.Name, provider.Location, harness, NookStatus.Creating, time.GetUtcNow(), createdBy, copyOf, copyCheckpoint, keptPaths);
     }
 
-    public void SourcesPrepared()
+    // Its files are in place, and its setup, if it has one, runs in the process.
+    public void SourcesPrepared(List<string> setupScripts, ProcessId? setupProcess)
     {
         SourcesReady = true;
+        SetupScripts = setupScripts;
+        SetupProcessId = setupProcess;
     }
 
     // The checkpoint of the nook it copies that its files come from, once taken.
@@ -97,6 +106,8 @@ internal sealed class Nook
     {
         Status = NookStatus.Creating;
         SourcesReady = false;
+        SetupScripts = [];
+        SetupProcessId = null;
         DaemonTokenHash = null;
         if (latestCheckpoint is int number)
         {

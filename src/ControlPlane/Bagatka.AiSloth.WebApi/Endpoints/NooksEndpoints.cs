@@ -44,6 +44,7 @@ internal static class NooksEndpoints
         nooks.MapDelete("/{id:guid}", Delete);
         nooks.MapGet("/{id:guid}/download", Download);
         nooks.MapGet("/{nookId:guid}/checkpoints", ListCheckpoints);
+        nooks.MapGet("/{nookId:guid}/setup", GetSetup);
         nooks.MapPost("/{nookId:guid}/processes", StartProcess);
         nooks.MapGet("/{nookId:guid}/processes", ListProcesses);
         nooks.MapGet("/{nookId:guid}/processes/{processId:guid}/output", WatchProcess);
@@ -186,6 +187,20 @@ internal static class NooksEndpoints
         CancellationToken ct)
     {
         Result<Page<ProcessSummary>> result = await api.ListProcessesAsync(principal.ToActor(), NookId.From(nookId), Paging.Request(cursor, limit), ct);
+        return result.ToOk();
+    }
+
+    /// <summary>
+    /// The nook's setup: the project's <c>.agents/setup</c> and <c>.agents/resume</c> scripts, which run
+    /// whenever the nook gets its files, and their latest run, whose process's output says what they did.
+    /// </summary>
+    private static async Task<Results<Ok<NookSetup>, ProblemHttpResult>> GetSetup(
+        [FromRoute] Guid nookId,
+        ClaimsPrincipal principal,
+        [FromServices] INooksApi api,
+        CancellationToken ct)
+    {
+        Result<NookSetup> result = await api.GetSetupAsync(principal.ToActor(), NookId.From(nookId), ct);
         return result.ToOk();
     }
 

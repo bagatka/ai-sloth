@@ -30,6 +30,8 @@ internal static class ChatsEndpoints
 
     internal sealed record SendMessageRequest(string Text, MessageId? Proposal = null, bool ConfirmNearlyFullDisk = false);
 
+    internal sealed record PrepareRequest(bool ConfirmNearlyFullDisk = false);
+
     internal sealed record InstructionsRequest(string Text);
 
 
@@ -47,6 +49,7 @@ internal static class ChatsEndpoints
         RouteGroupBuilder chats = app.MapGroup("/chats").WithTags("Chats");
         chats.MapGet("/{id:guid}", Get);
         chats.MapPost("/{id:guid}/messages", Send);
+        chats.MapPost("/{id:guid}/prepare", Prepare);
         chats.MapPost("/{id:guid}/stop", Stop);
         chats.MapGet("/{id:guid}/events", Watch);
         chats.MapPost("/{id:guid}/push", Push);
@@ -127,6 +130,24 @@ internal static class ChatsEndpoints
         CancellationToken ct)
     {
         Result<ChatMessage> result = await api.SendAsync(principal.ToActor(), new SendMessage(ChatId.From(id), request.Text, request.Proposal, request.ConfirmNearlyFullDisk), ct);
+        return result.ToOk();
+    }
+
+    /// <summary>
+    /// Asks the agent to prepare the project for fast starts: to write its <c>.agents/setup</c> and
+    /// <c>.agents/resume</c> scripts, run them, and commit them. After that turn, they are tested in a
+    /// fresh nook with only the chat's files, and a failure goes back to the agent, for at most three
+    /// tests; the chat's events tell how each went. Only someone who may use the chat's account may.
+    /// While the nook's disk is nearly full, it is sent only with <c>confirmNearlyFullDisk</c>.
+    /// </summary>
+    private static async Task<Results<Ok<ChatMessage>, ProblemHttpResult>> Prepare(
+        [FromRoute] Guid id,
+        [FromBody] PrepareRequest? request,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result<ChatMessage> result = await api.PrepareAsync(principal.ToActor(), new PrepareChat(ChatId.From(id), request?.ConfirmNearlyFullDisk ?? false), ct);
         return result.ToOk();
     }
 
@@ -276,6 +297,10 @@ internal static class ChatsEndpoints
                 CheckpointSaved saved => ("checkpoint-saved", saved),
                 CheckpointFailed failed => ("checkpoint-failed", failed),
                 AgentRestarted restarted => ("agent-restarted", restarted),
+                SetupStarted started => ("setup-started", started),
+                SetupEnded ended => ("setup-ended", ended),
+                SetupTestStarted testing => ("setup-test-started", testing),
+                SetupTested tested => ("setup-tested", tested),
             };
             yield return new SseItem<ChatEventData>(new ChatEventData(chatEvent.Sequence, chatEvent.At, body), type)
             {

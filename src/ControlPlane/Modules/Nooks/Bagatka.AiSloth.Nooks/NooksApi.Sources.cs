@@ -57,8 +57,8 @@ internal sealed partial class NooksApi
 
     // Puts the nook's sources in place before anything else runs in it: its repositories, copied in
     // with its creator's GitHub connection, with the guide that tells agents where they are; or a
-    // checkpoint's files. Done once, by whichever call comes first while the others wait; a failure
-    // is returned, and the next call tries again.
+    // checkpoint's files. Then starts the project's setup. Done once, by whichever call comes first
+    // while the others wait; a failure is returned, and the next call tries again.
     private async Task<Result> PrepareSourcesAsync(Nook nook, DaemonConnection connection, CancellationToken ct)
     {
         if (nook.SourcesReady)
@@ -94,12 +94,24 @@ internal sealed partial class NooksApi
             }
         }
 
-        return await MarkPreparedAsync(nook, copiedCheckpoint, ct);
+        // A nook that got no files, without repositories or a checkpoint, has no setup to look for.
+        Result<SetupStart> setup = new Result<SetupStart>(new SetupStart([], Process: null));
+        if (copies.Count > 0 || copiedCheckpoint is not null)
+        {
+            setup = await StartSetupAsync(nook, connection, ct);
+        }
+
+        if (setup.Failed)
+        {
+            return new Result(setup.Error);
+        }
+
+        return await MarkPreparedAsync(nook, copiedCheckpoint, setup.Output, ct);
     }
 
     // The daemon's disk reports change the nook while its sources are copied in, so marking it ready
     // reads it again and retries on their conflict. A copy records the checkpoint it came from.
-    private async Task<Result> MarkPreparedAsync(Nook nook, int? copiedCheckpoint, CancellationToken ct)
+    private async Task<Result> MarkPreparedAsync(Nook nook, int? copiedCheckpoint, SetupStart setup, CancellationToken ct)
     {
         Result saved = new Result(ModuleDbContextExtensions.ConcurrencyConflict);
         for (int attempt = 0; attempt < 3 && saved.Failed && saved.Error == ModuleDbContextExtensions.ConcurrencyConflict; attempt++)
@@ -110,7 +122,7 @@ internal sealed partial class NooksApi
                 nook.Copies(number);
             }
 
-            nook.SourcesPrepared();
+            nook.SourcesPrepared(setup.Scripts, setup.Process);
             saved = await db.SaveAsync(ct);
         }
 

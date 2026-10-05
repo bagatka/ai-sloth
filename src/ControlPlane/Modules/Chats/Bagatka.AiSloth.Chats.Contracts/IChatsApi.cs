@@ -14,7 +14,8 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// its nook, and acts there without asking.
 /// </summary>
 /// <remarks>
-/// The agent runs as a process in the nook, started with the first message and kept running. Every
+/// The agent runs as a process in the nook, started with the chat once the project's setup ended,
+/// and kept running. Every
 /// event is saved as it arrives, so a chat outlives control-plane restarts and anyone can replay it.
 /// </remarks>
 public interface IChatsApi
@@ -24,8 +25,8 @@ public interface IChatsApi
 
     /// <summary>
     /// Starts a chat and creates the nook its agent works in, on the provider, carrying the harness;
-    /// the agent runs on the account, and starts with the first message. Other people reach the chat
-    /// through its nook's access.
+    /// the agent runs on the account, and starts now, once the project's setup ended, while people
+    /// write. Other people reach the chat through its nook's access.
     /// </summary>
     /// <returns>
     /// The chat, with its nook; a validation error for an unknown harness or provider, or an account the
@@ -57,6 +58,20 @@ public interface IChatsApi
     /// messages don't reach the agent; or not found.
     /// </returns>
     public Task<Result<ChatMessage>> SendAsync(Actor actor, SendMessage command, CancellationToken ct);
+
+    /// <summary>
+    /// Asks the agent to prepare the project for fast starts: to write its setup, the
+    /// <c>.agents/setup</c> and <c>.agents/resume</c> scripts that new nooks run before their agent
+    /// starts, run them, and commit them. A message from the actor carries AiSloth's instructions.
+    /// After its turn, the setup is tested in a fresh nook with only the chat's files; a failure goes
+    /// back to the agent to fix, for at most three tests (<see cref="SetupTested"/>). Stopping the
+    /// agent stops the test too.
+    /// </summary>
+    /// <returns>
+    /// The message; <see cref="ChatsErrors.DiskNearlyFull"/>; forbidden for anyone who may not use the
+    /// chat's account; or not found.
+    /// </returns>
+    public Task<Result<ChatMessage>> PrepareAsync(Actor actor, PrepareChat command, CancellationToken ct);
 
     /// <summary>
     /// Stops the agent: the running turn ends as <c>cancelled</c>, and messages it hasn't received yet

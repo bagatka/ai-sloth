@@ -994,7 +994,8 @@ UserId;System.Guid
 - **Traces and metrics.**
   - OpenTelemetry is configured by `Bagatka.ServiceDefaults` in every host.
   - A module adds an `ActivitySource` or `Meter` named `Bagatka.AiSloth.<Module>` only when it
-    has something specific to measure.
+    has something specific to measure; the WebApi collects every `Bagatka.AiSloth.*` meter.
+    Canonical example: `src/ControlPlane/Modules/Chats/Bagatka.AiSloth.Chats/Harness/ChatsMeter.cs`.
 
 ## 22. External APIs
 

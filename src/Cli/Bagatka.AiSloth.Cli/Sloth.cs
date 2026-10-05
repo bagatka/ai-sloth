@@ -79,6 +79,11 @@ internal sealed partial class Sloth(
                                      Push the chat's changes to GitHub, with a pull request each
           sloth chat checkpoints <id>
                                      The chat's files saved after each turn, newest first
+          sloth chat setup <id>      What the project's .agents/setup and .agents/resume printed
+                                     when they last ran, following them while they run
+          sloth chat prepare <id> [--anyway]
+                                     Have the agent write the project's setup, so new nooks start
+                                     with everything installed, and test it in a fresh nook
           sloth chat download <id> [--source <name>] [--checkpoint <n>] [--out <file>]
                                      Save the chat's files as a .tar.gz, now or at a checkpoint
           sloth instructions         What every agent of your chats is told, whatever its harness
@@ -156,7 +161,10 @@ internal sealed partial class Sloth(
             ["chat", "push", string id, .. string[] rest] => PushChatAsync(id, rest, ct),
             ["chat", "download", string id, .. string[] rest] => DownloadChatAsync(id, rest, ct),
             ["chat", "checkpoints", string id] => ListCheckpointsAsync(id, ct),
-            ["chat", "list" or "open" or "send" or "stop" or "push" or "download" or "checkpoints", ..] => UsageAsync(),
+            ["chat", "setup", string id] => ShowSetupAsync(id, ct),
+            ["chat", "prepare", string id] => PrepareChatAsync(id, anyway: false, ct),
+            ["chat", "prepare", string id, "--anyway"] => PrepareChatAsync(id, anyway: true, ct),
+            ["chat", "list" or "open" or "send" or "stop" or "push" or "download" or "checkpoints" or "setup" or "prepare", ..] => UsageAsync(),
             ["chat", .. string[] rest] => StartChatAsync(rest, ct),
             ["harness", "state"] => ListHarnessStatesAsync(ct),
             ["harness", "state", "forget", string harness] => ForgetHarnessStateAsync(harness, ct),

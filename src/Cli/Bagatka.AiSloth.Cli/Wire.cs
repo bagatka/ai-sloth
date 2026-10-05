@@ -94,9 +94,19 @@ internal static class Wire
 
     internal sealed record CheckpointPage(IReadOnlyList<Checkpoint> Items, string? NextCursor);
 
+    internal sealed record NookSetup(IReadOnlyList<string> Scripts, SetupRun? Run);
+
+    internal sealed record SetupRun(Guid Process, DateTimeOffset StartedAt, DateTimeOffset? EndedAt, int? ExitCode);
+
+    internal sealed record ProcessOutput(long Offset, byte[] Data);
+
+    internal sealed record ProcessExit(int ExitCode);
+
     internal sealed record StartChat(string Provider, string Harness, Guid Account, IReadOnlyList<NookRepository> Repositories, Guid? CopyOf, int? Checkpoint);
 
     internal sealed record SendMessage(string Text, bool ConfirmNearlyFullDisk);
+
+    internal sealed record Prepare(bool ConfirmNearlyFullDisk);
 
     internal sealed record HarnessState(string Harness, DateTimeOffset SavedAt, long Bytes, Guid SavedFrom);
 

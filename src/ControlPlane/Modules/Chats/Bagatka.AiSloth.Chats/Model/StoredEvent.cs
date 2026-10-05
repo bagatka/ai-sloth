@@ -45,6 +45,10 @@ internal sealed class StoredEvent
             CheckpointSaved saved => ("checkpoint-saved", JsonSerializer.Serialize(saved, FoundationJson.Options)),
             CheckpointFailed failed => ("checkpoint-failed", JsonSerializer.Serialize(failed, FoundationJson.Options)),
             AgentRestarted restarted => ("agent-restarted", JsonSerializer.Serialize(restarted, FoundationJson.Options)),
+            SetupStarted started => ("setup-started", JsonSerializer.Serialize(started, FoundationJson.Options)),
+            SetupEnded ended => ("setup-ended", JsonSerializer.Serialize(ended, FoundationJson.Options)),
+            SetupTestStarted testing => ("setup-test-started", JsonSerializer.Serialize(testing, FoundationJson.Options)),
+            SetupTested tested => ("setup-tested", JsonSerializer.Serialize(tested, FoundationJson.Options)),
         };
         return new StoredEvent(chatId, sequence, at, kind, data);
     }
@@ -63,6 +67,10 @@ internal sealed class StoredEvent
             "checkpoint-saved" => new ChatEventBody(Read<CheckpointSaved>()),
             "checkpoint-failed" => new ChatEventBody(Read<CheckpointFailed>()),
             "agent-restarted" => new ChatEventBody(Read<AgentRestarted>()),
+            "setup-started" => new ChatEventBody(Read<SetupStarted>()),
+            "setup-ended" => new ChatEventBody(Read<SetupEnded>()),
+            "setup-test-started" => new ChatEventBody(Read<SetupTestStarted>()),
+            "setup-tested" => new ChatEventBody(Read<SetupTested>()),
             _ => throw new InvalidOperationException("Chat " + ChatId.Value + " has an event of unknown kind " + Kind + "."),
         };
         return new ChatEvent(Sequence, At, body);

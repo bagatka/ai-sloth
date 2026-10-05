@@ -37,33 +37,18 @@ internal sealed partial class NooksApi
         CancellationToken ct)
     {
         StartProcess command = new StartProcess(connection.NookId, "/bin/sh", ["-c", script, "sh", .. arguments], WorkingDirectory: null, OutputRetention.Complete, environment);
-        Result<Process> started = Process.Start(command, time);
-        if (started.Failed)
-        {
-            throw new InvalidOperationException("A script the control plane runs in nooks is invalid: " + started.Error.Message);
-        }
-
-        await using (NooksDbContext recording = await databases.CreateDbContextAsync(ct))
-        {
-            recording.Processes.Add(started.Output);
-            Result saved = await recording.SaveAsync(ct);
-            if (saved.Failed)
-            {
-                throw new InvalidOperationException("Recording a process the control plane runs failed: " + saved.Error.Message);
-            }
-        }
-
-        InputFeed? feed = input is null ? null : feeds.Register(connection.NookId, started.Output.Id, input);
+        Process process = await RecordAsync(command, ct);
+        InputFeed? feed = input is null ? null : feeds.Register(connection.NookId, process.Id, input);
         ProcessRun run;
         try
         {
-            bool sent = await connection.SendAsync(new DaemonInstruction(started.Output.ToInstruction(environment, inputStreamed: feed is not null)), ct);
+            bool sent = await connection.SendAsync(new DaemonInstruction(process.ToInstruction(environment, inputStreamed: feed is not null)), ct);
             if (!sent)
             {
                 return new ProcessRun(ExitCode: -1, "The nook's daemon disconnected before the process could start; try again.");
             }
 
-            run = await WatchToEndAsync(connection, started.Output.Id, output, ct);
+            run = await WatchToEndAsync(connection, process.Id, output, ct);
         }
         finally
         {
@@ -79,6 +64,26 @@ internal sealed partial class NooksApi
         }
 
         return run;
+    }
+
+    // Records a process the control plane runs, in a database context of its own, before it starts.
+    private async Task<Process> RecordAsync(StartProcess command, CancellationToken ct)
+    {
+        Result<Process> started = Process.Start(command, time);
+        if (started.Failed)
+        {
+            throw new InvalidOperationException("A script the control plane runs in nooks is invalid: " + started.Error.Message);
+        }
+
+        await using NooksDbContext recording = await databases.CreateDbContextAsync(ct);
+        recording.Processes.Add(started.Output);
+        Result saved = await recording.SaveAsync(ct);
+        if (saved.Failed)
+        {
+            throw new InvalidOperationException("Recording a process the control plane runs failed: " + saved.Error.Message);
+        }
+
+        return started.Output;
     }
 
     private async Task<ProcessRun> WatchToEndAsync(DaemonConnection connection, ProcessId processId, Stream? output, CancellationToken ct)

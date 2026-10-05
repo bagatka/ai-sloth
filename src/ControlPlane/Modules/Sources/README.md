@@ -93,8 +93,7 @@ the refresh token with each renewal.
 ## Not built yet
 
 - Other git hosts, such as GitLab, with a token per repository; and repositories by URL.
-- Folders AiSloth keeps, with versions, which need object storage (with Checkpoints); recipes, with
-  Fast start.
+- Folders AiSloth keeps, with versions, which need object storage (with Checkpoints).
 - Bringing new commits from GitHub into a running nook; a nook keeps the branch it started from.
 - Revoking a person's authorization at GitHub when they disconnect, and a workspace-wide identity
   policy.

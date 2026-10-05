@@ -25,6 +25,8 @@ public static class ChatsModule
         services.AddSingleton<AgentProcess>();
         services.AddSingleton<HarnessStates>();
         services.AddSingleton<AgentInstructions>();
+        services.AddSingleton<ChatsMeter>();
+        services.AddSingleton<ProjectSetups>();
         services.AddSingleton<ChatRunners>();
         services.AddHostedService(provider => provider.GetRequiredService<ChatRunners>());
         services.AddScoped<ChatsApi>();

@@ -19,6 +19,9 @@ public static class NooksErrors
     /// <summary>The nook has no source by that name.</summary>
     public static readonly Error SourceNotFound = Error.NotFound("nooks.source_not_found", "The nook has no such source.");
 
+    /// <summary>The nook's setup is running; run it again once it ended.</summary>
+    public static readonly Error SetupRunning = Error.Conflict("nooks.setup_running", "The nook's setup is running; wait for it to end.");
+
     /// <summary>The nook has no checkpoint with that number.</summary>
     public static readonly Error CheckpointNotFound = Error.NotFound("nooks.checkpoint_not_found", "The nook has no such checkpoint.");
 }

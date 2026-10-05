@@ -26,6 +26,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
 // Anything that slips past the analyzers formats the same way on every server.
@@ -45,6 +46,9 @@ builder.Host.UseDefaultServiceProvider(provider =>
 
 // Npgsql traces its commands; collecting them puts database time into each request's trace.
 builder.Services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddSource("Npgsql"));
+
+// Modules' own measurements, such as how long a message waits for its agent's first action.
+builder.Services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddMeter("Bagatka.AiSloth.*"));
 
 // The only place that reads configuration (PATTERNS.md, entry 20).
 HostSettings host = builder.Configuration.GetRequired<HostSettings>("Host");

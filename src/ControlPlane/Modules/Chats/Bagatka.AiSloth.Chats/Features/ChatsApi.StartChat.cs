@@ -74,6 +74,8 @@ internal sealed partial class ChatsApi
             return new Result<ChatSummary>(saved.Error);
         }
 
+        // The agent starts now, after the nook's setup, while people write their first message.
+        runners.Wake(chat.Id);
         return new Result<ChatSummary>(chat.ToSummary(messagesWaiting: false));
     }
 }

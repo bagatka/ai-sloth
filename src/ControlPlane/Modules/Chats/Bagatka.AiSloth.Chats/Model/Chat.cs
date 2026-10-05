@@ -46,6 +46,19 @@ internal sealed class Chat
     // The personal account's owner; null for the workspace's account.
     public UserId? AccountOwnerId { get; private set; }
 
+    // Its agent starts with the chat, before any message, until it tried.
+    public bool StartsAgent { get; private set; }
+
+    // The run of its nook's setup whose start the chat told, and that run's exit code once it told its
+    // end. The agent starts after that.
+    public ProcessId? SetupRunId { get; private set; }
+
+    public int? SetupExitCode { get; private set; }
+
+    // The message whose turn calls for testing the project's setup in a fresh nook afterwards, until
+    // the test ended; the next turn waits for it.
+    public MessageId? SetupTestAfter { get; private set; }
+
     // The agent's process, while it runs, and the SHA-256 of the token its model calls carry.
     public ProcessId? HarnessProcessId { get; private set; }
 
@@ -83,7 +96,7 @@ internal sealed class Chat
 
     public static Chat Start(NookId nookId, WorkspaceId workspaceId, UserId startedBy, string harness, AgentAccountCredential account, TimeProvider time)
     {
-        return new Chat(ChatId.New(), nookId, workspaceId, startedBy, time.GetUtcNow(), harness, account.Id, account.OwnerId);
+        return new Chat(ChatId.New(), nookId, workspaceId, startedBy, time.GetUtcNow(), harness, account.Id, account.OwnerId) { StartsAgent = true };
     }
 
     public static byte[] HashToken(string token)
@@ -97,6 +110,33 @@ internal sealed class Chat
         string token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         HarnessTokenHash = HashToken(token);
         return token;
+    }
+
+    // Its agent starts now, or couldn't; either way nothing waits for it to start any more.
+    public void AgentStartTried()
+    {
+        StartsAgent = false;
+    }
+
+    // A run of its nook's setup; returns whether its start is news.
+    public bool SetupRunSeen(ProcessId run)
+    {
+        if (SetupRunId == run)
+        {
+            return false;
+        }
+
+        SetupRunId = run;
+        SetupExitCode = null;
+        return true;
+    }
+
+    // Whether the agent still waits for the run it saw to end.
+    public bool WaitsForSetup => SetupRunId is not null && SetupExitCode is null;
+
+    public void SetupRunEnded(int exitCode)
+    {
+        SetupExitCode = exitCode;
     }
 
     public void HarnessStarted(ProcessId processId)
@@ -164,9 +204,18 @@ internal sealed class Chat
         OutputOffset = offset;
     }
 
-    public void TurnStarted(MessageId messageId)
+    public void TurnStarted(MessageId messageId, bool testsSetup)
     {
         TurnMessageId = messageId;
+        if (testsSetup)
+        {
+            SetupTestAfter = messageId;
+        }
+    }
+
+    public void SetupTestEnded()
+    {
+        SetupTestAfter = null;
     }
 
     // The turn ended, so a checkpoint of the files it changed is due.

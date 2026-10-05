@@ -17,4 +17,7 @@ internal static partial class Log
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't write to the agent of chat {ChatId}: {Reason}")]
     public static partial void InputFailed(ILogger logger, Guid chatId, string reason);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't delete nook {NookId}, which tested a project's setup; it stays in its workspace: {Reason}")]
+    public static partial void TestNookKept(ILogger logger, Guid nookId, string reason);
 }

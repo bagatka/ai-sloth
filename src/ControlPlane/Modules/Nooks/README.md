@@ -41,7 +41,7 @@ later starts them fast from templates.
 `INooksApi` in `Bagatka.AiSloth.Nooks.Contracts`: people with access and their agents list the
 providers they can use, create (with the workspace's repositories, or from one of another nook's
 checkpoints), list, and delete nooks, start, watch, feed, and stop processes in them, take and
-list checkpoints, download their files as they are or at a checkpoint, copy files out of and into
+list checkpoints, see the project's setup and its latest run, run it again, download their files as they are or at a checkpoint, copy files out of and into
 them, and export a source's changes for pushing. `INookDaemonsApi` is the daemon endpoint's side,
 never a public route or a tool.
 
@@ -102,9 +102,9 @@ nook is suspended: a nook with running processes is never idle.
 ## Data
 
 Schema `nooks`. Tables `nooks` (ID, workspace ID, provider name and location, status, created at and
-by, the nook and checkpoint it copies, its kept paths, whether its sources are in place, daemon
-token hash; a concurrency token), `source_copies` (nook ID and name, repository, branch, the commit
-it started from), `processes` (ID, nook ID, command, arguments, started at, exit code),
+by, the nook and checkpoint it copies, its kept paths, whether its sources are in place, the setup
+scripts found then and the process running them, daemon token hash; a concurrency token), `source_copies` (nook ID and name, repository, branch, the commit
+it started from), `processes` (ID, nook ID, command, arguments, started at, exit code and when it came),
 `checkpoints` (ID, nook ID, number, taken at, note), and `checkpoint_parts` (checkpoint, the place it
 keeps, its snapshot commit, the commit its bundle builds on, the bundle's object key). Bundles are in
 object storage under `nooks/<nook ID>/checkpoints/<number>/`.
@@ -123,17 +123,19 @@ object storage under `nooks/<nook ID>/checkpoints/<number>/`.
   claiming nooks atomically before several instances run it.
 - **Idle suspender** (planned): suspends nooks that stay idle longer than a setting.
 
-## Templates
+## Setup
 
-A template is a snapshot of a nook taken right after its sources' recipes ran. It is labelled with
-the recipes' versions, the base image, and a fingerprint of the sources' lockfiles. A new nook starts
-from the template with the matching label, or the nearest one; then each source moves to its target
-revision and the recipes run again. Because recipes are safe to run again, a matching template makes
-that step nearly instant and an older one makes it incremental. A missing label triggers a template
-build in the background.
-
-A template only makes starts faster; it never changes the result. If a recipe fails, the nook still
-starts and reports the failure.
+A project prepares its own nooks with scripts that live in its files, as Amp's do: `.agents/setup`
+installs what it needs, and `.agents/resume` starts its services, such as `docker compose up -d`.
+They live in `/work` or a folder directly in it, so a repository, an upload, or a project an agent
+made all carry theirs, and so do checkpoints and copies. Whenever a nook gets its files, as a new
+nook, a copy, or one brought back after its sandbox was lost, the files go in, then every setup runs,
+then every resume: `/work`'s own before each folder's, by name, each in its own folder, with the
+workspace's secrets, 30 minutes for a setup and 5 for a resume. One process runs them all, so people
+see it, and its output also goes to `/var/log/aisloth/setup.log` for the agent. A failure fails the
+run with the first failing script's exit code, after the others ran; the nook works either way.
+Scripts must be safe to run again, because ready copies (planned) will run them again on top of an
+earlier run.
 
 ## Checkpoints
 
@@ -198,9 +200,10 @@ before suspension comes with suspension.
   with the creator's GitHub connection, cloned beside its folder and moved into place, with origin
   pointing at GitHub without credentials and git set to commit as the creator. Then `/work/AGENTS.md`
   tells agents each folder is its own repository with its own instructions. A nook from a checkpoint
-  gets the checkpoint's files instead, and git set to commit as its creator. One operation on a
-  nook's files runs at a time per nook, preparation or checkpoint; a failure is returned and
-  retried by the next call.
+  gets the checkpoint's files instead, and git set to commit as its creator. Then the project's
+  setup starts (see Setup), and nothing waits for it here: Chats holds its agent until it ended. One
+  operation on a nook's files runs at a time per nook, preparation or checkpoint; a failure is
+  returned and retried by the next call.
 - **Losing a sandbox loses at most what changed since the latest checkpoint.** Chats takes one after
   every turn. The nook keeps its ID, record, and access; its processes don't survive, so they end
   with exit code -1 (`ProcessExited.Lost`).
@@ -229,7 +232,7 @@ before suspension comes with suspension.
 - **Lost processes.** Processes a restarted daemon lost in the same sandbox never report an exit:
   watching one ends at once with exit code -1, but the process list still shows it running. Handling
   it means marking them exited on the daemon's next hello. A replaced sandbox's processes are marked.
-- **Templates.**
+- **Ready copies,** and resuming a suspended nook's services with its resume scripts alone.
 - **What checkpoints leave out.** Ignored files; git's settings besides remotes, which a restored
   source gets again from its creator; tags; repositories deeper than directly in `/work`, and
   submodules' files. Folders whose names hold a tab or a line break fail the checkpoint, as do more

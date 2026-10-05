@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,11 +10,12 @@ namespace Bagatka.AiSloth.Cli;
 
 internal sealed partial class Sloth
 {
-    // Shows a chat's events as text as they arrive: people's messages, what the agent says and does,
-    // and how each turn ends. Between events it keeps whether a line is open, the agent's tool calls,
+    // Shows a chat's events as text as they arrive: people's messages, the project's setup and its
+    // tests, what the agent says and does, and how each turn ends. A chat whose project came with it
+    // and has no setup suggests preparing it, once, after its first turn. Between events it keeps whether a line is open, the agent's tool calls,
     // people's names, and the messages typed here, which the terminal already shows. Agent updates
     // without a line here (thoughts, plans, the agent's commands and modes) aren't shown.
-    private sealed class ChatPrinter(Terminal output, HostApi api, Guid me)
+    private sealed class ChatPrinter(Terminal output, HostApi api, Guid me, Guid chat, bool suggestPrepare)
     {
         private readonly Dictionary<string, string> _toolCalls = new Dictionary<string, string>(StringComparer.Ordinal);
         private readonly HashSet<string> _shown = new HashSet<string>(StringComparer.Ordinal);
@@ -21,6 +23,7 @@ internal sealed partial class Sloth
         private readonly List<string> _typedHere = [];
         private DateTimeOffset? _turnStartedAt;
         private bool _lineOpen;
+        private bool _setUp;
 
         // A message typed here, whose event isn't shown again.
         public void TypedHere(string text)
@@ -61,12 +64,16 @@ internal sealed partial class Sloth
                     string? took = _turnStartedAt is DateTimeOffset started ? " · " + Duration(chatEvent.At - started) : null;
                     await LineAsync("── " + Ending(StringOf(body, "stopReason"), StringOf(body, "failure")) + took + " ──");
                     _turnStartedAt = null;
+                    await SuggestPrepareAsync();
                     break;
                 case "checkpoint-saved":
                     await LineAsync(string.Create(CultureInfo.InvariantCulture, $"  (files saved as checkpoint {body.GetProperty("number").GetInt32()})"));
                     break;
                 case "checkpoint-failed":
                     await LineAsync("  (saving the files failed: " + StringOf(body, "failure") + ")");
+                    break;
+                case "setup-started" or "setup-ended" or "setup-test-started" or "setup-tested":
+                    await PrintSetupAsync(type, body);
                     break;
                 case "agent-restarted":
                     bool remembers = body.GetProperty("remembers").GetBoolean();
@@ -76,6 +83,92 @@ internal sealed partial class Sloth
                     // message-steered, and kinds a newer host adds: nothing to show.
                     break;
             }
+        }
+
+        // The project's setup: when it starts and ends, and the tests of one the agent prepared.
+        private async Task PrintSetupAsync(string type, JsonElement body)
+        {
+            switch (type)
+            {
+                case "setup-started":
+                    List<string> scripts = [.. body.GetProperty("scripts").EnumerateArray().Select(script => script.GetString() ?? string.Empty)];
+                    await LineAsync("Setting up: " + string.Join(", ", scripts));
+                    _setUp = true;
+                    break;
+                case "setup-ended":
+                    await PrintSetupEndAsync(body);
+                    break;
+                case "setup-test-started":
+                    int test = body.GetProperty("test").GetInt32();
+                    await LineAsync(test == 1 ? "Testing the setup in a fresh nook…" : string.Create(CultureInfo.InvariantCulture, $"Testing the setup in a fresh nook again (test {test} of 3)…"));
+                    break;
+                default:
+                    await PrintSetupTestAsync(body);
+                    break;
+            }
+        }
+
+        // A failed setup shows the end of its output; the agent starts either way.
+        private async Task PrintSetupEndAsync(JsonElement ended)
+        {
+            int exitCode = ended.GetProperty("exitCode").GetInt32();
+            string took = Duration(TimeSpan.Parse(StringOf(ended, "took") ?? "0", CultureInfo.InvariantCulture));
+            if (exitCode == 0)
+            {
+                await LineAsync("Set up in " + took + ".");
+                return;
+            }
+
+            await LineAsync(string.Create(CultureInfo.InvariantCulture, $"Setup failed after {took} (exit {exitCode}):"));
+            foreach (string line in (StringOf(ended, "output") ?? string.Empty).Split('\n'))
+            {
+                await LineAsync("  " + line);
+            }
+
+            await LineAsync("The agent knows and can fix it. Full output: sloth chat setup " + ShortId(chat));
+        }
+
+        // Both runs' times when the test passed; otherwise what went wrong, and whether the agent fixes it.
+        private async Task PrintSetupTestAsync(JsonElement tested)
+        {
+            int exitCode = tested.GetProperty("exitCode").GetInt32();
+            TimeSpan fromScratch = TimeSpan.Parse(StringOf(tested, "fromScratch") ?? "0", CultureInfo.InvariantCulture);
+            string? again = StringOf(tested, "again");
+            if (exitCode == 0)
+            {
+                string second = again is null ? string.Empty : "; run again: " + Duration(TimeSpan.Parse(again, CultureInfo.InvariantCulture));
+                await LineAsync("Setup works from scratch: " + Duration(fromScratch) + second + ".");
+                return;
+            }
+
+            string after = fromScratch > TimeSpan.Zero ? " after " + Duration(fromScratch) : string.Empty;
+            string code = exitCode > 0 ? string.Create(CultureInfo.InvariantCulture, $" (exit {exitCode})") : string.Empty;
+            await LineAsync("Setup failed in a fresh nook" + after + code + ":");
+            foreach (string line in (StringOf(tested, "output") ?? string.Empty).Split('\n'))
+            {
+                await LineAsync("  " + line);
+            }
+
+            if (tested.GetProperty("agentFixes").GetBoolean())
+            {
+                await LineAsync("Sent to the agent to fix; it's tested again after its turn.");
+            }
+            else if (exitCode > 0)
+            {
+                await LineAsync("It still fails after 3 tests. Tell the agent what you know, then prepare again: sloth chat prepare " + ShortId(chat));
+            }
+        }
+
+        // Once, after a turn, for a chat whose project has no setup.
+        private async Task SuggestPrepareAsync()
+        {
+            if (!suggestPrepare || _setUp)
+            {
+                return;
+            }
+
+            await LineAsync("Tip: this project has no setup, so every new nook installs what it needs from scratch. Prepare it once: sloth chat prepare " + ShortId(chat));
+            _setUp = true;
         }
 
         private async Task PrintUpdateAsync(JsonElement update)

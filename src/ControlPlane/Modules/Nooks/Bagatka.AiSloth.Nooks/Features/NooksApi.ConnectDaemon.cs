@@ -64,7 +64,7 @@ internal sealed partial class NooksApi
                 {
                     case ProcessExited exited:
                         Process? process = await current.Processes.SingleOrDefaultAsync(found => found.Id == exited.ProcessId && found.NookId == nookId, ct);
-                        process?.Exited(exited.ExitCode);
+                        process?.Exited(exited.ExitCode, time);
                         await current.SaveAsync(ct);
                         break;
                     case DiskUsage disk:

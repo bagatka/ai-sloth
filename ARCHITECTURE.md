@@ -254,8 +254,9 @@ A capability with one contract, `I<Module>Api`.
 ### Nooks, providers, and the daemon
 
 Built: the Docker provider, the daemon and its image, the Nooks module from creating a nook to
-deleting it, checkpoints and coming back from them, and machines, a workspace's own computers as a
-provider. Suspension and templates are not built yet (`ROADMAP.md` has the order). The maps are `src/ControlPlane/Modules/Nooks/README.md`,
+deleting it, a project's setup, checkpoints and coming back from them, and machines, a workspace's
+own computers as a provider. Suspension and ready copies are not built yet (`ROADMAP.md` has the
+order). The maps are `src/ControlPlane/Modules/Nooks/README.md`,
 `src/ControlPlane/Modules/Machines/README.md`, `src/Sandboxing/README.md`, and `src/Daemon/README.md`.
 These decisions are fixed:
 
@@ -472,9 +473,9 @@ this table in the same change.
 | Module | Owns | Asks | Reacts to | Schema |
 |---|---|---|---|---|
 | Workspaces (contract only) | Workspaces, and who may do what with them and their nooks: access levels, invites | — | — | `workspaces` |
-| Nooks | Nooks, where each runs, their lifecycle and recovery, processes, their copies of sources, checkpoints, templates (planned), daemon connections | Workspaces, Sources, Machines, Secrets | — | `nooks` |
+| Nooks | Nooks, where each runs, their lifecycle and recovery, processes, their copies of sources, running the project's setup, checkpoints, ready copies (planned), daemon connections | Workspaces, Sources, Machines, Secrets | — | `nooks` |
 | Secrets | Workspaces' environment variables for every process in their nooks, their sealed values | Workspaces | — | `secrets` |
-| Sources | GitHub repositories a workspace connected, people's GitHub connections and git settings, copying in and pushing out, push policy; folders and recipes (planned) | Workspaces | — | `sources` |
+| Sources | GitHub repositories a workspace connected, people's GitHub connections and git settings, copying in and pushing out, push policy; folders (planned) | Workspaces | — | `sources` |
 | AgentAccounts | Accounts at agent vendors that pay for agents: a workspace's and people's own, their sealed secrets | Workspaces | — | `agent_accounts` |
 | Chats | ACP conversations in nooks, their messages, proposals, and events, the agents' runners, the instructions agents get, people's harness state | Nooks, AgentAccounts, Workspaces | — | `chats` |
 | Machines | Computers workspaces add to run nooks, their credentials and connections, the `machine` provider | Workspaces | — | `machines` |

@@ -212,7 +212,9 @@ internal sealed class NookReconciler(
             }
         }
 
-        await db.Processes.Where(process => process.NookId == nook.Id && process.ExitCode == null).ExecuteUpdateAsync(set => set.SetProperty(process => process.ExitCode, -1), ct);
+        DateTimeOffset lostAt = time.GetUtcNow();
+        await db.Processes.Where(process => process.NookId == nook.Id && process.ExitCode == null)
+            .ExecuteUpdateAsync(set => set.SetProperty(process => process.ExitCode, -1).SetProperty(process => process.ExitedAt, lostAt), ct);
         nook.Replace(latest);
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)

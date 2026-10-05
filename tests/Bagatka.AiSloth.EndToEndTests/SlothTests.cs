@@ -158,7 +158,53 @@ public sealed partial class SlothTests(ControlPlane controlPlane)
         Assert.StartsWith("   1  just now    after: Please write hello.txt for me\n", checkpoints, StringComparison.Ordinal);
         Assert.Equal(0, started);
         Assert.Contains(" · a copy of " + shortId + " at checkpoint 1\n", second, StringComparison.Ordinal);
+        Assert.Contains("\nTip: this project has no setup, so every new nook installs what it needs from scratch. Prepare it once: sloth chat prepare ", second, StringComparison.Ordinal);
         Assert.Equal(0, restored);
+    }
+
+    [Fact]
+    public async Task A_chats_setup_shows_while_it_starts_and_in_full_on_request()
+    {
+        await using SlothCli sloth = await SignedInAsync();
+        await sloth.RunWithInputAsync(FakeModel.ApiKey + "\n", "account", "add", "anthropic-api-key", "--name", "Fake", "--endpoint", controlPlane.Model.Url.AbsoluteUri);
+        await sloth.RunAsync("chat", "say hello", "--harness", "claude-code");
+        string first = sloth.Output[5..11];
+        await ChangeAsync(sloth, "mkdir -p /work/.agents && printf '#!/bin/sh\\necho preparing\\nexit 2\\n' > /work/.agents/setup && chmod 755 /work/.agents/setup");
+
+        int started = await sloth.RunAsync("chat", "say hello", "--from", first);
+        string chat = sloth.Output;
+        string second = chat[5..11];
+        int shown = await sloth.RunAsync("chat", "setup", second);
+        string setup = sloth.Output;
+
+        Assert.Equal(0, started);
+        Assert.Contains("\nSetting up: .agents/setup\n", chat, StringComparison.Ordinal);
+        Assert.Matches("\nSetup failed after [0-9]+s \\(exit 2\\):\n  ==> \\.agents/setup\n  preparing\n", chat);
+        Assert.Contains("The agent knows and can fix it. Full output: sloth chat setup " + second + "\n", chat, StringComparison.Ordinal);
+        Assert.Contains("── done · ", chat, StringComparison.Ordinal);
+        Assert.Equal(1, shown);
+        Assert.Equal("==> .agents/setup\npreparing\n==> .agents/setup failed with exit code 2\n", setup);
+    }
+
+    [Fact]
+    public async Task Preparing_a_chat_follows_it_until_its_setup_works_in_a_fresh_nook()
+    {
+        await using SlothCli sloth = await SignedInAsync();
+        await sloth.RunWithInputAsync(FakeModel.ApiKey + "\n", "account", "add", "anthropic-api-key", "--name", "Fake", "--endpoint", controlPlane.Model.Url.AbsoluteUri);
+        await sloth.RunAsync("chat", "say hello", "--harness", "claude-code");
+        string shortId = sloth.Output[5..11];
+        await ChangeAsync(sloth, "mkdir -p /opt && touch /opt/by-hand");
+
+        int prepared = await sloth.RunAsync("chat", "prepare", shortId);
+        string output = sloth.Output;
+
+        Assert.Equal(0, prepared);
+        Assert.StartsWith("Asked the agent to prepare the project for fast starts.", output, StringComparison.Ordinal);
+        Assert.Contains("\nTesting the setup in a fresh nook…\n", output, StringComparison.Ordinal);
+        Assert.Matches("\nSetup failed in a fresh nook after [0-9]+s \\(exit 1\\):\n", output);
+        Assert.Contains("\nSent to the agent to fix; it's tested again after its turn.\n", output, StringComparison.Ordinal);
+        Assert.Contains("\nTesting the setup in a fresh nook again (test 2 of 3)…\n", output, StringComparison.Ordinal);
+        Assert.Matches("\nSetup works from scratch: [0-9]+s; run again: [0-9]+s\\.\n", output);
     }
 
     // Runs a script in the newest chat's nook as an agent would, through the API with the CLI's own

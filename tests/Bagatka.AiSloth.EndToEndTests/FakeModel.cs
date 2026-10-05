@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -21,7 +22,9 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// <summary>
 /// A model provider at the HTTP boundary: the real agent runs in a real nook, only the model is fake.
 /// It speaks the Anthropic Messages API well enough for Claude Code, answering by the last user
-/// message's latest text: a tool result ends the turn, "write hello" asks to write <c>/work/hello.txt</c>, "wait"
+/// message's latest text: a tool result last ends the turn, "write hello" asks to write <c>/work/hello.txt</c>, a
+/// request to prepare the project writes a <c>.agents/setup</c> that needs what was installed by hand
+/// (<c>/opt/by-hand</c>), and a failed test of it fixes it to install that, "wait"
 /// holds the answer until <see cref="Release"/>, "first message" answers with the conversation's first
 /// message, and anything else gets a short text. It speaks
 /// OpenAI's Responses API well enough for Codex and pi, answering every call with a short text.
@@ -114,10 +117,12 @@ internal sealed class FakeModel : IAsyncDisposable
         JsonArray messages = request["messages"]!.AsArray();
         JsonNode? lastUser = messages.LastOrDefault(message => string.Equals((string?)message!["role"], "user", StringComparison.Ordinal));
         bool tools = request["tools"] is JsonArray offered && offered.Any(tool => string.Equals((string?)tool!["name"], "Write", StringComparison.Ordinal));
+        bool shell = request["tools"] is JsonArray offers && offers.Any(tool => string.Equals((string?)tool!["name"], "Bash", StringComparison.Ordinal));
 
         JsonObject[] blocks;
         string stopReason;
-        if (Blocks(lastUser).Any(block => string.Equals((string?)block["type"], "tool_result", StringComparison.Ordinal)))
+        // A tool's result ends the turn, unless a new prompt follows it in the same message.
+        if (string.Equals((string?)Blocks(lastUser).LastOrDefault()?["type"], "tool_result", StringComparison.Ordinal))
         {
             (blocks, stopReason) = ([Text("Done.")], "end_turn");
         }
@@ -125,6 +130,10 @@ internal sealed class FakeModel : IAsyncDisposable
         {
             JsonObject write = new JsonObject { ["type"] = "tool_use", ["id"] = "toolu_e2e", ["name"] = "Write", ["input"] = new JsonObject { ["file_path"] = "/work/hello.txt", ["content"] = "hi from the fake model\n" } };
             (blocks, stopReason) = ([write], "tool_use");
+        }
+        else if (shell && SetupCommand(messages, lastUser) is string command)
+        {
+            (blocks, stopReason) = ([Shell(command)], "tool_use");
         }
         else if (Says(lastUser, "first message"))
         {
@@ -204,6 +213,37 @@ internal sealed class FakeModel : IAsyncDisposable
     private static JsonObject Text(string text)
     {
         return new JsonObject { ["type"] = "text", ["text"] = text };
+    }
+
+    // What the agent runs when asked to fix its setup after a failed test, or to prepare the project:
+    // each once in a conversation. Any text of the message counts, because Claude Code sends a
+    // later turn's prompt with the earlier turn's tool result and adds reminders.
+    private static string? SetupCommand(JsonArray messages, JsonNode? message)
+    {
+        string text = message?["content"] is JsonValue plain
+            ? plain.GetValue<string>()
+            : string.Join("\n", Blocks(message).Select(block => block["text"]?.GetValue<string>()));
+        (string Asked, string Command)[] steps =
+        [
+            ("in a fresh nook, with only the project's files, and it failed", "printf '#!/bin/sh\\nmkdir -p /opt && touch /opt/by-hand\\n' > /work/.agents/setup"),
+            ("Prepare this project", "mkdir -p /work/.agents && printf '#!/bin/sh\\ntest -f /opt/by-hand\\n' > /work/.agents/setup && chmod +x /work/.agents/setup"),
+        ];
+        return steps
+            .Where(step => text.Contains(step.Asked, StringComparison.Ordinal) && !Ran(messages, step.Command))
+            .Select(step => step.Command)
+            .FirstOrDefault();
+    }
+
+    private static bool Ran(JsonArray messages, string command)
+    {
+        return messages.Where(message => string.Equals((string?)message!["role"], "assistant", StringComparison.Ordinal))
+            .SelectMany(Blocks)
+            .Any(block => string.Equals((string?)block["type"], "tool_use", StringComparison.Ordinal) && string.Equals((string?)block["input"]?["command"], command, StringComparison.Ordinal));
+    }
+
+    private static JsonObject Shell(string command)
+    {
+        return new JsonObject { ["type"] = "tool_use", ["id"] = "toolu_e2e_" + Guid.CreateVersion7().ToString("N", CultureInfo.InvariantCulture), ["name"] = "Bash", ["input"] = new JsonObject { ["command"] = command, ["description"] = "Write the setup" } };
     }
 
     private static IEnumerable<JsonObject> Blocks(JsonNode? message)

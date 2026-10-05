@@ -65,7 +65,7 @@ internal sealed partial class Sloth
         string at = checkpoint is int number ? string.Create(CultureInfo.InvariantCulture, $" at checkpoint {number}") : string.Empty;
         string starting = line.Values("--repo").Count > 0 ? " · " + string.Join(", ", line.Values("--repo")) : copyOf is null ? string.Empty : " · a copy of " + ShortId(copyOf.Id) + at;
         await terminal.WriteLineAsync("Chat " + ShortId(chat.Id) + " · " + harness.Name + " · " + account.Name + " · " + provider.Name + starting);
-        ChatPrinter printer = new ChatPrinter(terminal, api, host.UserId);
+        ChatPrinter printer = new ChatPrinter(terminal, api, host.UserId, chat.Id, suggestPrepare: repositories.Count > 0 || copyOf is not null);
         Wire.SentMessage sent = await SendMessageAsync(api, chat.Id, message, anyway: false, ct);
         return await FollowAsync(api, chat, printer, terminal.Interactive ? null : sent.Id, ct);
     }
@@ -182,7 +182,7 @@ internal sealed partial class Sloth
         }
 
         await terminal.WriteLineAsync("Chat " + ShortId(chat.Id) + " · " + chat.Harness + (chat.Working ? " · working" : string.Empty));
-        return await FollowAsync(api, chat, new ChatPrinter(terminal, api, host.UserId), until: null, ct);
+        return await FollowAsync(api, chat, new ChatPrinter(terminal, api, host.UserId, chat.Id, suggestPrepare: false), until: null, ct);
     }
 
     private async Task<int> SendToChatAsync(string id, string text, bool anyway, CancellationToken ct)
@@ -381,7 +381,7 @@ internal sealed partial class Sloth
         }
 
         using CancellationTokenSource leave = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        Task<int> watching = WatchAsync(api, chat, printer, until, leave.Token);
+        Task<int> watching = WatchAsync(api, chat, printer, until, untilTested: false, leave.Token);
         Task typing = terminal.Interactive ? TypeAsync(api, chat, printer, leave.Token) : Task.Delay(Timeout.InfiniteTimeSpan, leave.Token);
         Task first = await Task.WhenAny(watching, typing);
         await leave.CancelAsync();
@@ -397,8 +397,10 @@ internal sealed partial class Sloth
         return 0;
     }
 
-    // The chat's events as they happen, resuming after the last one shown when the connection drops.
-    private async Task<int> WatchAsync(HostApi api, Wire.Chat chat, ChatPrinter printer, Guid? until, CancellationToken ct)
+    // The chat's events as they happen, resuming after the last one shown when the connection drops;
+    // until the turn of the message `until` ended, or with `untilTested` the last test of the setup it
+    // asked to prepare.
+    private async Task<int> WatchAsync(HostApi api, Wire.Chat chat, ChatPrinter printer, Guid? until, bool untilTested, CancellationToken ct)
     {
         long after = 0;
         bool ours = false;
@@ -419,7 +421,9 @@ internal sealed partial class Sloth
                     Wire.ChatEvent chatEvent = JsonSerializer.Deserialize(item.Data, CliJsonContext.Default.ChatEvent)!;
                     after = chatEvent.Sequence;
                     await printer.PrintAsync(item.EventType, chatEvent, ct);
-                    int? ended = until is Guid message ? EndOf(item.EventType, chatEvent, message, ref ours, ref checkpointDue) : null;
+                    int? ended = until is not Guid message ? null
+                        : untilTested ? EndOfTest(item.EventType, chatEvent, message, ref ours)
+                        : EndOf(item.EventType, chatEvent, message, ref ours, ref checkpointDue);
                     if (ended is not null)
                     {
                         return ended.Value;
@@ -461,6 +465,26 @@ internal sealed partial class Sloth
         else if (checkpointDue && type is "checkpoint-saved" or "checkpoint-failed")
         {
             return 0;
+        }
+
+        return null;
+    }
+
+    // The exit code once the last test of the setup that the message `until` asked to prepare ended,
+    // or its turn was stopped, so no test follows; null until then.
+    private static int? EndOfTest(string type, Wire.ChatEvent chatEvent, Guid until, ref bool ours)
+    {
+        if (MessageOf(chatEvent.Event) == until && type is "message-sent")
+        {
+            ours = true;
+        }
+        else if (ours && type is "setup-tested" && !chatEvent.Event.GetProperty("agentFixes").GetBoolean())
+        {
+            return chatEvent.Event.GetProperty("exitCode").GetInt32() == 0 ? 0 : 1;
+        }
+        else if (ours && type is "turn-ended" && chatEvent.Event.GetProperty("stopReason").GetString() is "cancelled")
+        {
+            return 1;
         }
 
         return null;

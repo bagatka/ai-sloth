@@ -45,13 +45,18 @@ internal sealed partial class ChatsApi
             }
         }
 
-        bool unconfirmed = await NeedsDiskConfirmationAsync(chat, command, isProposal, ct);
+        bool unconfirmed = false;
+        if (!isProposal)
+        {
+            unconfirmed = await NeedsDiskConfirmationAsync(chat, command.ConfirmNearlyFullDisk, ct);
+        }
+
         if (unconfirmed)
         {
             return new Result<ChatMessage>(ChatsErrors.DiskNearlyFull);
         }
 
-        Result<Message> sent = Message.Send(command.ChatId, user.UserId, command.Text, isProposal, command.Proposal, time);
+        Result<Message> sent = Message.Send(command.ChatId, user.UserId, command.Text, isProposal, command.Proposal, setupTest: null, time);
         if (sent.Failed)
         {
             return new Result<ChatMessage>(sent.Error);
@@ -72,10 +77,10 @@ internal sealed partial class ChatsApi
 
     // A nearly full disk is the sender's to confirm, because the agent's work and checkpoints may
     // fail: a message for the agent, unconfirmed, while the nook's disk was nearly full at its
-    // daemon's last report, needs it.
-    private async Task<bool> NeedsDiskConfirmationAsync(Chat chat, SendMessage command, bool isProposal, CancellationToken ct)
+    // daemon's last report, needs it. Proposals don't run the agent, so they never ask.
+    private async Task<bool> NeedsDiskConfirmationAsync(Chat chat, bool confirmed, CancellationToken ct)
     {
-        if (isProposal || command.ConfirmNearlyFullDisk)
+        if (confirmed)
         {
             return false;
         }

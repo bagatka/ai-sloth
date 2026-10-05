@@ -22,6 +22,8 @@ internal sealed class ChatRunners(
     AgentProcess agent,
     HarnessStates states,
     AgentInstructions instructions,
+    ProjectSetups setups,
+    ChatsMeter meter,
     ChatsSettings settings,
     ChatSignals signals,
     TimeProvider time,
@@ -94,7 +96,7 @@ internal sealed class ChatRunners(
                 return _runners[chat].Runner;
             }
 
-            ChatRunner runner = new ChatRunner(chat, databases, scopes, agent, states, instructions, settings, signals, time, logger);
+            ChatRunner runner = new ChatRunner(chat, databases, scopes, agent, states, instructions, setups, meter, settings, signals, time, logger);
             Task running = Task.Run(() => runner.RunAsync(Retire, _stopping.Token), CancellationToken.None);
             _runners[chat] = (runner, running);
             return runner;

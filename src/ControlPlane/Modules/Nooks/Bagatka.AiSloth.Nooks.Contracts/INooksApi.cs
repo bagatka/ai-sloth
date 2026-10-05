@@ -71,6 +71,20 @@ public interface INooksApi
     public Task<Result<ProcessSummary>> StartProcessAsync(Actor actor, StartProcess command, CancellationToken ct);
 
     /// <summary>
+    /// The nook's setup (<see cref="NookSetup"/>). Its files are put in place first, which starts its
+    /// setup when it has one. People who can see the nook may.
+    /// </summary>
+    /// <returns>The setup; <see cref="NooksErrors.NotReady"/>; or not found.</returns>
+    public Task<Result<NookSetup>> GetSetupAsync(Actor actor, NookId id, CancellationToken ct);
+
+    /// <summary>
+    /// Runs the nook's setup again now, as its scripts are now, as when the nook got its files: to
+    /// check that it is safe and fast to run again. People with Write may.
+    /// </summary>
+    /// <returns>The setup with the new run; <see cref="NooksErrors.SetupRunning"/>; <see cref="NooksErrors.NotReady"/>; or not found or forbidden.</returns>
+    public Task<Result<NookSetup>> RunSetupAsync(Actor actor, NookId id, CancellationToken ct);
+
+    /// <summary>
     /// The nook's processes, newest first.
     /// </summary>
     public Task<Result<Page<ProcessSummary>>> ListProcessesAsync(Actor actor, NookId nookId, PageRequest page, CancellationToken ct);

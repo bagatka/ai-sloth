@@ -3,26 +3,23 @@
 What we build next, in order. A step leaves this list when it lands on main; what a module still
 lacks lives in its README's "Not built yet".
 
-Steps 1 to 6, with what is built, are the first release: the product principles in
+Steps 1 to 5, with what is built, are the first release: the product principles in
 `ARCHITECTURE.md` hold for every kind of customer, with few integrations of each kind. Everything
 after it adds entries to existing lists (a provider, an account kind, a harness) rather than new
 concepts. Providers for now: local Docker, people's own machines, and Azure Container Apps
 Sandboxes for the official host.
 
-1. **Fast start: setup and Prepare.** A project's own `.agents/setup` and `.agents/resume`, wherever
-   its files come from, run before the agent; Prepare has the agent write them and proves them in a
-   fresh nook. Agents start when the chat does. Measured from Send to the agent's first action.
-2. **Projects without a repository.** Publish a chat's project as a new GitHub repository, and start
+1. **Projects without a repository.** Publish a chat's project as a new GitHub repository, and start
    a chat from an uploaded folder or archive.
-3. **Azure provider and suspension.** Hosted nooks on Azure Container Apps Sandboxes, microVMs with
+2. **Azure provider and suspension.** Hosted nooks on Azure Container Apps Sandboxes, microVMs with
    memory snapshots; idle nooks suspend on every provider and resume without anyone noticing.
-4. **Fast start: ready copies.** A nook whose setup took a while leaves a copy of itself right after
+3. **Fast start: ready copies.** A nook whose setup took a while leaves a copy of itself right after
    setup, matched by its setup and harness, that the next nooks start from and catch up; on Azure a
    memory snapshot with its services running.
-5. **Hosting.** The official host on Azure, object storage in Azure Blob Storage, self-hosting
+4. **Hosting.** The official host on Azure, object storage in Azure Blob Storage, self-hosting
    packaged for a VPS or a company network, machines connecting from anywhere, and a
    push-notification relay any host can use.
-6. **Apps.** The web app, served by every host, and native iOS and Android apps that connect to any
+5. **Apps.** The web app, served by every host, and native iOS and Android apps that connect to any
    number of hosts.
 
 Later, order not decided: Macs as machines, with a VM per nook, Linux or macOS for Apple platforms;

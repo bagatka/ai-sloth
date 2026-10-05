@@ -70,8 +70,9 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Changes | What differs in a nook's copy of a source from what it started with: its commits since, and what isn't committed | Nooks, Sources | diff, patch (except as a download format) |
 | Agents' guide | `/work/AGENTS.md` in a nook with sources, telling agents each folder is its own repository with its own instructions | Nooks | root AGENTS.md |
 | Instructions | What AiSloth tells every agent to follow, whatever its harness: a workspace's, for everyone's chats there, and a person's own, for the chats they start; written to the file each harness reads its user's instructions from | Chats | system prompt, rules, custom instructions |
-| Recipe | A source's setup script, safe to run again, owned by AiSloth and versioned | Sources (planned) | setup script, bootstrap, skill |
-| Template | A snapshot of a nook right after its recipes ran, used to start new nooks fast | Nooks (planned) | image, cache, warm pool |
+| Setup | A project's own scripts that prepare a nook, `.agents/setup` installing what it needs and `.agents/resume` starting its services, in `/work` or a folder directly in it; they run whenever a nook gets the project's files, before its agent starts | Nooks | recipe, bootstrap, init script |
+| Prepare | Having a chat's agent write the project's setup, then testing it in a fresh nook, from scratch and again, sending failures back to the agent, three tests at most | Chats | init, onboard, bootstrap |
+| Ready copy | A copy of a nook right after its setup, which the next nooks with the same setup and harness start from and catch up | Nooks (planned) | template, image, cache, warm pool |
 | Project | An optional group of nooks, chats, and sources for a team working toward one goal | Projects (planned) | space, board, workspace |
 | Harness | The program that runs a coding agent, such as Claude Code or Codex; in a nook, through its ACP adapter | Chats | agent (that's what it runs), CLI, client |
 | Harness profile | What AiSloth knows about one harness: its ID, name, the credentials it takes, and where it keeps its sessions and its state; its image's start script configures it | `Bagatka.Harnesses` | adapter, plugin |
