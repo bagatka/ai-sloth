@@ -73,6 +73,23 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
         return new Wire.OutputUploadResult();
     }
 
+    public override async Task ReadInput(Wire.InputRequest request, IServerStreamWriter<Wire.InputChunk> responseStream, ServerCallContext context)
+    {
+        CancellationToken ct = context.CancellationToken;
+        ReadInput command = new ReadInput(NookId.From(GrpcCalls.ParseId(request.NookId)), GrpcCalls.BearerToken(context), ProcessId.From(GrpcCalls.ParseId(request.ProcessId)));
+        Result<IAsyncEnumerable<ReadOnlyMemory<byte>>> input = await nooks.ReadInputAsync(Actor.Anonymous, command, ct);
+        if (input.Failed)
+        {
+            throw GrpcCalls.Rejection(input.Error);
+        }
+
+        await foreach (ReadOnlyMemory<byte> chunk in input.Output.WithCancellation(ct))
+        {
+            // Each chunk is a fresh array the feed hands over, so wrapping it without a copy is safe.
+            await responseStream.WriteAsync(new Wire.InputChunk { Data = UnsafeByteOperations.UnsafeWrap(chunk) }, ct);
+        }
+    }
+
     // The reports after Hello. The stream ends however the daemon leaves: reports carry no state a
     // broken connection could leave half done.
     private static async IAsyncEnumerable<DaemonReport> ReportsAsync(IAsyncStreamReader<Wire.DaemonEvent> events, [EnumeratorCancellation] CancellationToken ct)
@@ -145,6 +162,7 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
             Command = start.Command,
             Arguments = { start.Arguments },
             WorkingDirectory = start.WorkingDirectory ?? string.Empty,
+            InputStreamed = start.InputStreamed,
             Retention = start.Retention switch
             {
                 OutputRetention.Recent => Wire.OutputRetention.Recent,

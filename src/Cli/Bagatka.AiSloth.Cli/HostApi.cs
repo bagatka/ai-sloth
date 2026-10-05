@@ -18,6 +18,9 @@ namespace Bagatka.AiSloth.Cli;
 // status code is set for a refusal and null when the host couldn't be reached or didn't answer.
 internal sealed class HostApi : IDisposable
 {
+    // Where a refusal's error code is, in the exception's data.
+    public const string ProblemCode = "code";
+
     private readonly HttpClient _http;
     private readonly Uri _url;
 
@@ -90,6 +93,7 @@ internal sealed class HostApi : IDisposable
         }
 
         string why;
+        string? code = null;
         if (response.StatusCode == HttpStatusCode.Unauthorized)
         {
             why = "Your session on " + _url.Authority + " ended. Sign in again: sloth host add " + _url.AbsoluteUri.TrimEnd('/');
@@ -100,9 +104,13 @@ internal sealed class HostApi : IDisposable
             string[] fields = problem.Errors is null ? [] : [.. problem.Errors.Values.SelectMany(messages => messages)];
             why = fields.Length > 0 ? string.Join(" ", fields)
                 : problem.Title ?? string.Create(CultureInfo.InvariantCulture, $"{_url.Authority} answered {(int)response.StatusCode} {response.ReasonPhrase}.");
+            code = problem.Code;
         }
 
-        throw new HttpRequestException(why, inner: null, response.StatusCode);
+        // The host's error code rides along, for commands that can say what to do about it.
+        HttpRequestException refused = new HttpRequestException(why, inner: null, response.StatusCode);
+        refused.Data[ProblemCode] = code;
+        throw refused;
     }
 
     // What the host said about a refusal; empty when it said nothing sloth can read.
@@ -111,18 +119,18 @@ internal sealed class HostApi : IDisposable
         string? type = response.Content.Headers.ContentType?.MediaType;
         if (type is not ("application/problem+json" or "application/json"))
         {
-            return new Wire.Problem(Title: null, Errors: null);
+            return new Wire.Problem(Title: null, Code: null, Errors: null);
         }
 
         try
         {
             Wire.Problem? problem = await response.Content.ReadFromJsonAsync(CliJsonContext.Default.Problem, ct);
-            return problem ?? new Wire.Problem(Title: null, Errors: null);
+            return problem ?? new Wire.Problem(Title: null, Code: null, Errors: null);
         }
         catch (JsonException)
         {
             // The status code alone says what happened.
-            return new Wire.Problem(Title: null, Errors: null);
+            return new Wire.Problem(Title: null, Code: null, Errors: null);
         }
     }
 

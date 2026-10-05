@@ -17,7 +17,7 @@ namespace Bagatka.AiSloth.Cli;
 // which it dials on the daemon endpoint. It runs on Linux and macOS; on Windows, inside WSL.
 internal sealed partial class Sloth
 {
-    private string MachinePath => Path.Combine(folder, "machine.json");
+    private string MachinePath => Path.Combine(home, "machine.json");
 
     private async Task<int> ConnectMachineAsync(string url, string code, CancellationToken ct)
     {

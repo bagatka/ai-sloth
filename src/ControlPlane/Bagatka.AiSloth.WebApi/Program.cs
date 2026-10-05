@@ -7,6 +7,7 @@ using Bagatka.AiSloth.Chats;
 using Bagatka.AiSloth.Machines;
 using Bagatka.AiSloth.Nooks;
 using Bagatka.AiSloth.Secrets;
+using Bagatka.AiSloth.Sources;
 using Bagatka.AiSloth.Users;
 using Bagatka.AiSloth.WebApi;
 using Bagatka.AiSloth.WebApi.Endpoints;
@@ -15,6 +16,7 @@ using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.Foundation.Web;
 using Bagatka.Sandboxing.Docker;
+using Bagatka.Sdk.GitHub;
 using Bagatka.ServiceDefaults;
 using Bagatka.AiSloth.Users.Contracts;
 using Microsoft.AspNetCore.Authentication;
@@ -55,6 +57,8 @@ MachinesSettings machines = builder.Configuration.GetRequired<MachinesSettings>(
 NooksSettings nooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
 AgentAccountsSettings agentAccounts = builder.Configuration.GetRequired<AgentAccountsSettings>("Modules:AgentAccounts");
 SecretsSettings secrets = builder.Configuration.GetRequired<SecretsSettings>("Modules:Secrets");
+SourcesSettings sources = builder.Configuration.GetRequired<SourcesSettings>("Modules:Sources");
+GitHubSettings gitHub = builder.Configuration.GetSection("GitHub").Exists() ? builder.Configuration.GetRequired<GitHubSettings>("GitHub") : GitHubSettings.Public;
 ChatsSettings chats = builder.Configuration.GetRequired<ChatsSettings>("Modules:Chats");
 ModelGatewaySettings modelGateway = builder.Configuration.GetRequired<ModelGatewaySettings>("ModelGateway");
 
@@ -93,12 +97,17 @@ if (signInProvider is not null)
 builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
+// Sources copies repositories in and pushes them out with people's GitHub connections, through the
+// host's GitHub App, running git on this computer.
+builder.Services.AddGitHubClient(gitHub);
+
 builder.Services
     .AddDockerSandboxProvider(docker)
     .AddUsersModule(users)
     .AddWorkspacesModule(workspaces)
     .AddMachinesModule(machines)
     .AddSecretsModule(secrets)
+    .AddSourcesModule(sources)
     .AddNooksModule(nooks)
     .AddAgentAccountsModule(agentAccounts)
     .AddChatsModule(chats);
@@ -139,6 +148,7 @@ app.MapMachinesEndpoints();
 app.MapNooksEndpoints();
 app.MapAgentAccountsEndpoints();
 app.MapSecretsEndpoints();
+app.MapSourcesEndpoints();
 app.MapChatsEndpoints();
 
 // Agents in nooks reach the model gateway on Kestrel's "Models" endpoint (appsettings.json); a call

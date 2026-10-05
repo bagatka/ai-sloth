@@ -34,12 +34,13 @@ GitHub Copilot.
 ## Contract
 
 `IChatsApi` in `Bagatka.AiSloth.Chats.Contracts`: members list the harnesses, start chats (each
-creating its nook, on a provider, with a harness and an agent account), list a workspace's chats, send messages (or send a proposal on), stop the agent, and watch
+creating its nook, on a provider, with a harness and an agent account, and with the workspace's
+repositories or a copy of another chat's files), list a workspace's chats, send messages (or send a proposal on), stop the agent, and watch
 a chat's events from any sequence number.
 `IChatHarnessesApi` is the model gateway's side, never a public route or a tool.
 
 ```csharp
-Result<ChatSummary> started = await chats.StartAsync(alice, new StartChat(workspaceId, "docker", "codex", teamAccountId), ct); // creates its nook
+Result<ChatSummary> started = await chats.StartAsync(alice, new StartChat(workspaceId, "docker", "codex", teamAccountId, [new NookRepository(apiRepositoryId)], CopyOf: null), ct); // creates its nook
 if (started.Failed)
 {
     return new Result(started.Error);

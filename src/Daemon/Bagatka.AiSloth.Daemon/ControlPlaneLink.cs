@@ -35,7 +35,7 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
     private static readonly string Version =
         typeof(ControlPlaneLink).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
 
-    // Bounds concurrent uploads; every upload ends before its connection does.
+    // Bounds concurrent uploads; every upload and input stream ends before its connection does.
     private readonly SemaphoreSlim _uploadSlots = new SemaphoreSlim(MaxConcurrentUploads);
 
     /// <summary>Connects, and reconnects with backoff, until <paramref name="ct"/> is cancelled.</summary>
@@ -111,6 +111,12 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
                 {
                     case DaemonInstruction.InstructionOneofCase.StartProcess:
                         await processes.StartAsync(instruction.StartProcess);
+                        if (instruction.StartProcess.InputStreamed)
+                        {
+                            uploads.RemoveAll(upload => upload.IsCompleted);
+                            uploads.Add(ReadInputAsync(client, instruction.StartProcess.ProcessId, connection.Token));
+                        }
+
                         break;
                     case DaemonInstruction.InstructionOneofCase.StopProcess:
                         processes.Stop(instruction.StopProcess.ProcessId);
@@ -245,6 +251,38 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
         {
             // The watcher left, or the connection broke; either way the watch is over.
             Log.WatchEnded(logger, exception, watch.WatchId);
+        }
+    }
+
+    // Feeds a process's standard input from its own stream, then closes it, however the stream ends.
+    private async Task ReadInputAsync(ControlPlane.ControlPlaneClient client, string processId, CancellationToken ct)
+    {
+        NookProcess? process = processes.Find(processId);
+        if (process is null)
+        {
+            return;
+        }
+
+        try
+        {
+            InputRequest request = new InputRequest { NookId = settings.NookId.ToString("D", CultureInfo.InvariantCulture), ProcessId = processId };
+            using AsyncServerStreamingCall<InputChunk> call = client.ReadInput(request, Authorization(), cancellationToken: ct);
+            await foreach (InputChunk chunk in call.ResponseStream.ReadAllAsync(ct))
+            {
+                await process.SendInputAsync(chunk.Data.Memory, ct);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // The connection ended; the input is cut short.
+        }
+        catch (RpcException exception)
+        {
+            Log.InputEnded(logger, exception, processId);
+        }
+        finally
+        {
+            process.CompleteInput();
         }
     }
 

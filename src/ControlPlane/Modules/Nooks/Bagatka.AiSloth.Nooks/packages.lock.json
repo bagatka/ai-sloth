@@ -74,11 +74,19 @@
       "bagatka.aisloth.nooks.contracts": {
         "type": "Project",
         "dependencies": {
+          "Bagatka.AiSloth.Sources.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
           "Bagatka.Foundation": "[1.0.0, )"
         }
       },
       "bagatka.aisloth.secrets.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
+      "bagatka.aisloth.sources.contracts": {
         "type": "Project",
         "dependencies": {
           "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",

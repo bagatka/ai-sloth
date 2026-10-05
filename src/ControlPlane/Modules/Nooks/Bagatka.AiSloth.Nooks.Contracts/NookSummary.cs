@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Bagatka.AiSloth.Workspaces.Contracts;
 
 namespace Bagatka.AiSloth.Nooks.Contracts;
@@ -13,6 +14,7 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// <param name="CreatedAt">When it was recorded.</param>
 /// <param name="Disk">How full its disk was at the daemon's last report, or <see langword="null"/> before the first.</param>
 /// <param name="Harness">The harness it carries for its chat's agent, or <see langword="null"/> for none.</param>
+/// <param name="Sources">Its sources, each a repository at <c>/work/&lt;name&gt;</c>, by name.</param>
 public sealed record NookSummary(
     NookId Id,
     WorkspaceId WorkspaceId,
@@ -20,4 +22,5 @@ public sealed record NookSummary(
     NookStatus Status,
     DateTimeOffset CreatedAt,
     DiskUsage? Disk,
-    string? Harness);
+    string? Harness,
+    IReadOnlyList<NookSource> Sources);

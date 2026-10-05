@@ -13,7 +13,7 @@ namespace Bagatka.AiSloth.Cli;
 // 0 when it did what it says, 1 when it couldn't, and 2 when it was called wrong.
 internal sealed partial class Sloth(
     Terminal terminal,
-    string folder,
+    string home,
     HttpMessageHandler http,
     Func<Uri, CancellationToken, Task> openBrowser,
     string device,
@@ -50,22 +50,46 @@ internal sealed partial class Sloth(
           sloth secret set <NAME>    Reads the value hidden, or from standard input
           sloth secret remove <NAME>
 
+        GitHub and repositories
+          sloth github connect       Connect your GitHub account, for your repositories and pushes
+          sloth github               Which account is connected
+          sloth github disconnect
+          sloth repo add [<owner/name>]
+                                     Add a repository to the workspace; without one, those you can add
+          sloth repo list
+          sloth repo remove <name>
+          sloth git                  How your commits and branches look
+          sloth git author "<Name> <email>"|github
+          sloth git committer "<Name> <email>"|author
+          sloth git co-author on|off
+          sloth git branch-prefix <prefix>
+
         Chats
           sloth chat "<message>" [--harness <id>] [--account <name>] [--on <provider>]
-                                     Start a chat in a nook of its own, and follow it
+                     [--repo <name>[@<branch>]]... [--from <chat>]
+                                     Start a chat in a nook of its own, and follow it: with the
+                                     workspace's repositories at /work/<name>, or a copy of a chat's files
           sloth chat list
           sloth chat open <id>       Follow a chat; type to write to the agent, /stop to stop it
           sloth chat send <id> "<message>"
           sloth chat stop <id>
+          sloth chat push <id> [--pr] [--branch <name>] [--source <name>]... [--message <text>]
+                                     Push the chat's changes to GitHub, with a pull request each
+          sloth chat download <id> [--source <name>] [--out <file>]
+                                     Save the chat's files as a .tar.gz
           Ctrl+C only leaves a chat: the agent keeps working.
 
         Machines
           sloth machine connect <url> <code>
                                      Connect this computer to a workspace with a code from its owner
           sloth machine run          Run the workspace's nooks here, in Docker
+
+        Hosting
+          sloth github create-app [--org <org>] [--name <name>] [--public]
+                                     Make the host's GitHub App, which people connect GitHub through
         """;
 
-    private string HostsPath => Path.Combine(folder, "hosts.json");
+    private string HostsPath => Path.Combine(home, "hosts.json");
 
     public async Task<int> RunAsync(string[] args, CancellationToken ct)
     {
@@ -92,8 +116,19 @@ internal sealed partial class Sloth(
             ["chat", "open", string id] => OpenChatAsync(id, ct),
             ["chat", "send", string id, string text] => SendToChatAsync(id, text, ct),
             ["chat", "stop", string id] => StopChatAsync(id, ct),
-            ["chat", "list" or "open" or "send" or "stop", ..] => UsageAsync(),
+            ["chat", "push", string id, .. string[] rest] => PushChatAsync(id, rest, ct),
+            ["chat", "download", string id, .. string[] rest] => DownloadChatAsync(id, rest, ct),
+            ["chat", "list" or "open" or "send" or "stop" or "push" or "download", ..] => UsageAsync(),
             ["chat", .. string[] rest] => StartChatAsync(rest, ct),
+            ["github"] => ShowGitHubAsync(ct),
+            ["github", "connect"] => ConnectGitHubAsync(ct),
+            ["github", "disconnect"] => DisconnectGitHubAsync(ct),
+            ["github", "create-app", .. string[] rest] => CreateGitHubAppAsync(rest, ct),
+            ["repo"] or ["repo", "list"] => ListRepositoriesAsync(ct),
+            ["repo", "add", .. string[] rest] => AddRepositoryAsync(rest, ct),
+            ["repo", "remove", string name] => RemoveRepositoryAsync(name, ct),
+            ["git"] => ShowGitSettingsAsync(ct),
+            ["git", "author" or "committer" or "co-author" or "branch-prefix", string value] => SetGitSettingAsync(args[1], value, ct),
             ["machine", "connect", string url, string code] => ConnectMachineAsync(url, code, ct),
             ["machine", "run"] => RunMachineAsync(ct),
             _ => UsageAsync(),
@@ -105,7 +140,8 @@ internal sealed partial class Sloth(
         }
         catch (HttpRequestException exception)
         {
-            await terminal.FailAsync(exception.Message);
+            string hint = exception.Data[HostApi.ProblemCode] is "sources.github_not_connected" ? " Connect it: sloth github connect" : string.Empty;
+            await terminal.FailAsync(exception.Message + hint);
             return 1;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

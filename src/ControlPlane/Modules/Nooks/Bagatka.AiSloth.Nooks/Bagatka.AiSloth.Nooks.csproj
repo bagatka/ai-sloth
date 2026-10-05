@@ -4,6 +4,7 @@
     <ProjectReference Include="..\Bagatka.AiSloth.Nooks.Contracts\Bagatka.AiSloth.Nooks.Contracts.csproj" />
     <ProjectReference Include="..\..\Machines\Bagatka.AiSloth.Machines.Contracts\Bagatka.AiSloth.Machines.Contracts.csproj" />
     <ProjectReference Include="..\..\Secrets\Bagatka.AiSloth.Secrets.Contracts\Bagatka.AiSloth.Secrets.Contracts.csproj" />
+    <ProjectReference Include="..\..\Sources\Bagatka.AiSloth.Sources.Contracts\Bagatka.AiSloth.Sources.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\Foundation\Bagatka.Foundation.Modules\Bagatka.Foundation.Modules.csproj" />
     <ProjectReference Include="..\..\..\..\Sandboxing\Bagatka.Sandboxing\Bagatka.Sandboxing.csproj" />
   </ItemGroup>

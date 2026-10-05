@@ -8,8 +8,10 @@ templates, runs processes in them through their daemons, and checkpoints and for
 
 ## Owns
 
-- **Data:** nook records (workspace, provider, harness, sources, status, latest disk usage), the hash of
-  each nook's daemon token, the processes started in each nook, templates, and checkpoints.
+- **Data:** nook records (workspace, provider, harness, who created it, what it copies, status, latest
+  disk usage), the hash of each nook's daemon token, its copies of its sources (each repository's
+  name, branch, and the commit it started from), the processes started in each nook, templates, and
+  checkpoints.
 - **Rules:** what each access level allows with a nook (Read sees it and watches its processes; Write
   starts, feeds, and stops processes and deletes it; the control plane's own processes, such as Chats
   running an agent, may do anything), the lifecycle below, when an idle nook is suspended, and which
@@ -26,7 +28,8 @@ templates, runs processes in them through their daemons, and checkpoints and for
   records in its contract.
 - What runs in a nook, such as agent chats: other modules start and watch processes through
   `INooksApi`.
-- Sources and their recipes: Sources. A nook mounts each of its sources at `/work/<name>`.
+- Repositories, GitHub, and pushing: Sources. A nook holds a copy of each of its sources at
+  `/work/<name>`; Sources makes the copy and pushes the changes, with people's GitHub connections.
 - Projects: a project refers to nooks; nooks never refer to projects.
 - People's own computers: Machines. To this module they are one more provider, `machine`, whose
   places are the workspace's machines; Machines says which machines a workspace has.
@@ -34,8 +37,10 @@ templates, runs processes in them through their daemons, and checkpoints and for
 ## Contract
 
 `INooksApi` in `Bagatka.AiSloth.Nooks.Contracts`: people with access and their agents list the
-providers they can use, create, list, and delete nooks, and start, watch, feed, and stop processes
-in them. `INookDaemonsApi` is the daemon endpoint's side, never a public route or a tool.
+providers they can use, create (with the workspace's repositories, or a copy of another nook),
+list, and delete nooks, start, watch, feed, and stop processes in them, download their files, and
+export a source's changes for pushing. `INookDaemonsApi` is the daemon endpoint's side, never a public
+route or a tool.
 
 A provider ID names where a nook runs: a provider the deployment runs for every workspace, such as
 `docker`, or one of the workspace's machines, `machine:<machine ID>`. Callers take IDs from
@@ -46,8 +51,9 @@ A provider ID names where a nook runs: a provider the deployment runs for every 
 Workspaces (`GetAccessAsync`), on every call made for a user, and `AddResourceAsync` when creating a
 nook; Machines (`ListAsync`, `GetAsync`), for
 the workspace's machines when listing providers and creating a nook on one; Secrets
-(`ResolveAsync`), for the workspace's secrets whenever it starts a process; Sources (planned), for
-what to mount and how to set it up.
+(`ResolveAsync`), for the workspace's secrets whenever it starts a process; Sources
+(`GetRepositoryAsync` when a nook is created, `ExportAsync` and `GetGitSettingsAsync` when its
+sources are copied in), as the nook's creator.
 
 ## Publishes
 
@@ -76,9 +82,10 @@ nook is suspended: a nook with running processes is never idle.
 
 ## Data
 
-Schema `nooks`. Tables `nooks` (ID, workspace ID, provider name and location, status, created at,
-daemon token hash; the status has a concurrency token) and `processes` (ID, nook ID, command, arguments, started at,
-exit code).
+Schema `nooks`. Tables `nooks` (ID, workspace ID, provider name and location, status, created at and
+by, the nook it copies, whether its sources are in place, daemon token hash; a concurrency token),
+`source_copies` (nook ID and name, repository, branch, the commit it started from), and `processes`
+(ID, nook ID, command, arguments, started at, exit code).
 
 ## Background work
 
@@ -150,6 +157,17 @@ and memory. The idle period before suspension comes with suspension.
   `SLOTHD_CONTROL_PLANE_URL`), and only its SHA-256 hash is stored. This module verifies it, which is why
   `INookDaemonsApi` takes an anonymous actor. Anything inside the nook can read the token, so it
   grants only what that nook's daemon needs.
+- **Sources go in before anything runs.** The first process started in a nook, an agent's included,
+  waits while its sources are copied in: each repository as a git bundle the control plane fetched
+  with the creator's GitHub connection, cloned beside its folder and moved into place, with origin
+  pointing at GitHub without credentials and git set to commit as the creator. Then `/work/AGENTS.md`
+  tells agents each folder is its own repository with its own instructions. One preparation runs at
+  a time per nook; a failure is returned and retried by the next call.
+- **Moving files is processes.** Copying in, copying out, archiving, and bundling changes are shell
+  scripts run as processes, recorded like any other, so people see what ran. Bulk input reaches them
+  on a stream of its own (`daemon.proto`, `ReadInput`), whose end closes their input; their output is
+  watched as usual, with `Complete` retention. What a run writes out, an archive or a bundle, lands
+  on the control plane's disk first, so a run that writes more than 4 GiB is stopped and fails.
 - **Watches survive reconnects.** A watch asks the daemon for output from the last offset it
   relayed, again after every reconnect, so a watcher sees each byte once.
 - **One active instance for now.** Daemon connections live in the instance they dialed. A deploy
@@ -172,4 +190,7 @@ and memory. The idle period before suspension comes with suspension.
   them exited on the daemon's next hello.
 - **Disk usage** is stored and returned, but nothing acts on it yet; Chats will ask for
   confirmation at 90%.
-- **Checkpoints, forks, and templates.**
+- **Checkpoints, forks, and templates.** A copy of another nook takes its files as they are now.
+- **Sources from another workspace,** and bringing new commits into a running nook.
+- **Timeouts for copying in.** A copy that hangs, such as one whose daemon never reads its input,
+  holds the nook's first process until its caller gives up.

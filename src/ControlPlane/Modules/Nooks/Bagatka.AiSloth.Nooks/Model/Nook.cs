@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Nooks.Model;
 
@@ -15,7 +17,7 @@ internal sealed class Nook
     public const int MaxHarnessLength = 32;
 
     // Used by Create and by EF: parameter names match property names.
-    private Nook(NookId id, WorkspaceId workspaceId, string provider, string? location, string? harness, NookStatus status, DateTimeOffset createdAt)
+    private Nook(NookId id, WorkspaceId workspaceId, string provider, string? location, string? harness, NookStatus status, DateTimeOffset createdAt, UserId? createdBy, NookId? copyOf)
     {
         Id = id;
         WorkspaceId = workspaceId;
@@ -24,6 +26,8 @@ internal sealed class Nook
         Harness = harness;
         Status = status;
         CreatedAt = createdAt;
+        CreatedBy = createdBy;
+        CopyOf = copyOf;
     }
 
     public NookId Id { get; private set; }
@@ -42,6 +46,17 @@ internal sealed class Nook
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    // Whose GitHub connection copies its repositories in; none for a nook the control plane created.
+    public UserId? CreatedBy { get; private set; }
+
+    // The nook whose files it starts with a copy of, if any.
+    public NookId? CopyOf { get; private set; }
+
+    // Whether its sources are in place: its repositories copied in, or another nook's files, and the
+    // agents' guide to them.
+    // Nothing else runs in it before.
+    public bool SourcesReady { get; private set; }
+
     // The SHA-256 of the daemon's token; the token itself is never stored.
     public byte[]? DaemonTokenHash { get; private set; }
 
@@ -52,9 +67,14 @@ internal sealed class Nook
     // PostgreSQL's xmin: concurrent changes to one nook conflict instead of overwriting each other.
     public uint Version { get; private set; }
 
-    public static Nook Create(WorkspaceId workspaceId, ProviderId provider, string? harness, TimeProvider time)
+    public static Nook Create(WorkspaceId workspaceId, ProviderId provider, string? harness, UserId? createdBy, NookId? copyOf, TimeProvider time)
     {
-        return new Nook(NookId.New(), workspaceId, provider.Name, provider.Location, harness, NookStatus.Creating, time.GetUtcNow());
+        return new Nook(NookId.New(), workspaceId, provider.Name, provider.Location, harness, NookStatus.Creating, time.GetUtcNow(), createdBy, copyOf);
+    }
+
+    public void SourcesPrepared()
+    {
+        SourcesReady = true;
     }
 
     // A new token for the daemon of a sandbox about to be created. It replaces any earlier one, which
@@ -106,10 +126,10 @@ internal sealed class Nook
         DiskAvailableBytes = disk.AvailableBytes;
     }
 
-    public NookSummary ToSummary()
+    public NookSummary ToSummary(IReadOnlyList<NookSource> copies)
     {
         DiskUsage? disk = DiskTotalBytes is long total && DiskAvailableBytes is long available ? new DiskUsage(total, available) : null;
-        return new NookSummary(Id, WorkspaceId, new ProviderId(Provider, Location).ToString(), Status, CreatedAt, disk, Harness);
+        return new NookSummary(Id, WorkspaceId, new ProviderId(Provider, Location).ToString(), Status, CreatedAt, disk, Harness, copies);
     }
 
     private static byte[] Hash(string token)

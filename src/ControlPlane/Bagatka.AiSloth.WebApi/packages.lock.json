@@ -372,6 +372,7 @@
           "Bagatka.AiSloth.Machines.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Nooks.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Secrets.Contracts": "[1.0.0, )",
+          "Bagatka.AiSloth.Sources.Contracts": "[1.0.0, )",
           "Bagatka.Foundation.Modules": "[1.0.0, )",
           "Bagatka.Sandboxing": "[1.0.0, )"
         }
@@ -379,6 +380,7 @@
       "bagatka.aisloth.nooks.contracts": {
         "type": "Project",
         "dependencies": {
+          "Bagatka.AiSloth.Sources.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
           "Bagatka.Foundation": "[1.0.0, )"
         }
@@ -391,6 +393,21 @@
         }
       },
       "bagatka.aisloth.secrets.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
+      "bagatka.aisloth.sources": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.AiSloth.Sources.Contracts": "[1.0.0, )",
+          "Bagatka.Foundation.Modules": "[1.0.0, )",
+          "Bagatka.Sdk.GitHub": "[1.0.0, )"
+        }
+      },
+      "bagatka.aisloth.sources.contracts": {
         "type": "Project",
         "dependencies": {
           "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
@@ -464,6 +481,12 @@
         }
       },
       "bagatka.sdk.docker": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
+      "bagatka.sdk.github": {
         "type": "Project",
         "dependencies": {
           "Bagatka.Foundation": "[1.0.0, )"

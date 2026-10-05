@@ -52,6 +52,27 @@ public sealed class DaemonTests
     }
 
     [Fact(Timeout = Timeout)]
+    public async Task A_process_reads_streamed_input_to_its_end()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await using FakeControlPlane controlPlane = await FakeControlPlane.StartAsync();
+        await using DaemonUnderTest daemon = DaemonUnderTest.Start(controlPlane.Url);
+        FakeControlPlane.Connection connection = await controlPlane.Endpoint.NextConnectionAsync(ct);
+        string process = NewId();
+        byte[] input = Encoding.ASCII.GetBytes(string.Concat(Enumerable.Range(0, 20_000).Select(line => line.ToString("D9", CultureInfo.InvariantCulture) + "\n")));
+        controlPlane.Endpoint.Feed(process, input);
+        DaemonInstruction start = Start(process, "wc", "-c");
+        start.StartProcess.InputStreamed = true;
+
+        await connection.Instructions.Writer.WriteAsync(start, ct);
+        ProcessExited exited = await NextExitAsync(connection, process);
+        List<ProcessOutput> output = await WatchAsync(controlPlane, connection, process, fromOffset: 0);
+
+        Assert.Equal(0, exited.ExitCode);
+        Assert.Equal(input.Length.ToString(CultureInfo.InvariantCulture), Text(output, OutputChannel.StandardOutput).Trim());
+    }
+
+    [Fact(Timeout = Timeout)]
     public async Task A_process_gets_the_variables_it_was_started_with()
     {
         CancellationToken ct = TestContext.Current.CancellationToken;

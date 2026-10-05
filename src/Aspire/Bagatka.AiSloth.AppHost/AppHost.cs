@@ -34,6 +34,16 @@ string? chatGptApi = builder.Configuration["Parameters:chatgpt-api"];
 IResourceBuilder<ParameterResource> agentAccountsKey = builder.AddParameter(
     "agent-accounts-key", new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
 
+// People connect GitHub through the host's GitHub App, which `sloth github create-app` makes: give
+// github-app-client-id, -client-secret, and -slug as user secrets of this project. Tests point
+// github-api and github-web at a fake GitHub.
+string? gitHubAppClientId = builder.Configuration["Parameters:github-app-client-id"];
+string? gitHubApi = builder.Configuration["Parameters:github-api"];
+
+// Encrypts people's GitHub tokens at rest; generated once and kept in this project's user secrets.
+IResourceBuilder<ParameterResource> sourcesKey = builder.AddParameter(
+    "sources-key", new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
+
 // Encrypts secrets' values at rest; generated once and kept in this project's user secrets.
 IResourceBuilder<ParameterResource> secretsKey = builder.AddParameter(
     "secrets-key", new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
@@ -80,6 +90,8 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         .WithEnvironment("Modules__AgentAccounts__AllowChatGptPlans", allowChatGptPlans)
         .WithEnvironment("Modules__Secrets__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Secrets__EncryptionKey", secretsKey)
+        .WithEnvironment("Modules__Sources__ConnectionString", database.Resource.ConnectionStringExpression)
+        .WithEnvironment("Modules__Sources__EncryptionKey", sourcesKey)
         .WithEnvironment("ModelGateway__AllowPrivateNetworks", modelPrivateNetworks)
         .WithEnvironment("Modules__Nooks__DaemonUrl", ReferenceExpression.Create($"http://host.docker.internal:{daemonEndpoint.Property(EndpointProperty.Port)}"))
         .WithEnvironment("Modules__Nooks__Image", NookImage)
@@ -101,6 +113,19 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
             if (inviteSignUp is not null)
             {
                 environment.EnvironmentVariables["Host__InviteSignUp"] = inviteSignUp;
+            }
+
+            if (gitHubAppClientId is not null)
+            {
+                environment.EnvironmentVariables["Modules__Sources__GitHubApp__ClientId"] = gitHubAppClientId;
+                environment.EnvironmentVariables["Modules__Sources__GitHubApp__ClientSecret"] = builder.Configuration["Parameters:github-app-client-secret"] ?? string.Empty;
+                environment.EnvironmentVariables["Modules__Sources__GitHubApp__Slug"] = builder.Configuration["Parameters:github-app-slug"] ?? string.Empty;
+            }
+
+            if (gitHubApi is not null)
+            {
+                environment.EnvironmentVariables["GitHub__ApiUrl"] = gitHubApi;
+                environment.EnvironmentVariables["GitHub__WebUrl"] = builder.Configuration["Parameters:github-web"] ?? string.Empty;
             }
 
             if (chatGptAuthority is not null)

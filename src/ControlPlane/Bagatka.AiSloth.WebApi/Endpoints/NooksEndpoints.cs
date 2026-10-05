@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
@@ -20,7 +21,7 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class NooksEndpoints
 {
-    internal sealed record CreateNookRequest(string Provider);
+    internal sealed record CreateNookRequest(string Provider, IReadOnlyList<NookRepository>? Repositories = null, NookId? CopyOf = null);
 
     internal sealed record StartProcessRequest(
         string Command,
@@ -41,6 +42,7 @@ internal static class NooksEndpoints
         RouteGroupBuilder nooks = app.MapGroup("/nooks").WithTags("Nooks");
         nooks.MapGet("/{id:guid}", Get);
         nooks.MapDelete("/{id:guid}", Delete);
+        nooks.MapGet("/{id:guid}/download", Download);
         nooks.MapPost("/{nookId:guid}/processes", StartProcess);
         nooks.MapGet("/{nookId:guid}/processes", ListProcesses);
         nooks.MapGet("/{nookId:guid}/processes/{processId:guid}/output", WatchProcess);
@@ -61,8 +63,45 @@ internal static class NooksEndpoints
         [FromServices] INooksApi api,
         CancellationToken ct)
     {
-        Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider, Harness: null), ct);
+        Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider, Harness: null, request.Repositories ?? [], request.CopyOf), ct);
         return result.ToCreated(nook => string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Id.Value}"));
+    }
+
+    /// <summary>
+    /// The nook's files as a gzipped tar archive: one of its sources with <c>source</c>, or all of
+    /// <c>/work</c>. Anyone who sees the nook may.
+    /// </summary>
+    private static async Task<Results<PushStreamHttpResult, ProblemHttpResult>> Download(
+        [FromRoute] Guid id,
+        [FromQuery] string? source,
+        ClaimsPrincipal principal,
+        [FromServices] INooksApi api,
+        CancellationToken ct)
+    {
+        // The archive is complete before it is sent, so a failure midway is a problem, not a broken
+        // file. Sending it deletes it.
+        string path = Path.GetTempFileName();
+        Result downloaded;
+        await using (FileStream archive = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 81920, FileOptions.Asynchronous))
+        {
+            downloaded = await api.DownloadAsync(principal.ToActor(), new DownloadFiles(NookId.From(id), source), archive, ct);
+        }
+
+        if (downloaded.Failed)
+        {
+            File.Delete(path);
+            return downloaded.Error.ToProblem();
+        }
+
+        string name = (source ?? "work") + "-" + id.ToString("N", CultureInfo.InvariantCulture)[^6..] + ".tar.gz";
+        return TypedResults.Stream(
+            async body =>
+            {
+                await using FileStream archive = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None, bufferSize: 81920, FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+                await archive.CopyToAsync(body);
+            },
+            "application/gzip",
+            name);
     }
 
     /// <summary>The providers the workspace's nooks can run on, with the ID <c>provider</c> takes when creating one.</summary>

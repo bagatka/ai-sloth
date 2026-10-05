@@ -1,8 +1,13 @@
 using System;
+using System.Globalization;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Bagatka.AiSloth.Chats.Contracts;
+using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.Foundation;
 using Xunit;
 
 namespace Bagatka.AiSloth.EndToEndTests;
@@ -94,6 +99,51 @@ public sealed partial class SlothTests(ControlPlane controlPlane)
         Assert.Matches("── done · [0-9]+s ──", chat);
         Assert.Equal(0, listed);
         Assert.StartsWith(shortId + "  claude-code", sloth.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_repository_goes_from_GitHub_into_a_chat_and_back_as_a_pull_request()
+    {
+        string person = "erin-" + Guid.CreateVersion7();
+        string owner = "acme-" + Guid.CreateVersion7().ToString("N", CultureInfo.InvariantCulture)[^8..];
+        await controlPlane.GitHub.CreateRepositoryAsync(owner, "api", person);
+        await using SlothCli sloth = new SlothCli(person);
+        await sloth.RunAsync("host", "add", controlPlane.WebApiUrl.AbsoluteUri);
+        await sloth.RunWithInputAsync(FakeModel.ApiKey + "\n", "account", "add", "anthropic-api-key", "--name", "Fake", "--endpoint", controlPlane.Model.Url.AbsoluteUri);
+
+        int connected = await sloth.RunAsync("github", "connect");
+        string connectedOutput = sloth.Output;
+        int added = await sloth.RunAsync("repo", "add", owner + "/api");
+        int chatted = await sloth.RunAsync("chat", "Please write hello.txt for me", "--harness", "claude-code", "--repo", "api");
+        string chat = sloth.Output;
+        string shortId = chat[5..11];
+        await ChangeAsync(sloth, "echo hi > /work/api/CHANGE.md");
+        int pushed = await sloth.RunAsync("chat", "push", shortId, "--pr");
+        string pushedOutput = sloth.Output;
+        string archive = Path.Combine(Path.GetTempPath(), "sloth-e2e-" + shortId + ".tar.gz");
+        int downloaded = await sloth.RunAsync("chat", "download", shortId, "--source", "api", "--out", archive);
+
+        Assert.Equal(0, connected);
+        Assert.Contains("Connected GitHub as " + person + ".", connectedOutput, StringComparison.Ordinal);
+        Assert.Equal(0, added);
+        Assert.Equal(0, chatted);
+        Assert.Matches("^Chat [0-9a-f]{6} · Claude Code · Fake · docker · api\n", chat);
+        Assert.Equal(0, pushed);
+        Assert.Matches("^api: 1 commits on aisloth/" + shortId + "  http://127.0.0.1:[0-9]+/" + owner + "/api/pull/1\n", pushedOutput);
+        Assert.Equal(0, downloaded);
+        Assert.True(new FileInfo(archive).Length > 0);
+        File.Delete(archive);
+    }
+
+    // Changes the chat's files as an agent would, through the API with the CLI's own session.
+    private async Task ChangeAsync(SlothCli sloth, string script)
+    {
+        string? token = await sloth.TokenForAsync(Host);
+        using HttpClient client = controlPlane.ClientWithToken(token);
+        Page<WorkspaceSummary> workspaces = await Api.ReadAsync<Page<WorkspaceSummary>>(client.SendGetAsync("/workspaces"), HttpStatusCode.OK);
+        Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(client.SendGetAsync(string.Create(CultureInfo.InvariantCulture, $"/workspaces/{workspaces.Items[0].Id.Value}/chats")), HttpStatusCode.OK);
+        int? changed = await NookProcesses.ExitCodeAsync(client, chats.Items[0].NookId, "sh", "-c", script);
+        Assert.Equal(0, changed);
     }
 
     [GeneratedRegex("--code (?<code>[A-Z0-9]{16})", RegexOptions.None, matchTimeoutMilliseconds: 1000)]

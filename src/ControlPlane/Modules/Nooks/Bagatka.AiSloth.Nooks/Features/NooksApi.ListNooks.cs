@@ -31,7 +31,10 @@ internal sealed partial class NooksApi
         }
 
         List<Nook> nooks = await paged.Output.ToListAsync(ct);
-        List<NookSummary> fetched = nooks.Select(nook => nook.ToSummary()).ToList();
+        List<NookId> ids = [.. nooks.Select(nook => nook.Id)];
+        List<SourceCopy> copies = await db.SourceCopies.AsNoTracking().Where(copy => ids.Contains(copy.NookId)).OrderBy(copy => copy.Name).ToListAsync(ct);
+        ILookup<NookId, NookSource> byNook = copies.ToLookup(copy => copy.NookId, copy => copy.ToContract());
+        List<NookSummary> fetched = nooks.Select(nook => nook.ToSummary([.. byNook[nook.Id]])).ToList();
         return new Result<Page<NookSummary>>(Keyset.ToPage(fetched, page, nook => nook.Id.Value));
     }
 }

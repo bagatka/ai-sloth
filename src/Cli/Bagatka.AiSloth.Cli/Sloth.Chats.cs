@@ -25,7 +25,7 @@ internal sealed partial class Sloth
 
     private async Task<int> StartChatAsync(string[] words, CancellationToken ct)
     {
-        CommandLine? line = CommandLine.Parse(words, ["--harness", "--account", "--on"], []);
+        CommandLine? line = CommandLine.Parse(words, ["--harness", "--account", "--on", "--from"], [], repeatable: ["--repo"]);
         if (line is not { Arguments: [string message] })
         {
             return await UsageAsync();
@@ -39,7 +39,14 @@ internal sealed partial class Sloth
 
         using HostApi api = ApiFor(host);
         ChatSetup? setup = await ChooseSetupAsync(api, host, workspace, line, ct);
-        if (setup is not (Wire.Account account, Wire.Harness harness, Wire.Provider provider))
+        List<Wire.NookRepository>? repositories = await ResolveRepositoriesAsync(api, host, workspace, line.Values("--repo"), ct);
+        Wire.Chat? copyOf = null;
+        if (line.Value("--from") is string from)
+        {
+            copyOf = await FindChatAsync(api, host, from, ct);
+        }
+
+        if (setup is not (Wire.Account account, Wire.Harness harness, Wire.Provider provider) || repositories is null || (line.Value("--from") is not null && copyOf is null))
         {
             return 1;
         }
@@ -47,13 +54,14 @@ internal sealed partial class Sloth
         Wire.Chat chat = await api.SendAsync(
             HttpMethod.Post,
             "/workspaces/" + workspace + "/chats",
-            new Wire.StartChat(provider.Id, harness.Id, account.Id),
+            new Wire.StartChat(provider.Id, harness.Id, account.Id, repositories, copyOf?.Id),
             CliJsonContext.Default.StartChat,
             CliJsonContext.Default.Chat,
             ct);
         HostsFile hosts = await ReadHostsAsync(ct);
         await PrivateFile.WriteAsync(HostsPath, hosts.With(host with { Defaults = new ChatDefaults(harness.Id, account.Id, provider.Id) }), CliJsonContext.Default.HostsFile, ct);
-        await terminal.WriteLineAsync("Chat " + ShortId(chat.Id) + " · " + harness.Name + " · " + account.Name + " · " + provider.Name);
+        string starting = line.Values("--repo").Count > 0 ? " · " + string.Join(", ", line.Values("--repo")) : copyOf is null ? string.Empty : " · a copy of " + ShortId(copyOf.Id);
+        await terminal.WriteLineAsync("Chat " + ShortId(chat.Id) + " · " + harness.Name + " · " + account.Name + " · " + provider.Name + starting);
         ChatPrinter printer = new ChatPrinter(terminal, api, host.UserId);
         Wire.SentMessage sent = await SendMessageAsync(api, chat.Id, message, ct);
         return await FollowAsync(api, chat, printer, terminal.Interactive ? null : sent.Id, ct);
@@ -180,6 +188,87 @@ internal sealed partial class Sloth
         await terminal.WriteLineAsync(sent.IsProposal
             ? "Proposed: the chat runs on someone else's plan, so its owner decides whether it reaches the agent."
             : "Sent. Follow the chat: sloth chat open " + ShortId(chat.Id));
+        return 0;
+    }
+
+    // Pushes the chat's changes to GitHub: every source that changed, onto one branch, with a pull
+    // request each when asked. Exits with 1 when any repository's push was refused.
+    private async Task<int> PushChatAsync(string id, string[] words, CancellationToken ct)
+    {
+        CommandLine? line = CommandLine.Parse(words, ["--branch", "--message"], ["--pr"], repeatable: ["--source"]);
+        if (line is not { Arguments: [] })
+        {
+            return await UsageAsync();
+        }
+
+        HostsFile hosts = await ReadHostsAsync(ct);
+        SignedInHost? host = await CurrentHostAsync(hosts);
+        if (host is null)
+        {
+            return 1;
+        }
+
+        using HostApi api = ApiFor(host);
+        Wire.Chat? chat = await FindChatAsync(api, host, id, ct);
+        if (chat is null)
+        {
+            return 1;
+        }
+
+        IReadOnlyList<string>? names = line.Values("--source").Count > 0 ? line.Values("--source") : null;
+        Wire.Push push = new Wire.Push(names, line.Value("--branch"), line.Has("--pr"), line.Value("--message"));
+        IReadOnlyList<Wire.PushedSource> pushed = await api.SendAsync(
+            HttpMethod.Post, "/chats/" + chat.Id + "/push", push, CliJsonContext.Default.Push, CliJsonContext.Default.IReadOnlyListPushedSource, ct);
+        if (pushed.Count == 0)
+        {
+            await terminal.WriteLineAsync("The chat's nook has no repositories to push.");
+        }
+
+        foreach (Wire.PushedSource source in pushed)
+        {
+            string outcome = source.Problem is not null ? "not pushed: " + source.Problem
+                : source.Branch is null ? "no changes"
+                : string.Create(CultureInfo.InvariantCulture, $"{source.Commits} commits on {source.Branch}  {source.PullRequestUrl ?? source.BranchUrl}");
+            await terminal.WriteLineAsync(source.Source + ": " + outcome);
+        }
+
+        return pushed.Any(source => source.Problem is not null) ? 1 : 0;
+    }
+
+    // Saves the chat's files as a gzipped tar archive: one of its sources, or all of /work.
+    private async Task<int> DownloadChatAsync(string id, string[] words, CancellationToken ct)
+    {
+        CommandLine? line = CommandLine.Parse(words, ["--source", "--out"], []);
+        if (line is not { Arguments: [] })
+        {
+            return await UsageAsync();
+        }
+
+        HostsFile hosts = await ReadHostsAsync(ct);
+        SignedInHost? host = await CurrentHostAsync(hosts);
+        if (host is null)
+        {
+            return 1;
+        }
+
+        using HostApi api = ApiFor(host);
+        Wire.Chat? chat = await FindChatAsync(api, host, id, ct);
+        if (chat is null)
+        {
+            return 1;
+        }
+
+        string? source = line.Value("--source");
+        string path = Path.GetFullPath(line.Value("--out") ?? (source ?? "work") + "-" + ShortId(chat.Id) + ".tar.gz");
+        string query = source is null ? string.Empty : "?source=" + Uri.EscapeDataString(source);
+        using HttpResponseMessage response = await api.SendAsync(HttpMethod.Get, "/nooks/" + chat.NookId + "/download" + query, content: null, ct, HttpCompletionOption.ResponseHeadersRead);
+        await api.EnsureSuccessAsync(response, ct);
+        await using (FileStream file = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 81920, FileOptions.Asynchronous))
+        {
+            await response.Content.CopyToAsync(file, ct);
+        }
+
+        await terminal.WriteLineAsync("Saved " + path + ".");
         return 0;
     }
 

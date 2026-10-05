@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,4 +41,11 @@ public interface INookDaemonsApi
         OutputUpload upload,
         IAsyncEnumerable<ProcessEvent> events,
         CancellationToken ct);
+
+    /// <summary>
+    /// The standard input of a process started with <see cref="StartProcessInstruction.InputStreamed"/>,
+    /// for its daemon to feed it, once: chunks until it ends, which ends the process's input.
+    /// </summary>
+    /// <returns>The chunks; unauthorized for a wrong token; or not found when nothing waits to be read.</returns>
+    public Task<Result<IAsyncEnumerable<ReadOnlyMemory<byte>>>> ReadInputAsync(Actor actor, ReadInput command, CancellationToken ct);
 }

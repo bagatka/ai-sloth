@@ -10,6 +10,7 @@ using Bagatka.AiSloth.Nooks.Data;
 using Bagatka.AiSloth.Nooks.Jobs;
 using Bagatka.AiSloth.Nooks.Model;
 using Bagatka.AiSloth.Secrets.Contracts;
+using Bagatka.AiSloth.Sources.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Sandboxing;
@@ -25,8 +26,11 @@ internal sealed partial class NooksApi(
     IWorkspacesApi workspaces,
     IMachinesApi machines,
     ISecretsApi secrets,
+    ISourcesApi sources,
     IEnumerable<ISandboxProvider> providers,
     DaemonConnections daemons,
+    InputFeeds feeds,
+    SourceLocks sourceLocks,
     NookReconciler reconciler,
     NooksSettings settings,
     TimeProvider time) : INooksApi, INookDaemonsApi

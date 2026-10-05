@@ -25,6 +25,12 @@ service ControlPlane {
   // process's exit once it has exited and all its output is sent. An upload that ends without the
   // exit broke off, and the control plane watches again from where it stopped.
   rpc UploadOutput(stream OutputUploadMessage) returns (OutputUploadResult);
+
+  // One call per process started with input_streamed, made as soon as it starts: the process's
+  // standard input, in chunks of at most 64 KiB, on its own HTTP/2 stream so bulk input never delays
+  // instructions. When the stream ends, the daemon closes the process's standard input; a call that
+  // fails closes it too, so the process sees its input cut short instead of waiting forever.
+  rpc ReadInput(InputRequest) returns (stream InputChunk);
 }
 
 // Sent by the daemon on the control stream.
@@ -88,6 +94,8 @@ message StartProcess {
   OutputRetention retention = 5;
   // Added to the process's environment. May hold secrets: never log it.
   map<string, string> environment = 6;
+  // Whether the process's standard input comes from ReadInput instead of SendInput, and ends with it.
+  bool input_streamed = 7;
 }
 
 // How a process's output is kept. Files are never affected: this is only what the process prints.
@@ -154,4 +162,13 @@ enum OutputChannel {
 }
 
 message OutputUploadResult {
+}
+
+message InputRequest {
+  string nook_id = 1;
+  string process_id = 2;
+}
+
+message InputChunk {
+  bytes data = 1;
 }

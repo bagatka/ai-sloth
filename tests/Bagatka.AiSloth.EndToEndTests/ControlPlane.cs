@@ -35,6 +35,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
     private FakeIssuer? _issuer;
     private FakeModel? _model;
     private FakeChatGpt? _chatGpt;
+    private FakeGitHub? _gitHub;
     private DistributedApplication? _app;
 
     /// <summary>What <c>sloth machine connect</c> takes: the endpoint daemons and machines dial.</summary>
@@ -77,6 +78,20 @@ public sealed partial class ControlPlane : IAsyncLifetime
     /// <summary>The WebApi's public endpoint: what <c>sloth host add</c> takes.</summary>
     public Uri WebApiUrl => App.GetEndpoint("webapi", "Http");
 
+    /// <summary>GitHub, which people connect and whose repositories nooks start with.</summary>
+    internal FakeGitHub GitHub
+    {
+        get
+        {
+            if (_gitHub is null)
+            {
+                throw new InvalidOperationException("GitHub hasn't started.");
+            }
+
+            return _gitHub;
+        }
+    }
+
     /// <summary>The model gateway on the endpoint agents in nooks reach.</summary>
     public Uri ModelGatewayUrl => new Uri(string.Create(CultureInfo.InvariantCulture, $"http://localhost:{_modelsPort}/models/"));
 
@@ -112,6 +127,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
         _issuer = await FakeIssuer.StartAsync();
         _model = await FakeModel.StartAsync();
         _chatGpt = await FakeChatGpt.StartAsync();
+        _gitHub = await FakeGitHub.StartAsync();
         IDistributedApplicationTestingBuilder appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Bagatka_AiSloth_AppHost>(
             [
                 "Parameters:sign-in-provider-issuer=" + _issuer.Issuer,
@@ -124,6 +140,12 @@ public sealed partial class ControlPlane : IAsyncLifetime
                 "Parameters:allow-chatgpt-plans=true",
                 "Parameters:chatgpt-authority=" + _chatGpt.Url,
                 "Parameters:chatgpt-api=" + _model.OpenAIUrl,
+                "Parameters:github-app-client-id=" + FakeGitHub.ClientId,
+                "Parameters:github-app-client-secret=" + FakeGitHub.ClientSecret,
+                "Parameters:github-app-slug=" + FakeGitHub.AppSlug,
+                "Parameters:github-api=" + _gitHub.ApiUrl,
+                "Parameters:github-web=" + _gitHub.Url,
+                "Parameters:sources-key=" + RandomNumberGenerator.GetHexString(64),
                 "Parameters:agent-accounts-key=" + RandomNumberGenerator.GetHexString(64),
                 "Parameters:secrets-key=" + RandomNumberGenerator.GetHexString(64),
                 "DaemonPort=" + _daemonPort.ToString(CultureInfo.InvariantCulture),
@@ -201,6 +223,11 @@ public sealed partial class ControlPlane : IAsyncLifetime
         if (_chatGpt is not null)
         {
             await _chatGpt.DisposeAsync();
+        }
+
+        if (_gitHub is not null)
+        {
+            await _gitHub.DisposeAsync();
         }
     }
 

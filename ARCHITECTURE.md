@@ -24,8 +24,9 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
   other's files; people share a chat through its nook's access, and parallel work is more chats.
   A nook without a chat runs processes only. Underneath, a nook is a provider's sandbox; "sandbox" is
   a technical term that never reaches the product.
-- **Sources:** where a nook's files come from: repositories (any git remote) and folders AiSloth
-  keeps. A nook mounts any number of them at `/work/<name>`.
+- **Sources:** where a nook's files come from: a workspace's GitHub repositories today, folders
+  AiSloth keeps later. A chat's nook starts with any number of them at `/work/<name>`, or with a copy
+  of another chat's files, and its changes leave as branches and pull requests or as a download.
 - **Agent accounts and secrets:** an agent account pays for an agent's model and never enters a
   nook; secrets are environment variables a workspace gives to every process in its nooks for the agent's
   tools.
@@ -60,7 +61,8 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 - **Nooks are untrusted.** The agent, the repository, and its dependencies may be hostile, and they
   can read anything inside a nook, including the daemon's token. Shared credentials never enter a
   nook: agent accounts reach models through the model gateway, and the control plane moves code in
-  and out with its own git credentials. Secrets are the exception people choose: they exist for
+  and out itself, as git bundles, with each person's GitHub connection. Secrets are the exception
+  people choose: they exist for
   the agent's tools, and everyone who may write in a nook can use the secrets in it.
 - **Starting is nearly instant.** A nook starts from a template of its folders with their
   dependencies installed, cached where it runs, and catches up from there; no start waits for a
@@ -91,7 +93,7 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 | CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API: hosts, sign-in, agent accounts, secrets, and chats; its machine mode runs nooks on people's own computers (`src/Cli/README.md`) | Built |
 | Foundation | `Bagatka.Foundation` (+ `.Modules`, `.Web`) | Plumbing: results, errors, actors, typed IDs | Built |
 | Object storage | `Bagatka.ObjectStorage` + `.<Backend>` | Store and read objects by key: folder versions, checkpoints, harness state | Planned |
-| Sdk | `Bagatka.Sdk.<Vendor>` | Clients for vendor APIs without an official .NET SDK | Docker Engine, Sign in with ChatGPT |
+| Sdk | `Bagatka.Sdk.<Vendor>` | Clients for vendor APIs without an official .NET SDK | Docker Engine, Sign in with ChatGPT, GitHub |
 | Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration; defaults every service host shares | Built |
 
 The web and mobile apps are not in this repository. They use the same public HTTP API as the CLI.
@@ -449,7 +451,8 @@ These are choices, not omissions. Change them only through `PATTERNS.md`, with a
 - **Projects are an extension.** Nooks and chats are complete without them, so a team feature never
   makes the single-person path more complex.
 - **Git is a file-history format, not a product concept.** Sources may be repositories or folders,
-  and changes leave a nook by download, by saving a folder version, or by pushing a branch.
+  and changes leave a nook by download, by saving a folder version (planned), or by pushing a branch
+  and opening a pull request.
 
 ## Module map
 
@@ -459,9 +462,9 @@ this table in the same change.
 | Module | Owns | Asks | Reacts to | Schema |
 |---|---|---|---|---|
 | Workspaces (contract only) | Workspaces, and who may do what with them and their nooks: access levels, invites | — | — | `workspaces` |
-| Nooks (contract only) | Nooks, where each runs, their lifecycle, processes, templates, checkpoints, daemon connections | Workspaces, Sources, Machines, Secrets | — | `nooks` |
+| Nooks | Nooks, where each runs, their lifecycle, processes, their copies of sources, templates, checkpoints, daemon connections | Workspaces, Sources, Machines, Secrets | — | `nooks` |
 | Secrets | Workspaces' environment variables for every process in their nooks, their sealed values | Workspaces | — | `secrets` |
-| Sources (planned) | Repositories and folders, their recipes, delivery, push policy | Workspaces | — | `sources` |
+| Sources | GitHub repositories a workspace connected, people's GitHub connections and git settings, copying in and pushing out, push policy; folders and recipes (planned) | Workspaces | — | `sources` |
 | AgentAccounts | Accounts at agent vendors that pay for agents: a workspace's and people's own, their sealed secrets | Workspaces | — | `agent_accounts` |
 | Chats | ACP conversations in nooks, their messages, proposals, and events, the agents' runners; harness state (planned) | Nooks, AgentAccounts, Workspaces | — | `chats` |
 | Machines | Computers workspaces add to run nooks, their credentials and connections, the `machine` provider | Workspaces | — | `machines` |

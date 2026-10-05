@@ -8,6 +8,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
+using Bagatka.AiSloth.Nooks.Contracts;
+using Bagatka.AiSloth.Sources.Contracts;
+using Bagatka.AiSloth.WebApi.Composition;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Web;
@@ -21,7 +24,9 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class ChatsEndpoints
 {
-    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account);
+    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account, IReadOnlyList<NookRepository>? Repositories = null, ChatId? CopyOf = null);
+
+    internal sealed record PushRequest(IReadOnlyList<string>? Sources = null, string? Branch = null, bool PullRequest = false, string? Message = null);
 
     internal sealed record SendMessageRequest(string Text, MessageId? Proposal = null);
 
@@ -42,6 +47,7 @@ internal static class ChatsEndpoints
         chats.MapPost("/{id:guid}/messages", Send);
         chats.MapPost("/{id:guid}/stop", Stop);
         chats.MapGet("/{id:guid}/events", Watch);
+        chats.MapPost("/{id:guid}/push", Push);
         return chats;
     }
 
@@ -68,7 +74,7 @@ internal static class ChatsEndpoints
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        StartChat command = new StartChat(WorkspaceId.From(workspaceId), request.Provider, request.Harness, request.Account);
+        StartChat command = new StartChat(WorkspaceId.From(workspaceId), request.Provider, request.Harness, request.Account, request.Repositories ?? [], request.CopyOf);
         Result<ChatSummary> result = await api.StartAsync(principal.ToActor(), command, ct);
         return result.ToCreated(chat => string.Create(CultureInfo.InvariantCulture, $"/chats/{chat.Id.Value}"));
     }
@@ -123,6 +129,28 @@ internal static class ChatsEndpoints
     {
         Result result = await api.StopAsync(principal.ToActor(), ChatId.From(id), ct);
         return result.ToNoContent();
+    }
+
+    /// <summary>
+    /// Pushes the changes in the chat's repositories to GitHub with your connection: what isn't
+    /// committed is committed as you, then each repository's commits go to one branch, your prefix and
+    /// the chat's short ID unless you name another, and a pull request opens when asked. A branch is
+    /// created or moved forward, never the default branch, never forced. Each repository's outcome is
+    /// its own: one refused leaves the others pushed. People with Write only.
+    /// </summary>
+    private static async Task<Results<Ok<IReadOnlyList<ChatPush.PushedSource>>, ProblemHttpResult>> Push(
+        [FromRoute] Guid id,
+        [FromBody] PushRequest request,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi chats,
+        [FromServices] INooksApi nooks,
+        [FromServices] ISourcesApi sources,
+        [FromServices] IWorkspacesApi workspaces,
+        CancellationToken ct)
+    {
+        Result<IReadOnlyList<ChatPush.PushedSource>> result = await ChatPush.PushAsync(
+            principal.ToActor(), ChatId.From(id), request.Sources, request.Branch, request.PullRequest, request.Message, chats, nooks, sources, workspaces, ct);
+        return result.ToOk();
     }
 
     /// <summary>

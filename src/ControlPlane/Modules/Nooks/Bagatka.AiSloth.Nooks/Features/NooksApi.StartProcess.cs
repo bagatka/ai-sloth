@@ -48,6 +48,13 @@ internal sealed partial class NooksApi
             return new Result<ProcessSummary>(NooksErrors.NotReady);
         }
 
+        // Nothing runs before the nook's sources are in place, agents included.
+        Result prepared = await PrepareSourcesAsync(nook.Output, connection, ct);
+        if (prepared.Failed)
+        {
+            return new Result<ProcessSummary>(prepared.Error);
+        }
+
         db.Processes.Add(process);
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)
@@ -58,7 +65,7 @@ internal sealed partial class NooksApi
         // Not handled: the connection ending between the commit and the send, which leaves the
         // process recorded as running. Handling it would mean comparing recorded processes with the
         // daemon's hello when it reconnects.
-        bool sent = await connection.SendAsync(new DaemonInstruction(process.ToInstruction(environment)), ct);
+        bool sent = await connection.SendAsync(new DaemonInstruction(process.ToInstruction(environment, inputStreamed: false)), ct);
         if (!sent)
         {
             throw new InvalidOperationException("Nook " + command.NookId.Value + "'s daemon disconnected before process " + process.Id.Value + " was sent.");

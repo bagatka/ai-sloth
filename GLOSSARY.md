@@ -59,10 +59,15 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Model gateway | The WebApi endpoint agents call their model through; it forwards each call to their chat's agent account's endpoint with the headers that pay for it, so no nook holds a key or a plan's token | WebApi, Chats | LLM proxy, API proxy |
 | Checkpoint | A nook's source files saved at one moment, such as after a turn | Nooks (planned) | snapshot, backup |
 | Fork | A new nook started from a checkpoint, with the chat resumed up to that point | Nooks, Chats (planned) | clone, copy, branch |
-| Source | Where some of a nook's files come from, mounted at `/work/<name>`: a repository or a folder | Sources (planned) | repo (for both kinds), mount |
-| Repository | A source from a git remote such as GitHub or GitLab | Sources (planned) | repo link, git source |
+| Source | Where some of a nook's files come from: a repository, later a folder. A nook holds a copy of each at `/work/<name>`, named after it | Sources, Nooks | repo (for both kinds), mount, folder (for a repository) |
+| Repository | A GitHub repository a workspace connected, which its chats' nooks can start with | Sources | repo link, git source, project |
+| GitHub connection | A person's GitHub account, connected through the host's GitHub App; AiSloth copies repositories in and pushes changes as them with it, and no nook ever holds it | Sources | GitHub integration, token, login |
+| GitHub App | The app on GitHub each host has, which people connect their account through and install on their repositories | Sources | OAuth app, bot (for the app) |
+| Push | Sending a nook's changes in a source to a branch on GitHub, opening a pull request when asked: never to the default branch, and only ever moving a branch forward | Sources, WebApi | sync, upload, deploy |
+| Git settings | How a person's commits and branches look: author, committer, AiSloth as co-author, and branch prefix | Sources | git config, identity (alone) |
 | Folder | A source whose files AiSloth keeps, starting empty or from an upload, with versions | Sources (planned) | upload, directory, bucket |
-| Changes | What differs in a nook's copy of a source from what it started with | Nooks, Sources (planned) | diff, patch (except as a download format) |
+| Changes | What differs in a nook's copy of a source from what it started with: its commits since, and what isn't committed | Nooks, Sources | diff, patch (except as a download format) |
+| Agents' guide | `/work/AGENTS.md` in a nook with sources, telling agents each folder is its own repository with its own instructions | Nooks | workspace instructions, root AGENTS.md |
 | Recipe | A source's setup script, safe to run again, owned by AiSloth and versioned | Sources (planned) | setup script, bootstrap, skill |
 | Template | A snapshot of a nook right after its recipes ran, used to start new nooks fast | Nooks (planned) | image, cache, warm pool |
 | Project | An optional group of nooks, chats, and sources for a team working toward one goal | Projects (planned) | space, board, workspace |

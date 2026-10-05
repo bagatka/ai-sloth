@@ -88,9 +88,9 @@ internal sealed class Process
     }
 
     // The environment is passed through, never kept: it may hold secrets.
-    public StartProcessInstruction ToInstruction(IReadOnlyDictionary<string, string> environment)
+    public StartProcessInstruction ToInstruction(IReadOnlyDictionary<string, string> environment, bool inputStreamed)
     {
-        return new StartProcessInstruction(Id, Command, Arguments, WorkingDirectory, Retention, environment);
+        return new StartProcessInstruction(Id, Command, Arguments, WorkingDirectory, Retention, environment, inputStreamed);
     }
 
     public ProcessSummary ToSummary()

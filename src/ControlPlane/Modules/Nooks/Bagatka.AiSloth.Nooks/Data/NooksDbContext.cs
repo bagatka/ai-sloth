@@ -1,6 +1,8 @@
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Model;
+using Bagatka.AiSloth.Sources.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,11 +16,14 @@ internal sealed class NooksDbContext(DbContextOptions<NooksDbContext> options) :
 
     public DbSet<Process> Processes => Set<Process>();
 
+    public DbSet<SourceCopy> SourceCopies => Set<SourceCopy>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfiguration(new NookConfiguration());
         modelBuilder.ApplyConfiguration(new ProcessConfiguration());
+        modelBuilder.ApplyConfiguration(new SourceCopyConfiguration());
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
@@ -26,6 +31,8 @@ internal sealed class NooksDbContext(DbContextOptions<NooksDbContext> options) :
         configurationBuilder.Properties<NookId>().HaveConversion<TypedIdConverter<NookId>>();
         configurationBuilder.Properties<ProcessId>().HaveConversion<TypedIdConverter<ProcessId>>();
         configurationBuilder.Properties<WorkspaceId>().HaveConversion<TypedIdConverter<WorkspaceId>>();
+        configurationBuilder.Properties<RepositoryId>().HaveConversion<TypedIdConverter<RepositoryId>>();
+        configurationBuilder.Properties<UserId>().HaveConversion<TypedIdConverter<UserId>>();
         configurationBuilder.Properties<NookStatus>().HaveConversion<string>().HaveMaxLength(StoredEnums.MaxLength);
         configurationBuilder.Properties<OutputRetention>().HaveConversion<string>().HaveMaxLength(StoredEnums.MaxLength);
     }

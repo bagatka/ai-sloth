@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Workspaces.Contracts;
@@ -92,4 +93,22 @@ public interface INooksApi
     /// Stops a process: first politely, then forcibly. Stopping a process that already exited succeeds.
     /// </summary>
     public Task<Result> StopProcessAsync(Actor actor, StopProcess command, CancellationToken ct);
+
+    /// <summary>
+    /// Writes the nook's files to <paramref name="destination"/> as a gzipped tar archive: one of its sources,
+    /// or all of <c>/work</c>. People who can see the nook may. Its sources are put in place first.
+    /// </summary>
+    /// <returns>Success; <see cref="NooksErrors.SourceNotFound"/>; <see cref="NooksErrors.NotReady"/>; or not found.</returns>
+    public Task<Result> DownloadAsync(Actor actor, DownloadFiles command, Stream destination, CancellationToken ct);
+
+    /// <summary>
+    /// Commits what a source has that isn't committed, then writes its commits since it was
+    /// copied in to <paramref name="destination"/> as a git bundle, for pushing. People with
+    /// Write only. A source without commits beyond its start writes nothing.
+    /// </summary>
+    /// <returns>
+    /// The changes; <see cref="NooksErrors.SourceNotFound"/> for a source that isn't one of its
+    /// repositories; <see cref="NooksErrors.NotReady"/>; or not found or forbidden.
+    /// </returns>
+    public Task<Result<ExportedChanges>> ExportChangesAsync(Actor actor, ExportChanges command, Stream destination, CancellationToken ct);
 }

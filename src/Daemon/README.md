@@ -23,6 +23,10 @@ feeds, watches, and stops processes on its instructions. It is a single .NET Nat
   Previews of web servers will travel the same way.
 - **Authentication.** Every call carries `authorization: Bearer <token>`. The Nooks module issued
   the token and verifies it.
+- **Bulk input.** A process started with `input_streamed` reads its standard input from a
+  `ReadInput` call of its own, which the daemon makes as soon as it starts it; the stream's end, or
+  its failure, closes the process's input. The control plane copies repositories and files into
+  nooks this way.
 - **Instructions:** `StartProcess`, `StopProcess`, `SendInput`, `WatchOutput`, and `Reconnect`.
   **Events:** `ProcessExited`, always the last thing reported about a process. A program that can't
   start exits with 127 and says why on standard error.

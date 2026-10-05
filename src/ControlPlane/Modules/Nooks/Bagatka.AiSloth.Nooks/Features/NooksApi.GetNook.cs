@@ -1,9 +1,12 @@
-using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
+using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Nooks;
 
@@ -17,6 +20,7 @@ internal sealed partial class NooksApi
             return new Result<NookSummary>(nook.Error);
         }
 
-        return new Result<NookSummary>(nook.Output.ToSummary());
+        List<SourceCopy> copies = await db.SourceCopies.AsNoTracking().Where(copy => copy.NookId == id).OrderBy(copy => copy.Name).ToListAsync(ct);
+        return new Result<NookSummary>(nook.Output.ToSummary([.. copies.Select(copy => copy.ToContract())]));
     }
 }

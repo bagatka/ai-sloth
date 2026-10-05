@@ -15,6 +15,8 @@
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Chats\Bagatka.AiSloth.Chats\Bagatka.AiSloth.Chats.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Secrets\Bagatka.AiSloth.Secrets.Contracts\Bagatka.AiSloth.Secrets.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Secrets\Bagatka.AiSloth.Secrets\Bagatka.AiSloth.Secrets.csproj" />
+    <ProjectReference Include="..\..\src\ControlPlane\Modules\Sources\Bagatka.AiSloth.Sources.Contracts\Bagatka.AiSloth.Sources.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\ControlPlane\Modules\Sources\Bagatka.AiSloth.Sources\Bagatka.AiSloth.Sources.csproj" />
     <ProjectReference Include="..\..\src\Cli\Bagatka.AiSloth.MachineProtocol\Bagatka.AiSloth.MachineProtocol.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Machines\Bagatka.AiSloth.Machines.Contracts\Bagatka.AiSloth.Machines.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Machines\Bagatka.AiSloth.Machines\Bagatka.AiSloth.Machines.csproj" />
@@ -29,6 +31,7 @@
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Remote\Bagatka.Sandboxing.Remote.csproj" />
     <ProjectReference Include="..\..\src\Sdk\Bagatka.Sdk.Docker\Bagatka.Sdk.Docker.csproj" />
+    <ProjectReference Include="..\..\src\Sdk\Bagatka.Sdk.GitHub\Bagatka.Sdk.GitHub.csproj" />
     <ProjectReference Include="..\..\src\Sdk\Bagatka.Sdk.OpenAI\Bagatka.Sdk.OpenAI.csproj" />
   </ItemGroup>
 

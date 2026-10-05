@@ -19,22 +19,32 @@ internal sealed class LoopbackCallback : IDisposable
     // How much of a request sloth reads: the request line and headers of a browser's GET.
     private const int MaxHeaderLines = 100;
 
+    private const string StartPath = "/start";
+
     private readonly TcpListener _listener;
 
-    private LoopbackCallback(TcpListener listener)
+    // A page served at /start before the browser leaves, such as a form it posts onward; or none.
+    private readonly string? _startPage;
+
+    private LoopbackCallback(TcpListener listener, Func<Uri, string>? startPage)
     {
         _listener = listener;
         int port = ((IPEndPoint)listener.LocalEndpoint).Port;
         Url = new Uri(string.Create(CultureInfo.InvariantCulture, $"http://127.0.0.1:{port}{CallbackPath}"));
+        _startPage = startPage?.Invoke(Url);
     }
 
     public Uri Url { get; }
 
-    public static LoopbackCallback Start()
+    // Where the start page is served.
+    public Uri StartUrl => new Uri(Url, StartPath);
+
+    // The start page, if any, is made knowing where the browser comes back to.
+    public static LoopbackCallback Start(Func<Uri, string>? startPage = null)
     {
         TcpListener listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
-        return new LoopbackCallback(listener);
+        return new LoopbackCallback(listener, startPage);
     }
 
     // The whole address the browser came back to. Whichever way it arrives first wins; the other is
@@ -84,10 +94,12 @@ internal sealed class LoopbackCallback : IDisposable
             await using NetworkStream stream = client.GetStream();
             string? target = await ReadTargetAsync(stream, ct);
             bool arrived = target is not null && target.StartsWith(CallbackPath + "?", StringComparison.Ordinal);
-            string page = arrived ? "Done. You can close this tab and go back to the terminal." : "Not found.";
+            bool starting = _startPage is not null && string.Equals(target, StartPath, StringComparison.Ordinal);
+            string page = arrived ? "Done. You can close this tab and go back to the terminal." : starting ? _startPage! : "Not found.";
+            string type = starting ? "text/html" : "text/plain";
             string answer = string.Create(
                 CultureInfo.InvariantCulture,
-                $"HTTP/1.1 {(arrived ? "200 OK" : "404 Not Found")}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {Encoding.UTF8.GetByteCount(page)}\r\nConnection: close\r\n\r\n{page}");
+                $"HTTP/1.1 {(arrived || starting ? "200 OK" : "404 Not Found")}\r\nContent-Type: {type}; charset=utf-8\r\nContent-Length: {Encoding.UTF8.GetByteCount(page)}\r\nConnection: close\r\n\r\n{page}");
             await stream.WriteAsync(Encoding.UTF8.GetBytes(answer), ct);
             if (arrived)
             {

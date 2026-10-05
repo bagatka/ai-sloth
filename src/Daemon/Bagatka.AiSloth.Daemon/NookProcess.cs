@@ -125,6 +125,12 @@ internal sealed class NookProcess : IAsyncDisposable
         }
     }
 
+    /// <summary>Closes the process's standard input once what was queued has been written.</summary>
+    public void CompleteInput()
+    {
+        _input.Writer.TryComplete();
+    }
+
     /// <summary>
     /// Starts stopping the process: SIGTERM now, a kill after the grace period. Returns at once; the
     /// exit is reported as usual.

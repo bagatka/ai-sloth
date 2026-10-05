@@ -15,4 +15,7 @@ public static class NooksErrors
 
     /// <summary>The nook is still being created, or its daemon couldn't be reached in time; retry later.</summary>
     public static readonly Error NotReady = Error.Conflict("nooks.not_ready", "Nook is not ready.");
+
+    /// <summary>The nook has no source by that name.</summary>
+    public static readonly Error SourceNotFound = Error.NotFound("nooks.source_not_found", "The nook has no such source.");
 }

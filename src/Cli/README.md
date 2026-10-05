@@ -1,18 +1,20 @@
 # CLI
 
 `sloth`, a Native AOT command line over a host's public HTTP API: sign in to hosts, add agent
-accounts and secrets, and start, follow, and steer chats. Its machine mode runs a workspace's nooks
-on the computer it runs on.
+accounts and secrets, connect GitHub and add repositories, start, follow, and steer chats, and push
+their changes or download their files. Its machine mode runs a workspace's nooks on the computer it
+runs on, and `github create-app` makes a host's GitHub App for its operator.
 
 ## Parts
 
 - **`Sloth`** (`Sloth.*.cs`): the commands, one area per file (hosts, workspaces, accounts, secrets,
-  chats, machines), dispatched in `Sloth.cs`. Each returns its exit code: 0 done, 1 failed, 2 called
+  GitHub, repositories, git settings, chats, machines), dispatched in `Sloth.cs`. Each returns its exit code: 0 done, 1 failed, 2 called
   wrong.
 - **`HostApi`**: calls to one host as one session, or anonymously to sign in. A refusal or an
   unreachable host is an `HttpRequestException` with the host's words, which `sloth` prints.
 - **`LoopbackCallback`**: where a browser comes back after signing in, at `http://127.0.0.1:<port>/auth/callback`,
-  or the address pasted when the browser is on another computer.
+  or the address pasted when the browser is on another computer; it can first serve a page the
+  browser starts from, such as the form GitHub's manifest flow begins with.
 - **`Terminal`**: the person at the keyboard; secrets are read without echo at a console, or from
   standard input.
 - **`PrivateFile`**, **`HostsFile`**: what lasts between runs, readable by its owner only.
@@ -51,3 +53,4 @@ mode 600.
 - Published binaries for macOS and Windows: the project restores Linux runtimes only. Machine mode
   on Windows runs inside WSL.
 - Commands for nooks without a chat, and for inviting people to one nook.
+- `sloth github create-app` for GitHub Enterprise Server: it makes apps on github.com only.

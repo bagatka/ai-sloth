@@ -13,7 +13,10 @@ WebApi prints a setup code in its console output; sign in with it as the host's 
 `... -- help` for what `sloth` does. To sign people in with an OpenID Connect provider as well, such
 as a WorkOS staging environment, give the AppHost `Parameters:sign-in-provider-issuer`,
 `-client-id`, `-client-secret`, and `-name` with
-`dotnet user-secrets set <name> <value> --project src/Aspire/Bagatka.AiSloth.AppHost`. Anything that runs containers,
+`dotnet user-secrets set <name> <value> --project src/Aspire/Bagatka.AiSloth.AppHost`. For chats
+to start with your GitHub repositories, make the host's GitHub App once with
+`... -- github create-app`, turn on its device flow at GitHub as it says, and give the AppHost
+`Parameters:github-app-client-id`, `-client-secret`, and `-slug` the same way. Anything that runs containers,
 including the tests, needs a Docker engine, which Nix can't provide: use Docker Desktop (with WSL
 integration on Windows), OrbStack, Colima, or a system `dockerd`.
 

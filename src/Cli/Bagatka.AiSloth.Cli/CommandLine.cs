@@ -5,13 +5,14 @@ using System.Linq;
 namespace Bagatka.AiSloth.Cli;
 
 // A command's words after its name: arguments, options with a value (`--name Alex`), and switches
-// (`--workspace`). An unknown option doesn't parse, so a typo never runs a command differently.
+// (`--workspace`). Options listed as repeatable may come more than once (`--repo api --repo web`);
+// others only once. An unknown option doesn't parse, so a typo never runs a command differently.
 internal sealed class CommandLine
 {
-    private readonly Dictionary<string, string> _values;
+    private readonly Dictionary<string, List<string>> _values;
     private readonly HashSet<string> _switches;
 
-    private CommandLine(List<string> arguments, Dictionary<string, string> values, HashSet<string> switches)
+    private CommandLine(List<string> arguments, Dictionary<string, List<string>> values, HashSet<string> switches)
     {
         Arguments = arguments;
         _values = values;
@@ -20,15 +21,18 @@ internal sealed class CommandLine
 
     public IReadOnlyList<string> Arguments { get; }
 
-    // Null when the words don't fit: an unknown option, an option without its value, or one given twice.
-    public static CommandLine? Parse(IReadOnlyList<string> words, IReadOnlyList<string> options, IReadOnlyList<string> switches)
+    // Null when the words don't fit: an unknown option, an option without its value, or one given
+    // twice that isn't repeatable.
+    public static CommandLine? Parse(IReadOnlyList<string> words, IReadOnlyList<string> options, IReadOnlyList<string> switches, IReadOnlyList<string>? repeatable = null)
     {
         List<string> arguments = [];
-        Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal);
+        Dictionary<string, List<string>> values = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         HashSet<string> given = new HashSet<string>(StringComparer.Ordinal);
         for (int at = 0; at < words.Count; at++)
         {
             string word = words[at];
+            bool once = options.Contains(word, StringComparer.Ordinal);
+            bool many = repeatable?.Contains(word, StringComparer.Ordinal) == true;
             if (!word.StartsWith("--", StringComparison.Ordinal))
             {
                 arguments.Add(word);
@@ -37,8 +41,11 @@ internal sealed class CommandLine
             {
                 continue;
             }
-            else if (options.Contains(word, StringComparer.Ordinal) && at + 1 < words.Count && values.TryAdd(word, words[at + 1]))
+            else if ((once || many) && at + 1 < words.Count && (many || !values.ContainsKey(word)))
             {
+                List<string> list = values.GetValueOrDefault(word) ?? [];
+                list.Add(words[at + 1]);
+                values[word] = list;
                 at++;
             }
             else
@@ -52,7 +59,12 @@ internal sealed class CommandLine
 
     public string? Value(string option)
     {
-        return _values.GetValueOrDefault(option);
+        return _values.GetValueOrDefault(option)?.LastOrDefault();
+    }
+
+    public IReadOnlyList<string> Values(string option)
+    {
+        return _values.GetValueOrDefault(option) ?? [];
     }
 
     public bool Has(string option)

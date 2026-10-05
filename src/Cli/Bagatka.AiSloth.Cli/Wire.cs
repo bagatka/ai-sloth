@@ -53,11 +53,44 @@ internal static class Wire
 
     internal sealed record SetSecret(string Value);
 
-    internal sealed record Chat(Guid Id, Guid StartedBy, DateTimeOffset StartedAt, bool Working, string Harness, Guid Account);
+    internal sealed record Chat(Guid Id, Guid NookId, Guid StartedBy, DateTimeOffset StartedAt, bool Working, string Harness, Guid Account);
+
+    internal sealed record Nook(Guid Id, IReadOnlyList<NookSource> Sources);
+
+    internal sealed record NookSource(string Name, string? Branch, string? Commit);
+
+    internal sealed record NookRepository(Guid Repository, string? Branch);
+
+    internal sealed record GitHubConnectionStarted(Guid Id, string UserCode, Uri VerificationUri, DateTimeOffset ExpiresAt, TimeSpan Interval);
+
+    internal sealed record GitHubAccount(string Login);
+
+    internal sealed record GitHubConnectionProgress(GitHubAccount? Account, TimeSpan RetryAfter);
+
+    internal sealed record AvailableRepository(string FullName, bool Private);
+
+    internal sealed record AvailableRepositories(IReadOnlyList<AvailableRepository> Repositories, Uri InstallUrl);
+
+    internal sealed record Repository(Guid Id, string Name, string FullName, string DefaultBranch, Uri Url);
+
+    internal sealed record AddRepository(string FullName);
+
+    internal sealed record GitIdentity(string Name, string Email);
+
+    internal sealed record CommitIdentity(GitIdentity Author, GitIdentity Committer, string? CoAuthor);
+
+    internal sealed record GitSettings(GitIdentity? Author, GitIdentity? Committer, bool AiSlothCoAuthor, string BranchPrefix, CommitIdentity? Effective);
+
+    internal sealed record SetGitSettings(GitIdentity? Author, GitIdentity? Committer, bool AiSlothCoAuthor, string BranchPrefix);
+
+    internal sealed record Push(IReadOnlyList<string>? Sources, string? Branch, bool PullRequest, string? Message);
+
+    internal sealed record PushedSource(string Source, string? Branch, int Commits, Uri? BranchUrl, Uri? PullRequestUrl, string? Problem);
+
 
     internal sealed record ChatPage(IReadOnlyList<Chat> Items, string? NextCursor);
 
-    internal sealed record StartChat(string Provider, string Harness, Guid Account);
+    internal sealed record StartChat(string Provider, string Harness, Guid Account, IReadOnlyList<NookRepository> Repositories, Guid? CopyOf);
 
     internal sealed record SendMessage(string Text);
 
@@ -65,5 +98,5 @@ internal static class Wire
 
     internal sealed record ChatEvent(long Sequence, DateTimeOffset At, JsonElement Event);
 
-    internal sealed record Problem(string? Title, Dictionary<string, string[]>? Errors);
+    internal sealed record Problem(string? Title, string? Code, Dictionary<string, string[]>? Errors);
 }

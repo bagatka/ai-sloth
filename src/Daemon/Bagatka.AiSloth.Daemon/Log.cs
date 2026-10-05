@@ -29,4 +29,7 @@ internal static partial class Log
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Watch {WatchId} ended before the process's output was delivered")]
     public static partial void WatchEnded(ILogger logger, Exception exception, string watchId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Process {ProcessId}'s input stream broke off; its input was closed")]
+    public static partial void InputEnded(ILogger logger, Exception exception, string processId);
 }

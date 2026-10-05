@@ -8,4 +8,5 @@ NookId;System.Guid
 ProcessId;System.String
 Reason;System.String
 RetryDelay;System.TimeSpan
+UserId;System.Guid
 WatchId;System.String

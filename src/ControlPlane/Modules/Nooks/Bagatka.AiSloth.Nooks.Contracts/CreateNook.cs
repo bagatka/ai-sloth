@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Bagatka.AiSloth.Workspaces.Contracts;
 
 namespace Bagatka.AiSloth.Nooks.Contracts;
@@ -14,4 +15,12 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// The harness the nook carries for its chat's agent, such as <c>claude-code</c>, or
 /// <see langword="null"/> for a nook without a chat. It can't change later.
 /// </param>
-public sealed record CreateNook(WorkspaceId WorkspaceId, string Provider, string? Harness);
+/// <param name="Repositories">
+/// The workspace's repositories the nook starts with, each at <c>/work/&lt;name&gt;</c>, copied in with
+/// the creator's GitHub connection before anything runs in the nook. Empty for an empty <c>/work</c>.
+/// </param>
+/// <param name="CopyOf">
+/// Another nook of the workspace whose <c>/work</c> this one starts with a copy of, as it is when the
+/// copy is made, with its repositories; or <see langword="null"/>. Not together with repositories.
+/// </param>
+public sealed record CreateNook(WorkspaceId WorkspaceId, string Provider, string? Harness, IReadOnlyList<NookRepository> Repositories, NookId? CopyOf);

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
@@ -9,6 +10,7 @@ using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.Harnesses;
+using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Chats;
 
@@ -47,9 +49,17 @@ internal sealed partial class ChatsApi
             return new Result<ChatSummary>(unusable);
         }
 
+        // A copy of another chat is of its nook's files; Nooks decides whether the actor may see them.
+        NookId? copyOf = await db.Chats.AsNoTracking().Where(found => found.Id == command.CopyOf).Select(found => (NookId?)found.NookId).SingleOrDefaultAsync(ct);
+        if (command.CopyOf is not null && copyOf is null)
+        {
+            return new Result<ChatSummary>(Error.Validation("copyOf", "Must be another chat of the workspace."));
+        }
+
         // Every chat gets a nook of its own, so its agent never works on another agent's files. The nook
         // stands on its own: should saving the chat fail, it stays until someone deletes it.
-        Result<NookSummary> created = await nooks.CreateAsync(actor, new CreateNook(command.WorkspaceId, command.Provider, harness.Id), ct);
+        CreateNook nook = new CreateNook(command.WorkspaceId, command.Provider, harness.Id, command.Repositories, copyOf);
+        Result<NookSummary> created = await nooks.CreateAsync(actor, nook, ct);
         if (created.Failed)
         {
             return new Result<ChatSummary>(created.Error);

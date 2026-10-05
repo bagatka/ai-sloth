@@ -13,10 +13,15 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// <param name="WorkingDirectory">The directory to start in, or <see langword="null"/> for the daemon's default.</param>
 /// <param name="Retention">How its output is kept.</param>
 /// <param name="Environment">Variables added to the process's environment; they may hold secrets.</param>
+/// <param name="InputStreamed">
+/// Whether the daemon reads the process's standard input with <see cref="INookDaemonsApi.ReadInputAsync"/>
+/// and closes it at the end, instead of taking <see cref="SendInputInstruction"/>s.
+/// </param>
 public sealed record StartProcessInstruction(
     ProcessId ProcessId,
     string Command,
     IReadOnlyList<string> Arguments,
     string? WorkingDirectory,
     OutputRetention Retention,
-    IReadOnlyDictionary<string, string> Environment);
+    IReadOnlyDictionary<string, string> Environment,
+    bool InputStreamed);

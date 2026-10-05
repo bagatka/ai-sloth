@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.DaemonProtocol.V1;
+using Google.Protobuf;
 using Grpc.Core;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -70,6 +71,27 @@ internal sealed class FakeControlPlane : IAsyncDisposable
         private readonly Channel<Connection> _connections = Channel.CreateUnbounded<Connection>();
         private readonly ConcurrentDictionary<string, Channel<ProcessOutput>> _uploads = new ConcurrentDictionary<string, Channel<ProcessOutput>>(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, TaskCompletionSource<ProcessExited?>> _exits = new ConcurrentDictionary<string, TaskCompletionSource<ProcessExited?>>(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, byte[]> _inputs = new ConcurrentDictionary<string, byte[]>(StringComparer.Ordinal);
+
+        /// <summary>What a process started with streamed input reads, served in chunks when its daemon asks.</summary>
+        public void Feed(string processId, byte[] input)
+        {
+            _inputs[processId] = input;
+        }
+
+        public override async Task ReadInput(InputRequest request, IServerStreamWriter<InputChunk> responseStream, ServerCallContext context)
+        {
+            bool fed = _inputs.TryRemove(request.ProcessId, out byte[]? input);
+            if (!fed)
+            {
+                throw new RpcException(new Status(StatusCode.NotFound, "No input for this process."));
+            }
+
+            for (int start = 0; start < input!.Length; start += 64 * 1024)
+            {
+                await responseStream.WriteAsync(new InputChunk { Data = ByteString.CopyFrom(input, start, Math.Min(64 * 1024, input.Length - start)) }, context.CancellationToken);
+            }
+        }
 
         /// <summary>The daemon's next connection.</summary>
         public async Task<Connection> NextConnectionAsync(CancellationToken ct)

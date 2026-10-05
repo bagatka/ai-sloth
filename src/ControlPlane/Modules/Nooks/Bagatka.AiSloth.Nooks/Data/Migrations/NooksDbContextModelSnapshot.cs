@@ -17,7 +17,7 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261004164339_AddNookHarness";
+    public override string LastMigrationId => "20261005130956_Sources";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -35,9 +35,17 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("uuid")
                     .HasColumnName("id");
 
+                b.Property<Guid?>("CopyOf")
+                    .HasColumnType("uuid")
+                    .HasColumnName("copy_of");
+
                 b.Property<DateTimeOffset>("CreatedAt")
                     .HasColumnType("timestamp with time zone")
                     .HasColumnName("created_at");
+
+                b.Property<Guid?>("CreatedBy")
+                    .HasColumnType("uuid")
+                    .HasColumnName("created_by");
 
                 b.Property<byte[]>("DaemonTokenHash")
                     .HasColumnType("bytea")
@@ -66,6 +74,10 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(40)
                     .HasColumnType("character varying(40)")
                     .HasColumnName("provider");
+
+                b.Property<bool>("SourcesReady")
+                    .HasColumnType("boolean")
+                    .HasColumnName("sources_ready");
 
                 b.Property<string>("Status")
                     .IsRequired()
@@ -142,6 +154,37 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
                     .HasDatabaseName("ix_processes_nook_id_id");
 
                 b.ToTable("processes", "nooks");
+            });
+
+        modelBuilder.Entity("Bagatka.AiSloth.Nooks.Model.SourceCopy", b =>
+            {
+                b.Property<Guid>("NookId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("nook_id");
+
+                b.Property<string>("Name")
+                    .HasMaxLength(100)
+                    .HasColumnType("character varying(100)")
+                    .HasColumnName("name");
+
+                b.Property<string>("Branch")
+                    .HasMaxLength(255)
+                    .HasColumnType("character varying(255)")
+                    .HasColumnName("branch");
+
+                b.Property<string>("Commit")
+                    .HasMaxLength(64)
+                    .HasColumnType("character varying(64)")
+                    .HasColumnName("commit");
+
+                b.Property<Guid>("RepositoryId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("repository_id");
+
+                b.HasKey("NookId", "Name")
+                    .HasName("pk_source_copies");
+
+                b.ToTable("source_copies", "nooks");
             });
 #pragma warning restore 612, 618
     }
