@@ -30,12 +30,28 @@ internal static class AgentAccountsEndpoints
         workspaceAccounts.MapPost("/", AddToWorkspace);
         workspaceAccounts.MapGet("/", List);
 
+        app.MapGet("/agent-account-kinds", ListKinds).WithTags("Agent accounts");
+
         RouteGroupBuilder accounts = app.MapGroup("/agent-accounts").WithTags("Agent accounts");
         accounts.MapPost("/", AddOwn);
         accounts.MapDelete("/{id:guid}", Remove);
         accounts.MapPost("/sign-ins", StartSignIn);
         accounts.MapPost("/sign-ins/{id:guid}/complete", CompleteSignIn);
         return accounts;
+    }
+
+    /// <summary>
+    /// Every kind of account, how each is added (with its secret, or by signing in at the vendor),
+    /// whether it is personal only, and whether this host allows it. <c>GET /harnesses</c> says which
+    /// harnesses run on each.
+    /// </summary>
+    private static async Task<Ok<IReadOnlyList<AgentAccountKindSummary>>> ListKinds(
+        ClaimsPrincipal principal,
+        [FromServices] IAgentAccountsApi api,
+        CancellationToken ct)
+    {
+        IReadOnlyList<AgentAccountKindSummary> kinds = await api.ListKindsAsync(principal.ToActor(), ct);
+        return TypedResults.Ok(kinds);
     }
 
     /// <summary>

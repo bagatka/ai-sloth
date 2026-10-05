@@ -10,10 +10,12 @@ const string NookImage = "aisloth-nook:dev";
 // The harnesses a nook can carry: the profiles in src/Harnesses, one image each.
 string[] harnesses = ["claude-code", "codex", "pi", "copilot"];
 
-// Sign-in: the OpenID Connect provider whose tokens the WebApi accepts, such as a WorkOS staging
-// environment. Set them as user secrets of this project, or when the dashboard asks.
-IResourceBuilder<ParameterResource> issuer = builder.AddParameter("authentication-issuer");
-IResourceBuilder<ParameterResource> audience = builder.AddParameter("authentication-audience");
+// Sign-in: with codes always (the WebApi prints the first person's setup code to its console), and
+// with an OpenID Connect provider when one is configured, such as a WorkOS staging environment: set
+// sign-in-provider-issuer, -client-id, -client-secret, and -name as user secrets of this project.
+// Tests configure a fake one, and let invites sign people up beside it.
+string? providerIssuer = builder.Configuration["Parameters:sign-in-provider-issuer"];
+string? inviteSignUp = builder.Configuration["Parameters:invite-sign-up"];
 
 // Agents call their models through the WebApi's model gateway, which forwards each call to its chat's
 // agent account's endpoint. Endpoints must be public https ones unless private networks are allowed,
@@ -66,8 +68,7 @@ IResourceBuilder<ProjectResource> migrations = builder.AddProject<Projects.Bagat
 // through the Docker host.
 foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
 {
-    mode.WithEnvironment("Authentication__Issuer", issuer)
-        .WithEnvironment("Authentication__Audience", audience)
+    mode.WithEnvironment("Host__PublicUrl", webApi.GetEndpoint("Http"))
         .WithEnvironment("Modules__Users__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Workspaces__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Machines__ConnectionString", database.Resource.ConnectionStringExpression)
@@ -87,6 +88,19 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
             foreach (string harness in harnesses)
             {
                 environment.EnvironmentVariables["Modules__Nooks__HarnessImages__" + harness] = HarnessImage(harness);
+            }
+
+            if (providerIssuer is not null)
+            {
+                environment.EnvironmentVariables["SignIn__Provider__Issuer"] = providerIssuer;
+                environment.EnvironmentVariables["SignIn__Provider__ClientId"] = builder.Configuration["Parameters:sign-in-provider-client-id"] ?? string.Empty;
+                environment.EnvironmentVariables["SignIn__Provider__ClientSecret"] = builder.Configuration["Parameters:sign-in-provider-client-secret"] ?? string.Empty;
+                environment.EnvironmentVariables["SignIn__Provider__Name"] = builder.Configuration["Parameters:sign-in-provider-name"] ?? string.Empty;
+            }
+
+            if (inviteSignUp is not null)
+            {
+                environment.EnvironmentVariables["Host__InviteSignUp"] = inviteSignUp;
             }
 
             if (chatGptAuthority is not null)

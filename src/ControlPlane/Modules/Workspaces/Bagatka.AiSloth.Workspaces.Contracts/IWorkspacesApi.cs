@@ -60,6 +60,13 @@ public interface IWorkspacesApi
     public Task<Result<Resource>> AcceptInviteAsync(Actor actor, AcceptInvite command, CancellationToken ct);
 
     /// <summary>
+    /// What an invite code would give, without accepting it, for letting a new person sign up with it
+    /// before they accept it. The code is the credential: any actor may check it.
+    /// </summary>
+    /// <returns>What it gives access to; or <see cref="WorkspacesErrors.InviteNotFound"/> for a code unknown, used, or expired.</returns>
+    public Task<Result<Resource>> CheckInviteAsync(Actor actor, AcceptInvite command, CancellationToken ct);
+
+    /// <summary>
     /// Who was given access to the resource directly, by user ID. The actor needs Read on it.
     /// </summary>
     public Task<Result<IReadOnlyList<GrantSummary>>> ListGrantsAsync(Actor actor, Resource resource, CancellationToken ct);

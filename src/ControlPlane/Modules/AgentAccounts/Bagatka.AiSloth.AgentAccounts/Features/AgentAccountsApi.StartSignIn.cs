@@ -24,15 +24,19 @@ internal sealed partial class AgentAccountsApi
             return new Result<SignInStarted>(Error.Forbidden);
         }
 
-        Error? refused = command.Kind switch
+        Error? refused = null;
+        if (!KindRules.Known(command.Kind))
         {
-            AgentAccountKind.ChatGptPlan when !settings.AllowChatGptPlans =>
-                Error.Validation("kind", "This deployment doesn't allow ChatGPT plans."),
-            AgentAccountKind.ChatGptPlan => null,
-            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.GitHubCopilotToken or AgentAccountKind.ClaudeSubscription =>
-                Error.Validation("kind", "This kind of account is added with its secret."),
-            _ => Error.Validation("kind", "Unknown kind of account."),
-        };
+            refused = Error.Validation("kind", "Unknown kind of account.");
+        }
+        else if (!KindRules.AddedBySignIn(command.Kind))
+        {
+            refused = Error.Validation("kind", "This kind of account is added with its secret.");
+        }
+        else if (!KindRules.Allowed(command.Kind, settings))
+        {
+            refused = Error.Validation("kind", "This host doesn't allow this kind of account.");
+        }
         if (refused is not null)
         {
             return new Result<SignInStarted>(refused);

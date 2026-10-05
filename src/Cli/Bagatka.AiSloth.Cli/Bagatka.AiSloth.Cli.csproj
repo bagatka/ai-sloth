@@ -12,14 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- sloth runs on Linux and macOS; on Windows, it runs inside WSL. -->
-    <AssemblyAttribute Include="System.Runtime.Versioning.UnsupportedOSPlatformAttribute">
-      <_Parameter1>windows</_Parameter1>
-    </AssemblyAttribute>
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- The end-to-end tests run machine mode in their own process. -->
+    <!-- The end-to-end tests run sloth's commands and machine mode in their own process. -->
     <InternalsVisibleTo Include="Bagatka.AiSloth.EndToEndTests" />
   </ItemGroup>
 

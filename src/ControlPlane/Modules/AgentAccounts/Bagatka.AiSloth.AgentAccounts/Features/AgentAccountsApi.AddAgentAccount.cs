@@ -73,20 +73,25 @@ internal sealed partial class AgentAccountsApi
         return new Result<AgentAccountSummary>(account.ToSummary());
     }
 
-    // Plans are for one person, Claude subscriptions need the deployment's permission, and ChatGPT
-    // plans are added by signing in.
+    // Plans are for one person, some need the deployment's permission, and some are added by signing in.
     private Error? Refusal(AddAgentAccount command)
     {
-        return command.Kind switch
+        if (!KindRules.Known(command.Kind))
         {
-            AgentAccountKind.ChatGptPlan =>
-                Error.Validation("kind", "A ChatGPT plan is added by signing in with ChatGPT."),
-            AgentAccountKind.ClaudeSubscription when !settings.AllowClaudeSubscriptions =>
-                Error.Validation("kind", "This deployment doesn't allow Claude subscriptions."),
-            AgentAccountKind.GitHubCopilotToken or AgentAccountKind.ClaudeSubscription when command.WorkspaceId is not null =>
-                Error.Validation("kind", "A plan is for one person: add it as your own account."),
-            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.GitHubCopilotToken or AgentAccountKind.ClaudeSubscription => null,
-            _ => Error.Validation("kind", "Unknown kind of account."),
-        };
+            return Error.Validation("kind", "Unknown kind of account.");
+        }
+
+        if (KindRules.AddedBySignIn(command.Kind))
+        {
+            return Error.Validation("kind", "This kind of account is added by signing in at its vendor.");
+        }
+
+        if (!KindRules.Allowed(command.Kind, settings))
+        {
+            return Error.Validation("kind", "This host doesn't allow this kind of account.");
+        }
+
+        bool sharedPlan = KindRules.PersonalOnly(command.Kind) && command.WorkspaceId is not null;
+        return sharedPlan ? Error.Validation("kind", "A plan is for one person: add it as your own account.") : null;
     }
 }

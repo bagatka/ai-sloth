@@ -38,7 +38,12 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Term | Meaning | Owner | Don't call it |
 |---|---|---|---|
 | Control plane | The system that owns all state and decisions: the WebApi and its modules, later several services | `src/ControlPlane` | platform, backend, engine |
+| Host | A running control plane people sign in to, known by its address: the official one, someone's VPS, a company's | WebApi | server, instance, deployment (for the running thing) |
 | User | A person who signs in. One user can have access to many workspaces and nooks. | Users | account, customer |
+| Session | One device's sign-in to a host: an opaque token the host issued, kept only as a hash, ending when signed out or after 90 days unused | Users | login, JWT, access token |
+| Setup code | The one-time code a host prints while nobody has signed up; whoever uses it first becomes the host's first person | Users | bootstrap token, admin password |
+| Link code | A one-time code from a signed-in device that signs the same person in on another, within 10 minutes | Users | pairing code, device code |
+| Sign-in provider | An OpenID Connect provider a host may sign people in with, such as WorkOS or Entra ID; the host is its client | WebApi | IdP, auth server, issuer (for the provider) |
 | Workspace | Where people work together and what owns nooks, like a Slack workspace: a personal one, a company one | Workspaces | organization, team, tenant |
 | Member | Someone given access to a workspace | Workspaces | participant, seat |
 | Access level | How much a person may do with a resource: Read (see), Write (work), or Manage (decide who else has access). Each includes the ones below it. | Workspaces | role, permission |
@@ -69,7 +74,8 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Secret | An environment variable a workspace gives to every process in its nooks, agents included, such as `GH_TOKEN`; readable by everyone who may write in a nook | Secrets | env var (alone), credential, key |
 | Endpoint | The base URL of the API an API key is for, when it isn't the vendor's own, such as OpenRouter's for OpenAI's API | AgentAccounts | base URL, provider, upstream |
 | Plan | A person's subscription at a vendor that pays for agents' work, such as a ChatGPT, Claude, or Copilot plan; always personal | AgentAccounts | subscription (for API keys), seat |
-| Sign-in | Adding a plan by signing in at its vendor in a browser, which AiSloth finishes with the address the browser returns to | AgentAccounts | OAuth flow, login, connect |
+| Sign-in | Proving who you are in a browser or with a code: to a host, which starts a session (Users), or at a plan's vendor, which adds the plan, finished with the address the browser returns to (AgentAccounts) | Users, AgentAccounts | OAuth flow, login, connect |
+| Account kind | What an agent account is at its vendor, named so vendors can't be confused: `chatgpt-plan`, `claude-plan`, `copilot-plan`, `openai-api-key`, `anthropic-api-key` | AgentAccounts | provider, type |
 | Proposal | A message in a chat from someone who may not use its account; it never reaches the agent until the account's owner sends it on, as is or edited | Chats | suggestion, draft |
 | Paused | A nook whose compute is released with memory and files kept; it resumes in about a second and processes continue | Nooks | hibernated, sleeping, hot |
 | Stopped | A nook whose compute is released with files kept; it resumes in seconds and processes start again | Nooks | archived, cold, shut down |

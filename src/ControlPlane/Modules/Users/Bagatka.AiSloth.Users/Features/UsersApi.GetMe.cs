@@ -18,7 +18,7 @@ internal sealed partial class UsersApi
 
         UserProfile? profile = await db.Users
             .Where(found => found.Id == user.UserId)
-            .Select(found => new UserProfile(found.Id, found.CreatedAt))
+            .Select(found => new UserProfile(found.Id, found.Name.Value, found.CreatedAt))
             .SingleOrDefaultAsync(ct);
         return profile is null ? new Result<UserProfile>(UsersErrors.NotFound) : new Result<UserProfile>(profile);
     }

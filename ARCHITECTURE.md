@@ -88,7 +88,7 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 | Harnesses | `Bagatka.Harnesses` | The programs that run coding agents, how to start and pay for each, and the client's side of ACP | Claude Code, Codex, pi, and GitHub Copilot |
 | Sandboxing | `Bagatka.Sandboxing` + `.<Provider>`, `.Remote` | Provider contract, conformance tests, one project per compute backend, remote calls | Contract, Docker provider, remote calls |
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |
-| CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API; its machine mode runs nooks on people's own computers | Machine mode built; the rest planned |
+| CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API: hosts, sign-in, agent accounts, secrets, and chats; its machine mode runs nooks on people's own computers (`src/Cli/README.md`) | Built |
 | Foundation | `Bagatka.Foundation` (+ `.Modules`, `.Web`) | Plumbing: results, errors, actors, typed IDs | Built |
 | Object storage | `Bagatka.ObjectStorage` + `.<Backend>` | Store and read objects by key: folder versions, checkpoints, harness state | Planned |
 | Sdk | `Bagatka.Sdk.<Vendor>` | Clients for vendor APIs without an official .NET SDK | Docker Engine, Sign in with ChatGPT |
@@ -136,7 +136,7 @@ src/
     Bagatka.AiSloth.Daemon/        slothd
   Cli/
     Bagatka.AiSloth.MachineProtocol/  machine.proto and the code generated from it
-    Bagatka.AiSloth.Cli/           sloth: machine mode today
+    Bagatka.AiSloth.Cli/           sloth: hosts, accounts, secrets, chats, and machine mode
   Harnesses/
     README.md
     Bagatka.Harnesses/             harness profiles and the client's side of ACP
@@ -176,10 +176,13 @@ The name tells you which rules apply before you open the project.
 
 The HTTP host of the control plane and its composition root. It has four jobs:
 
-- **Authenticate:** turn a request into an `Actor`. It accepts OpenID Connect tokens from the
-  issuer named in its settings: WorkOS for the hosted service, and any compliant provider (their
-  own WorkOS, Entra ID, Cognito, Zitadel, and others) for self-hosting. Only configuration
-  differs; no code knows the provider.
+- **Authenticate:** turn a request into an `Actor` from its session token, which the host issued
+  (Users owns sessions). People sign in at its sign-in endpoints with a code (the setup code it
+  prints for its first person, a link code from their other device, or an invite where invites sign
+  people up), or in a browser through its sign-in provider when it has one: WorkOS for the hosted
+  service, any OpenID Connect provider (Entra ID, Okta, Google, Zitadel) when self-hosting. The WebApi
+  is that provider's client, so no client knows the provider, and only configuration differs.
+  `/.well-known/aisloth` tells any client the host's name and how to sign in.
 - **Translate:** map HTTP to contract calls, and `Result`s back to HTTP.
 - **Curate:** decide which contract methods are public.
 - **Compose:** assemble responses that need several modules.
@@ -432,10 +435,11 @@ These are choices, not omissions. Change them only through `PATTERNS.md`, with a
 - **One contract per module, for every caller.** HTTP lives in the WebApi, outside modules.
 - **The daemon carries behavior; providers carry lifecycle.** A new provider implements a small
   contract, and a new nook feature is written once.
-- **Standard sign-in, no provider in code.** The WebApi validates OpenID Connect tokens: their
-  signature against the issuer's published keys, the issuer, and the audience, which WorkOS adds
-  through a JWT template. WorkOS hosts sign-in for the hosted service. Provider-specific extras,
-  such as directory sync, would be an optional extension.
+- **The host issues sessions; a sign-in provider is optional.** Every client gets the same opaque
+  session token, stored only as a hash. A host signs people in with codes, and with any OpenID
+  Connect provider as its server-side client (authorization code with PKCE and a client secret), so
+  self-hosting needs no provider and no client handles one. Provider-specific extras, such as
+  directory sync, would be an optional extension.
 - **Explicit over implicit.**
   - No implicit conversions, no assembly scanning, no base classes, no `var`.
   - No reliance on the machine's culture or time zone.

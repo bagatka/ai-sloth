@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -6,4 +7,35 @@ namespace Bagatka.AiSloth.Cli;
 // Source-generated, as Native AOT requires.
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, WriteIndented = true)]
 [JsonSerializable(typeof(MachineCredential))]
+[JsonSerializable(typeof(HostsFile))]
+[JsonSerializable(typeof(Wire.HostDiscovery))]
+[JsonSerializable(typeof(Wire.CodeSignIn))]
+[JsonSerializable(typeof(Wire.TokenExchange))]
+[JsonSerializable(typeof(Wire.SignedIn))]
+[JsonSerializable(typeof(Wire.LinkCode))]
+[JsonSerializable(typeof(Wire.WorkspacePage))]
+[JsonSerializable(typeof(Wire.CreateInvite))]
+[JsonSerializable(typeof(Wire.Invite))]
+[JsonSerializable(typeof(Wire.AcceptInvite))]
+[JsonSerializable(typeof(Wire.Resource))]
+[JsonSerializable(typeof(IReadOnlyList<Wire.AccountKind>))]
+[JsonSerializable(typeof(IReadOnlyList<Wire.Account>))]
+[JsonSerializable(typeof(Wire.Account))]
+[JsonSerializable(typeof(Wire.AddAccount))]
+[JsonSerializable(typeof(Wire.StartAccountSignIn))]
+[JsonSerializable(typeof(Wire.AccountSignInStarted))]
+[JsonSerializable(typeof(Wire.CompleteAccountSignIn))]
+[JsonSerializable(typeof(IReadOnlyList<Wire.Harness>))]
+[JsonSerializable(typeof(IReadOnlyList<Wire.Provider>))]
+[JsonSerializable(typeof(IReadOnlyList<Wire.Secret>))]
+[JsonSerializable(typeof(Wire.Secret))]
+[JsonSerializable(typeof(Wire.SetSecret))]
+[JsonSerializable(typeof(Wire.Chat))]
+[JsonSerializable(typeof(Wire.ChatPage))]
+[JsonSerializable(typeof(Wire.StartChat))]
+[JsonSerializable(typeof(Wire.SendMessage))]
+[JsonSerializable(typeof(Wire.SentMessage))]
+[JsonSerializable(typeof(Wire.ChatEvent))]
+[JsonSerializable(typeof(IReadOnlyList<Wire.Person>))]
+[JsonSerializable(typeof(Wire.Problem))]
 internal sealed partial class CliJsonContext : JsonSerializerContext;

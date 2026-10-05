@@ -48,7 +48,7 @@ public sealed class AgentAccountsTests(ControlPlane controlPlane) : IDisposable
         WorkspaceSummary bobs = await CreateWorkspaceAsync(bob);
 
         AgentAccountSummary own = await Api.ReadAsync<AgentAccountSummary>(
-            _alice.SendPostAsync("/agent-accounts", new { kind = "GitHubCopilotToken", name = "My Copilot", secret = "github_pat_example" }), HttpStatusCode.Created);
+            _alice.SendPostAsync("/agent-accounts", new { kind = "CopilotPlan", name = "My Copilot", secret = "github_pat_example" }), HttpStatusCode.Created);
 
         IReadOnlyList<AgentAccountSummary> inAcme = await ListAsync(_alice, acme);
         IReadOnlyList<AgentAccountSummary> inPersonal = await ListAsync(_alice, personal);
@@ -66,9 +66,9 @@ public sealed class AgentAccountsTests(ControlPlane controlPlane) : IDisposable
         WorkspaceSummary workspace = await CreateWorkspaceAsync(_alice);
 
         Problem copilotForEveryone = await Api.ProblemAsync(
-            _alice.SendPostAsync(AccountsPath(workspace), new { kind = "GitHubCopilotToken", name = "Shared", secret = "github_pat_example" }), HttpStatusCode.BadRequest);
+            _alice.SendPostAsync(AccountsPath(workspace), new { kind = "CopilotPlan", name = "Shared", secret = "github_pat_example" }), HttpStatusCode.BadRequest);
         Problem claudePlan = await Api.ProblemAsync(
-            _alice.SendPostAsync("/agent-accounts", new { kind = "ClaudeSubscription", name = "Mine", secret = "sk-ant-oat-example" }), HttpStatusCode.BadRequest);
+            _alice.SendPostAsync("/agent-accounts", new { kind = "ClaudePlan", name = "Mine", secret = "sk-ant-oat-example" }), HttpStatusCode.BadRequest);
 
         Assert.True(copilotForEveryone.Errors?.ContainsKey("kind"));
         Assert.True(claudePlan.Errors?.ContainsKey("kind"));
@@ -101,7 +101,7 @@ public sealed class AgentAccountsTests(ControlPlane controlPlane) : IDisposable
         AgentAccountSummary key = await Api.ReadAsync<AgentAccountSummary>(
             _alice.SendPostAsync("/agent-accounts", new { kind = "OpenAIApiKey", name = "OpenRouter", secret = "sk-or-example", endpoint = openRouter }), HttpStatusCode.Created);
         Problem copilot = await Api.ProblemAsync(
-            _alice.SendPostAsync("/agent-accounts", new { kind = "GitHubCopilotToken", name = "Mine", secret = "github_pat_example", endpoint = openRouter }), HttpStatusCode.BadRequest);
+            _alice.SendPostAsync("/agent-accounts", new { kind = "CopilotPlan", name = "Mine", secret = "github_pat_example", endpoint = openRouter }), HttpStatusCode.BadRequest);
         Problem withQuery = await Api.ProblemAsync(
             _alice.SendPostAsync("/agent-accounts", new { kind = "OpenAIApiKey", name = "Mine", secret = "sk", endpoint = "https://example.com/v1?key=secret" }), HttpStatusCode.BadRequest);
 

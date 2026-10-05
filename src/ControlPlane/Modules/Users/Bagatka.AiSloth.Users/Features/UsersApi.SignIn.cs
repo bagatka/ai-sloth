@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,50 +12,135 @@ namespace Bagatka.AiSloth.Users;
 
 internal sealed partial class UsersApi
 {
-    public async Task<Result<UserId>> SignInAsync(Actor actor, VerifiedIdentity identity, CancellationToken ct)
+    public async Task<Result<StartedSession>> SignInAsync(Actor actor, SignIn command, CancellationToken ct)
     {
-        // Only system code, which validated the provider's token, may vouch for an identity.
+        // Only system code, the host's sign-in, starts sessions: it validated a provider's token or
+        // checked that a newcomer may join. A code proves itself.
         if (actor is not SystemActor)
         {
-            return new Result<UserId>(Error.Forbidden);
+            return new Result<StartedSession>(Error.Forbidden);
         }
 
-        Result<User> registration = User.Register(identity, time);
-        if (registration.Failed)
+        Result<BoundedName> device = BoundedName.Parse(command.Device, "device");
+        if (device.Failed)
         {
-            return new Result<UserId>(registration.Error);
+            return new Result<StartedSession>(device.Error);
         }
 
-        UserId? existing = await FindUserIdAsync(identity, ct);
-        if (existing is not null)
+        Task<Result<SignedInPerson>> finding = command.Proof switch
         {
-            return new Result<UserId>(existing.Value);
+            VerifiedIdentity identity => PersonWithIdentityAsync(identity, ct),
+            SignInCode code => PersonWithCodeAsync(code, ct),
+            Newcomer newcomer => Task.FromResult(AddNewcomer(newcomer)),
+        };
+        Result<SignedInPerson> person = await finding;
+        if (person.Failed)
+        {
+            return new Result<StartedSession>(person.Error);
         }
 
-        User newcomer = registration.Output;
-        db.Users.Add(newcomer);
+        // The session commits with what finding the person changed, such as using up a code.
+        (Session session, string token) = Session.Start(person.Output.User.Id, device.Output, time);
+        db.Sessions.Add(session);
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)
         {
-            // Two first sign-ins at once, such as a web app's parallel requests: the other one won.
-            bool otherSignInWon = saved.Error == ModuleDbContextExtensions.AlreadyExists;
-            UserId? winner = null;
-            if (otherSignInWon)
-            {
-                winner = await FindUserIdAsync(identity, ct);
-            }
-
-            return winner is null ? new Result<UserId>(saved.Error) : new Result<UserId>(winner.Value);
+            // A code used twice at the same moment: the other sign-in removed it first.
+            return new Result<StartedSession>(command.Proof is SignInCode ? UsersErrors.CodeNotFound : saved.Error);
         }
 
-        return new Result<UserId>(newcomer.Id);
+        return new Result<StartedSession>(new StartedSession(session.Id, token, person.Output.User.ToSummary(), person.Output.IsNew));
     }
 
-    private async Task<UserId?> FindUserIdAsync(VerifiedIdentity identity, CancellationToken ct)
+    // The person a provider vouches for, recorded with the name it gave on their first sign-in. A new
+    // person is saved at once, so two first sign-ins at the same moment, such as a web app's parallel
+    // requests, end with the same person: the unique index lets one win, and the other reads it.
+    private async Task<Result<SignedInPerson>> PersonWithIdentityAsync(VerifiedIdentity identity, CancellationToken ct)
     {
-        return await db.Users
-            .Where(user => user.Issuer == identity.Issuer && user.Subject == identity.Subject)
-            .Select(user => (UserId?)user.Id)
-            .SingleOrDefaultAsync(ct);
+        Result<User> recorded = User.FromProvider(identity, time);
+        if (recorded.Failed)
+        {
+            return new Result<SignedInPerson>(recorded.Error);
+        }
+
+        User? existing = await FindByIdentityAsync(identity, ct);
+        if (existing is not null)
+        {
+            return new Result<SignedInPerson>(new SignedInPerson(existing, IsNew: false));
+        }
+
+        db.Users.Add(recorded.Output);
+        Result saved = await db.SaveAsync(ct);
+        if (saved.Failed)
+        {
+            bool otherSignInWon = saved.Error == ModuleDbContextExtensions.AlreadyExists;
+            User? winner = null;
+            if (otherSignInWon)
+            {
+                // The failed insert stays tracked; forget it, or saving the session would repeat it.
+                db.ChangeTracker.Clear();
+                winner = await FindByIdentityAsync(identity, ct);
+            }
+
+            return winner is null ? new Result<SignedInPerson>(saved.Error) : new Result<SignedInPerson>(new SignedInPerson(winner, IsNew: false));
+        }
+
+        return new Result<SignedInPerson>(new SignedInPerson(recorded.Output, IsNew: true));
     }
+
+    private async Task<User?> FindByIdentityAsync(VerifiedIdentity identity, CancellationToken ct)
+    {
+        return await db.Users.AsNoTracking().SingleOrDefaultAsync(user => user.Issuer == identity.Issuer && user.Subject == identity.Subject, ct);
+    }
+
+    // The setup code makes its user the host's first person, while nobody has signed up; a link code
+    // signs in its creator. The code is removed with the session, so it works once.
+    private async Task<Result<SignedInPerson>> PersonWithCodeAsync(SignInCode proof, CancellationToken ct)
+    {
+        byte[] hash = OneTimeCode.Hash(proof.Code ?? string.Empty);
+        IssuedCode? code = await db.IssuedCodes.SingleOrDefaultAsync(found => found.CodeHash == hash, ct);
+        DateTimeOffset now = time.GetUtcNow();
+        if (code is null || !code.UsableAt(now))
+        {
+            return new Result<SignedInPerson>(UsersErrors.CodeNotFound);
+        }
+
+        db.IssuedCodes.Remove(code);
+        if (code.Purpose == IssuedCodePurpose.Link)
+        {
+            User? creator = await db.Users.AsNoTracking().SingleOrDefaultAsync(found => found.Id == code.UserId, ct);
+            return creator is null ? new Result<SignedInPerson>(UsersErrors.CodeNotFound) : new Result<SignedInPerson>(new SignedInPerson(creator, IsNew: false));
+        }
+
+        bool someoneSignedUp = await db.Users.AnyAsync(ct);
+        if (someoneSignedUp)
+        {
+            return new Result<SignedInPerson>(UsersErrors.CodeNotFound);
+        }
+
+        Result<BoundedName> name = BoundedName.Parse(proof.Name, "name");
+        if (name.Failed)
+        {
+            return new Result<SignedInPerson>(name.Error);
+        }
+
+        User first = User.Named(name.Output, time);
+        db.Users.Add(first);
+        return new Result<SignedInPerson>(new SignedInPerson(first, IsNew: true));
+    }
+
+    private Result<SignedInPerson> AddNewcomer(Newcomer newcomer)
+    {
+        Result<BoundedName> name = BoundedName.Parse(newcomer.Name, "name");
+        if (name.Failed)
+        {
+            return new Result<SignedInPerson>(name.Error);
+        }
+
+        User person = User.Named(name.Output, time);
+        db.Users.Add(person);
+        return new Result<SignedInPerson>(new SignedInPerson(person, IsNew: true));
+    }
+
+    private sealed record SignedInPerson(User User, bool IsNew);
 }

@@ -14,6 +14,9 @@ namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 /// </summary>
 public interface IAgentAccountsApi
 {
+    /// <summary>Every kind of account, how each is added, and whether this host allows it, for clients to offer.</summary>
+    public Task<IReadOnlyList<AgentAccountKindSummary>> ListKindsAsync(Actor actor, CancellationToken ct);
+
     /// <summary>
     /// Adds an account with its secret: to a workspace, by one of its managers, or as the actor's own.
     /// Plans are personal only. An API key may name another endpoint than its vendor's. A ChatGPT plan

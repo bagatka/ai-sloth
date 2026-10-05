@@ -2,7 +2,7 @@
 
   <ItemGroup>
     <PackageReference Include="Grpc.AspNetCore.Server" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <!-- For `dotnet ef migrations add`; never part of the published app. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />

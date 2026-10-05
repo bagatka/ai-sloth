@@ -2,7 +2,7 @@
 
 Agent accounts are accounts at agent vendors that pay for agents' work: an API key for OpenAI's or
 Anthropic's API (at the vendor or at another endpoint that speaks it, such as OpenRouter), a ChatGPT
-plan added by signing in with ChatGPT, a Copilot plan, or a Claude subscription. A workspace's
+plan added by signing in with ChatGPT, a Copilot plan, or a Claude plan. A workspace's
 account serves everyone with Write on it; a personal account serves its owner, wherever they work.
 Secrets are encrypted at rest and never shown again, and the keys and plans of model APIs never enter
 a nook: the model gateway adds them to each call.
@@ -30,7 +30,8 @@ a nook: the model gateway adds them to each call.
 
 `IAgentAccountsApi` in `Bagatka.AiSloth.AgentAccounts.Contracts`: people add accounts to a workspace
 or as their own, with their secret or by signing in at the vendor, list the ones they can use in a
-workspace, and remove them. `UseAsync` hands whoever runs an agent what it takes, renewing a plan's
+workspace, and remove them; `ListKindsAsync` says, for every kind, how it is added, whether it is
+personal only, and whether this host allows it. `UseAsync` hands whoever runs an agent what it takes, renewing a plan's
 token when it is due; it is for module callers only, never a route.
 
 ```csharp
@@ -49,7 +50,7 @@ if (used.Failed)
 switch (used.Output.Access)
 {
     case ModelEndpoint endpoint: ...; break;   // the gateway forwards to endpoint.Url with endpoint.Headers
-    case HarnessToken token: ...; break;       // a Copilot token or a Claude subscription goes to the harness
+    case HarnessToken token: ...; break;       // a Copilot or Claude plan's token goes to the harness
 }
 ```
 
@@ -83,7 +84,7 @@ None. A plan's access token is renewed when it is used and due, never in the bac
 - the connection string;
 - the encryption key, at least 32 characters (the AppHost generates one and keeps it in its user
   secrets);
-- `AllowClaudeSubscriptions`, off: Anthropic's terms forbid storing Claude sign-in tokens without
+- `AllowClaudePlans`, off: Anthropic's terms forbid storing Claude sign-in tokens without
   its written permission, so turn it on only with that permission;
 - `AllowChatGptPlans`, off: OpenAI lets open-source and self-hosted deployments use Sign in with
   ChatGPT; a hosted service for other people needs OpenAI's approval first. The AppHost turns it on,
@@ -95,7 +96,7 @@ None. A plan's access token is renewed when it is used and due, never in the bac
 - **Secrets at rest** are sealed with AES-256-GCM under the deployment's encryption key, bound to
   their row's ID (`PATTERNS.md`, entry 13). They leave the module only through `UseAsync`, in records
   whose text form leaves them out.
-- **Plans are personal.** Copilot tokens, Claude subscriptions, and ChatGPT plans can only be
+- **Plans are personal.** Copilot, Claude, and ChatGPT plans can only be
   someone's own; a team shares a workspace's API key.
 - **Model APIs go through the gateway.** `UseAsync` gives an API key's or a plan's calls an endpoint
   and the headers that pay for them (`ModelEndpoint`); only tokens tied to one harness go to it
@@ -124,6 +125,6 @@ None. A plan's access token is renewed when it is used and due, never in the bac
 - **Key rotation.** A new encryption key makes every stored secret unreadable.
 - **Signing in again** to an account whose sign-in ended, keeping its registration; today it is
   removed and added again.
-- **Claude subscriptions behind the gateway.** Their token still goes to Claude Code; moving it needs
+- **Claude plans behind the gateway.** Their token still goes to Claude Code; moving it needs
   a test against Anthropic.
 - **Per-vendor sharing rules.** Plans are always personal; nobody else ever sends to them.

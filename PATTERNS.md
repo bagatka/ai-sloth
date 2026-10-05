@@ -535,6 +535,11 @@ UserProfile profile = found.Output;
   by the global handler.
 - **Catching.** Catch exceptions to turn them into errors only at known boundaries:
   concurrency conflicts in `SaveAsync`, and Sdk clients.
+- **In `sloth`, a command ends at its first failure** with a sentence on standard error and exit
+  code 1 (2 when called wrong). A host that refuses or can't be reached throws
+  `HttpRequestException` carrying the host's own words, which `Sloth.RunAsync` prints; a failure
+  sloth decides itself is written with `Terminal.FailAsync` where it is decided. Canonical example:
+  `src/Cli/Bagatka.AiSloth.Cli/HostApi.cs`.
 - **Rare cases.** A case too rare to earn its own handling (AGENTS.md, "Proportional handling")
   throws `InvalidOperationException` with a message saying what is off, under a
   `// Not handled: <case>; <what handling it would take>.` comment, and reaches the general handler
@@ -549,13 +554,17 @@ Canonical example: `src/Foundation/Bagatka.Foundation/Actor.cs`.
   `AnonymousActor`, created with `Actor.ForUser(userId)`, `Actor.ForSystem("<module>.<process>")`,
   or `Actor.Anonymous`.
 - **The WebApi authenticates; modules authorize.**
-  - The WebApi validates OpenID Connect tokens from the issuer in its settings, creates the actor
-    (`principal.ToActor()`), and requires authentication by default.
-  - A user is identified by the token's issuer and subject; the Users module maps them to a
-    `UserId` on first sign-in. No code depends on which provider issued the token.
-  - End-to-end tests run a small fake issuer at the HTTP boundary; the WebApi's validation is the
-    real one.
-  - Canonical examples: `src/ControlPlane/Bagatka.AiSloth.WebApi/TokenSignIn.cs` and
+  - Every call carries a session token the host issued (`Authorization: Bearer`). The WebApi asks
+    Users whose it is (`IUsersApi.AuthenticateAsync`), creates the actor (`principal.ToActor()`),
+    and requires authentication by default.
+  - Sessions start only at the WebApi's sign-in endpoints: with a code, or through the host's
+    optional OpenID Connect provider, whose ID token the WebApi validates as its client. Users maps
+    the provider's issuer and subject to a `UserId` on first sign-in; no code depends on which
+    provider it is.
+  - End-to-end tests run a small fake provider at the HTTP boundary; the sign-in and its validation
+    are the real ones.
+  - Canonical examples: `src/ControlPlane/Bagatka.AiSloth.WebApi/SessionAuthentication.cs`,
+    `src/ControlPlane/Bagatka.AiSloth.WebApi/Endpoints/SignInEndpoints.cs`, and
     `src/Foundation/Bagatka.Foundation.Web/ActorPrincipals.cs`.
   - It decides no other permissions.
 - **The owner of the data owns the permission rule.** That module checks the rule first. Other
@@ -1032,8 +1041,10 @@ Test what people and agents rely on, through the surface they use: the public AP
 - **End to end first** (`tests/Bagatka.AiSloth.EndToEndTests`). Aspire's test builder starts the
   real app: PostgreSQL, the WebApi, and the Docker sandbox provider creating real nooks that run a
   real daemon. Tests call the public API as a client would, so what is tested is what agents can do.
-  A fake OpenID Connect provider in the test process (`FakeIssuer`) signs their tokens, and the
-  AppHost's `sandbox-scope` parameter keeps each run's nooks apart.
+  A fake OpenID Connect provider in the test process (`FakeIssuer`) signs people in through the
+  host's real sign-in, the host's first person takes its setup code, and the AppHost's
+  `sandbox-scope` parameter keeps each run's nooks apart. `sloth` runs in the test process the same
+  way, against the same host (`SlothCli`).
 - **Waiting has a deadline.** A test that waits for background work polls with a bounded patience,
   so a broken test fails instead of hanging.
 - **Every feature** gets an end-to-end test of its normal path, its consequential failure, and its

@@ -16,9 +16,11 @@ using Bagatka.Foundation.Modules;
 using Bagatka.Foundation.Web;
 using Bagatka.Sandboxing.Docker;
 using Bagatka.ServiceDefaults;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Bagatka.AiSloth.Users.Contracts;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OpenTelemetry.Trace;
@@ -42,7 +44,10 @@ builder.Host.UseDefaultServiceProvider(provider =>
 builder.Services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddSource("Npgsql"));
 
 // The only place that reads configuration (PATTERNS.md, entry 20).
-AuthenticationSettings authentication = builder.Configuration.GetRequired<AuthenticationSettings>("Authentication");
+HostSettings host = builder.Configuration.GetRequired<HostSettings>("Host");
+SignInProviderSettings? signInProvider = builder.Configuration.GetSection("SignIn:Provider").Exists()
+    ? builder.Configuration.GetRequired<SignInProviderSettings>("SignIn:Provider")
+    : null;
 DockerSandboxSettings docker = builder.Configuration.GetRequired<DockerSandboxSettings>("Sandboxing:Docker");
 UsersSettings users = builder.Configuration.GetRequired<UsersSettings>("Modules:Users");
 WorkspacesSettings workspaces = builder.Configuration.GetRequired<WorkspacesSettings>("Modules:Workspaces");
@@ -70,18 +75,19 @@ builder.Services.AddHttpClient(ModelGatewayEndpoints.HttpClientName, client => c
         ConnectCallback = modelGateway.AllowPrivateNetworks ? null : PublicNetworks.ConnectAsync,
     });
 
-// Tokens from the configured OpenID Connect provider; who the token's subject is, Users decides.
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(jwt =>
-    {
-        jwt.Authority = authentication.Issuer.AbsoluteUri;
-        jwt.Audience = authentication.Audience;
-        jwt.RequireHttpsMetadata = string.Equals(authentication.Issuer.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal);
-
-        // Claims keep the token's names, such as "sub".
-        jwt.MapInboundClaims = false;
-        jwt.Events = new JwtBearerEvents { OnTokenValidated = TokenSignIn.RecordUserAsync };
-    });
+// Each call carries its device's session; Users decides whose it is. People sign in with codes, or
+// through the host's identity provider when it has one (Endpoints/SignInEndpoints.cs), whose browser
+// round trip Data Protection keeps safe instead of state here.
+builder.Services.AddSingleton(host);
+builder.Services.AddDataProtection();
+builder.Services.AddAuthentication(SessionAuthentication.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, SessionAuthentication>(SessionAuthentication.SchemeName, configureOptions: null);
+if (signInProvider is not null)
+{
+    builder.Services.AddSingleton(signInProvider);
+    builder.Services.AddSingleton<SignInProvider>();
+    builder.Services.AddHttpClient(SignInProvider.HttpClientName);
+}
 
 // Every endpoint requires a signed-in user unless it says AllowAnonymous().
 builder.Services.AddAuthorizationBuilder()
@@ -112,7 +118,19 @@ app.UseStatusCodePages();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// While nobody has signed up, the host's first person signs in with a setup code. It goes to
+// standard output only, never through logging, so no telemetry carries it.
+await using (AsyncServiceScope setup = app.Services.CreateAsyncScope())
+{
+    string? setupCode = await setup.ServiceProvider.GetRequiredService<IUsersApi>().OpenSetupAsync(Actor.ForSystem("webapi.setup"), CancellationToken.None);
+    if (setupCode is not null)
+    {
+        await Console.Out.WriteLineAsync("First sign-in: sloth host add " + host.PublicUrl.AbsoluteUri.TrimEnd('/') + " --code " + setupCode + "   (valid for a day, once)");
+    }
+}
+
 app.MapDefaultEndpoints();
+app.MapSignInEndpoints();
 app.MapOpenApi().AllowAnonymous();
 app.MapUsersEndpoints();
 app.MapWorkspacesEndpoints();

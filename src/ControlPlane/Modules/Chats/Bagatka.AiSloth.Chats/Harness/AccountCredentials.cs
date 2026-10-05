@@ -13,8 +13,8 @@ internal static class AccountCredentials
         {
             AgentAccountKind.AnthropicApiKey => CredentialKind.AnthropicApi,
             AgentAccountKind.OpenAIApiKey or AgentAccountKind.ChatGptPlan => CredentialKind.OpenAIApi,
-            AgentAccountKind.GitHubCopilotToken => CredentialKind.GitHubToken,
-            AgentAccountKind.ClaudeSubscription => CredentialKind.ClaudeOAuthToken,
+            AgentAccountKind.CopilotPlan => CredentialKind.GitHubToken,
+            AgentAccountKind.ClaudePlan => CredentialKind.ClaudeOAuthToken,
         };
     }
 }

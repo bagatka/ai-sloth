@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.Globalization;
 using System.Net;
 using System.Net.Http;
@@ -9,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Aspire.Hosting;
 using Aspire.Hosting.Testing;
+using Aspire.Hosting.ApplicationModel;
 using Bagatka.AiSloth.Cli;
 using Bagatka.Sandboxing;
 using Bagatka.Sandboxing.Docker;
@@ -24,7 +28,7 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// the nook image, and the WebApi, which accepts tokens from a fake identity provider in this process.
 /// Tests call the public API over HTTP, as any client would.
 /// </summary>
-public sealed class ControlPlane : IAsyncLifetime
+public sealed partial class ControlPlane : IAsyncLifetime
 {
     private readonly int _daemonPort = FreePort();
     private readonly int _modelsPort = FreePort();
@@ -70,6 +74,9 @@ public sealed class ControlPlane : IAsyncLifetime
         }
     }
 
+    /// <summary>The WebApi's public endpoint: what <c>sloth host add</c> takes.</summary>
+    public Uri WebApiUrl => App.GetEndpoint("webapi", "Http");
+
     /// <summary>The model gateway on the endpoint agents in nooks reach.</summary>
     public Uri ModelGatewayUrl => new Uri(string.Create(CultureInfo.InvariantCulture, $"http://localhost:{_modelsPort}/models/"));
 
@@ -107,8 +114,11 @@ public sealed class ControlPlane : IAsyncLifetime
         _chatGpt = await FakeChatGpt.StartAsync();
         IDistributedApplicationTestingBuilder appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Bagatka_AiSloth_AppHost>(
             [
-                "Parameters:authentication-issuer=" + _issuer.Issuer,
-                "Parameters:authentication-audience=" + FakeIssuer.Audience,
+                "Parameters:sign-in-provider-issuer=" + _issuer.Issuer,
+                "Parameters:sign-in-provider-client-id=" + FakeIssuer.ClientId,
+                "Parameters:sign-in-provider-client-secret=" + FakeIssuer.ClientSecret,
+                "Parameters:sign-in-provider-name=Fake",
+                "Parameters:invite-sign-up=true",
                 "Parameters:sandbox-scope=" + Scope,
                 "Parameters:model-private-networks=true",
                 "Parameters:allow-chatgpt-plans=true",
@@ -121,17 +131,33 @@ public sealed class ControlPlane : IAsyncLifetime
             ],
             ct);
         _app = await appHost.BuildAsync(ct);
+
         await _app.StartAsync(ct);
-        await _app.ResourceNotifications.WaitForResourceHealthyAsync("webapi", ct);
+        ResourceEvent webApi = await _app.ResourceNotifications.WaitForResourceHealthyAsync("webapi", ct);
+
+        // Nobody has signed up yet, so the WebApi printed the host's setup code as it started; its
+        // first person takes it before any test runs.
+        SetupCode = await ReadSetupCodeAsync(webApi.ResourceId, ct);
+        using HttpClient anonymous = ClientWithToken(token: null);
+        Owner = await Api.ReadAsync<SignInEndpointsShapes.SignedIn>(
+            anonymous.SendPostAsync("/sign-in/code", new { code = SetupCode, name = "Owner", device = "e2e" }), HttpStatusCode.OK);
     }
 
+    /// <summary>The setup code the host printed when nobody had signed up; its first person used it.</summary>
+    public string SetupCode { get; private set; } = string.Empty;
+
+    /// <summary>The host's first person, signed in with the setup code.</summary>
+    internal SignInEndpointsShapes.SignedIn? Owner { get; private set; }
+
     /// <summary>
-    /// A client signed in as whoever the identity provider knows by <paramref name="subject"/>; the
-    /// WebApi records that user on their first call.
+    /// A client signed in as whoever the identity provider knows by <paramref name="subject"/>: on its
+    /// first call it signs in through the host's provider, as a person's browser and the CLI would, and
+    /// someone new gets a workspace of their own.
     /// </summary>
     public HttpClient ClientFor(string subject)
     {
-        return ClientWithToken(Issuer.TokenFor(subject));
+        ProviderSignIn signIn = new ProviderSignIn(WebApiUrl, subject) { InnerHandler = new SocketsHttpHandler() };
+        return new HttpClient(signIn) { BaseAddress = WebApiUrl };
     }
 
     /// <summary>A client presenting <paramref name="token"/>, or no token when it is <see langword="null"/>.</summary>
@@ -177,6 +203,31 @@ public sealed class ControlPlane : IAsyncLifetime
             await _chatGpt.DisposeAsync();
         }
     }
+
+    // The line the WebApi prints to its console: "First sign-in: sloth host add <url> --code <code> ...".
+    // Read from its running instance's logs, which keep what came before watching.
+    private async Task<string> ReadSetupCodeAsync(string instance, CancellationToken ct)
+    {
+        using CancellationTokenSource patience = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        patience.CancelAfter(TimeSpan.FromMinutes(5));
+        ResourceLoggerService logs = App.Services.GetRequiredService<ResourceLoggerService>();
+        await foreach (IReadOnlyList<LogLine> batch in logs.WatchAsync(instance).WithCancellation(patience.Token))
+        {
+            foreach (LogLine line in batch)
+            {
+                Match found = SetupLine().Match(line.Content);
+                if (found.Success)
+                {
+                    return found.Groups["code"].Value;
+                }
+            }
+        }
+
+        throw new InvalidOperationException("The WebApi printed no setup code.");
+    }
+
+    [GeneratedRegex("First sign-in: sloth host add [^ ]+ --code (?<code>[A-Z0-9]{16}) ", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex SetupLine();
 
     // The daemon endpoint gets a port of its own, so tests run while the app runs for development.
     private static int FreePort()

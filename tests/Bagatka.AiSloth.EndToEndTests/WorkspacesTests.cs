@@ -48,23 +48,25 @@ public sealed class WorkspacesTests(ControlPlane controlPlane)
         Page<WorkspaceSummary> bobs = await Api.ReadAsync<Page<WorkspaceSummary>>(bob.SendGetAsync("/workspaces"), HttpStatusCode.OK);
 
         Assert.Equal(WorkspacesErrors.NotFound.Code, problem.Code);
-        Assert.Empty(bobs.Items);
+        Assert.DoesNotContain(bobs.Items, found => found.Id == created.Id);
     }
 
     [Fact]
     public async Task A_users_workspaces_are_listed_oldest_first_page_by_page()
     {
-        using HttpClient alice = controlPlane.ClientFor("alice-" + Guid.CreateVersion7());
+        // Signing up made the first: a workspace of her own, named after her.
+        string subject = "alice-" + Guid.CreateVersion7();
+        using HttpClient alice = controlPlane.ClientFor(subject);
         string[] names = ["First", "Second", "Third"];
         foreach (string name in names)
         {
             await Api.ExpectAsync(alice.SendPostAsync("/workspaces", new { name }), HttpStatusCode.Created);
         }
 
-        Page<WorkspaceSummary> first = await Api.ReadAsync<Page<WorkspaceSummary>>(alice.SendGetAsync("/workspaces?limit=2"), HttpStatusCode.OK);
-        Page<WorkspaceSummary> second = await Api.ReadAsync<Page<WorkspaceSummary>>(alice.SendGetAsync("/workspaces?limit=2&cursor=" + first.NextCursor), HttpStatusCode.OK);
+        Page<WorkspaceSummary> first = await Api.ReadAsync<Page<WorkspaceSummary>>(alice.SendGetAsync("/workspaces?limit=3"), HttpStatusCode.OK);
+        Page<WorkspaceSummary> second = await Api.ReadAsync<Page<WorkspaceSummary>>(alice.SendGetAsync("/workspaces?limit=3&cursor=" + first.NextCursor), HttpStatusCode.OK);
 
-        Assert.Equal(names, first.Items.Concat(second.Items).Select(workspace => workspace.Name), StringComparer.Ordinal);
+        Assert.Equal([subject, .. names], first.Items.Concat(second.Items).Select(workspace => workspace.Name), StringComparer.Ordinal);
         Assert.Null(second.NextCursor);
     }
 

@@ -14,8 +14,8 @@ public sealed record AgentAccountsSettings
     /// The secret that encrypts accounts' secrets at rest: at least 32 random characters. Changing it
     /// makes every stored secret unreadable.
     /// </param>
-    /// <param name="allowClaudeSubscriptions">
-    /// Whether people may add Claude subscriptions. Off unless Anthropic has given this deployment
+    /// <param name="allowClaudePlans">
+    /// Whether people may add Claude plans. Off unless Anthropic has given this deployment
     /// written permission: its terms forbid storing Claude sign-in tokens otherwise.
     /// </param>
     /// <param name="allowChatGptPlans">
@@ -27,7 +27,7 @@ public sealed record AgentAccountsSettings
     public AgentAccountsSettings(
         string connectionString,
         string encryptionKey,
-        bool allowClaudeSubscriptions = false,
+        bool allowClaudePlans = false,
         bool allowChatGptPlans = false,
         Uri? chatGptAuthority = null,
         Uri? chatGptApi = null)
@@ -41,7 +41,7 @@ public sealed record AgentAccountsSettings
 
         ConnectionString = connectionString;
         EncryptionKey = encryptionKey;
-        AllowClaudeSubscriptions = allowClaudeSubscriptions;
+        AllowClaudePlans = allowClaudePlans;
         AllowChatGptPlans = allowChatGptPlans;
         ChatGptAuthority = chatGptAuthority ?? new Uri("https://auth.openai.com");
         ChatGptApi = chatGptApi ?? ChatGptSignInClient.Resource;
@@ -54,8 +54,8 @@ public sealed record AgentAccountsSettings
     /// <summary>The secret that encrypts accounts' secrets at rest.</summary>
     public string EncryptionKey { get; }
 
-    /// <summary>Whether people may add Claude subscriptions.</summary>
-    public bool AllowClaudeSubscriptions { get; }
+    /// <summary>Whether people may add Claude plans.</summary>
+    public bool AllowClaudePlans { get; }
 
     /// <summary>Whether people may sign in with ChatGPT to add their plans.</summary>
     public bool AllowChatGptPlans { get; }

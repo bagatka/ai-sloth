@@ -16,7 +16,7 @@ partial class UsersDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261004121127_Initial";
+    public override string LastMigrationId => "20261005120126_SessionsAndCodes";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -27,6 +27,87 @@ partial class UsersDbContextModelSnapshot : ModelSnapshot
             .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
         NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+        modelBuilder.Entity("Bagatka.AiSloth.Users.Model.IssuedCode", b =>
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid")
+                    .HasColumnName("id");
+
+                b.Property<byte[]>("CodeHash")
+                    .IsRequired()
+                    .HasColumnType("bytea")
+                    .HasColumnName("code_hash");
+
+                b.Property<DateTimeOffset>("ExpiresAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("expires_at");
+
+                b.Property<string>("Purpose")
+                    .IsRequired()
+                    .HasMaxLength(32)
+                    .HasColumnType("character varying(32)")
+                    .HasColumnName("purpose");
+
+                b.Property<Guid?>("UserId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("user_id");
+
+                b.HasKey("Id")
+                    .HasName("pk_issued_codes");
+
+                b.HasIndex("CodeHash")
+                    .IsUnique()
+                    .HasDatabaseName("ix_issued_codes_code_hash");
+
+                b.HasIndex("UserId", "ExpiresAt")
+                    .HasDatabaseName("ix_issued_codes_user_id_expires_at");
+
+                b.ToTable("issued_codes", "users");
+            });
+
+        modelBuilder.Entity("Bagatka.AiSloth.Users.Model.Session", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("uuid")
+                    .HasColumnName("id");
+
+                b.Property<string>("Device")
+                    .IsRequired()
+                    .HasMaxLength(100)
+                    .HasColumnType("character varying(100)")
+                    .HasColumnName("device");
+
+                b.Property<DateTimeOffset>("LastUsedAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("last_used_at");
+
+                b.Property<DateTimeOffset>("StartedAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("started_at");
+
+                b.Property<byte[]>("TokenHash")
+                    .IsRequired()
+                    .HasColumnType("bytea")
+                    .HasColumnName("token_hash");
+
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("user_id");
+
+                b.HasKey("Id")
+                    .HasName("pk_sessions");
+
+                b.HasIndex("TokenHash")
+                    .IsUnique()
+                    .HasDatabaseName("ix_sessions_token_hash");
+
+                b.HasIndex("UserId")
+                    .HasDatabaseName("ix_sessions_user_id");
+
+                b.ToTable("sessions", "users");
+            });
 
         modelBuilder.Entity("Bagatka.AiSloth.Users.Model.User", b =>
             {
@@ -39,13 +120,17 @@ partial class UsersDbContextModelSnapshot : ModelSnapshot
                     .HasColumnName("created_at");
 
                 b.Property<string>("Issuer")
-                    .IsRequired()
                     .HasMaxLength(2048)
                     .HasColumnType("character varying(2048)")
                     .HasColumnName("issuer");
 
-                b.Property<string>("Subject")
+                b.Property<string>("Name")
                     .IsRequired()
+                    .HasMaxLength(100)
+                    .HasColumnType("character varying(100)")
+                    .HasColumnName("name");
+
+                b.Property<string>("Subject")
                     .HasMaxLength(255)
                     .HasColumnType("character varying(255)")
                     .HasColumnName("subject");
@@ -57,7 +142,10 @@ partial class UsersDbContextModelSnapshot : ModelSnapshot
                     .IsUnique()
                     .HasDatabaseName("ix_users_issuer_subject");
 
-                b.ToTable("users", "users");
+                b.ToTable("users", "users", t =>
+                    {
+                        t.HasCheckConstraint("ck_users_identity", "(issuer IS NULL) = (subject IS NULL)");
+                    });
             });
 #pragma warning restore 612, 618
     }

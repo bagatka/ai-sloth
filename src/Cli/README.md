@@ -1,0 +1,53 @@
+# CLI
+
+`sloth`, a Native AOT command line over a host's public HTTP API: sign in to hosts, add agent
+accounts and secrets, and start, follow, and steer chats. Its machine mode runs a workspace's nooks
+on the computer it runs on.
+
+## Parts
+
+- **`Sloth`** (`Sloth.*.cs`): the commands, one area per file (hosts, workspaces, accounts, secrets,
+  chats, machines), dispatched in `Sloth.cs`. Each returns its exit code: 0 done, 1 failed, 2 called
+  wrong.
+- **`HostApi`**: calls to one host as one session, or anonymously to sign in. A refusal or an
+  unreachable host is an `HttpRequestException` with the host's words, which `sloth` prints.
+- **`LoopbackCallback`**: where a browser comes back after signing in, at `http://127.0.0.1:<port>/auth/callback`,
+  or the address pasted when the browser is on another computer.
+- **`Terminal`**: the person at the keyboard; secrets are read without echo at a console, or from
+  standard input.
+- **`PrivateFile`**, **`HostsFile`**: what lasts between runs, readable by its owner only.
+- **`MachineLink`** and `Bagatka.AiSloth.MachineProtocol`: machine mode, dialing the control plane's
+  daemon endpoint.
+- **`Program.cs`**: the composition root, the only code that reads the environment.
+
+Depends on: a host's public HTTP API (`/.well-known/aisloth` first), `Bagatka.Sandboxing.Docker` for
+machine mode.
+
+## Files
+
+In the operating system's per-user, non-roaming place: `$XDG_CONFIG_HOME/sloth` or `~/.config/sloth`
+on Linux, `~/Library/Application Support/sloth` on macOS, `%LOCALAPPDATA%\sloth` on Windows.
+`hosts.json` holds each host's session token, the person, the workspace in use, and the last chat's
+choices; `machine.json` holds a machine's token. Both are written whole and, on Linux and macOS, with
+mode 600.
+
+## Decisions and constraints
+
+- **Ctrl+C only leaves a chat.** The agent keeps working; stopping it is explicit (`/stop`,
+  `sloth chat stop`). Anything typed while following goes to the agent at once.
+- **Choices are remembered per host:** a chat runs with what the command names, else what the last
+  chat ran with, else the only choice.
+- **Short chat IDs are the end of the ID,** its random part; the start is a timestamp shared by chats
+  started together.
+- **Browser sign-ins always show their link,** and accept the address pasted back, so they work over
+  SSH. The browser opens only http and https links.
+- **Without a person at the keyboard,** `sloth chat "<message>"` ends when that message's turn ends,
+  with exit code 1 when the turn failed, for scripts.
+
+## Not built yet
+
+- Picking an account kind with the arrow keys; `sloth account add` lists the kinds.
+- Tokens in the operating system's keychain.
+- Published binaries for macOS and Windows: the project restores Linux runtimes only. Machine mode
+  on Windows runs inside WSL.
+- Commands for nooks without a chat, and for inviting people to one nook.

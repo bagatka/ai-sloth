@@ -125,7 +125,7 @@ internal sealed class AgentAccount
             AgentAccountKind.AnthropicApiKey => Through(Endpoint?.Value ?? AnthropicApi, "x-api-key", OpenSecret(box)),
             AgentAccountKind.OpenAIApiKey => Through(Endpoint?.Value ?? OpenAIApi, "Authorization", "Bearer " + OpenSecret(box)),
             AgentAccountKind.ChatGptPlan => Through(chatGptApi, "Authorization", "Bearer " + OpenSession(box).AccessToken),
-            AgentAccountKind.GitHubCopilotToken or AgentAccountKind.ClaudeSubscription => new AgentAccountAccess(new HarnessToken(OpenSecret(box))),
+            AgentAccountKind.CopilotPlan or AgentAccountKind.ClaudePlan => new AgentAccountAccess(new HarnessToken(OpenSecret(box))),
         };
         return new AgentAccountCredential(Id, Kind, OwnerId, access);
     }

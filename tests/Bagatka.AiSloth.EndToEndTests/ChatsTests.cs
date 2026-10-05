@@ -157,7 +157,7 @@ public sealed class ChatsTests(ControlPlane controlPlane) : IDisposable
     {
         (WorkspaceSummary workspace, _) = await WorkspaceWithAccountAsync();
         AgentAccountSummary own = await Api.ReadAsync<AgentAccountSummary>(
-            _alice.SendPostAsync("/agent-accounts", new { kind = "GitHubCopilotToken", name = "Mine", secret = "github_pat_not_a_real_token" }), HttpStatusCode.Created);
+            _alice.SendPostAsync("/agent-accounts", new { kind = "CopilotPlan", name = "Mine", secret = "github_pat_not_a_real_token" }), HttpStatusCode.Created);
         ChatSummary chat = await StartChatAsync(workspace, own, "copilot");
         await using ChatWatch watch = await ChatWatch.OpenAsync(_alice, chat);
 
