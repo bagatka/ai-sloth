@@ -233,7 +233,7 @@ A capability with one contract, `I<Module>Api`.
 
 Built: the Docker provider, the daemon and its image, the Nooks module from creating a nook to
 deleting it, and machines, a workspace's own computers as a provider. Suspension, checkpoints, and
-templates are next. The maps are `src/ControlPlane/Modules/Nooks/README.md`,
+templates are not built yet (`ROADMAP.md` has the order). The maps are `src/ControlPlane/Modules/Nooks/README.md`,
 `src/ControlPlane/Modules/Machines/README.md`, `src/Sandboxing/README.md`, and `src/Daemon/README.md`.
 These decisions are fixed:
 

@@ -297,6 +297,7 @@ conflict.
   - New migration (`dotnet-ef` is pinned in `dotnet-tools.json`):
     `dotnet ef migrations add <Name> --project src/ControlPlane/Modules/<Module>/Bagatka.AiSloth.<Module> --startup-project src/ControlPlane/Bagatka.AiSloth.WebApi --context <Module>DbContext --output-dir Data/Migrations`
 - **System map:** `ARCHITECTURE.md`
+- **Roadmap:** `ROADMAP.md`, the order of the next steps
 - **Pattern registry:** `PATTERNS.md`
 - **Glossary:** `GLOSSARY.md`
 - **Module maps:** `src/ControlPlane/Modules/<Module>/README.md`, from the template
