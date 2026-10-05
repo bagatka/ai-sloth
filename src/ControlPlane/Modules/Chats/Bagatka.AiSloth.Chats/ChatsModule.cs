@@ -13,8 +13,9 @@ namespace Bagatka.AiSloth.Chats;
 public static class ChatsModule
 {
     /// <summary>
-    /// Registers the module. The host also registers a <see cref="System.TimeProvider"/> and the
-    /// Workspaces and Nooks modules.
+    /// Registers the module. The host also registers a <see cref="System.TimeProvider"/>, the
+    /// Workspaces, Nooks, and AgentAccounts modules, and the <see cref="Bagatka.ObjectStorage.IObjectStorage"/>
+    /// that keeps checkpoints and people's harness state.
     /// </summary>
     public static IServiceCollection AddChatsModule(this IServiceCollection services, ChatsSettings settings)
     {
@@ -22,6 +23,8 @@ public static class ChatsModule
         services.AddModuleDbContext<ChatsDbContext>(settings.ConnectionString, ChatsDbContext.Schema);
         services.AddSingleton<ChatSignals>();
         services.AddSingleton<AgentProcess>();
+        services.AddSingleton<HarnessStates>();
+        services.AddSingleton<AgentInstructions>();
         services.AddSingleton<ChatRunners>();
         services.AddHostedService(provider => provider.GetRequiredService<ChatRunners>());
         services.AddScoped<ChatsApi>();

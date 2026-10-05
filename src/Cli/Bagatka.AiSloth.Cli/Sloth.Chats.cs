@@ -41,9 +41,11 @@ internal sealed partial class Sloth
         ChatSetup? setup = await ChooseSetupAsync(api, host, workspace, line, ct);
         List<Wire.NookRepository>? repositories = await ResolveRepositoriesAsync(api, host, workspace, line.Values("--repo"), ct);
         Wire.Chat? copyOf = null;
+        int? checkpoint = null;
         if (line.Value("--from") is string from)
         {
-            copyOf = await FindChatAsync(api, host, from, ct);
+            (string fromChat, checkpoint) = ChatAndCheckpoint(from);
+            copyOf = await FindChatAsync(api, host, fromChat, ct);
         }
 
         if (setup is not (Wire.Account account, Wire.Harness harness, Wire.Provider provider) || repositories is null || (line.Value("--from") is not null && copyOf is null))
@@ -54,17 +56,32 @@ internal sealed partial class Sloth
         Wire.Chat chat = await api.SendAsync(
             HttpMethod.Post,
             "/workspaces/" + workspace + "/chats",
-            new Wire.StartChat(provider.Id, harness.Id, account.Id, repositories, copyOf?.Id),
+            new Wire.StartChat(provider.Id, harness.Id, account.Id, repositories, copyOf?.Id, checkpoint),
             CliJsonContext.Default.StartChat,
             CliJsonContext.Default.Chat,
             ct);
         HostsFile hosts = await ReadHostsAsync(ct);
         await PrivateFile.WriteAsync(HostsPath, hosts.With(host with { Defaults = new ChatDefaults(harness.Id, account.Id, provider.Id) }), CliJsonContext.Default.HostsFile, ct);
-        string starting = line.Values("--repo").Count > 0 ? " · " + string.Join(", ", line.Values("--repo")) : copyOf is null ? string.Empty : " · a copy of " + ShortId(copyOf.Id);
+        string at = checkpoint is int number ? string.Create(CultureInfo.InvariantCulture, $" at checkpoint {number}") : string.Empty;
+        string starting = line.Values("--repo").Count > 0 ? " · " + string.Join(", ", line.Values("--repo")) : copyOf is null ? string.Empty : " · a copy of " + ShortId(copyOf.Id) + at;
         await terminal.WriteLineAsync("Chat " + ShortId(chat.Id) + " · " + harness.Name + " · " + account.Name + " · " + provider.Name + starting);
         ChatPrinter printer = new ChatPrinter(terminal, api, host.UserId);
-        Wire.SentMessage sent = await SendMessageAsync(api, chat.Id, message, ct);
+        Wire.SentMessage sent = await SendMessageAsync(api, chat.Id, message, anyway: false, ct);
         return await FollowAsync(api, chat, printer, terminal.Interactive ? null : sent.Id, ct);
+    }
+
+    // `<chat>@<checkpoint>` as the chat and the checkpoint's number; without a number, the chat's
+    // files as they are. A number that isn't one is left in the chat's ID, which then isn't found.
+    private static (string Chat, int? Checkpoint) ChatAndCheckpoint(string from)
+    {
+        int at = from.LastIndexOf('@', StringComparison.Ordinal);
+        if (at <= 0)
+        {
+            return (from, null);
+        }
+
+        bool numbered = int.TryParse(from.AsSpan(at + 1), NumberStyles.None, CultureInfo.InvariantCulture, out int number);
+        return numbered ? (from[..at], number) : (from, null);
     }
 
     // What a new chat runs with, from the command's options and the last chat's choices, or null after
@@ -168,7 +185,7 @@ internal sealed partial class Sloth
         return await FollowAsync(api, chat, new ChatPrinter(terminal, api, host.UserId), until: null, ct);
     }
 
-    private async Task<int> SendToChatAsync(string id, string text, CancellationToken ct)
+    private async Task<int> SendToChatAsync(string id, string text, bool anyway, CancellationToken ct)
     {
         HostsFile hosts = await ReadHostsAsync(ct);
         SignedInHost? host = await CurrentHostAsync(hosts);
@@ -184,7 +201,7 @@ internal sealed partial class Sloth
             return 1;
         }
 
-        Wire.SentMessage sent = await SendMessageAsync(api, chat.Id, text, ct);
+        Wire.SentMessage sent = await SendMessageAsync(api, chat.Id, text, anyway, ct);
         await terminal.WriteLineAsync(sent.IsProposal
             ? "Proposed: the chat runs on someone else's plan, so its owner decides whether it reaches the agent."
             : "Sent. Follow the chat: sloth chat open " + ShortId(chat.Id));
@@ -235,13 +252,60 @@ internal sealed partial class Sloth
         return pushed.Any(source => source.Problem is not null) ? 1 : 0;
     }
 
-    // Saves the chat's files as a gzipped tar archive: one of its sources, or all of /work.
+    // The chat's checkpoints, newest first: the latest 50.
+    private async Task<int> ListCheckpointsAsync(string id, CancellationToken ct)
+    {
+        HostsFile hosts = await ReadHostsAsync(ct);
+        SignedInHost? host = await CurrentHostAsync(hosts);
+        if (host is null)
+        {
+            return 1;
+        }
+
+        using HostApi api = ApiFor(host);
+        Wire.Chat? chat = await FindChatAsync(api, host, id, ct);
+        if (chat is null)
+        {
+            return 1;
+        }
+
+        Wire.CheckpointPage checkpoints = await api.GetAsync("/nooks/" + chat.NookId + "/checkpoints?limit=50", CliJsonContext.Default.CheckpointPage, ct);
+        if (checkpoints.Items.Count == 0)
+        {
+            await terminal.WriteLineAsync("No checkpoints yet: the chat saves one after each turn.");
+            return 0;
+        }
+
+        foreach (Wire.Checkpoint checkpoint in checkpoints.Items)
+        {
+            string number = checkpoint.Number.ToString(CultureInfo.InvariantCulture);
+            await terminal.WriteLineAsync(number.PadLeft(4) + "  " + Ago(checkpoint.CreatedAt).PadRight(10) + "  after: " + checkpoint.Note);
+        }
+
+        await terminal.WriteLineAsync("Start from one: sloth chat \"<message>\" --from " + ShortId(chat.Id) + "@<n>");
+        return 0;
+    }
+
+    // Saves the chat's files as a gzipped tar archive: one of its sources, or all of /work, as they
+    // are or at a checkpoint.
     private async Task<int> DownloadChatAsync(string id, string[] words, CancellationToken ct)
     {
-        CommandLine? line = CommandLine.Parse(words, ["--source", "--out"], []);
+        CommandLine? line = CommandLine.Parse(words, ["--source", "--out", "--checkpoint"], []);
         if (line is not { Arguments: [] })
         {
             return await UsageAsync();
+        }
+
+        int? checkpoint = null;
+        if (line.Value("--checkpoint") is string given)
+        {
+            bool numbered = int.TryParse(given, NumberStyles.None, CultureInfo.InvariantCulture, out int parsed);
+            if (!numbered)
+            {
+                return await UsageAsync();
+            }
+
+            checkpoint = parsed;
         }
 
         HostsFile hosts = await ReadHostsAsync(ct);
@@ -259,9 +323,21 @@ internal sealed partial class Sloth
         }
 
         string? source = line.Value("--source");
-        string path = Path.GetFullPath(line.Value("--out") ?? (source ?? "work") + "-" + ShortId(chat.Id) + ".tar.gz");
-        string query = source is null ? string.Empty : "?source=" + Uri.EscapeDataString(source);
-        using HttpResponseMessage response = await api.SendAsync(HttpMethod.Get, "/nooks/" + chat.NookId + "/download" + query, content: null, ct, HttpCompletionOption.ResponseHeadersRead);
+        string at = checkpoint is int saved ? "@" + saved.ToString(CultureInfo.InvariantCulture) : string.Empty;
+        string path = Path.GetFullPath(line.Value("--out") ?? (source ?? "work") + "-" + ShortId(chat.Id) + at + ".tar.gz");
+        List<string> query = [];
+        if (source is not null)
+        {
+            query.Add("source=" + Uri.EscapeDataString(source));
+        }
+
+        if (checkpoint is int number)
+        {
+            query.Add("checkpoint=" + number.ToString(CultureInfo.InvariantCulture));
+        }
+
+        string download = "/nooks/" + chat.NookId + "/download" + (query.Count == 0 ? string.Empty : "?" + string.Join('&', query));
+        using HttpResponseMessage response = await api.SendAsync(HttpMethod.Get, download, content: null, ct, HttpCompletionOption.ResponseHeadersRead);
         await api.EnsureSuccessAsync(response, ct);
         await using (FileStream file = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 81920, FileOptions.Asynchronous))
         {
@@ -294,8 +370,8 @@ internal sealed partial class Sloth
     }
 
     // Shows the chat's events from the start while sending what the person types. Without a person at
-    // the keyboard, it ends when the turn of the message `until` ends: 0 when it finished, 1 when it
-    // failed or never started. Otherwise it ends only with Ctrl+C or the end of input, leaving the agent
+    // the keyboard, it ends when the turn of the message `until` ends, after its checkpoint: 0 when it
+    // finished, 1 when it failed or never started. Otherwise it ends only with Ctrl+C or the end of input, leaving the agent
     // working.
     private async Task<int> FollowAsync(HostApi api, Wire.Chat chat, ChatPrinter printer, Guid? until, CancellationToken ct)
     {
@@ -326,6 +402,7 @@ internal sealed partial class Sloth
     {
         long after = 0;
         bool ours = false;
+        bool checkpointDue = false;
         int reconnects = 0;
         string lost = "the host ended the stream";
         while (reconnects <= MaxReconnects)
@@ -342,24 +419,10 @@ internal sealed partial class Sloth
                     Wire.ChatEvent chatEvent = JsonSerializer.Deserialize(item.Data, CliJsonContext.Default.ChatEvent)!;
                     after = chatEvent.Sequence;
                     await printer.PrintAsync(item.EventType, chatEvent, ct);
-                    Guid? message = MessageOf(chatEvent.Event);
-                    if (until is null)
+                    int? ended = until is Guid message ? EndOf(item.EventType, chatEvent, message, ref ours, ref checkpointDue) : null;
+                    if (ended is not null)
                     {
-                        continue;
-                    }
-
-                    if (message == until && item.EventType is "turn-started" or "message-steered")
-                    {
-                        ours = true;
-                    }
-                    else if (message == until && item.EventType is "message-cancelled")
-                    {
-                        return 1;
-                    }
-                    else if (ours && item.EventType is "turn-ended")
-                    {
-                        bool failed = chatEvent.Event.GetProperty("stopReason").GetString() is "failed";
-                        return failed ? 1 : 0;
+                        return ended.Value;
                     }
                 }
             }
@@ -374,6 +437,33 @@ internal sealed partial class Sloth
 
         await terminal.FailAsync("Lost the chat (" + lost + "). Follow it again: sloth chat open " + ShortId(chat.Id));
         return 1;
+    }
+
+    // The exit code once the turn of the message `until` ended, after its checkpoint: a turn that
+    // ran is followed by one, so its files are saved when following ends. Null until then.
+    private static int? EndOf(string type, Wire.ChatEvent chatEvent, Guid until, ref bool ours, ref bool checkpointDue)
+    {
+        Guid? message = MessageOf(chatEvent.Event);
+        if (message == until && type is "turn-started" or "message-steered")
+        {
+            ours = true;
+        }
+        else if (message == until && type is "message-cancelled")
+        {
+            return 1;
+        }
+        else if (ours && type is "turn-ended")
+        {
+            bool failed = chatEvent.Event.GetProperty("stopReason").GetString() is "failed";
+            checkpointDue = !failed;
+            return failed ? 1 : null;
+        }
+        else if (checkpointDue && type is "checkpoint-saved" or "checkpoint-failed")
+        {
+            return 0;
+        }
+
+        return null;
     }
 
     // What the person types while following: each line goes to the agent; /stop stops it. A message
@@ -393,7 +483,7 @@ internal sealed partial class Sloth
                 else if (text.Length > 0)
                 {
                     printer.TypedHere(text);
-                    await SendMessageAsync(api, chat.Id, text, ct);
+                    await SendMessageAsync(api, chat.Id, text, anyway: false, ct);
                 }
             }
             catch (HttpRequestException exception)
@@ -483,10 +573,31 @@ internal sealed partial class Sloth
         return null;
     }
 
-    private static async Task<Wire.SentMessage> SendMessageAsync(HostApi api, Guid chat, string text, CancellationToken ct)
+    // Sends the message. While the nook's disk is nearly full, the host wants it confirmed: `anyway`
+    // does, and otherwise the person at the keyboard is asked.
+    private async Task<Wire.SentMessage> SendMessageAsync(HostApi api, Guid chat, string text, bool anyway, CancellationToken ct)
+    {
+        try
+        {
+            return await PostMessageAsync(api, chat, text, anyway, ct);
+        }
+        catch (HttpRequestException refused) when (refused.Data[HostApi.ProblemCode] is "chats.disk_nearly_full" && terminal.Interactive)
+        {
+            await terminal.WriteAsync(refused.Message + " Send it anyway? [y/N] ");
+            string? answer = await terminal.ReadLineAsync(ct);
+            if (answer?.Trim() is not ("y" or "Y" or "yes"))
+            {
+                throw;
+            }
+
+            return await PostMessageAsync(api, chat, text, confirm: true, ct);
+        }
+    }
+
+    private static async Task<Wire.SentMessage> PostMessageAsync(HostApi api, Guid chat, string text, bool confirm, CancellationToken ct)
     {
         return await api.SendAsync(
-            HttpMethod.Post, "/chats/" + chat + "/messages", new Wire.SendMessage(text), CliJsonContext.Default.SendMessage, CliJsonContext.Default.SentMessage, ct);
+            HttpMethod.Post, "/chats/" + chat + "/messages", new Wire.SendMessage(text, confirm), CliJsonContext.Default.SendMessage, CliJsonContext.Default.SentMessage, ct);
     }
 
     // The names of people, for showing who did what.

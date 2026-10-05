@@ -110,6 +110,9 @@
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[11.0.0-rc.1.1, )"
         }
       },
+      "bagatka.objectstorage": {
+        "type": "Project"
+      },
       "bagatka.sandboxing": {
         "type": "Project",
         "dependencies": {

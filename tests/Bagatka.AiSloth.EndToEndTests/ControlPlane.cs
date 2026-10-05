@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Globalization;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -46,6 +47,9 @@ public sealed partial class ControlPlane : IAsyncLifetime
     private string Scope { get; } = "e2e-" + RandomNumberGenerator.GetHexString(12, lowercase: true);
 
     private string MachineScope => Scope + "-m";
+
+    // This run's checkpoints, deleted with it.
+    private string ObjectStorage => Path.Combine(Path.GetTempPath(), "aisloth-" + Scope);
 
     /// <summary>The model agents talk to through the gateway.</summary>
     internal FakeModel Model
@@ -136,6 +140,8 @@ public sealed partial class ControlPlane : IAsyncLifetime
                 "Parameters:sign-in-provider-name=Fake",
                 "Parameters:invite-sign-up=true",
                 "Parameters:sandbox-scope=" + Scope,
+                "Parameters:object-storage=" + ObjectStorage,
+                "Parameters:nearly-full-disk=1",
                 "Parameters:model-private-networks=true",
                 "Parameters:allow-chatgpt-plans=true",
                 "Parameters:chatgpt-authority=" + _chatGpt.Url,
@@ -194,6 +200,21 @@ public sealed partial class ControlPlane : IAsyncLifetime
         return client;
     }
 
+    /// <summary>
+    /// Removes a nook's container behind the app's back, on the docker provider or a machine, as when
+    /// the computer it ran on is lost with its disk.
+    /// </summary>
+    internal async Task LoseSandboxAsync(Guid nookId)
+    {
+        foreach (string scope in new[] { Scope, MachineScope })
+        {
+            ServiceCollection services = new ServiceCollection();
+            services.AddDockerSandboxProvider(new DockerSandboxSettings(new Uri("unix:///var/run/docker.sock"), scope));
+            await using ServiceProvider provider = services.BuildServiceProvider();
+            await provider.GetRequiredService<ISandboxProvider>().DeleteAsync(SandboxKey.From(nookId), CancellationToken.None);
+        }
+    }
+
     /// <summary>Runs machine mode in this process, as <c>sloth machine run</c> would.</summary>
     internal RunningMachine StartMachine(MachineCredential credential)
     {
@@ -208,6 +229,10 @@ public sealed partial class ControlPlane : IAsyncLifetime
             await _app.DisposeAsync();
             await DeleteSandboxesAsync(Scope);
             await DeleteSandboxesAsync(MachineScope);
+            if (Directory.Exists(ObjectStorage))
+            {
+                Directory.Delete(ObjectStorage, recursive: true);
+            }
         }
 
         if (_issuer is not null)

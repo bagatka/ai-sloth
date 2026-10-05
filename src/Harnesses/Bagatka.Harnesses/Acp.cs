@@ -38,6 +38,17 @@ public static class Acp
         return Request(RequestIds.NewSession, "session/new", new JsonObject { ["cwd"] = workingDirectory, ["mcpServers"] = new JsonArray() });
     }
 
+    /// <summary>
+    /// Loads an earlier session working in <paramref name="workingDirectory"/>, whose files the agent
+    /// kept, when it supports that (<see cref="AcpInitialized.SupportsLoading"/>): it continues the
+    /// conversation. While loading, the agent replays the conversation as updates, which a client that
+    /// has them already ignores; the answer is <see cref="AcpSessionLoaded"/> or <see cref="AcpLoadFailed"/>.
+    /// </summary>
+    public static string LoadSession(string sessionId, string workingDirectory)
+    {
+        return Request(RequestIds.LoadSession, "session/load", new JsonObject { ["sessionId"] = sessionId, ["cwd"] = workingDirectory, ["mcpServers"] = new JsonArray() });
+    }
+
     /// <summary>Sends a message, starting a turn; its answer, <see cref="AcpPromptEnded"/> or <see cref="AcpPromptFailed"/>, carries <paramref name="key"/>.</summary>
     public static string Prompt(Guid key, string sessionId, string text)
     {
@@ -148,6 +159,11 @@ public static class Acp
     // What a response answers, found by the ID this client gave its request.
     private static AcpEvent? Answer(AcpResponse response)
     {
+        if (string.Equals(response.Id, RequestIds.LoadSession, StringComparison.Ordinal))
+        {
+            return response.Error is null ? new AcpEvent(new AcpSessionLoaded()) : new AcpEvent(new AcpLoadFailed(response.Error));
+        }
+
         bool initialized = string.Equals(response.Id, RequestIds.Initialize, StringComparison.Ordinal);
         bool sessionCreated = string.Equals(response.Id, RequestIds.NewSession, StringComparison.Ordinal);
         if (initialized || sessionCreated)
@@ -159,7 +175,7 @@ public static class Acp
 
             if (initialized)
             {
-                return new AcpEvent(new AcpInitialized(response.SupportsSteering));
+                return new AcpEvent(new AcpInitialized(response.SupportsSteering, response.SupportsLoading));
             }
 
             return new AcpEvent(new AcpSessionCreated(response.SessionId));

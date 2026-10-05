@@ -62,6 +62,16 @@ internal sealed partial class Sloth
                     await LineAsync("── " + Ending(StringOf(body, "stopReason"), StringOf(body, "failure")) + took + " ──");
                     _turnStartedAt = null;
                     break;
+                case "checkpoint-saved":
+                    await LineAsync(string.Create(CultureInfo.InvariantCulture, $"  (files saved as checkpoint {body.GetProperty("number").GetInt32()})"));
+                    break;
+                case "checkpoint-failed":
+                    await LineAsync("  (saving the files failed: " + StringOf(body, "failure") + ")");
+                    break;
+                case "agent-restarted":
+                    bool remembers = body.GetProperty("remembers").GetBoolean();
+                    await LineAsync(remembers ? "  (the agent started again, and remembers the conversation)" : "  (the agent started again, without the earlier conversation)");
+                    break;
                 default:
                     // message-steered, and kinds a newer host adds: nothing to show.
                     break;

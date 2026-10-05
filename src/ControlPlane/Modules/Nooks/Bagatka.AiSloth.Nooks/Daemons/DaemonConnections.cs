@@ -53,6 +53,14 @@ internal sealed class DaemonConnections(TimeProvider time)
         End(connection);
     }
 
+    public bool IsConnected(NookId nookId)
+    {
+        lock (_gate)
+        {
+            return _connections.ContainsKey(nookId);
+        }
+    }
+
     // The nook's connection, waiting up to `timeout` for its daemon to dial in; null if it doesn't.
     public async Task<DaemonConnection?> WaitAsync(NookId nookId, TimeSpan timeout, CancellationToken ct)
     {

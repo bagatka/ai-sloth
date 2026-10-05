@@ -16,7 +16,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261005093623_OneChatPerNook";
+    public override string LastMigrationId => "20261005153006_CheckpointsStateAndInstructions";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -42,6 +42,10 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("uuid")
                     .HasColumnName("agent_account_id");
 
+                b.Property<Guid?>("CheckpointAfter")
+                    .HasColumnType("uuid")
+                    .HasColumnName("checkpoint_after");
+
                 b.Property<string>("Harness")
                     .IsRequired()
                     .HasMaxLength(32)
@@ -52,6 +56,11 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("uuid")
                     .HasColumnName("harness_process_id");
 
+                b.Property<string>("HarnessStateFiles")
+                    .HasMaxLength(366000)
+                    .HasColumnType("character varying(366000)")
+                    .HasColumnName("harness_state_files");
+
                 b.Property<byte[]>("HarnessTokenHash")
                     .HasColumnType("bytea")
                     .HasColumnName("harness_token_hash");
@@ -60,6 +69,10 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("bigint")
                     .HasColumnName("last_sequence");
 
+                b.Property<bool>("LoadingSession")
+                    .HasColumnType("boolean")
+                    .HasColumnName("loading_session");
+
                 b.Property<Guid>("NookId")
                     .HasColumnType("uuid")
                     .HasColumnName("nook_id");
@@ -67,6 +80,11 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.Property<long>("OutputOffset")
                     .HasColumnType("bigint")
                     .HasColumnName("output_offset");
+
+                b.Property<string>("ResumableSessionId")
+                    .HasMaxLength(256)
+                    .HasColumnType("character varying(256)")
+                    .HasColumnName("resumable_session_id");
 
                 b.Property<string>("SessionId")
                     .HasMaxLength(256)
@@ -116,6 +134,50 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("chats", "chats");
             });
 
+        modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.HarnessState", b =>
+            {
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("person_id");
+
+                b.Property<Guid>("WorkspaceId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("workspace_id");
+
+                b.Property<string>("Harness")
+                    .HasMaxLength(32)
+                    .HasColumnType("character varying(32)")
+                    .HasColumnName("harness");
+
+                b.Property<long>("Bytes")
+                    .HasColumnType("bigint")
+                    .HasColumnName("bytes");
+
+                b.Property<DateTimeOffset>("SavedAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("saved_at");
+
+                b.Property<Guid>("SavedFrom")
+                    .HasColumnType("uuid")
+                    .HasColumnName("saved_from");
+
+                b.Property<byte[]>("Sha256")
+                    .IsRequired()
+                    .HasColumnType("bytea")
+                    .HasColumnName("sha256");
+
+                b.Property<uint>("Version")
+                    .IsConcurrencyToken()
+                    .ValueGeneratedOnAddOrUpdate()
+                    .HasColumnType("xid")
+                    .HasColumnName("xmin");
+
+                b.HasKey("PersonId", "WorkspaceId", "Harness")
+                    .HasName("pk_harness_states");
+
+                b.ToTable("harness_states", "chats");
+            });
+
         modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.Message", b =>
             {
                 b.Property<Guid>("Id")
@@ -163,6 +225,28 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("messages", "chats");
             });
 
+        modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.PersonalInstructions", b =>
+            {
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("person_id");
+
+                b.Property<string>("Text")
+                    .IsRequired()
+                    .HasMaxLength(10000)
+                    .HasColumnType("character varying(10000)")
+                    .HasColumnName("text");
+
+                b.Property<DateTimeOffset>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("updated_at");
+
+                b.HasKey("PersonId")
+                    .HasName("pk_personal_instructions");
+
+                b.ToTable("personal_instructions", "chats");
+            });
+
         modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.StoredEvent", b =>
             {
                 b.Property<Guid>("ChatId")
@@ -192,6 +276,32 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasName("pk_events");
 
                 b.ToTable("events", "chats");
+            });
+
+        modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.WorkspaceInstructions", b =>
+            {
+                b.Property<Guid>("WorkspaceId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("workspace_id");
+
+                b.Property<string>("Text")
+                    .IsRequired()
+                    .HasMaxLength(10000)
+                    .HasColumnType("character varying(10000)")
+                    .HasColumnName("text");
+
+                b.Property<DateTimeOffset>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("updated_at");
+
+                b.Property<Guid>("UpdatedBy")
+                    .HasColumnType("uuid")
+                    .HasColumnName("updated_by");
+
+                b.HasKey("WorkspaceId")
+                    .HasName("pk_workspace_instructions");
+
+                b.ToTable("workspace_instructions", "chats");
             });
 #pragma warning restore 612, 618
     }

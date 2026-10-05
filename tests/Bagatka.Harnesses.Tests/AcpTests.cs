@@ -29,7 +29,7 @@ public sealed class AcpTests
         object? injected = CaseOf("""{"jsonrpc":"2.0","id":"steer:01a10812-bca7-7f56-8efa-be22ffa9681b","result":{"outcome":"injected"}}""");
         object? promptRequired = CaseOf("""{"jsonrpc":"2.0","id":"steer:01a10812-bca7-7f56-8efa-be22ffa9681b","result":{"outcome":"promptRequired"}}""");
 
-        Assert.Equal(new AcpInitialized(SupportsSteering: true), initialized);
+        Assert.Equal(new AcpInitialized(SupportsSteering: true, SupportsLoading: false), initialized);
         Assert.Equal(new AcpSessionCreated("session-1"), created);
         Assert.Equal(new AcpPromptEnded(Key, "end_turn"), ended);
         Assert.Equal(new AcpSteerAnswered(Key, Injected: true), injected);

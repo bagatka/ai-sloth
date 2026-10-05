@@ -3,20 +3,22 @@
 Nooks are where agents work: isolated machines with their files and processes, created on the
 provider someone who works in a workspace chooses. A chat and the nook it creates are AiSloth's basic
 unit, one agent per nook; a nook without a chat runs processes only. A project may group nooks, but a
-nook never needs one. This module tracks nooks' lifecycle, starts them fast from
-templates, runs processes in them through their daemons, and checkpoints and forks them.
+nook never needs one. This module tracks nooks' lifecycle, runs processes in them through their
+daemons, checkpoints their files and brings a lost nook back from its latest checkpoint, and
+later starts them fast from templates.
 
 ## Owns
 
-- **Data:** nook records (workspace, provider, harness, who created it, what it copies, status, latest
-  disk usage), the hash of each nook's daemon token, its copies of its sources (each repository's
-  name, branch, and the commit it started from), the processes started in each nook, templates, and
-  checkpoints.
+- **Data:** nook records (workspace, provider, harness, who created it, what it copies, its kept
+  paths, status, latest disk usage), the hash of each nook's daemon token, its copies of its sources
+  (each repository's name, branch, and the commit it started from), the processes started in each
+  nook, and its checkpoints, whose bundles are in object storage; templates later.
 - **Rules:** what each access level allows with a nook (Read sees it and watches its processes; Write
   starts, feeds, and stops processes and deletes it; the control plane's own processes, such as Chats
   running an agent, may do anything), the lifecycle below, when an idle nook is suspended, and which
   providers a workspace's nooks may run on.
-- **Integrations:** sandbox providers (`src/Sandboxing`), registered by the host.
+- **Integrations:** sandbox providers (`src/Sandboxing`) and object storage (`src/Storage`),
+  registered by the host.
 - **Runtime state:** each running nook's daemon connection and active watches, in the memory of
   the instance the daemon dialed.
 
@@ -37,10 +39,22 @@ templates, runs processes in them through their daemons, and checkpoints and for
 ## Contract
 
 `INooksApi` in `Bagatka.AiSloth.Nooks.Contracts`: people with access and their agents list the
-providers they can use, create (with the workspace's repositories, or a copy of another nook),
-list, and delete nooks, start, watch, feed, and stop processes in them, download their files, and
-export a source's changes for pushing. `INookDaemonsApi` is the daemon endpoint's side, never a public
-route or a tool.
+providers they can use, create (with the workspace's repositories, or from one of another nook's
+checkpoints), list, and delete nooks, start, watch, feed, and stop processes in them, take and
+list checkpoints, download their files as they are or at a checkpoint, copy files out of and into
+them, and export a source's changes for pushing. `INookDaemonsApi` is the daemon endpoint's side,
+never a public route or a tool.
+
+```csharp
+Result<CheckpointSummary> saved = await nooks.CheckpointAsync(actor, new CheckpointNook(nookId, "Add a README"), ct);
+if (saved.Failed)
+{
+    return new Result(saved.Error); // e.g. NotReady while the nook's daemon is away
+}
+
+// A new nook with the files of checkpoint 3 of another, and its agent's sessions kept from now on.
+CreateNook copy = new CreateNook(workspaceId, "docker", "claude-code", [], CopyOf: nookId, Checkpoint: 3, KeptPaths: ["/root/.claude/projects"]);
+```
 
 A provider ID names where a nook runs: a provider the deployment runs for every workspace, such as
 `docker`, or one of the workspace's machines, `machine:<machine ID>`. Callers take IDs from
@@ -65,14 +79,19 @@ Nothing yet. Once workspaces can be deleted, `WorkspaceDeleted` deletes their no
 
 ## Lifecycle
 
-Built so far: Creating, Running, Failed, and Deleting. Paused, Stopped, and Unreachable come with
-suspension and with noticing daemons that stay away.
+Built so far: Creating, Running, Unreachable, Failed, and Deleting. Paused and Stopped come with
+suspension. A running nook whose daemon is away and whose sandbox is gone or failed goes back to
+Creating, and its new sandbox starts from its latest checkpoint; when its provider can't be asked,
+such as for a machine that is offline, it is Unreachable until its daemon or its provider answers.
 
 ```
-Creating ──daemon connects──▶ Running ──idle──▶ Paused or Stopped (the provider decides which)
+Creating ──daemon connects──▶ Running ──sandbox lost──▶ Creating (from the latest checkpoint)
+                                 │
+                                 └──idle──▶ Paused or Stopped (the provider decides which)
                                  ▲                           │
                                  └──────any operation────────┘
-Running ──daemon doesn't reconnect in time──▶ Unreachable ──reconnects──▶ Running
+Running ──daemon away, provider can't be asked──▶ Unreachable ──daemon reconnects──▶ Running
+Unreachable ──provider says the sandbox is gone──▶ Creating (from the latest checkpoint)
 any ──provider reports failure──▶ Failed
 any ──user deletes──▶ Deleting ──provider confirms──▶ (record removed)
 ```
@@ -83,19 +102,25 @@ nook is suspended: a nook with running processes is never idle.
 ## Data
 
 Schema `nooks`. Tables `nooks` (ID, workspace ID, provider name and location, status, created at and
-by, the nook it copies, whether its sources are in place, daemon token hash; a concurrency token),
-`source_copies` (nook ID and name, repository, branch, the commit it started from), and `processes`
-(ID, nook ID, command, arguments, started at, exit code).
+by, the nook and checkpoint it copies, its kept paths, whether its sources are in place, daemon
+token hash; a concurrency token), `source_copies` (nook ID and name, repository, branch, the commit
+it started from), `processes` (ID, nook ID, command, arguments, started at, exit code),
+`checkpoints` (ID, nook ID, number, taken at, note), and `checkpoint_parts` (checkpoint, the place it
+keeps, its snapshot commit, the commit its bundle builds on, the bundle's object key). Bundles are in
+object storage under `nooks/<nook ID>/checkpoints/<number>/`.
 
 ## Background work
 
 - **Reconciler** (`Jobs/NookReconciler.cs`): runs every 10 seconds, and at once after a nook is
   recorded or deleted, in bounded batches. Recorded `Creating` and missing at the provider: issue a
-  daemon token and call `CreateAsync`. Recorded `Deleting`: call `DeleteAsync`, then remove the record
-  and its processes. Reported failed at the provider, or rejected by it: mark it `Failed`. Planned:
-  deleting sandboxes without a record (after a grace period) and noticing running nooks whose sandbox
-  failed, by comparing with each provider's `ListAsync`; and claiming nooks atomically before several
-  instances run it.
+  daemon token and call `CreateAsync`. Recorded `Running` or `Unreachable` without a daemon
+  connection here: ask the provider, and when the sandbox is gone or failed, delete what is left of
+  it, end the processes that ran there with exit code -1, and create it again from the latest
+  checkpoint; when the provider can't be asked, mark it `Unreachable`, logged once. Recorded `Deleting`:
+  call `DeleteAsync`, then remove the record, its processes, and its checkpoints. A `Creating` nook
+  reported failed at the provider, or rejected by it: mark it `Failed`. Planned: deleting sandboxes
+  without a record (after a grace period), by comparing with each provider's `ListAsync`; and
+  claiming nooks atomically before several instances run it.
 - **Idle suspender** (planned): suspends nooks that stay idle longer than a setting.
 
 ## Templates
@@ -110,20 +135,31 @@ build in the background.
 A template only makes starts faster; it never changes the result. If a recipe fails, the nook still
 starts and reports the failure.
 
-## Checkpoints and forks (planned)
+## Checkpoints
 
-A checkpoint saves a nook's source files, with untracked files and honoring `.gitignore`, as a
-commit in each source's git repository, stored in object storage so it outlives the nook. A fork is
-a new nook from a checkpoint: from its template, then the checkpoint's files, then the recipes.
-"Fork now" takes a checkpoint first, so there is one mechanism. Chats records a checkpoint after
-every turn, which is what makes forking from an older message possible.
+A checkpoint saves the places a nook keeps: each git repository directly in `/work`, with its
+history, branches, HEAD, and remotes, and its files as they are, committed or not; the rest of
+`/work`; and the nook's kept paths. Each place becomes a snapshot commit, made with a separate index
+so the nook's own repositories never change, and bundled into object storage with only what the
+place's previous checkpoint lacks; a place that didn't change makes the same commit and no bundle.
+`.gitignore` is honored, so installed dependencies and build output aren't kept.
+
+Putting a checkpoint back fetches each place's bundles in order and checks the snapshot out: a
+repository gets its history and branches back, with its uncommitted changes uncommitted again.
+That happens when a nook starts from a checkpoint, its own after its sandbox was lost or another
+nook's; a copy of a nook without a chosen checkpoint takes one of it first, so there is one way to
+copy files between nooks. A copy leaves out the other nook's kept paths, which belong to its agent.
+Downloading a checkpoint puts it back into a folder in the nook and archives that. The scripts
+(`NooksApi.Checkpoints.cs`) own the format; the control plane checks what comes back from a nook
+before storing it.
 
 ## Configuration
 
 `NooksSettings`, passed by the host (`PATTERNS.md`, entry 20): the connection string, the URL
 daemons dial (the WebApi's daemon endpoint as a nook reaches it), the base nook image and the image
 for each harness a nook can carry, and each nook's CPU
-and memory. The idle period before suspension comes with suspension.
+and memory. The host also registers the object storage checkpoints are kept in. The idle period
+before suspension comes with suspension.
 
 ## Decisions and constraints
 
@@ -161,10 +197,15 @@ and memory. The idle period before suspension comes with suspension.
   waits while its sources are copied in: each repository as a git bundle the control plane fetched
   with the creator's GitHub connection, cloned beside its folder and moved into place, with origin
   pointing at GitHub without credentials and git set to commit as the creator. Then `/work/AGENTS.md`
-  tells agents each folder is its own repository with its own instructions. One preparation runs at
-  a time per nook; a failure is returned and retried by the next call.
-- **Moving files is processes.** Copying in, copying out, archiving, and bundling changes are shell
-  scripts run as processes, recorded like any other, so people see what ran. Bulk input reaches them
+  tells agents each folder is its own repository with its own instructions. A nook from a checkpoint
+  gets the checkpoint's files instead, and git set to commit as its creator. One operation on a
+  nook's files runs at a time per nook, preparation or checkpoint; a failure is returned and
+  retried by the next call.
+- **Losing a sandbox loses at most what changed since the latest checkpoint.** Chats takes one after
+  every turn. The nook keeps its ID, record, and access; its processes don't survive, so they end
+  with exit code -1 (`ProcessExited.Lost`).
+- **Moving files is processes.** Copying in, copying out, archiving, checkpoints, and bundling
+  changes are shell scripts run as processes, recorded like any other, so people see what ran. Bulk input reaches them
   on a stream of its own (`daemon.proto`, `ReadInput`), whose end closes their input; their output is
   watched as usual, with `Complete` retention. What a run writes out, an archive or a bundle, lands
   on the control plane's disk first, so a run that writes more than 4 GiB is stopped and fails.
@@ -176,21 +217,25 @@ and memory. The idle period before suspension comes with suspension.
 
 ## Not built yet
 
-- **Suspension.** No nook is Paused or Stopped yet, and none becomes Unreachable: a nook whose daemon
-  stays away still shows Running, and calls wait up to 60 seconds for it, then answer `NotReady`.
+- **Suspension.** No nook is Paused or Stopped yet. A nook whose daemon stays away while its sandbox
+  runs still shows Running; calls to an away nook wait up to 60 seconds for it, then answer
+  `NotReady`.
 - **Handover.** A control-plane instance that shuts down doesn't send `ReconnectInstruction`;
   daemons notice the lost connection and reconnect with backoff, within about a second.
-- **Reconciler gaps.** Sandboxes without a record aren't deleted, and a running nook whose sandbox
-  fails stays Running. Nooks aren't claimed atomically, so only one instance may run the job. Nooks
+- **Reconciler gaps.** Sandboxes without a record aren't deleted. Nooks aren't claimed atomically, so only one instance may run the job. Nooks
   are reconciled one at a time without deadlines, so a slow call, such as the first image pull on a
   fresh host or machine, delays every other nook, and a provider that hangs blocks them. A nook on
   a machine that is offline stays Creating, and its retries log an error every pass.
-- **Lost processes.** Processes a restarted daemon lost never report an exit: watching one ends at
-  once with exit code -1, but the process list still shows it running. Handling it means marking
-  them exited on the daemon's next hello.
-- **Disk usage** is stored and returned, but nothing acts on it yet; Chats will ask for
-  confirmation at 90%.
-- **Checkpoints, forks, and templates.** A copy of another nook takes its files as they are now.
+- **Lost processes.** Processes a restarted daemon lost in the same sandbox never report an exit:
+  watching one ends at once with exit code -1, but the process list still shows it running. Handling
+  it means marking them exited on the daemon's next hello. A replaced sandbox's processes are marked.
+- **Templates.**
+- **What checkpoints leave out.** Ignored files; git's settings besides remotes, which a restored
+  source gets again from its creator; tags; repositories deeper than directly in `/work`, and
+  submodules' files. Folders whose names hold a tab or a line break fail the checkpoint, as do more
+  than 100 repositories. Checkpoints are kept until the nook is deleted; none are pruned.
+- **A checkpoint's bundles are fetched whole before they go in,** so restoring and downloading need
+  the nook's disk to hold them twice for a moment.
 - **Sources from another workspace,** and bringing new commits into a running nook.
 - **Timeouts for copying in.** A copy that hangs, such as one whose daemon never reads its input,
   holds the nook's first process until its caller gives up.

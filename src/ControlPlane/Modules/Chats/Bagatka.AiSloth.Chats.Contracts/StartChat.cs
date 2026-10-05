@@ -14,7 +14,18 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <param name="Account">The agent account that pays for its work: the workspace's, or the actor's own.</param>
 /// <param name="Repositories">The workspace's repositories its nook starts with, each at <c>/work/&lt;name&gt;</c>; empty for none.</param>
 /// <param name="CopyOf">
-/// Another chat of the workspace whose nook's files its nook starts with a copy of, as they are now;
-/// or <see langword="null"/>. Not together with repositories.
+/// Another chat of the workspace whose nook's files its nook starts with, with its repositories; or
+/// <see langword="null"/>. Not together with repositories. The conversation isn't copied.
 /// </param>
-public sealed record StartChat(WorkspaceId WorkspaceId, string Provider, string Harness, AgentAccountId Account, IReadOnlyList<NookRepository> Repositories, ChatId? CopyOf);
+/// <param name="Checkpoint">
+/// With <paramref name="CopyOf"/>, which of its checkpoints (<see cref="CheckpointSaved"/>) to start
+/// from; <see langword="null"/> for its files as they are when the new agent starts.
+/// </param>
+public sealed record StartChat(
+    WorkspaceId WorkspaceId,
+    string Provider,
+    string Harness,
+    AgentAccountId Account,
+    IReadOnlyList<NookRepository> Repositories,
+    ChatId? CopyOf,
+    int? Checkpoint);

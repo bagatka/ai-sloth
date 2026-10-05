@@ -47,6 +47,14 @@ internal sealed class HostApi : IDisposable
         return await ReadAsync(response, answer, ct);
     }
 
+    // A call with a body and nothing to answer, such as setting text.
+    public async Task CallAsync<TBody>(HttpMethod method, string path, TBody body, JsonTypeInfo<TBody> request, CancellationToken ct)
+    {
+        using JsonContent content = JsonContent.Create(body, request);
+        using HttpResponseMessage response = await SendAsync(method, path, content, ct);
+        await EnsureSuccessAsync(response, ct);
+    }
+
     // A call without a body either way, such as a removal.
     public async Task CallAsync(HttpMethod method, string path, CancellationToken ct)
     {

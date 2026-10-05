@@ -24,6 +24,17 @@ internal sealed record AcpResponse(string Id, JsonElement Result, string? Error)
         }
     }
 
+    // Whether the agent loads earlier sessions, from the answer to Acp.Initialize.
+    public bool SupportsLoading
+    {
+        get
+        {
+            JsonElement? capabilities = Json.Property(Result, "agentCapabilities");
+            JsonElement? loading = capabilities is null ? null : Json.Property(capabilities.Value, "loadSession");
+            return loading?.ValueKind == JsonValueKind.True;
+        }
+    }
+
     // Whether a steered message joined the running turn, from the answer to Acp.Steer.
     public bool Injected
     {

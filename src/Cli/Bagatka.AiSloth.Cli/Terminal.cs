@@ -20,6 +20,12 @@ internal sealed class Terminal(TextReader input, TextWriter output, TextWriter e
         return await Task.Run(input.ReadLine, ct).WaitAsync(ct);
     }
 
+    // Everything until the end of input, such as a file piped in.
+    public async Task<string> ReadToEndAsync(CancellationToken ct)
+    {
+        return await Task.Run(input.ReadToEnd, ct).WaitAsync(ct);
+    }
+
     // A secret, typed without echo at a console; otherwise the first line of input, such as from
     // `echo $KEY | sloth secret set NAME`. Ctrl+C cancels the typing.
     public async Task<string?> ReadSecretAsync(string prompt, CancellationToken ct)

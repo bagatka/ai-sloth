@@ -13,7 +13,26 @@ namespace Bagatka.Harnesses;
 /// <param name="Id">A stable identifier, such as <c>claude-code</c>; its start script is named after it.</param>
 /// <param name="Name">Its name for people.</param>
 /// <param name="Credentials">The kinds of credential it takes.</param>
-public sealed record HarnessProfile(string Id, string Name, IReadOnlyList<CredentialKind> Credentials)
+/// <param name="SessionPaths">
+/// Where in its image it keeps its sessions, as absolute paths: saved with every checkpoint, so a new
+/// agent loads the conversation (<see cref="Acp.LoadSession"/>).
+/// </param>
+/// <param name="InstructionsPath">
+/// The file it reads its user's own standing instructions from, in every session, as an absolute
+/// path; a host writes instructions it gives every agent there.
+/// </param>
+/// <param name="StatePaths">
+/// Where it keeps what it writes for itself to use in later sessions, such as Claude Code's memory, as
+/// absolute paths; empty when it keeps nothing of the kind. Never its sessions, credentials, or what
+/// its start script writes.
+/// </param>
+public sealed record HarnessProfile(
+    string Id,
+    string Name,
+    IReadOnlyList<CredentialKind> Credentials,
+    IReadOnlyList<string> SessionPaths,
+    string InstructionsPath,
+    IReadOnlyList<string> StatePaths)
 {
     /// <summary>The program, on the PATH of the harness's image, that starts it.</summary>
     public const string Command = "harness";

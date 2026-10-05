@@ -31,12 +31,12 @@ internal sealed partial class NooksApi
         mv "$incoming" "/work/$1"
         """;
 
-    // Points origin at GitHub, without credentials, and sets who commits name. The hook credits the
-    // co-author in aisloth.coauthor on every commit, when there is one.
+    // Points origin at GitHub, without credentials, unless the URL is empty, and sets who commits
+    // name. The hook credits the co-author in aisloth.coauthor on every commit, when there is one.
     private const string ConfigureScript = """
         set -eu
         cd "/work/$1"
-        git remote set-url origin "$2"
+        if [ -n "$2" ]; then git remote set-url origin "$2"; fi
         git config user.name "$3" && git config user.email "$4"
         git config author.name "$3" && git config author.email "$4"
         git config committer.name "$5" && git config committer.email "$6"
@@ -52,17 +52,13 @@ internal sealed partial class NooksApi
         chmod +x "$hook"
         """;
 
-    private const string CopyOutScript = "tar -czf - -C /work .";
-
-    private const string CopyInScript = "set -eu; mkdir -p /work; tar -xzf - -C /work";
-
     // Writes the agents' guide on standard input as /work/AGENTS.md, and points CLAUDE.md at it.
     private const string GuideScript = "set -eu; cat > /work/AGENTS.md; [ -e /work/CLAUDE.md ] || printf '@AGENTS.md\\n' > /work/CLAUDE.md";
 
     // Puts the nook's sources in place before anything else runs in it: its repositories, copied in
-    // with its creator's GitHub connection, or a copy of another nook's files; then the guide that
-    // tells agents where they are. Done once, by whichever call comes first while the others wait; a
-    // failure is returned, and the next call tries again.
+    // with its creator's GitHub connection, with the guide that tells agents where they are; or a
+    // checkpoint's files. Done once, by whichever call comes first while the others wait; a failure
+    // is returned, and the next call tries again.
     private async Task<Result> PrepareSourcesAsync(Nook nook, DaemonConnection connection, CancellationToken ct)
     {
         if (nook.SourcesReady)
@@ -70,7 +66,7 @@ internal sealed partial class NooksApi
             return new Result(new Success());
         }
 
-        using IDisposable held = await sourceLocks.AcquireAsync(nook.Id, ct);
+        using IDisposable held = await fileLocks.AcquireAsync(nook.Id, ct);
         await db.Entry(nook).ReloadAsync(ct);
         if (nook.SourcesReady)
         {
@@ -78,19 +74,59 @@ internal sealed partial class NooksApi
         }
 
         List<SourceCopy> copies = await db.SourceCopies.Where(copy => copy.NookId == nook.Id).OrderBy(copy => copy.Name).ToListAsync(ct);
-        Result copied;
+        int? copiedCheckpoint = null;
         if (nook.CopyOf is NookId source)
         {
-            copied = await CopyNookAsync(nook, source, connection, copies, ct);
+            Result<int> copied = await CopyCheckpointAsync(nook, source, connection, copies, ct);
+            if (copied.Failed)
+            {
+                return new Result(copied.Error);
+            }
+
+            copiedCheckpoint = copied.Output;
         }
         else
         {
-            copied = await CloneAllAsync(nook, copies, connection, ct);
+            Result cloned = await CloneAllAsync(nook, copies, connection, ct);
+            if (cloned.Failed)
+            {
+                return cloned;
+            }
         }
 
-        if (copied.Failed)
+        return await MarkPreparedAsync(nook, copiedCheckpoint, ct);
+    }
+
+    // The daemon's disk reports change the nook while its sources are copied in, so marking it ready
+    // reads it again and retries on their conflict. A copy records the checkpoint it came from.
+    private async Task<Result> MarkPreparedAsync(Nook nook, int? copiedCheckpoint, CancellationToken ct)
+    {
+        Result saved = new Result(ModuleDbContextExtensions.ConcurrencyConflict);
+        for (int attempt = 0; attempt < 3 && saved.Failed && saved.Error == ModuleDbContextExtensions.ConcurrencyConflict; attempt++)
         {
-            return copied;
+            await db.Entry(nook).ReloadAsync(ct);
+            if (copiedCheckpoint is int number)
+            {
+                nook.Copies(number);
+            }
+
+            nook.SourcesPrepared();
+            saved = await db.SaveAsync(ct);
+        }
+
+        return saved;
+    }
+
+    // Copies in the repositories not in place yet, then writes the guide to all of them.
+    private async Task<Result> CloneAllAsync(Nook nook, List<SourceCopy> copies, DaemonConnection connection, CancellationToken ct)
+    {
+        foreach (SourceCopy copy in copies.Where(copy => !copy.CopiedIn))
+        {
+            Result cloned = await CloneAsync(nook, copy, connection, ct);
+            if (cloned.Failed)
+            {
+                return cloned;
+            }
         }
 
         if (copies.Count > 0)
@@ -100,35 +136,6 @@ internal sealed partial class NooksApi
             if (!written.Succeeded)
             {
                 return new Result(SourcesFailed("Writing /work/AGENTS.md failed: " + written.Errors));
-            }
-        }
-
-        return await MarkPreparedAsync(nook, ct);
-    }
-
-    // The daemon's disk reports change the nook while its sources are copied in, so marking it ready
-    // reads it again and retries on their conflict.
-    private async Task<Result> MarkPreparedAsync(Nook nook, CancellationToken ct)
-    {
-        Result saved = new Result(ModuleDbContextExtensions.ConcurrencyConflict);
-        for (int attempt = 0; attempt < 3 && saved.Failed && saved.Error == ModuleDbContextExtensions.ConcurrencyConflict; attempt++)
-        {
-            await db.Entry(nook).ReloadAsync(ct);
-            nook.SourcesPrepared();
-            saved = await db.SaveAsync(ct);
-        }
-
-        return saved;
-    }
-
-    private async Task<Result> CloneAllAsync(Nook nook, List<SourceCopy> copies, DaemonConnection connection, CancellationToken ct)
-    {
-        foreach (SourceCopy copy in copies.Where(copy => !copy.CopiedIn))
-        {
-            Result cloned = await CloneAsync(nook, copy, connection, ct);
-            if (cloned.Failed)
-            {
-                return cloned;
             }
         }
 
@@ -163,25 +170,96 @@ internal sealed partial class NooksApi
             return new Result(SourcesFailed("Copying " + copy.Name + " into the nook failed: " + run.Errors));
         }
 
-        Result<GitSettings> gitSettings = await sources.GetGitSettingsAsync(person, ct);
-        if (gitSettings.Failed || gitSettings.Output.Effective is not CommitIdentity identity)
+        Result configured = await ConfigureGitAsync(creator, copy.Name, exported.Output.Url.AbsoluteUri, connection, ct);
+        if (configured.Failed)
         {
-            return new Result(SourcesFailed("Who commits in " + copy.Name + " name isn't known: connect GitHub, or set a git author."));
-        }
-
-        string[] configuration = [copy.Name, exported.Output.Url.AbsoluteUri, identity.Author.Name, identity.Author.Email, identity.Committer.Name, identity.Committer.Email, identity.CoAuthor ?? string.Empty];
-        ProcessRun configured = await RunAsync(connection, ConfigureScript, configuration, NoVariables, input: null, output: null, ct);
-        if (!configured.Succeeded)
-        {
-            return new Result(SourcesFailed("Setting up git in " + copy.Name + " failed: " + configured.Errors));
+            return configured;
         }
 
         copy.Copied(exported.Output.Branch, exported.Output.Commit);
         return await db.SaveAsync(ct);
     }
 
-    // Copies another nook's /work in, as it is now, with its repositories' records.
-    private async Task<Result> CopyNookAsync(Nook nook, NookId sourceId, DaemonConnection connection, List<SourceCopy> copies, CancellationToken ct)
+    // Sets who commits in the source name the person, as their git settings say, and points origin
+    // at the URL unless it is empty.
+    private async Task<Result> ConfigureGitAsync(UserId person, string name, string origin, DaemonConnection connection, CancellationToken ct)
+    {
+        Result<GitSettings> gitSettings = await sources.GetGitSettingsAsync(Actor.ForUser(person), ct);
+        if (gitSettings.Failed || gitSettings.Output.Effective is not CommitIdentity identity)
+        {
+            return new Result(SourcesFailed("Who commits in " + name + " name isn't known: connect GitHub, or set a git author."));
+        }
+
+        string[] configuration = [name, origin, identity.Author.Name, identity.Author.Email, identity.Committer.Name, identity.Committer.Email, identity.CoAuthor ?? string.Empty];
+        ProcessRun configured = await RunAsync(connection, ConfigureScript, configuration, NoVariables, input: null, output: null, ct);
+        return configured.Succeeded
+            ? new Result(new Success())
+            : new Result(SourcesFailed("Setting up git in " + name + " failed: " + configured.Errors));
+    }
+
+    // Puts a checkpoint's files in place: the nook's own latest one, after its sandbox was lost, or
+    // one of the nook it copies, taken now unless one was chosen. A copy takes the other nook's
+    // repositories with it, but never its kept paths, which belong to that nook's agent. Git's
+    // settings aren't in checkpoints, so who commits is set again, as the nook's creator. Returns the
+    // checkpoint copied.
+    private async Task<Result<int>> CopyCheckpointAsync(Nook nook, NookId from, DaemonConnection connection, List<SourceCopy> copies, CancellationToken ct)
+    {
+        int number;
+        if (nook.CopyCheckpoint is int chosen)
+        {
+            number = chosen;
+        }
+        else
+        {
+            Result<Checkpoint> taken = await CheckpointToCopyAsync(from, ct);
+            if (taken.Failed)
+            {
+                return new Result<int>(taken.Error);
+            }
+
+            number = taken.Output.Number;
+        }
+
+        List<KeptPlace>? places = await PlacesAsync(from, number, ct);
+        if (places is null)
+        {
+            return new Result<int>(SourcesFailed("The checkpoint to start from is gone."));
+        }
+
+        bool own = from == nook.Id;
+        places = own ? places : [.. places.Where(place => place.Path is not "/")];
+        ProcessRun restored = await RestoreAsync(connection, places, archive: string.Empty, output: null, ct);
+        if (!restored.Succeeded)
+        {
+            return new Result<int>(SourcesFailed("Putting the checkpoint's files in the nook failed: " + restored.Errors));
+        }
+
+        if (!own && copies.Count == 0)
+        {
+            List<SourceCopy> theirs = await db.SourceCopies.AsNoTracking().Where(copy => copy.NookId == from).ToListAsync(ct);
+            copies.AddRange(theirs.Select(copy => copy.CopyTo(nook.Id)));
+            db.SourceCopies.AddRange(copies);
+        }
+
+        // A nook the control plane created has nobody to commit as.
+        if (nook.CreatedBy is UserId creator)
+        {
+            foreach (SourceCopy copy in copies.Where(copy => places.Exists(place => string.Equals(place.Path, "/work/" + copy.Name, StringComparison.Ordinal))))
+            {
+                Result configured = await ConfigureGitAsync(creator, copy.Name, origin: string.Empty, connection, ct);
+                if (configured.Failed)
+                {
+                    return new Result<int>(configured.Error);
+                }
+            }
+        }
+
+        Result saved = await db.SaveAsync(ct);
+        return saved.Failed ? new Result<int>(saved.Error) : new Result<int>(number);
+    }
+
+    // A checkpoint of the nook to copy, as it is now, with its own sources in place first.
+    private async Task<Result<Checkpoint>> CheckpointToCopyAsync(NookId sourceId, CancellationToken ct)
     {
         Nook? source = await db.Nooks.SingleOrDefaultAsync(found => found.Id == sourceId, ct);
         DaemonConnection? sourceConnection = null;
@@ -192,38 +270,16 @@ internal sealed partial class NooksApi
 
         if (source is null || sourceConnection is null)
         {
-            return new Result(SourcesFailed("The nook to copy is gone, or isn't running."));
+            return new Result<Checkpoint>(SourcesFailed("The nook to copy is gone, or isn't running."));
         }
 
         Result sourceReady = await PrepareSourcesAsync(source, sourceConnection, ct);
         if (sourceReady.Failed)
         {
-            return sourceReady;
+            return new Result<Checkpoint>(sourceReady.Error);
         }
 
-        ProcessRun? copiedOut = null;
-        ProcessRun copiedIn = await RunAsync(
-            connection,
-            CopyInScript,
-            [],
-            NoVariables,
-            async (stream, token) => { copiedOut = await RunAsync(sourceConnection, CopyOutScript, [], NoVariables, input: null, stream, token); },
-            output: null,
-            ct);
-        if (copiedOut is not { Succeeded: true } || !copiedIn.Succeeded)
-        {
-            return new Result(SourcesFailed("Copying the other nook's files failed: " + (copiedOut?.Errors ?? string.Empty) + " " + copiedIn.Errors));
-        }
-
-        List<SourceCopy> theirs = await db.SourceCopies.AsNoTracking().Where(copy => copy.NookId == sourceId).ToListAsync(ct);
-        foreach (SourceCopy copy in theirs)
-        {
-            SourceCopy ours = copy.CopyTo(nook.Id);
-            db.SourceCopies.Add(ours);
-            copies.Add(ours);
-        }
-
-        return await db.SaveAsync(ct);
+        return await SaveCheckpointAsync(source, sourceConnection, "Copied into a new nook", ct);
     }
 
     // What agents read first: where the repositories are, and that each has its own instructions.

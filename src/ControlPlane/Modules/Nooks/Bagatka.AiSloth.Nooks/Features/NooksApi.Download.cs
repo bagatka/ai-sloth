@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -27,6 +29,25 @@ internal sealed partial class NooksApi
             return new Result(NooksErrors.SourceNotFound);
         }
 
+        // A checkpoint's /work: its repositories and the rest, or the one source.
+        List<KeptPlace>? places = null;
+        if (command.Checkpoint is int number)
+        {
+            places = await PlacesAsync(command.NookId, number, ct);
+            if (places is null)
+            {
+                return new Result(NooksErrors.CheckpointNotFound);
+            }
+
+            places = command.Source is null
+                ? [.. places.Where(place => place.Path is not "/")]
+                : [.. places.Where(place => string.Equals(place.Path, "/work/" + command.Source, StringComparison.Ordinal))];
+            if (places.Count == 0)
+            {
+                return new Result(NooksErrors.SourceNotFound);
+            }
+        }
+
         DaemonConnection? connection = await ConnectionAsync(command.NookId, ct);
         if (connection is null)
         {
@@ -39,7 +60,16 @@ internal sealed partial class NooksApi
             return prepared;
         }
 
-        ProcessRun archived = await RunAsync(connection, "tar -czf - -C /work \"$1\"", [command.Source ?? "."], NoVariables, input: null, destination, ct);
+        ProcessRun archived;
+        if (places is null)
+        {
+            archived = await RunAsync(connection, "tar -czf - -C /work \"$1\"", [command.Source ?? "."], NoVariables, input: null, destination, ct);
+        }
+        else
+        {
+            archived = await RestoreAsync(connection, places, command.Source ?? ".", destination, ct);
+        }
+
         return archived.Succeeded
             ? new Result(new Success())
             : new Result(Error.Conflict("nooks.download_failed", "Archiving the nook's files failed: " + archived.Errors));

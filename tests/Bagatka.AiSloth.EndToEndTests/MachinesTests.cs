@@ -65,6 +65,42 @@ public sealed class MachinesTests(ControlPlane controlPlane) : IDisposable
     }
 
     [Fact]
+    public async Task A_nook_whose_machine_is_away_waits_unreachable_and_comes_back_when_the_machine_does()
+    {
+        WorkspaceSummary workspace = await CreateWorkspaceAsync();
+        MachineRegistration added = await AddMachineAsync(workspace, "laptop");
+        MachineCredential credential = await MachineLink.RegisterAsync(controlPlane.MachinesUrl, added.Code, Ct);
+        NookSummary nook;
+        await using (RunningMachine machine = controlPlane.StartMachine(credential))
+        {
+            ProviderSummary provider = await Api.EventuallyAsync(async () =>
+            {
+                IReadOnlyList<ProviderSummary> providers = await ProvidersAsync(workspace);
+                return providers.SingleOrDefault(found => string.Equals(found.Name, "laptop", StringComparison.Ordinal) && found.Available);
+            });
+            nook = await Api.ReadAsync<NookSummary>(_alice.SendPostAsync(WorkspaceNooksPath(workspace), new { provider = provider.Id }), HttpStatusCode.Created);
+            await Api.ReadAsync<ProcessSummary>(_alice.SendPostAsync(PathOf(nook) + "/processes", new { command = "true" }), HttpStatusCode.OK);
+        }
+
+        // The machine is away, and its nook's daemon with it: nothing can say whether the nook is gone.
+        await controlPlane.LoseSandboxAsync(nook.Id.Value);
+        NookSummary away = await Api.EventuallyAsync(async () =>
+        {
+            NookSummary found = await Api.ReadAsync<NookSummary>(_alice.SendGetAsync(PathOf(nook)), HttpStatusCode.OK);
+            return found.Status == NookStatus.Unreachable ? found : null;
+        });
+        await using RunningMachine back = controlPlane.StartMachine(credential);
+        NookSummary running = await Api.EventuallyAsync(async () =>
+        {
+            NookSummary found = await Api.ReadAsync<NookSummary>(_alice.SendGetAsync(PathOf(nook)), HttpStatusCode.OK);
+            return found.Status == NookStatus.Running ? found : null;
+        });
+
+        Assert.Equal(NookStatus.Unreachable, away.Status);
+        Assert.Equal(nook.Provider, running.Provider);
+    }
+
+    [Fact]
     public async Task A_registration_code_works_once()
     {
         WorkspaceSummary workspace = await CreateWorkspaceAsync();

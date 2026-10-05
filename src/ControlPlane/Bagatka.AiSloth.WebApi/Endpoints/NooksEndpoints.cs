@@ -21,7 +21,7 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class NooksEndpoints
 {
-    internal sealed record CreateNookRequest(string Provider, IReadOnlyList<NookRepository>? Repositories = null, NookId? CopyOf = null);
+    internal sealed record CreateNookRequest(string Provider, IReadOnlyList<NookRepository>? Repositories = null, NookId? CopyOf = null, int? Checkpoint = null);
 
     internal sealed record StartProcessRequest(
         string Command,
@@ -43,6 +43,7 @@ internal static class NooksEndpoints
         nooks.MapGet("/{id:guid}", Get);
         nooks.MapDelete("/{id:guid}", Delete);
         nooks.MapGet("/{id:guid}/download", Download);
+        nooks.MapGet("/{nookId:guid}/checkpoints", ListCheckpoints);
         nooks.MapPost("/{nookId:guid}/processes", StartProcess);
         nooks.MapGet("/{nookId:guid}/processes", ListProcesses);
         nooks.MapGet("/{nookId:guid}/processes/{processId:guid}/output", WatchProcess);
@@ -63,17 +64,19 @@ internal static class NooksEndpoints
         [FromServices] INooksApi api,
         CancellationToken ct)
     {
-        Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider, Harness: null, request.Repositories ?? [], request.CopyOf), ct);
+        Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider, Harness: null, request.Repositories ?? [], request.CopyOf, request.Checkpoint, KeptPaths: []), ct);
         return result.ToCreated(nook => string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Id.Value}"));
     }
 
     /// <summary>
     /// The nook's files as a gzipped tar archive: one of its sources with <c>source</c>, or all of
-    /// <c>/work</c>. Anyone who sees the nook may.
+    /// <c>/work</c>; as they are now, or at the checkpoint numbered <c>checkpoint</c>. Anyone who
+    /// sees the nook may.
     /// </summary>
     private static async Task<Results<PushStreamHttpResult, ProblemHttpResult>> Download(
         [FromRoute] Guid id,
         [FromQuery] string? source,
+        [FromQuery] int? checkpoint,
         ClaimsPrincipal principal,
         [FromServices] INooksApi api,
         CancellationToken ct)
@@ -84,7 +87,7 @@ internal static class NooksEndpoints
         Result downloaded;
         await using (FileStream archive = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 81920, FileOptions.Asynchronous))
         {
-            downloaded = await api.DownloadAsync(principal.ToActor(), new DownloadFiles(NookId.From(id), source), archive, ct);
+            downloaded = await api.DownloadAsync(principal.ToActor(), new DownloadFiles(NookId.From(id), source, checkpoint), archive, ct);
         }
 
         if (downloaded.Failed)
@@ -93,7 +96,8 @@ internal static class NooksEndpoints
             return downloaded.Error.ToProblem();
         }
 
-        string name = (source ?? "work") + "-" + id.ToString("N", CultureInfo.InvariantCulture)[^6..] + ".tar.gz";
+        string at = checkpoint is int number ? "@" + number.ToString(CultureInfo.InvariantCulture) : string.Empty;
+        string name = (source ?? "work") + "-" + id.ToString("N", CultureInfo.InvariantCulture)[^6..] + at + ".tar.gz";
         return TypedResults.Stream(
             async body =>
             {
@@ -182,6 +186,19 @@ internal static class NooksEndpoints
         CancellationToken ct)
     {
         Result<Page<ProcessSummary>> result = await api.ListProcessesAsync(principal.ToActor(), NookId.From(nookId), Paging.Request(cursor, limit), ct);
+        return result.ToOk();
+    }
+
+    /// <summary>The nook's checkpoints, newest first: one after each of its chat's turns.</summary>
+    private static async Task<Results<Ok<Page<CheckpointSummary>>, ProblemHttpResult>> ListCheckpoints(
+        [FromRoute] Guid nookId,
+        [FromQuery] string? cursor,
+        [FromQuery] int? limit,
+        ClaimsPrincipal principal,
+        [FromServices] INooksApi api,
+        CancellationToken ct)
+    {
+        Result<Page<CheckpointSummary>> result = await api.ListCheckpointsAsync(principal.ToActor(), NookId.From(nookId), Paging.Request(cursor, limit), ct);
         return result.ToOk();
     }
 

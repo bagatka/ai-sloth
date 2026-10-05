@@ -9,7 +9,12 @@ speak. Nothing here knows AiSloth; Chats is its caller.
 `Bagatka.Harnesses`:
 
 - `HarnessProfiles` lists the known `HarnessProfile`s: Claude Code, Codex, and pi (each through its ACP
-  adapter), and GitHub Copilot CLI. A profile is data: an ID, a name, and the `CredentialKind`s it takes.
+  adapter), and GitHub Copilot CLI. A profile is data: an ID, a name, the `CredentialKind`s it takes,
+  where it keeps its sessions (`SessionPaths`), which a host saves with each nook so a new agent can
+  load one, the file it reads its user's standing instructions from (`InstructionsPath`), and where
+  it keeps what it writes for itself to use later (`StatePaths`: Claude Code's memory, which its start
+  script puts in `~/.claude/memory` whatever folder it works in; never credentials, nor what its start
+  script writes).
 - **Every harness starts the same way.** Its image provides `harness` (`HarnessProfile.Command`), its
   start script from `start/<id>.sh`, and the host starts it with the same three variables
   (`HarnessProfile.EnvironmentFor`):
@@ -27,6 +32,8 @@ speak. Nothing here knows AiSloth; Chats is its caller.
   update, a request to answer, or the answer to one of the client's requests, already matched to it.
   A prompt or steer carries the caller's key, and its answer comes back with it. The request IDs
   that carry keys are persisted wherever a host keeps harness output, so their format never changes.
+  `Acp.LoadSession` continues an earlier session whose files the harness kept, when it says it can
+  (`AcpInitialized.SupportsLoading`); the history it replays comes as updates before the answer.
 
 ```csharp
 IReadOnlyDictionary<string, string> environment = HarnessProfile.EnvironmentFor(CredentialKind.OpenAIApi, gatewayToken, gateway);
@@ -34,7 +41,8 @@ IReadOnlyDictionary<string, string> environment = HarnessProfile.EnvironmentFor(
 AcpEvent? read = Acp.Read(line);   // null: noise, or an answer to nothing this client asked
 switch (read?.Value)
 {
-    case AcpInitialized: Write(Acp.NewSession("/work")); break;
+    case AcpInitialized initialized: Write(initialized.SupportsLoading && earlier is not null ? Acp.LoadSession(earlier, "/work") : Acp.NewSession("/work")); break;
+    case AcpSessionLoaded: ...; break;                       // continues the conversation; AcpLoadFailed: start a new one
     case AcpSessionCreated created: Write(Acp.Prompt(messageId, created.SessionId, "Add a README")); break;
     case AcpUpdate update: ...; break;                       // save or show it
     case AcpRequest request: Write(Acp.Allow(request)); break;
@@ -54,6 +62,7 @@ switch (read?.Value)
 
 ## Not built yet
 
-- **Harness state:** each profile will list where its harness keeps memory, skills, and other files
-  between sessions, so a host can save them per person and restore them into new places.
-- **Resuming a session** (`session/load`), for forks.
+- **State for Codex, pi, and Copilot.** None of them writes a memory of its own that we know of, so
+  their profiles keep none. Copilot's instructions file is confirmed by `copilot instruction list`,
+  not by a test, since no fake serves Copilot.
+- **Forking a session** (`session/fork`), for continuing a conversation from an earlier turn.

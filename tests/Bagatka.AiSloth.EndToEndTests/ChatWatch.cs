@@ -46,10 +46,10 @@ internal sealed class ChatWatch : IAsyncDisposable
         return new ChatWatch(response, stream);
     }
 
-    /// <summary>Reads until the next event of the type, and returns its body.</summary>
-    public async Task<JsonElement> NextAsync(string type)
+    /// <summary>Reads until the next event of the type, within a minute or <paramref name="patience"/>, and returns its body.</summary>
+    public async Task<JsonElement> NextAsync(string type, TimeSpan? patience = null)
     {
-        _patience.CancelAfter(Patience);
+        _patience.CancelAfter(patience ?? Patience);
         while (await _items.MoveNextAsync())
         {
             JsonElement body = JsonElement.Parse(_items.Current.Data).GetProperty("event");

@@ -42,6 +42,9 @@ internal sealed class StoredEvent
             MessageCancelled cancelled => ("message-cancelled", JsonSerializer.Serialize(cancelled, FoundationJson.Options)),
             AgentUpdate update => ("agent-update", update.Update.GetRawText()),
             TurnEnded ended => ("turn-ended", JsonSerializer.Serialize(ended, FoundationJson.Options)),
+            CheckpointSaved saved => ("checkpoint-saved", JsonSerializer.Serialize(saved, FoundationJson.Options)),
+            CheckpointFailed failed => ("checkpoint-failed", JsonSerializer.Serialize(failed, FoundationJson.Options)),
+            AgentRestarted restarted => ("agent-restarted", JsonSerializer.Serialize(restarted, FoundationJson.Options)),
         };
         return new StoredEvent(chatId, sequence, at, kind, data);
     }
@@ -57,6 +60,9 @@ internal sealed class StoredEvent
             "message-cancelled" => new ChatEventBody(Read<MessageCancelled>()),
             "agent-update" => new ChatEventBody(new AgentUpdate(JsonElement.Parse(Data))),
             "turn-ended" => new ChatEventBody(Read<TurnEnded>()),
+            "checkpoint-saved" => new ChatEventBody(Read<CheckpointSaved>()),
+            "checkpoint-failed" => new ChatEventBody(Read<CheckpointFailed>()),
+            "agent-restarted" => new ChatEventBody(Read<AgentRestarted>()),
             _ => throw new InvalidOperationException("Chat " + ChatId.Value + " has an event of unknown kind " + Kind + "."),
         };
         return new ChatEvent(Sequence, At, body);

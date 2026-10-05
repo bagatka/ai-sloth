@@ -10,6 +10,7 @@ using Bagatka.AiSloth.Sources.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
+using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Nooks;
 
@@ -42,6 +43,12 @@ internal sealed partial class NooksApi
             return new Result<NookSummary>(Error.Validation("harness", "This deployment offers no harness with this ID."));
         }
 
+        bool keepable = command.KeptPaths.Count <= MaxPaths && command.KeptPaths.All(path => IsAbsolute(path) && path is not "/work" && !path.StartsWith("/work/", StringComparison.Ordinal));
+        if (!keepable)
+        {
+            return new Result<NookSummary>(Error.Validation("keptPaths", "At most 10 absolute paths outside /work, without . or .. parts."));
+        }
+
         Result<IReadOnlyList<PlannedRepository>> planned = await PlanSourcesAsync(actor, command, ct);
         if (planned.Failed)
         {
@@ -49,7 +56,7 @@ internal sealed partial class NooksApi
         }
 
         UserId? createdBy = actor is UserActor user ? user.UserId : null;
-        Nook nook = Nook.Create(command.WorkspaceId, provider.Value, command.Harness, createdBy, command.CopyOf, time);
+        Nook nook = Nook.Create(command.WorkspaceId, provider.Value, command.Harness, createdBy, command.CopyOf, command.Checkpoint, [.. command.KeptPaths], time);
         List<SourceCopy> copies = [.. planned.Output.Select(repository => SourceCopy.Planned(nook.Id, repository.Name, repository.Repository, repository.Branch))];
 
         // Recorded before the nook is saved: a record for a nook that never got saved stands alone harmlessly.
@@ -80,9 +87,25 @@ internal sealed partial class NooksApi
         {
             Result<Nook> source = await FindNookAsync(actor, copyOf, AccessLevel.Read, ct);
             bool copyable = !source.Failed && source.Output.WorkspaceId == command.WorkspaceId && command.Repositories.Count == 0;
-            return copyable
+            if (!copyable)
+            {
+                return new Result<IReadOnlyList<PlannedRepository>>(Error.Validation("copyOf", "Must be another nook of the workspace, without repositories besides."));
+            }
+
+            if (command.Checkpoint is not int number)
+            {
+                return new Result<IReadOnlyList<PlannedRepository>>([]);
+            }
+
+            bool checkpointExists = await db.Checkpoints.AnyAsync(checkpoint => checkpoint.NookId == copyOf && checkpoint.Number == number, ct);
+            return checkpointExists
                 ? new Result<IReadOnlyList<PlannedRepository>>([])
-                : new Result<IReadOnlyList<PlannedRepository>>(Error.Validation("copyOf", "Must be another nook of the workspace, without repositories besides."));
+                : new Result<IReadOnlyList<PlannedRepository>>(NooksErrors.CheckpointNotFound);
+        }
+
+        if (command.Checkpoint is not null)
+        {
+            return new Result<IReadOnlyList<PlannedRepository>>(Error.Validation("checkpoint", "Only with copyOf."));
         }
 
         if (command.Repositories.Count > MaxRepositories)

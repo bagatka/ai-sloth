@@ -10,6 +10,7 @@ using Bagatka.AiSloth.Chats.Model;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
+using Bagatka.ObjectStorage;
 using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Chats;
@@ -24,6 +25,8 @@ internal sealed partial class ChatsApi(
     IAgentAccountsApi accounts,
     ChatRunners runners,
     ChatSignals signals,
+    IObjectStorage storage,
+    ChatsSettings settings,
     TimeProvider time) : IChatsApi, IChatHarnessesApi
 {
     // The chat, if the actor may do at least `needed` with it: a chat is as open as its nook. Not found
@@ -48,6 +51,24 @@ internal sealed partial class ChatsApi(
         }
 
         return new Result<Chat>(chat);
+    }
+
+    // The person acting, if they may do at least `needed` with the workspace: their own settings
+    // there, such as harness state, need a person with access. Not found without access.
+    private async Task<Result<UserId>> PersonInAsync(Actor actor, WorkspaceId workspaceId, AccessLevel needed, CancellationToken ct)
+    {
+        if (actor is not UserActor user)
+        {
+            return new Result<UserId>(Error.Forbidden);
+        }
+
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(workspaceId), ct);
+        if (access is null)
+        {
+            return new Result<UserId>(WorkspacesErrors.NotFound);
+        }
+
+        return access < needed ? new Result<UserId>(Error.Forbidden) : new Result<UserId>(user.UserId);
     }
 
     private async Task<ChatSummary> SummaryAsync(Chat chat, CancellationToken ct)

@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -48,6 +49,17 @@ IResourceBuilder<ParameterResource> sourcesKey = builder.AddParameter(
 IResourceBuilder<ParameterResource> secretsKey = builder.AddParameter(
     "secrets-key", new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
 
+// Where checkpoints are kept: a folder of this computer, unless tests give their own.
+IResourceBuilder<ParameterResource> objectStorage = builder.AddParameter(
+    "object-storage",
+    builder.Configuration["Parameters:object-storage"]
+        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "aisloth", "objects"));
+
+// How full a nook's disk is when a message for its agent needs confirming. Docker nooks share this
+// computer's disk, so tests ask only for a full one.
+IResourceBuilder<ParameterResource> nearlyFullDisk = builder.AddParameter(
+    "nearly-full-disk", builder.Configuration["Parameters:nearly-full-disk"] ?? "0.9");
+
 // The Docker scope nooks run in, so test runs never touch a developer's nooks. A parameter given a
 // value can't be overridden, so the default is applied here.
 IResourceBuilder<ParameterResource> sandboxScope = builder.AddParameter("sandbox-scope", builder.Configuration["Parameters:sandbox-scope"] ?? "dev");
@@ -85,6 +97,7 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         .WithEnvironment("Modules__Nooks__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Chats__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Chats__ModelGatewayUrl", ReferenceExpression.Create($"http://host.docker.internal:{modelsEndpoint.Property(EndpointProperty.Port)}/models"))
+        .WithEnvironment("Modules__Chats__NearlyFullDisk", nearlyFullDisk)
         .WithEnvironment("Modules__AgentAccounts__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__AgentAccounts__EncryptionKey", agentAccountsKey)
         .WithEnvironment("Modules__AgentAccounts__AllowChatGptPlans", allowChatGptPlans)
@@ -95,6 +108,7 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         .WithEnvironment("ModelGateway__AllowPrivateNetworks", modelPrivateNetworks)
         .WithEnvironment("Modules__Nooks__DaemonUrl", ReferenceExpression.Create($"http://host.docker.internal:{daemonEndpoint.Property(EndpointProperty.Port)}"))
         .WithEnvironment("Modules__Nooks__Image", NookImage)
+        .WithEnvironment("ObjectStorage__FileSystem__Root", objectStorage)
         .WithEnvironment(environment =>
         {
             foreach (string harness in harnesses)

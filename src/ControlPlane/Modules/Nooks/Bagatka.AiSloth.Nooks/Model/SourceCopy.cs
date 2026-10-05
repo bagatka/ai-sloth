@@ -41,6 +41,12 @@ internal sealed class SourceCopy
         return new SourceCopy(nookId, Name, RepositoryId, Branch, Commit);
     }
 
+    // Its folder is gone with the nook's sandbox, and nothing kept it: it is copied in again.
+    public void Lost()
+    {
+        Commit = null;
+    }
+
     public void Copied(string branch, string commit)
     {
         Branch = branch;

@@ -20,7 +20,22 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// the creator's GitHub connection before anything runs in the nook. Empty for an empty <c>/work</c>.
 /// </param>
 /// <param name="CopyOf">
-/// Another nook of the workspace whose <c>/work</c> this one starts with a copy of, as it is when the
-/// copy is made, with its repositories; or <see langword="null"/>. Not together with repositories.
+/// Another nook of the workspace whose files this one starts with, with its repositories; or
+/// <see langword="null"/>. Not together with repositories.
 /// </param>
-public sealed record CreateNook(WorkspaceId WorkspaceId, string Provider, string? Harness, IReadOnlyList<NookRepository> Repositories, NookId? CopyOf);
+/// <param name="Checkpoint">
+/// With <paramref name="CopyOf"/>, which of its checkpoints this nook starts from; <see langword="null"/>
+/// for its files as they are when they're copied in, through a new checkpoint of it.
+/// </param>
+/// <param name="KeptPaths">
+/// Absolute paths outside <c>/work</c> the nook's checkpoints keep too, such as where its agent keeps
+/// its sessions; at most 10. Empty for none.
+/// </param>
+public sealed record CreateNook(
+    WorkspaceId WorkspaceId,
+    string Provider,
+    string? Harness,
+    IReadOnlyList<NookRepository> Repositories,
+    NookId? CopyOf,
+    int? Checkpoint,
+    IReadOnlyList<string> KeptPaths);

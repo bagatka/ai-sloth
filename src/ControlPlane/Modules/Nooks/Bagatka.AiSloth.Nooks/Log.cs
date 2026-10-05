@@ -9,6 +9,12 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Warning, Message = "Nook {NookId} failed: {Reason}")]
     public static partial void NookFailed(ILogger logger, Guid nookId, string reason);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Nook {NookId} is unreachable: its daemon is away, and its provider can't say why; it waits for either")]
+    public static partial void NookUnreachable(ILogger logger, Exception exception, Guid nookId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Nook {NookId} lost its sandbox; a new one starts from its latest checkpoint")]
+    public static partial void NookReplaced(ILogger logger, Guid nookId);
+
     [LoggerMessage(Level = LogLevel.Information, Message = "Deleted nook {NookId}")]
     public static partial void NookDeleted(ILogger logger, Guid nookId);
 

@@ -11,4 +11,17 @@ case "$HARNESS_CREDENTIAL" in
   *) echo "Claude Code doesn't take $HARNESS_CREDENTIAL." >&2; exit 64 ;;
 esac
 
+# Its memory goes to one place whatever folder it works in, so a host can keep it between nooks: user
+# settings name it, keeping whatever else they hold. Repositories' settings can't move it.
+settings="${HOME:-/root}/.claude/settings.json"
+mkdir -p "$(dirname "$settings")"
+node -e '
+const fs = require("fs");
+const file = process.argv[1];
+let settings = {};
+try { settings = JSON.parse(fs.readFileSync(file, "utf8")); } catch { }
+settings.autoMemoryDirectory = "~/.claude/memory";
+fs.writeFileSync(file, JSON.stringify(settings, null, 2) + "\n");
+' "$settings"
+
 exec claude-agent-acp

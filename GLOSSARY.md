@@ -57,8 +57,9 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Steering | A message sent during a turn going into that turn, so the agent reads it while it works | Chats | interrupt, injection |
 | Stop | Ending the running turn at once; messages the agent hasn't received are cancelled | Chats | cancel (in the product), abort, interrupt |
 | Model gateway | The WebApi endpoint agents call their model through; it forwards each call to their chat's agent account's endpoint with the headers that pay for it, so no nook holds a key or a plan's token | WebApi, Chats | LLM proxy, API proxy |
-| Checkpoint | A nook's source files saved at one moment, such as after a turn | Nooks (planned) | snapshot, backup |
-| Fork | A new nook started from a checkpoint, with the chat resumed up to that point | Nooks, Chats (planned) | clone, copy, branch |
+| Checkpoint | A nook's files saved at one moment, such as after each turn: `/work` and its repositories with their history, honoring `.gitignore`, and its kept paths; numbered in its nook, kept while the nook exists | Nooks | snapshot, backup, save point |
+| Kept paths | Paths outside `/work` a nook's checkpoints keep too, such as where its agent keeps its sessions | Nooks | extra paths, volumes |
+| Fork | A new chat continuing another's conversation from one of its turns, in a nook started from the checkpoint after it | Nooks, Chats (planned) | clone, branch |
 | Source | Where some of a nook's files come from: a repository, later a folder. A nook holds a copy of each at `/work/<name>`, named after it | Sources, Nooks | repo (for both kinds), mount, folder (for a repository) |
 | Repository | A GitHub repository a workspace connected, which its chats' nooks can start with | Sources | repo link, git source, project |
 | GitHub connection | A person's GitHub account, connected through the host's GitHub App; AiSloth copies repositories in and pushes changes as them with it, and no nook ever holds it | Sources | GitHub integration, token, login |
@@ -67,14 +68,15 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Git settings | How a person's commits and branches look: author, committer, AiSloth as co-author, and branch prefix | Sources | git config, identity (alone) |
 | Folder | A source whose files AiSloth keeps, starting empty or from an upload, with versions | Sources (planned) | upload, directory, bucket |
 | Changes | What differs in a nook's copy of a source from what it started with: its commits since, and what isn't committed | Nooks, Sources | diff, patch (except as a download format) |
-| Agents' guide | `/work/AGENTS.md` in a nook with sources, telling agents each folder is its own repository with its own instructions | Nooks | workspace instructions, root AGENTS.md |
+| Agents' guide | `/work/AGENTS.md` in a nook with sources, telling agents each folder is its own repository with its own instructions | Nooks | root AGENTS.md |
+| Instructions | What AiSloth tells every agent to follow, whatever its harness: a workspace's, for everyone's chats there, and a person's own, for the chats they start; written to the file each harness reads its user's instructions from | Chats | system prompt, rules, custom instructions |
 | Recipe | A source's setup script, safe to run again, owned by AiSloth and versioned | Sources (planned) | setup script, bootstrap, skill |
 | Template | A snapshot of a nook right after its recipes ran, used to start new nooks fast | Nooks (planned) | image, cache, warm pool |
 | Project | An optional group of nooks, chats, and sources for a team working toward one goal | Projects (planned) | space, board, workspace |
 | Harness | The program that runs a coding agent, such as Claude Code or Codex; in a nook, through its ACP adapter | Chats | agent (that's what it runs), CLI, client |
-| Harness profile | What AiSloth knows about one harness: its ID, name, and the credentials it takes, and later where it keeps state; its image's start script configures it | `Bagatka.Harnesses` | adapter, plugin |
+| Harness profile | What AiSloth knows about one harness: its ID, name, the credentials it takes, and where it keeps its sessions and its state; its image's start script configures it | `Bagatka.Harnesses` | adapter, plugin |
 | Start script | A harness image's `harness` command: it reads the same three variables for every harness and configures and runs its harness | `src/Harnesses/start` | wrapper, entrypoint |
-| Harness state | The files a harness keeps between sessions, such as its memory and skills, saved per person and restored into their new nooks | Chats (planned) | memory (ours), context |
+| Harness state | What a harness writes for itself to use in later sessions, such as Claude Code's memory: kept for the person who started the chat, in its workspace, and merged across their chats there at each turn's edges | Chats | memory (ours), context |
 | Agent account | An account at an agent vendor that pays for agents' work, such as an OpenAI API key or a ChatGPT plan: a workspace's, which every member uses, or a person's own | AgentAccounts | subscription (for API keys), credential, account (alone) |
 | Secret | An environment variable a workspace gives to every process in its nooks, agents included, such as `GH_TOKEN`; readable by everyone who may write in a nook | Secrets | env var (alone), credential, key |
 | Endpoint | The base URL of the API an API key is for, when it isn't the vendor's own, such as OpenRouter's for OpenAI's API | AgentAccounts | base URL, provider, upstream |

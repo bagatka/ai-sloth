@@ -78,6 +78,9 @@
     <Project Path="src/Sandboxing/Bagatka.Sandboxing.Remote/Bagatka.Sandboxing.Remote.csproj" />
     <Project Path="src/Sandboxing/Bagatka.Sandboxing/Bagatka.Sandboxing.csproj" />
   </Folder>
+  <Folder Name="/src/Storage/">
+    <Project Path="src/Storage/Bagatka.ObjectStorage/Bagatka.ObjectStorage.csproj" />
+  </Folder>
   <Folder Name="/src/Sdk/">
     <File Path="src/Sdk/README.md" />
     <Project Path="src/Sdk/Bagatka.Sdk.Docker/Bagatka.Sdk.Docker.csproj" />

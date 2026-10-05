@@ -10,6 +10,7 @@ internal static class RequestIds
 {
     public const string Initialize = "initialize";
     public const string NewSession = "session/new";
+    public const string LoadSession = "session/load";
     private const string PromptPrefix = "prompt:";
     private const string SteerPrefix = "steer:";
 

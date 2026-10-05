@@ -33,6 +33,7 @@
     <ProjectReference Include="..\..\src\Sdk\Bagatka.Sdk.Docker\Bagatka.Sdk.Docker.csproj" />
     <ProjectReference Include="..\..\src\Sdk\Bagatka.Sdk.GitHub\Bagatka.Sdk.GitHub.csproj" />
     <ProjectReference Include="..\..\src\Sdk\Bagatka.Sdk.OpenAI\Bagatka.Sdk.OpenAI.csproj" />
+    <ProjectReference Include="..\..\src\Storage\Bagatka.ObjectStorage\Bagatka.ObjectStorage.csproj" />
   </ItemGroup>
 
 </Project>

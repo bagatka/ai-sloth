@@ -18,18 +18,25 @@ internal sealed class NooksDbContext(DbContextOptions<NooksDbContext> options) :
 
     public DbSet<SourceCopy> SourceCopies => Set<SourceCopy>();
 
+    public DbSet<Checkpoint> Checkpoints => Set<Checkpoint>();
+
+    public DbSet<CheckpointPart> CheckpointParts => Set<CheckpointPart>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfiguration(new NookConfiguration());
         modelBuilder.ApplyConfiguration(new ProcessConfiguration());
         modelBuilder.ApplyConfiguration(new SourceCopyConfiguration());
+        modelBuilder.ApplyConfiguration(new CheckpointConfiguration());
+        modelBuilder.ApplyConfiguration(new CheckpointPartConfiguration());
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         configurationBuilder.Properties<NookId>().HaveConversion<TypedIdConverter<NookId>>();
         configurationBuilder.Properties<ProcessId>().HaveConversion<TypedIdConverter<ProcessId>>();
+        configurationBuilder.Properties<CheckpointId>().HaveConversion<TypedIdConverter<CheckpointId>>();
         configurationBuilder.Properties<WorkspaceId>().HaveConversion<TypedIdConverter<WorkspaceId>>();
         configurationBuilder.Properties<RepositoryId>().HaveConversion<TypedIdConverter<RepositoryId>>();
         configurationBuilder.Properties<UserId>().HaveConversion<TypedIdConverter<UserId>>();

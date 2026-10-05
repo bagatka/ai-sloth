@@ -47,7 +47,15 @@ public interface IChatsApi
     /// working: it goes into the running turn when the agent supports that, and otherwise waits and
     /// starts the next turn. <see cref="WatchAsync"/> shows which happened.
     /// </summary>
-    /// <returns>The message; a validation error for an empty or too long text, or a proposal not in the chat; forbidden when sending on a proposal from someone whose messages don't reach the agent; or not found.</returns>
+    /// <remarks>
+    /// When the nook's disk is nearly full, the agent may fail to write and checkpoints may fail, so a
+    /// message for the agent is sent only once the sender confirms (<see cref="SendMessage.ConfirmNearlyFullDisk"/>).
+    /// </remarks>
+    /// <returns>
+    /// The message; <see cref="ChatsErrors.DiskNearlyFull"/>; a validation error for an empty or too long
+    /// text, or a proposal not in the chat; forbidden when sending on a proposal from someone whose
+    /// messages don't reach the agent; or not found.
+    /// </returns>
     public Task<Result<ChatMessage>> SendAsync(Actor actor, SendMessage command, CancellationToken ct);
 
     /// <summary>
@@ -56,6 +64,44 @@ public interface IChatsApi
     /// message.
     /// </summary>
     public Task<Result> StopAsync(Actor actor, ChatId id, CancellationToken ct);
+
+    /// <summary>
+    /// The actor's harness state in the workspace, for each harness that keeps any: what its agents
+    /// write for themselves to use later, such as Claude Code's memory, saved from the chats the actor
+    /// starts there after each turn that changed it, and given to the agents of their next chats
+    /// there. It never leaves its workspace. A chat several people write in keeps the state of the
+    /// person who started it.
+    /// </summary>
+    /// <returns>The states; forbidden for anyone but a person; or not found without access to the workspace.</returns>
+    public Task<Result<IReadOnlyList<HarnessStateSummary>>> ListHarnessStatesAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct);
+
+    /// <summary>
+    /// Forgets the actor's state for the harness in the workspace: agents of their chats there start
+    /// without it. A chat whose agent already has it saves it again when it changes it. Forgetting
+    /// none succeeds.
+    /// </summary>
+    public Task<Result> ForgetHarnessStateAsync(Actor actor, WorkspaceId workspaceId, string harness, CancellationToken ct);
+
+    /// <summary>
+    /// The instructions the actor's agents in the workspace get, whatever their harness: the
+    /// workspace's, for everyone's chats there, and the actor's own, for the chats they start in any
+    /// workspace. Agents read them as their user's standing instructions, from when they start.
+    /// </summary>
+    /// <returns>The instructions; forbidden for anyone but a person; or not found without access to the workspace.</returns>
+    public Task<Result<Instructions>> GetInstructionsAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct);
+
+    /// <summary>
+    /// Sets the workspace's instructions, up to 10,000 characters of Markdown; empty for none. People
+    /// with Write on the workspace may. Agents that start afterwards follow them; running ones keep
+    /// theirs.
+    /// </summary>
+    public Task<Result> SetWorkspaceInstructionsAsync(Actor actor, WorkspaceId workspaceId, string text, CancellationToken ct);
+
+    /// <summary>
+    /// Sets the actor's own instructions, up to 10,000 characters of Markdown; empty for none. Agents
+    /// of the chats they start that start afterwards follow them.
+    /// </summary>
+    public Task<Result> SetPersonalInstructionsAsync(Actor actor, string text, CancellationToken ct);
 
     /// <summary>
     /// Streams the chat's events after a sequence number, first those already saved and then live.

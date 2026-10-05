@@ -17,7 +17,7 @@ internal sealed class Nook
     public const int MaxHarnessLength = 32;
 
     // Used by Create and by EF: parameter names match property names.
-    private Nook(NookId id, WorkspaceId workspaceId, string provider, string? location, string? harness, NookStatus status, DateTimeOffset createdAt, UserId? createdBy, NookId? copyOf)
+    private Nook(NookId id, WorkspaceId workspaceId, string provider, string? location, string? harness, NookStatus status, DateTimeOffset createdAt, UserId? createdBy, NookId? copyOf, int? copyCheckpoint, List<string> keptPaths)
     {
         Id = id;
         WorkspaceId = workspaceId;
@@ -28,6 +28,8 @@ internal sealed class Nook
         CreatedAt = createdAt;
         CreatedBy = createdBy;
         CopyOf = copyOf;
+        CopyCheckpoint = copyCheckpoint;
+        KeptPaths = keptPaths;
     }
 
     public NookId Id { get; private set; }
@@ -49,8 +51,14 @@ internal sealed class Nook
     // Whose GitHub connection copies its repositories in; none for a nook the control plane created.
     public UserId? CreatedBy { get; private set; }
 
-    // The nook whose files it starts with a copy of, if any.
+    // The nook whose files it starts with, if any, and which of its checkpoints; none until one is
+    // taken for the copy. A nook that lost its sandbox starts again from its own latest checkpoint.
     public NookId? CopyOf { get; private set; }
+
+    public int? CopyCheckpoint { get; private set; }
+
+    // Absolute paths outside /work its checkpoints keep too.
+    public List<string> KeptPaths { get; private set; }
 
     // Whether its sources are in place: its repositories copied in, or another nook's files, and the
     // agents' guide to them.
@@ -67,14 +75,34 @@ internal sealed class Nook
     // PostgreSQL's xmin: concurrent changes to one nook conflict instead of overwriting each other.
     public uint Version { get; private set; }
 
-    public static Nook Create(WorkspaceId workspaceId, ProviderId provider, string? harness, UserId? createdBy, NookId? copyOf, TimeProvider time)
+    public static Nook Create(WorkspaceId workspaceId, ProviderId provider, string? harness, UserId? createdBy, NookId? copyOf, int? copyCheckpoint, List<string> keptPaths, TimeProvider time)
     {
-        return new Nook(NookId.New(), workspaceId, provider.Name, provider.Location, harness, NookStatus.Creating, time.GetUtcNow(), createdBy, copyOf);
+        return new Nook(NookId.New(), workspaceId, provider.Name, provider.Location, harness, NookStatus.Creating, time.GetUtcNow(), createdBy, copyOf, copyCheckpoint, keptPaths);
     }
 
     public void SourcesPrepared()
     {
         SourcesReady = true;
+    }
+
+    // The checkpoint of the nook it copies that its files come from, once taken.
+    public void Copies(int checkpoint)
+    {
+        CopyCheckpoint = checkpoint;
+    }
+
+    // Its sandbox is gone: a new one is created, whose files come from the latest checkpoint when
+    // there is one, and otherwise from where they first came from.
+    public void Replace(int? latestCheckpoint)
+    {
+        Status = NookStatus.Creating;
+        SourcesReady = false;
+        DaemonTokenHash = null;
+        if (latestCheckpoint is int number)
+        {
+            CopyOf = Id;
+            CopyCheckpoint = number;
+        }
     }
 
     // A new token for the daemon of a sandbox about to be created. It replaces any earlier one, which
@@ -104,6 +132,19 @@ internal sealed class Nook
         }
 
         throw new InvalidOperationException("Nook " + Id.Value + " has no status.");
+    }
+
+    // Its daemon is away and its provider can't say what became of its sandbox, such as on a machine
+    // that is offline. Returns whether that is news.
+    public bool Unreachable()
+    {
+        if (Status != NookStatus.Running)
+        {
+            return false;
+        }
+
+        Status = NookStatus.Unreachable;
+        return true;
     }
 
     public void Fail()

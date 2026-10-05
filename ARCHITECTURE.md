@@ -71,10 +71,10 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
   a nook; agents may run for days. Suspension is invisible to callers.
 - **Nothing delivered is lost.** A nook is disposable, so what people can't afford to lose lives
   outside it: the control plane saves every chat event as it arrives, and every turn ends with a
-  checkpoint of the nook's files and the harness's session state in object storage. Losing a nook,
-  through a full disk, a crash, or a deletion, costs at most the turn in progress. Risks we can see
-  coming, such as a nearly full disk, pause new work until a person confirms, with the risk
-  explained.
+  checkpoint of the nook's files and the agent's session in object storage. A nook whose machine is
+  lost comes back from its latest checkpoint, and a new agent continues the conversation with the
+  turn in progress, so a loss costs at most that turn's work. Risks we can see coming, such as a
+  nearly full disk, pause new work until a person confirms, with the risk explained.
 - **Small units, optional groups.** A chat and its nook work on their own; a project groups them
   without anything else knowing about projects. Every capability is general-purpose: removing a
   grouping leaves the units working.
@@ -92,7 +92,7 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |
 | CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API: hosts, sign-in, agent accounts, secrets, and chats; its machine mode runs nooks on people's own computers (`src/Cli/README.md`) | Built |
 | Foundation | `Bagatka.Foundation` (+ `.Modules`, `.Web`) | Plumbing: results, errors, actors, typed IDs | Built |
-| Object storage | `Bagatka.ObjectStorage` + `.<Backend>` | Store and read objects by key: folder versions, checkpoints, harness state | Planned |
+| Object storage | `Bagatka.ObjectStorage` (+ `.<Backend>` for cloud backends) | Store and read objects by key: checkpoints and harness state, folder versions later | Contract, and a folder of this computer as backend |
 | Sdk | `Bagatka.Sdk.<Vendor>` | Clients for vendor APIs without an official .NET SDK | Docker Engine, Sign in with ChatGPT, GitHub |
 | Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration; defaults every service host shares | Built |
 
@@ -148,7 +148,7 @@ src/
     Bagatka.Sandboxing.<Backend>/  one provider per compute backend: Docker
     Bagatka.Sandboxing.Remote/     a provider's calls as messages, run on a provider elsewhere
   Storage/
-    Bagatka.ObjectStorage/         general-purpose object storage contract and backends (planned)
+    Bagatka.ObjectStorage/         general-purpose object storage: the contract, and a folder as backend
   Foundation/
     Bagatka.Foundation/            primitives usable everywhere, including Contracts
     Bagatka.Foundation.Modules/    plumbing for module projects
@@ -253,8 +253,8 @@ A capability with one contract, `I<Module>Api`.
 ### Nooks, providers, and the daemon
 
 Built: the Docker provider, the daemon and its image, the Nooks module from creating a nook to
-deleting it, and machines, a workspace's own computers as a provider. Suspension, checkpoints, and
-templates are not built yet (`ROADMAP.md` has the order). The maps are `src/ControlPlane/Modules/Nooks/README.md`,
+deleting it, checkpoints and coming back from them, and machines, a workspace's own computers as a
+provider. Suspension and templates are not built yet (`ROADMAP.md` has the order). The maps are `src/ControlPlane/Modules/Nooks/README.md`,
 `src/ControlPlane/Modules/Machines/README.md`, `src/Sandboxing/README.md`, and `src/Daemon/README.md`.
 These decisions are fixed:
 
@@ -273,6 +273,11 @@ These decisions are fixed:
   left undone and deletes what shouldn't exist.
 - **Processes are detached.** The daemon runs them until they exit or are stopped, keeps their
   output so anyone can watch it from any offset, and reports them again after it reconnects.
+- **Checkpoints are git, kept outside the nook.** A checkpoint saves `/work`, its repositories with
+  their history and branches, and paths the nook's creator names, such as an agent's sessions, as
+  git bundles in object storage: each holds only what changed since the last one. A running nook
+  whose sandbox is gone is created again from its latest checkpoint; copies of a nook start from
+  one of its checkpoints too.
 - **The daemon dials out,** over a protocol defined once in `daemon.proto`: a small control stream,
   plus one stream per bulk transfer so a busy process never delays instructions. Previews of web
   servers running in a nook will use the same connection.
@@ -311,8 +316,8 @@ vendor-shaped, product-agnostic, and used from module internals. Rules are in `s
 
 | Project | May reference | Must not reference |
 |---|---|---|
-| WebApi | Contracts, module projects (registration only), `Foundation`, `Foundation.Modules` (`migrate` only), `Foundation.Web`, `ServiceDefaults`, `DaemonProtocol`, `MachineProtocol`, sandbox providers (registration only) | module internals (enforced by `internal`) |
-| Module | its Contracts, other modules' Contracts, `Foundation`, `Foundation.Modules`, `Sandboxing`, Sdk clients | other module projects, ASP.NET Core, `Foundation.Web` |
+| WebApi | Contracts, module projects (registration only), `Foundation`, `Foundation.Modules` (`migrate` only), `Foundation.Web`, `ServiceDefaults`, `DaemonProtocol`, `MachineProtocol`, sandbox providers and object storage (registration only) | module internals (enforced by `internal`) |
+| Module | its Contracts, other modules' Contracts, `Foundation`, `Foundation.Modules`, `Sandboxing`, `Harnesses`, `ObjectStorage`, Sdk clients | other module projects, ASP.NET Core, `Foundation.Web` |
 | Contracts | `Foundation`, the Contracts of modules its module asks; Machines' also `Sandboxing.Remote` (below) | everything else |
 | Daemon | `DaemonProtocol`, `Foundation`, .NET | everything else |
 | CLI | `MachineProtocol`, `Sandboxing` and its providers, `Foundation`, .NET | modules, the WebApi |
@@ -462,10 +467,10 @@ this table in the same change.
 | Module | Owns | Asks | Reacts to | Schema |
 |---|---|---|---|---|
 | Workspaces (contract only) | Workspaces, and who may do what with them and their nooks: access levels, invites | — | — | `workspaces` |
-| Nooks | Nooks, where each runs, their lifecycle, processes, their copies of sources, templates, checkpoints, daemon connections | Workspaces, Sources, Machines, Secrets | — | `nooks` |
+| Nooks | Nooks, where each runs, their lifecycle and recovery, processes, their copies of sources, checkpoints, templates (planned), daemon connections | Workspaces, Sources, Machines, Secrets | — | `nooks` |
 | Secrets | Workspaces' environment variables for every process in their nooks, their sealed values | Workspaces | — | `secrets` |
 | Sources | GitHub repositories a workspace connected, people's GitHub connections and git settings, copying in and pushing out, push policy; folders and recipes (planned) | Workspaces | — | `sources` |
 | AgentAccounts | Accounts at agent vendors that pay for agents: a workspace's and people's own, their sealed secrets | Workspaces | — | `agent_accounts` |
-| Chats | ACP conversations in nooks, their messages, proposals, and events, the agents' runners; harness state (planned) | Nooks, AgentAccounts, Workspaces | — | `chats` |
+| Chats | ACP conversations in nooks, their messages, proposals, and events, the agents' runners, the instructions agents get, people's harness state | Nooks, AgentAccounts, Workspaces | — | `chats` |
 | Machines | Computers workspaces add to run nooks, their credentials and connections, the `machine` provider | Workspaces | — | `machines` |
 | Projects (planned, extension) | Groups of nooks, chats, and sources, shared context, project chat | Nooks, Chats, Sources, Workspaces | Nooks, Chats | `projects` |

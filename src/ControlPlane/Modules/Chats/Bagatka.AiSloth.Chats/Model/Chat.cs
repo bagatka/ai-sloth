@@ -54,10 +54,24 @@ internal sealed class Chat
     // How far the agent's output is read: everything before this offset is handled.
     public long OutputOffset { get; private set; }
 
-    // The agent's session, once it answered session/new, and whether it accepts messages mid-turn.
+    // The agent's session, once it answered session/new or session/load, and whether it accepts
+    // messages mid-turn.
     public string? SessionId { get; private set; }
 
     public bool SupportsSteering { get; private set; }
+
+    // The session of an agent that ended, which the next one loads when its harness can; and
+    // whether it is loading it, while the updates it replays are history already recorded.
+    public string? ResumableSessionId { get; private set; }
+
+    public bool LoadingSession { get; private set; }
+
+    // The message whose turn ended, until the checkpoint after it is taken.
+    public MessageId? CheckpointAfter { get; private set; }
+
+    // The manifest of the harness state its nook held when it last synced with its starter's
+    // (StateFiles); null before the first sync.
+    public string? HarnessStateFiles { get; private set; }
 
     // The message whose turn is running.
     public MessageId? TurnMessageId { get; private set; }
@@ -91,27 +105,58 @@ internal sealed class Chat
         OutputOffset = 0;
         SessionId = null;
         SupportsSteering = false;
+        LoadingSession = false;
     }
 
-    // The agent's process is gone, with its session and any turn it was working on.
+    // The agent's process is gone, with any turn it was working on; its session may come back.
     public void HarnessStopped()
+    {
+        HarnessLost();
+        TurnMessageId = null;
+    }
+
+    // The agent's process was lost with its nook: the turn it was working on, if any, goes to the
+    // next agent, and so may its session.
+    public void HarnessLost()
     {
         HarnessProcessId = null;
         HarnessTokenHash = null;
         OutputOffset = 0;
+        ResumableSessionId = SessionId ?? ResumableSessionId;
         SessionId = null;
         SupportsSteering = false;
-        TurnMessageId = null;
+        LoadingSession = false;
     }
 
-    public void Initialized(bool supportsSteering)
+    // Returns the earlier session the agent loads, or null when it starts a new one.
+    public string? Initialized(bool supportsSteering, bool supportsLoading)
     {
         SupportsSteering = supportsSteering;
+        LoadingSession = supportsLoading && ResumableSessionId is not null;
+        return LoadingSession ? ResumableSessionId : null;
     }
 
-    public void SessionReady(string sessionId)
+    // The agent couldn't load the earlier session, so a new one starts.
+    public void LoadFailed()
     {
+        LoadingSession = false;
+    }
+
+    // A new session; returns whether it took over from an earlier agent's, without its conversation.
+    public bool SessionReady(string sessionId)
+    {
+        bool tookOver = ResumableSessionId is not null;
         SessionId = sessionId;
+        ResumableSessionId = null;
+        return tookOver;
+    }
+
+    // The agent loaded the earlier session, and continues its conversation.
+    public void SessionLoaded()
+    {
+        SessionId = ResumableSessionId;
+        ResumableSessionId = null;
+        LoadingSession = false;
     }
 
     public void Read(long offset)
@@ -124,9 +169,21 @@ internal sealed class Chat
         TurnMessageId = messageId;
     }
 
+    // The turn ended, so a checkpoint of the files it changed is due.
     public void TurnEnded()
     {
+        CheckpointAfter = TurnMessageId;
         TurnMessageId = null;
+    }
+
+    public void CheckpointTaken()
+    {
+        CheckpointAfter = null;
+    }
+
+    public void HarnessStateSynced(string? manifest)
+    {
+        HarnessStateFiles = manifest;
     }
 
     public StoredEvent Record(ChatEventBody body, TimeProvider time)

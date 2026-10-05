@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Chats.Model;
+using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation.Modules;
 using Bagatka.Foundation;
@@ -44,6 +45,12 @@ internal sealed partial class ChatsApi
             }
         }
 
+        bool unconfirmed = await NeedsDiskConfirmationAsync(chat, command, isProposal, ct);
+        if (unconfirmed)
+        {
+            return new Result<ChatMessage>(ChatsErrors.DiskNearlyFull);
+        }
+
         Result<Message> sent = Message.Send(command.ChatId, user.UserId, command.Text, isProposal, command.Proposal, time);
         if (sent.Failed)
         {
@@ -61,5 +68,20 @@ internal sealed partial class ChatsApi
 
         runners.Wake(command.ChatId);
         return new Result<ChatMessage>(message.ToContract());
+    }
+
+    // A nearly full disk is the sender's to confirm, because the agent's work and checkpoints may
+    // fail: a message for the agent, unconfirmed, while the nook's disk was nearly full at its
+    // daemon's last report, needs it.
+    private async Task<bool> NeedsDiskConfirmationAsync(Chat chat, SendMessage command, bool isProposal, CancellationToken ct)
+    {
+        if (isProposal || command.ConfirmNearlyFullDisk)
+        {
+            return false;
+        }
+
+        Result<NookSummary> nook = await nooks.GetAsync(SystemActors.Harness, chat.NookId, ct);
+        return !nook.Failed && nook.Output.Disk is DiskUsage disk && disk.TotalBytes > 0
+            && 1 - ((double)disk.AvailableBytes / disk.TotalBytes) >= settings.NearlyFullDisk;
     }
 }

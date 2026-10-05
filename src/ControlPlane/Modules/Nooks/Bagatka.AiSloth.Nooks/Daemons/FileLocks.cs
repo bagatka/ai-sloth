@@ -6,9 +6,10 @@ using Bagatka.AiSloth.Nooks.Contracts;
 
 namespace Bagatka.AiSloth.Nooks.Daemons;
 
-// One preparation of a nook's sources at a time on this instance; whoever waits finds it done. A
-// nook's lock lives only while someone holds or waits for it.
-internal sealed class SourceLocks
+// One operation on a nook's files at a time on this instance, such as putting its sources in place
+// or taking a checkpoint; whoever waits for a preparation finds it done. A nook's lock lives only
+// while someone holds or waits for it.
+internal sealed class FileLocks
 {
     private readonly Lock _gate = new Lock();
     private readonly Dictionary<NookId, Held> _held = [];
@@ -48,7 +49,7 @@ internal sealed class SourceLocks
         }
     }
 
-    private sealed class Held(SourceLocks locks, NookId nookId) : IDisposable
+    private sealed class Held(FileLocks locks, NookId nookId) : IDisposable
     {
         public NookId NookId { get; } = nookId;
 

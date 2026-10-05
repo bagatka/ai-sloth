@@ -15,8 +15,8 @@ public static class NooksModule
 {
     /// <summary>
     /// Registers the module. The host also registers a <see cref="System.TimeProvider"/>, the
-    /// Workspaces, Machines, Secrets, and Sources modules, and every <see cref="Bagatka.Sandboxing.ISandboxProvider"/>
-    /// nooks may run on.
+    /// Workspaces, Machines, Secrets, and Sources modules, every <see cref="Bagatka.Sandboxing.ISandboxProvider"/>
+    /// nooks may run on, and the <see cref="Bagatka.ObjectStorage.IObjectStorage"/> that keeps checkpoints.
     /// </summary>
     public static IServiceCollection AddNooksModule(this IServiceCollection services, NooksSettings settings)
     {
@@ -24,7 +24,7 @@ public static class NooksModule
         services.AddModuleDbContext<NooksDbContext>(settings.ConnectionString, NooksDbContext.Schema);
         services.AddSingleton<DaemonConnections>();
         services.AddSingleton<InputFeeds>();
-        services.AddSingleton<SourceLocks>();
+        services.AddSingleton<FileLocks>();
         services.AddSingleton<NookReconciler>();
         services.AddHostedService(provider => provider.GetRequiredService<NookReconciler>());
         services.AddScoped<NooksApi>();

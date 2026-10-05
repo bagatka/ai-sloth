@@ -1,14 +1,15 @@
 # CLI
 
 `sloth`, a Native AOT command line over a host's public HTTP API: sign in to hosts, add agent
-accounts and secrets, connect GitHub and add repositories, start, follow, and steer chats, and push
-their changes or download their files. Its machine mode runs a workspace's nooks on the computer it
+accounts and secrets, connect GitHub and add repositories, start, follow, and steer chats, push
+their changes or download their files, now or at any checkpoint, start chats from another's
+checkpoint, set the instructions every agent gets, and see or forget harness state. Its machine mode runs a workspace's nooks on the computer it
 runs on, and `github create-app` makes a host's GitHub App for its operator.
 
 ## Parts
 
 - **`Sloth`** (`Sloth.*.cs`): the commands, one area per file (hosts, workspaces, accounts, secrets,
-  GitHub, repositories, git settings, chats, machines), dispatched in `Sloth.cs`. Each returns its exit code: 0 done, 1 failed, 2 called
+  GitHub, repositories, git settings, chats, instructions, harness state, machines), dispatched in `Sloth.cs`. Each returns its exit code: 0 done, 1 failed, 2 called
   wrong.
 - **`HostApi`**: calls to one host as one session, or anonymously to sign in. A refusal or an
   unreachable host is an `HttpRequestException` with the host's words, which `sloth` prints.
@@ -43,8 +44,11 @@ mode 600.
   started together.
 - **Browser sign-ins always show their link,** and accept the address pasted back, so they work over
   SSH. The browser opens only http and https links.
-- **Without a person at the keyboard,** `sloth chat "<message>"` ends when that message's turn ends,
-  with exit code 1 when the turn failed, for scripts.
+- **Without a person at the keyboard,** `sloth chat "<message>"` ends when that message's turn ends
+  and its checkpoint is taken, with exit code 1 when the turn failed, for scripts.
+- **Checkpoints are `<chat>@<number>`** wherever a chat's files are named: `--from abc123@3`.
+- **A nearly full disk is asked about** at the keyboard (y/N); otherwise the command fails with the
+  reason, and `sloth chat send ... --anyway` sends.
 
 ## Not built yet
 

@@ -66,17 +66,29 @@ internal sealed partial class Sloth(
 
         Chats
           sloth chat "<message>" [--harness <id>] [--account <name>] [--on <provider>]
-                     [--repo <name>[@<branch>]]... [--from <chat>]
+                     [--repo <name>[@<branch>]]... [--from <chat>[@<checkpoint>]]
                                      Start a chat in a nook of its own, and follow it: with the
-                                     workspace's repositories at /work/<name>, or a copy of a chat's files
+                                     workspace's repositories at /work/<name>, or a copy of a chat's
+                                     files, as they are or at one of its checkpoints
           sloth chat list
           sloth chat open <id>       Follow a chat; type to write to the agent, /stop to stop it
-          sloth chat send <id> "<message>"
+          sloth chat send <id> "<message>" [--anyway]
+                                     Send a message; --anyway sends it while the nook's disk is nearly full
           sloth chat stop <id>
           sloth chat push <id> [--pr] [--branch <name>] [--source <name>]... [--message <text>]
                                      Push the chat's changes to GitHub, with a pull request each
-          sloth chat download <id> [--source <name>] [--out <file>]
-                                     Save the chat's files as a .tar.gz
+          sloth chat checkpoints <id>
+                                     The chat's files saved after each turn, newest first
+          sloth chat download <id> [--source <name>] [--checkpoint <n>] [--out <file>]
+                                     Save the chat's files as a .tar.gz, now or at a checkpoint
+          sloth instructions         What every agent of your chats is told, whatever its harness
+          sloth instructions set [--workspace] <file>|-
+                                     Yours, or the workspace's for everyone's chats; - reads them
+                                     from standard input
+          sloth instructions clear [--workspace]
+          sloth harness state        What your agents keep for later in this workspace, such as
+                                     Claude Code's memory
+          sloth harness state forget <harness>
           Ctrl+C only leaves a chat: the agent keeps working.
 
         Machines
@@ -93,7 +105,31 @@ internal sealed partial class Sloth(
 
     public async Task<int> RunAsync(string[] args, CancellationToken ct)
     {
-        Task<int> command = args switch
+        try
+        {
+            return await CommandAsync(args, ct);
+        }
+        catch (HttpRequestException exception)
+        {
+            string hint = exception.Data[HostApi.ProblemCode] switch
+            {
+                "sources.github_not_connected" => " Connect it: sloth github connect",
+                "chats.disk_nearly_full" => " Send it anyway: sloth chat send <id> \"<message>\" --anyway",
+                _ => string.Empty,
+            };
+            await terminal.FailAsync(exception.Message + hint);
+            return 1;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Ctrl+C, as shells count it.
+            return 130;
+        }
+    }
+
+    private Task<int> CommandAsync(string[] args, CancellationToken ct)
+    {
+        return args switch
         {
             [] or ["help" or "--help" or "-h"] => HelpAsync(),
             ["host", "add", .. string[] rest] => AddHostAsync(rest, ct),
@@ -114,12 +150,19 @@ internal sealed partial class Sloth(
             ["secret", "remove", string name] => RemoveSecretAsync(name, ct),
             ["chat"] or ["chat", "list"] => ListChatsAsync(ct),
             ["chat", "open", string id] => OpenChatAsync(id, ct),
-            ["chat", "send", string id, string text] => SendToChatAsync(id, text, ct),
+            ["chat", "send", string id, string text] => SendToChatAsync(id, text, anyway: false, ct),
+            ["chat", "send", string id, string text, "--anyway"] => SendToChatAsync(id, text, anyway: true, ct),
             ["chat", "stop", string id] => StopChatAsync(id, ct),
             ["chat", "push", string id, .. string[] rest] => PushChatAsync(id, rest, ct),
             ["chat", "download", string id, .. string[] rest] => DownloadChatAsync(id, rest, ct),
-            ["chat", "list" or "open" or "send" or "stop" or "push" or "download", ..] => UsageAsync(),
+            ["chat", "checkpoints", string id] => ListCheckpointsAsync(id, ct),
+            ["chat", "list" or "open" or "send" or "stop" or "push" or "download" or "checkpoints", ..] => UsageAsync(),
             ["chat", .. string[] rest] => StartChatAsync(rest, ct),
+            ["harness", "state"] => ListHarnessStatesAsync(ct),
+            ["harness", "state", "forget", string harness] => ForgetHarnessStateAsync(harness, ct),
+            ["instructions"] => ShowInstructionsAsync(ct),
+            ["instructions", "set", .. string[] rest] => SetInstructionsAsync(rest, ct),
+            ["instructions", "clear", .. string[] rest] => ClearInstructionsAsync(rest, ct),
             ["github"] => ShowGitHubAsync(ct),
             ["github", "connect"] => ConnectGitHubAsync(ct),
             ["github", "disconnect"] => DisconnectGitHubAsync(ct),
@@ -133,22 +176,6 @@ internal sealed partial class Sloth(
             ["machine", "run"] => RunMachineAsync(ct),
             _ => UsageAsync(),
         };
-
-        try
-        {
-            return await command;
-        }
-        catch (HttpRequestException exception)
-        {
-            string hint = exception.Data[HostApi.ProblemCode] is "sources.github_not_connected" ? " Connect it: sloth github connect" : string.Empty;
-            await terminal.FailAsync(exception.Message + hint);
-            return 1;
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            // Ctrl+C, as shells count it.
-            return 130;
-        }
     }
 
     private async Task<int> HelpAsync()

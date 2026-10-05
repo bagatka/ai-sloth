@@ -90,9 +90,19 @@ internal static class Wire
 
     internal sealed record ChatPage(IReadOnlyList<Chat> Items, string? NextCursor);
 
-    internal sealed record StartChat(string Provider, string Harness, Guid Account, IReadOnlyList<NookRepository> Repositories, Guid? CopyOf);
+    internal sealed record Checkpoint(int Number, DateTimeOffset CreatedAt, string Note);
 
-    internal sealed record SendMessage(string Text);
+    internal sealed record CheckpointPage(IReadOnlyList<Checkpoint> Items, string? NextCursor);
+
+    internal sealed record StartChat(string Provider, string Harness, Guid Account, IReadOnlyList<NookRepository> Repositories, Guid? CopyOf, int? Checkpoint);
+
+    internal sealed record SendMessage(string Text, bool ConfirmNearlyFullDisk);
+
+    internal sealed record HarnessState(string Harness, DateTimeOffset SavedAt, long Bytes, Guid SavedFrom);
+
+    internal sealed record Instructions(string Workspace, string Personal);
+
+    internal sealed record SetInstructions(string Text);
 
     internal sealed record SentMessage(Guid Id, bool IsProposal);
 

@@ -17,7 +17,7 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261005130956_Sources";
+    public override string LastMigrationId => "20261005140239_Checkpoints";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -29,11 +29,85 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
 
         NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+        modelBuilder.Entity("Bagatka.AiSloth.Nooks.Model.Checkpoint", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("uuid")
+                    .HasColumnName("id");
+
+                b.Property<DateTimeOffset>("CreatedAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("created_at");
+
+                b.Property<Guid>("NookId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("nook_id");
+
+                b.Property<string>("Note")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("character varying(200)")
+                    .HasColumnName("note");
+
+                b.Property<int>("Number")
+                    .HasColumnType("integer")
+                    .HasColumnName("number");
+
+                b.HasKey("Id")
+                    .HasName("pk_checkpoints");
+
+                b.HasIndex("NookId", "Id")
+                    .HasDatabaseName("ix_checkpoints_nook_id_id");
+
+                b.HasIndex("NookId", "Number")
+                    .IsUnique()
+                    .HasDatabaseName("ix_checkpoints_nook_id_number");
+
+                b.ToTable("checkpoints", "nooks");
+            });
+
+        modelBuilder.Entity("Bagatka.AiSloth.Nooks.Model.CheckpointPart", b =>
+            {
+                b.Property<Guid>("CheckpointId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("checkpoint_id");
+
+                b.Property<string>("Path")
+                    .HasMaxLength(300)
+                    .HasColumnType("character varying(300)")
+                    .HasColumnName("path");
+
+                b.Property<string>("Commit")
+                    .IsRequired()
+                    .HasMaxLength(64)
+                    .HasColumnType("character varying(64)")
+                    .HasColumnName("commit");
+
+                b.Property<string>("ObjectKey")
+                    .HasMaxLength(512)
+                    .HasColumnType("character varying(512)")
+                    .HasColumnName("object_key");
+
+                b.Property<string>("Previous")
+                    .HasMaxLength(64)
+                    .HasColumnType("character varying(64)")
+                    .HasColumnName("previous");
+
+                b.HasKey("CheckpointId", "Path")
+                    .HasName("pk_checkpoint_parts");
+
+                b.ToTable("checkpoint_parts", "nooks");
+            });
+
         modelBuilder.Entity("Bagatka.AiSloth.Nooks.Model.Nook", b =>
             {
                 b.Property<Guid>("Id")
                     .HasColumnType("uuid")
                     .HasColumnName("id");
+
+                b.Property<int?>("CopyCheckpoint")
+                    .HasColumnType("integer")
+                    .HasColumnName("copy_checkpoint");
 
                 b.Property<Guid?>("CopyOf")
                     .HasColumnType("uuid")
@@ -63,6 +137,11 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(32)
                     .HasColumnType("character varying(32)")
                     .HasColumnName("harness");
+
+                b.PrimitiveCollection<List<string>>("KeptPaths")
+                    .IsRequired()
+                    .HasColumnType("text[]")
+                    .HasColumnName("kept_paths");
 
                 b.Property<string>("Location")
                     .HasMaxLength(64)
@@ -185,6 +264,16 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
                     .HasName("pk_source_copies");
 
                 b.ToTable("source_copies", "nooks");
+            });
+
+        modelBuilder.Entity("Bagatka.AiSloth.Nooks.Model.CheckpointPart", b =>
+            {
+                b.HasOne("Bagatka.AiSloth.Nooks.Model.Checkpoint", null)
+                    .WithMany()
+                    .HasForeignKey("CheckpointId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired()
+                    .HasConstraintName("fk_checkpoint_parts_checkpoints_checkpoint_id");
             });
 #pragma warning restore 612, 618
     }

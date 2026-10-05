@@ -24,11 +24,13 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class ChatsEndpoints
 {
-    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account, IReadOnlyList<NookRepository>? Repositories = null, ChatId? CopyOf = null);
+    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account, IReadOnlyList<NookRepository>? Repositories = null, ChatId? CopyOf = null, int? Checkpoint = null);
 
     internal sealed record PushRequest(IReadOnlyList<string>? Sources = null, string? Branch = null, bool PullRequest = false, string? Message = null);
 
-    internal sealed record SendMessageRequest(string Text, MessageId? Proposal = null);
+    internal sealed record SendMessageRequest(string Text, MessageId? Proposal = null, bool ConfirmNearlyFullDisk = false);
+
+    internal sealed record InstructionsRequest(string Text);
 
 
     // A chat event in a server-sent event: its type is the event's kind, its ID the sequence number.
@@ -48,6 +50,13 @@ internal static class ChatsEndpoints
         chats.MapPost("/{id:guid}/stop", Stop);
         chats.MapGet("/{id:guid}/events", Watch);
         chats.MapPost("/{id:guid}/push", Push);
+
+        RouteGroupBuilder workspaces = app.MapGroup("/workspaces/{workspaceId:guid}").WithTags("Chats");
+        workspaces.MapGet("/harness-state", ListHarnessStates);
+        workspaces.MapDelete("/harness-state/{harness}", ForgetHarnessState);
+        workspaces.MapGet("/instructions", GetInstructions);
+        workspaces.MapPut("/instructions", SetWorkspaceInstructions);
+        app.MapPut("/instructions", SetPersonalInstructions).WithTags("Chats");
         return chats;
     }
 
@@ -74,7 +83,7 @@ internal static class ChatsEndpoints
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        StartChat command = new StartChat(WorkspaceId.From(workspaceId), request.Provider, request.Harness, request.Account, request.Repositories ?? [], request.CopyOf);
+        StartChat command = new StartChat(WorkspaceId.From(workspaceId), request.Provider, request.Harness, request.Account, request.Repositories ?? [], request.CopyOf, request.Checkpoint);
         Result<ChatSummary> result = await api.StartAsync(principal.ToActor(), command, ct);
         return result.ToCreated(chat => string.Create(CultureInfo.InvariantCulture, $"/chats/{chat.Id.Value}"));
     }
@@ -107,7 +116,8 @@ internal static class ChatsEndpoints
     /// Sends a message. It reaches the agent when the chat runs on the workspace's account or the
     /// sender's own, and is otherwise a proposal the account's owner may send on, by passing its ID as
     /// <c>proposal</c>. It is never refused because the agent is working: it joins the running turn when
-    /// the agent supports that, and otherwise starts the next turn.
+    /// the agent supports that, and otherwise starts the next turn. While the nook's disk is nearly
+    /// full, it is sent only with <c>confirmNearlyFullDisk</c>.
     /// </summary>
     private static async Task<Results<Ok<ChatMessage>, ProblemHttpResult>> Send(
         [FromRoute] Guid id,
@@ -116,8 +126,78 @@ internal static class ChatsEndpoints
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        Result<ChatMessage> result = await api.SendAsync(principal.ToActor(), new SendMessage(ChatId.From(id), request.Text, request.Proposal), ct);
+        Result<ChatMessage> result = await api.SendAsync(principal.ToActor(), new SendMessage(ChatId.From(id), request.Text, request.Proposal, request.ConfirmNearlyFullDisk), ct);
         return result.ToOk();
+    }
+
+    /// <summary>
+    /// Your harness state in the workspace, for each harness that keeps any: what its agents write
+    /// for themselves to use later, such as Claude Code's memory, saved from your chats there after
+    /// each turn that changed it, and given to their next agents there.
+    /// </summary>
+    private static async Task<Results<Ok<IReadOnlyList<HarnessStateSummary>>, ProblemHttpResult>> ListHarnessStates(
+        [FromRoute] Guid workspaceId,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result<IReadOnlyList<HarnessStateSummary>> result = await api.ListHarnessStatesAsync(principal.ToActor(), WorkspaceId.From(workspaceId), ct);
+        return result.ToOk();
+    }
+
+    /// <summary>Forgets your state for the harness in the workspace: agents of your chats there start without it.</summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> ForgetHarnessState(
+        [FromRoute] Guid workspaceId,
+        [FromRoute] string harness,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result result = await api.ForgetHarnessStateAsync(principal.ToActor(), WorkspaceId.From(workspaceId), harness, ct);
+        return result.ToNoContent();
+    }
+
+    /// <summary>
+    /// The instructions your agents in the workspace get, whatever their harness: the workspace's,
+    /// and your own.
+    /// </summary>
+    private static async Task<Results<Ok<Instructions>, ProblemHttpResult>> GetInstructions(
+        [FromRoute] Guid workspaceId,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result<Instructions> result = await api.GetInstructionsAsync(principal.ToActor(), WorkspaceId.From(workspaceId), ct);
+        return result.ToOk();
+    }
+
+    /// <summary>
+    /// Sets the workspace's instructions for every agent of its chats, up to 10,000 characters of
+    /// Markdown; empty for none. Agents that start afterwards follow them.
+    /// </summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> SetWorkspaceInstructions(
+        [FromRoute] Guid workspaceId,
+        [FromBody] InstructionsRequest request,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result result = await api.SetWorkspaceInstructionsAsync(principal.ToActor(), WorkspaceId.From(workspaceId), request.Text, ct);
+        return result.ToNoContent();
+    }
+
+    /// <summary>
+    /// Sets your own instructions for every agent of the chats you start, up to 10,000 characters of
+    /// Markdown; empty for none. Agents that start afterwards follow them.
+    /// </summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> SetPersonalInstructions(
+        [FromBody] InstructionsRequest request,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result result = await api.SetPersonalInstructionsAsync(principal.ToActor(), request.Text, ct);
+        return result.ToNoContent();
     }
 
     /// <summary>Stops the agent: the running turn ends as cancelled, and messages it hasn't received are cancelled.</summary>
@@ -193,6 +273,9 @@ internal static class ChatsEndpoints
                 MessageCancelled cancelled => ("message-cancelled", cancelled),
                 AgentUpdate update => ("agent-update", update),
                 TurnEnded ended => ("turn-ended", ended),
+                CheckpointSaved saved => ("checkpoint-saved", saved),
+                CheckpointFailed failed => ("checkpoint-failed", failed),
+                AgentRestarted restarted => ("agent-restarted", restarted),
             };
             yield return new SseItem<ChatEventData>(new ChatEventData(chatEvent.Sequence, chatEvent.At, body), type)
             {

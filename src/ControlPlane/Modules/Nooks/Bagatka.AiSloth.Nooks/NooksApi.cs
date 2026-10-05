@@ -13,6 +13,7 @@ using Bagatka.AiSloth.Secrets.Contracts;
 using Bagatka.AiSloth.Sources.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
+using Bagatka.ObjectStorage;
 using Bagatka.Sandboxing;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,7 +31,8 @@ internal sealed partial class NooksApi(
     IEnumerable<ISandboxProvider> providers,
     DaemonConnections daemons,
     InputFeeds feeds,
-    SourceLocks sourceLocks,
+    FileLocks fileLocks,
+    IObjectStorage storage,
     NookReconciler reconciler,
     NooksSettings settings,
     TimeProvider time) : INooksApi, INookDaemonsApi

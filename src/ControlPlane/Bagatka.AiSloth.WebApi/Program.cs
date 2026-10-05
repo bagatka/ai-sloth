@@ -15,6 +15,7 @@ using Bagatka.AiSloth.Workspaces;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.Foundation.Web;
+using Bagatka.ObjectStorage;
 using Bagatka.Sandboxing.Docker;
 using Bagatka.Sdk.GitHub;
 using Bagatka.ServiceDefaults;
@@ -60,6 +61,7 @@ SecretsSettings secrets = builder.Configuration.GetRequired<SecretsSettings>("Mo
 SourcesSettings sources = builder.Configuration.GetRequired<SourcesSettings>("Modules:Sources");
 GitHubSettings gitHub = builder.Configuration.GetSection("GitHub").Exists() ? builder.Configuration.GetRequired<GitHubSettings>("GitHub") : GitHubSettings.Public;
 ChatsSettings chats = builder.Configuration.GetRequired<ChatsSettings>("Modules:Chats");
+FileSystemObjectStorageSettings objectStorage = builder.Configuration.GetRequired<FileSystemObjectStorageSettings>("ObjectStorage:FileSystem");
 ModelGatewaySettings modelGateway = builder.Configuration.GetRequired<ModelGatewaySettings>("ModelGateway");
 
 builder.Services.AddSingleton(TimeProvider.System);
@@ -100,6 +102,9 @@ builder.Services.AddAuthorizationBuilder()
 // Sources copies repositories in and pushes them out with people's GitHub connections, through the
 // host's GitHub App, running git on this computer.
 builder.Services.AddGitHubClient(gitHub);
+
+// Checkpoints are kept in a folder of this computer; an S3-compatible bucket comes with hosting.
+builder.Services.AddFileSystemObjectStorage(objectStorage);
 
 builder.Services
     .AddDockerSandboxProvider(docker)

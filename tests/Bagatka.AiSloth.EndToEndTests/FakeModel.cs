@@ -22,7 +22,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// A model provider at the HTTP boundary: the real agent runs in a real nook, only the model is fake.
 /// It speaks the Anthropic Messages API well enough for Claude Code, answering by the last user
 /// message's latest text: a tool result ends the turn, "write hello" asks to write <c>/work/hello.txt</c>, "wait"
-/// holds the answer until <see cref="Release"/>, and anything else gets a short text. It speaks
+/// holds the answer until <see cref="Release"/>, "first message" answers with the conversation's first
+/// message, and anything else gets a short text. It speaks
 /// OpenAI's Responses API well enough for Codex and pi, answering every call with a short text.
 /// </summary>
 internal sealed class FakeModel : IAsyncDisposable
@@ -55,6 +56,9 @@ internal sealed class FakeModel : IAsyncDisposable
         {
         }
     }
+
+    /// <summary>Every call's body as JSON, both APIs', so tests can see what agents told the model.</summary>
+    public ConcurrentQueue<string> Requests { get; } = new ConcurrentQueue<string>();
 
     /// <summary>The credentials each Anthropic message call carried, as the gateway forwarded them.</summary>
     public ConcurrentQueue<(string? ApiKey, string? Authorization)> Credentials { get; } = new ConcurrentQueue<(string? ApiKey, string? Authorization)>();
@@ -105,6 +109,8 @@ internal sealed class FakeModel : IAsyncDisposable
             throw new InvalidOperationException("The call had no body.");
         }
 
+        Requests.Enqueue(request.ToJsonString());
+
         JsonArray messages = request["messages"]!.AsArray();
         JsonNode? lastUser = messages.LastOrDefault(message => string.Equals((string?)message!["role"], "user", StringComparison.Ordinal));
         bool tools = request["tools"] is JsonArray offered && offered.Any(tool => string.Equals((string?)tool!["name"], "Write", StringComparison.Ordinal));
@@ -119,6 +125,11 @@ internal sealed class FakeModel : IAsyncDisposable
         {
             JsonObject write = new JsonObject { ["type"] = "tool_use", ["id"] = "toolu_e2e", ["name"] = "Write", ["input"] = new JsonObject { ["file_path"] = "/work/hello.txt", ["content"] = "hi from the fake model\n" } };
             (blocks, stopReason) = ([write], "tool_use");
+        }
+        else if (Says(lastUser, "first message"))
+        {
+            JsonNode? firstUser = messages.FirstOrDefault(message => string.Equals((string?)message!["role"], "user", StringComparison.Ordinal));
+            (blocks, stopReason) = ([Text("You first said: " + LatestText(firstUser))], "end_turn");
         }
         else if (Says(lastUser, "wait"))
         {
@@ -151,6 +162,7 @@ internal sealed class FakeModel : IAsyncDisposable
     {
         OpenAIAuthorizations.Enqueue(context.Request.Headers.Authorization.FirstOrDefault());
         JsonNode? request = await JsonNode.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted);
+        Requests.Enqueue(request?.ToJsonString() ?? string.Empty);
         string? modelName = (string?)request?["model"];
         JsonObject content = new JsonObject { ["type"] = "output_text", ["text"] = "Hello.", ["annotations"] = new JsonArray() };
         JsonObject item = new JsonObject { ["id"] = "msg_e2e", ["type"] = "message", ["role"] = "assistant", ["status"] = "completed", ["content"] = new JsonArray(content) };
@@ -203,10 +215,14 @@ internal sealed class FakeModel : IAsyncDisposable
     // as one user message.
     private static bool Says(JsonNode? message, string words)
     {
-        string? text = message?["content"] is JsonValue plain
+        return LatestText(message)?.Contains(words, StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static string? LatestText(JsonNode? message)
+    {
+        return message?["content"] is JsonValue plain
             ? plain.GetValue<string>()
             : Blocks(message).LastOrDefault(block => block["text"] is not null)?["text"]?.GetValue<string>();
-        return text?.Contains(words, StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private static JsonObject Message(string? stopReason)

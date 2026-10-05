@@ -677,6 +677,12 @@ arrives with the first integration event.
   `OneTimeCode` (Foundation) and are kept only as its hash.
 - **Concurrency.** Entities that can be edited concurrently get a concurrency token in their
   configuration.
+- **Files too big for a row** live in object storage (`IObjectStorage`, `src/Storage`), under a
+  prefix that names their owner, such as `nooks/<nook ID>/…` or `people/<user ID>/…`; a module's row
+  refers to them. The object is written before the row that refers to it, and the row deleted before
+  the object, so an object may be left over but a row never points at nothing. Objects aren't
+  encrypted here: the storage is protected like the database. Canonical example: checkpoints
+  (`src/ControlPlane/Modules/Nooks/Bagatka.AiSloth.Nooks/NooksApi.Checkpoints.cs`).
 
 ## 14. Migrations
 

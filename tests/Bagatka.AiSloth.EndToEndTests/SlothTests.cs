@@ -135,15 +135,47 @@ public sealed partial class SlothTests(ControlPlane controlPlane)
         File.Delete(archive);
     }
 
-    // Changes the chat's files as an agent would, through the API with the CLI's own session.
-    private async Task ChangeAsync(SlothCli sloth, string script)
+    [Fact]
+    public async Task A_chat_starts_from_a_checkpoint_of_another()
+    {
+        await using SlothCli sloth = await SignedInAsync();
+        await sloth.RunWithInputAsync(FakeModel.ApiKey + "\n", "account", "add", "anthropic-api-key", "--name", "Fake", "--endpoint", controlPlane.Model.Url.AbsoluteUri);
+        int chatted = await sloth.RunAsync("chat", "Please write hello.txt for me", "--harness", "claude-code");
+        string chat = sloth.Output;
+        string shortId = chat[5..11];
+        await ChangeAsync(sloth, "echo changed > /work/hello.txt");
+
+        int listed = await sloth.RunAsync("chat", "checkpoints", shortId);
+        string checkpoints = sloth.Output;
+        int started = await sloth.RunAsync("chat", "say hello", "--from", shortId + "@1");
+        string second = sloth.Output;
+        int? restored = await ChangeAsync(sloth, "grep -q 'hi from the fake model' /work/hello.txt", expected: null);
+
+        Assert.Equal(0, chatted);
+        Assert.Contains("── done · ", chat, StringComparison.Ordinal);
+        Assert.Contains("(files saved as checkpoint 1)", chat, StringComparison.Ordinal);
+        Assert.Equal(0, listed);
+        Assert.StartsWith("   1  just now    after: Please write hello.txt for me\n", checkpoints, StringComparison.Ordinal);
+        Assert.Equal(0, started);
+        Assert.Contains(" · a copy of " + shortId + " at checkpoint 1\n", second, StringComparison.Ordinal);
+        Assert.Equal(0, restored);
+    }
+
+    // Runs a script in the newest chat's nook as an agent would, through the API with the CLI's own
+    // session; its exit code must be `expected` unless that is null.
+    private async Task<int?> ChangeAsync(SlothCli sloth, string script, int? expected = 0)
     {
         string? token = await sloth.TokenForAsync(Host);
         using HttpClient client = controlPlane.ClientWithToken(token);
         Page<WorkspaceSummary> workspaces = await Api.ReadAsync<Page<WorkspaceSummary>>(client.SendGetAsync("/workspaces"), HttpStatusCode.OK);
         Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(client.SendGetAsync(string.Create(CultureInfo.InvariantCulture, $"/workspaces/{workspaces.Items[0].Id.Value}/chats")), HttpStatusCode.OK);
-        int? changed = await NookProcesses.ExitCodeAsync(client, chats.Items[0].NookId, "sh", "-c", script);
-        Assert.Equal(0, changed);
+        int? exitCode = await NookProcesses.ExitCodeAsync(client, chats.Items[0].NookId, "sh", "-c", script);
+        if (expected is not null)
+        {
+            Assert.Equal(expected, exitCode);
+        }
+
+        return exitCode;
     }
 
     [GeneratedRegex("--code (?<code>[A-Z0-9]{16})", RegexOptions.None, matchTimeoutMilliseconds: 1000)]

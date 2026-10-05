@@ -12,11 +12,16 @@ GitHub Copilot.
 
 ## Owns
 
-- **Data:** chats, the messages and proposals people send, and every event of every chat.
+- **Data:** chats, the messages and proposals people send, every event of every chat, workspaces'
+  and people's instructions, and each person's harness state in each workspace, whose archives are
+  in object storage.
 - **Rules:** who may read and write (the nook's access levels), whose messages reach the agent and
   whose are proposals (see above), which harness and
   account a chat may run on, how a message reaches the agent (a new turn, steered into the running
-  one, or cancelled by a stop), and what the agent may do without asking (anything inside its nook).
+  one, or cancelled by a stop), what the agent may do without asking (anything inside its nook),
+  that every turn ends with a checkpoint, when a new agent takes over a conversation, which
+  instructions and harness state an agent gets, and when a nearly full disk needs the sender's
+  confirmation.
 - **Runtime state:** each busy chat's runner, which talks to the agent, and the signals that wake
   watchers, in the memory of this instance.
 - **Integrations:** harnesses, through `Bagatka.Harnesses`; what each kind of agent account is to a
@@ -35,19 +40,21 @@ GitHub Copilot.
 
 `IChatsApi` in `Bagatka.AiSloth.Chats.Contracts`: members list the harnesses, start chats (each
 creating its nook, on a provider, with a harness and an agent account, and with the workspace's
-repositories or a copy of another chat's files), list a workspace's chats, send messages (or send a proposal on), stop the agent, and watch
-a chat's events from any sequence number.
+repositories or another chat's files, as they are or at one of its checkpoints), list a workspace's
+chats, send messages (or send a proposal on), stop the agent, watch a chat's events from any
+sequence number, set and read the instructions every agent gets, and list and forget a person's
+harness state in a workspace.
 `IChatHarnessesApi` is the model gateway's side, never a public route or a tool.
 
 ```csharp
-Result<ChatSummary> started = await chats.StartAsync(alice, new StartChat(workspaceId, "docker", "codex", teamAccountId, [new NookRepository(apiRepositoryId)], CopyOf: null), ct); // creates its nook
+Result<ChatSummary> started = await chats.StartAsync(alice, new StartChat(workspaceId, "docker", "codex", teamAccountId, [new NookRepository(apiRepositoryId)], CopyOf: null, Checkpoint: null), ct); // creates its nook
 if (started.Failed)
 {
     return new Result(started.Error);
 }
 
 ChatSummary chat = started.Output;
-Result<ChatMessage> sent = await chats.SendAsync(alice, new SendMessage(chat.Id, "Add a README"), ct); // joins the running turn or waits for the next
+Result<ChatMessage> sent = await chats.SendAsync(alice, new SendMessage(chat.Id, "Add a README", Proposal: null, ConfirmNearlyFullDisk: false), ct); // joins the running turn or waits for the next
 Result<IAsyncEnumerable<ChatEvent>> watch = await chats.WatchAsync(bob, new WatchChat(chat.Id, AfterSequence: 0), ct);
 if (watch.Failed)
 {
@@ -56,17 +63,18 @@ if (watch.Failed)
 
 await foreach (ChatEvent e in watch.Output)
 {
-    // MessageSent, TurnStarted, AgentUpdate (ACP session/update), ..., TurnEnded("end_turn");
-    // MessageProposed when someone who may not use the account writes
+    // MessageSent, TurnStarted, AgentUpdate (ACP session/update), ..., TurnEnded("end_turn"),
+    // CheckpointSaved(1); MessageProposed when someone who may not use the account writes;
+    // AgentRestarted(Remembers: true) when a new agent took over the conversation
 }
 ```
 
 ## Asks
 
 Workspaces (`GetAccessAsync`, on the workspace when a chat starts and on the chat's nook after), on
-every call made for a user; Nooks, to create a chat's nook and to start, feed, watch, and stop the
-agent's process; AgentAccounts, for the account a chat
-runs on and who may use it (`MayUseAsync`).
+every call made for a user; Nooks, to create a chat's nook, to start, feed, watch, and stop the
+agent's process, to take a checkpoint after each turn, to copy instructions in and harness state
+out and in, and for its disk usage; AgentAccounts, for the account a chat runs on and who may use it (`MayUseAsync`).
 
 ## Publishes
 
@@ -80,10 +88,16 @@ Nothing yet. Once nooks publish `NookDeleted`, their chats go with them.
 
 Schema `chats`. Tables `chats` (nook, unique: one chat per nook; workspace, who started it, the harness, the agent account and
 its owner when personal; the agent's process, token hash,
-session, and how far its output is read; the turn in progress; the last sequence number; `xmin`
-as concurrency token), `messages` (text, sender, the proposal it sends on, and where each is on its
-way to the agent, or that it is a proposal), and `events` (chat and sequence number as key, kind, and
-the body as `jsonb`; an agent update is the ACP update as the agent sent it).
+session, and how far its output is read; the session a new agent loads, and whether it is loading;
+the turn in progress; the turn a checkpoint is due after; the file list of the harness state its
+nook held at its last sync; the last sequence number; `xmin` as concurrency token), `messages` (text, sender, the
+proposal it sends on, and where each is on its way to the agent, or that it is a proposal), `events`
+(chat and sequence number as key, kind, and the body as `jsonb`; an agent update is the ACP update
+as the agent sent it), `workspace_instructions` and `personal_instructions` (the text, when, and for
+a workspace's who last changed it), and `harness_states` (person, workspace, and harness as key, when
+and from which chat it was saved, its size, its version: the SHA-256 of its file list; `xmin` as
+concurrency token). Archives are in object storage under
+`people/<user ID>/workspaces/<workspace ID>/harness-state/<harness>/<version>/`.
 
 ## Background work
 
@@ -92,12 +106,15 @@ the body as `jsonb`; an agent update is the ACP update as the agent sent it).
   runner back. A runner starts the agent with the first message, delivers messages, answers the
   agent's requests, and saves each batch of updates with the offset of the agent's output it has
   read, so a restart continues exactly where it stopped. It reaches the agent's process only through
-  `Harness/AgentProcess.cs`, which turns the process into lines of text.
+  `Harness/AgentProcess.cs`, which turns the process into lines of text. After each turn it takes
+  the nook's checkpoint and syncs the harness state (`Harness/HarnessStates.cs`) before the next
+  turn starts.
 
 ## Configuration
 
-`ChatsSettings`, passed by the host (`PATTERNS.md`, entry 20): the connection string and the model
-gateway's URL as an agent in a nook reaches it.
+`ChatsSettings`, passed by the host (`PATTERNS.md`, entry 20): the connection string, the model
+gateway's URL as an agent in a nook reaches it, and how full a nook's disk is when a message needs
+confirming (0.9 by default). The host also registers the object storage harness state is kept in.
 
 ## Decisions and constraints
 
@@ -134,21 +151,50 @@ gateway's URL as an agent in a nook reaches it.
 - **Events in ACP's own shape.** An agent update is stored and served unchanged, so a new harness
   or update kind needs no code here. The cost: ACP v1's shape is part of the stored data and the API.
 - **Every event is saved here.** A chat's history outlives its agent and its nook's suspension.
+- **Every turn ends with a checkpoint,** however it ended, before the next turn starts, so the
+  files a turn changed can be downloaded, started from (`StartChat.Checkpoint`), and come back with
+  a lost nook. A failed checkpoint is told (`CheckpointFailed`), and the chat goes on.
+- **A new agent continues the conversation.** Checkpoints keep the harness's sessions (its profile's
+  session paths), and an agent that took over after another ended loads the earlier session
+  (`session/load`) when its harness can, ignoring the history it replays; otherwise it starts a new
+  one. Either way the chat says so (`AgentRestarted`). An agent lost with its nook (exit code -1)
+  hands its turn to the next one, which gets the turn's message again in the nook's latest
+  checkpoint; any other exit ends the turn as failed, so a message that crashes its agent isn't
+  retried.
+- **Instructions are AiSloth's, not a harness's.** A workspace's and the chat starter's own
+  instructions are written, before each agent starts, to the file its harness reads its user's
+  standing instructions from (`HarnessProfile.InstructionsPath`), outside `/work`, so they never meet
+  a repository's files and every harness follows the same text. What belongs to one repository stays
+  in that repository's `AGENTS.md` or `CLAUDE.md`. An agent that can't get its instructions doesn't
+  start. Changes reach agents that start afterwards; a running agent keeps the ones it started with.
+- **Harness state follows the person who started the chat, within its workspace, kept in step
+  across their chats there.** What a harness writes for itself to use later (its profile's state
+  paths: today Claude Code's memory) syncs at a turn's edges, while the agent doesn't write: when the
+  agent starts, after each turn, and before a turn when another chat saved since. A sync merges what
+  the nook changed since its last one with what others saved meanwhile, file by file
+  (`Harness/StateFiles.cs`): a file one side changed, added, or deleted takes that side's, and a file
+  both changed keeps both sides' lines, so nothing learned is lost, at worst a line twice. The result
+  is saved as a new version, guarded by the row's concurrency token (a chat that loses the race
+  merges again), and put back in the nook. It never leaves its workspace, because it may describe
+  that workspace's work. Nothing reaches a running turn: the agent would race it, and Claude Code
+  reads its memory index when a session starts or compacts, so a turn sees others' changes in the
+  files it opens and its next agent sees them all. Failures are logged; the agent works with what its
+  nook has, and the next sync tries again.
+- **A nearly full disk asks first.** A message for the agent while the nook's disk is at the
+  threshold or above is refused (`DiskNearlyFull`) until the sender confirms, because the agent's
+  writes and the checkpoints may fail. Proposals don't run the agent, so they never ask.
 
 ## Not built yet
 
-- **Checkpoints and forks.** Nothing is saved from the nook after a turn yet, and a chat can't be
-  forked; both come next, with object storage. Until then, losing a nook loses its files.
-- **Resuming a conversation in a new agent.** When the agent's process ends, the next message starts
-  a new session without the earlier context (`session/load` comes with forks).
-- **A nearly full disk asks for confirmation** before a new message; it comes with checkpoints.
+- **Forks.** A chat starts from another's files at a checkpoint, but not from its conversation.
 - **MCP.** Agents can't use AiSloth's public API yet.
-- **Harness state per person.** A harness's memory, skills, and other files it keeps between
-  sessions will be saved per person, from each chat's nook, and restored into their new nooks; it
-  comes with object storage. Whose state a chat several people write in updates is decided then.
 - **Codex,** once OpenAI grants plan access for hosted apps.
 - **Deleted nooks.** A chat whose nook is gone stays; its next message fails with the reason.
 - **Dismissing a proposal.** It simply stays.
+- **Harness state edges.** An agent that deletes all of its state gets it back from the saved one,
+  as a nook created again after it was lost does; a binary file both sides changed keeps this chat's;
+  a state over 1,000 files or 16 MiB isn't kept; and a save that loses a race leaves its archive
+  behind in object storage.
 - **Event volume.** Every streamed text chunk is a row; nothing merges them yet.
 - **One active instance.** Runners and watch signals live in the instance's memory, as daemon
   connections do.

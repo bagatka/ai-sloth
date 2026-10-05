@@ -20,6 +20,8 @@ internal sealed class ChatRunners(
     IDbContextFactory<ChatsDbContext> databases,
     IServiceScopeFactory scopes,
     AgentProcess agent,
+    HarnessStates states,
+    AgentInstructions instructions,
     ChatsSettings settings,
     ChatSignals signals,
     TimeProvider time,
@@ -51,7 +53,7 @@ internal sealed class ChatRunners(
         await using (ChatsDbContext db = await databases.CreateDbContextAsync(stoppingToken))
         {
             busy = await db.Chats
-                .Where(chat => chat.TurnMessageId != null || (chat.HarnessProcessId != null && chat.SessionId == null)
+                .Where(chat => chat.TurnMessageId != null || chat.CheckpointAfter != null || (chat.HarnessProcessId != null && chat.SessionId == null)
                     || db.Messages.Any(message => message.ChatId == chat.Id
                         && (message.State == MessageState.New || message.State == MessageState.Queued || message.State == MessageState.Steering)))
                 .Select(chat => chat.Id)
@@ -92,7 +94,7 @@ internal sealed class ChatRunners(
                 return _runners[chat].Runner;
             }
 
-            ChatRunner runner = new ChatRunner(chat, databases, scopes, agent, settings, signals, time, logger);
+            ChatRunner runner = new ChatRunner(chat, databases, scopes, agent, states, instructions, settings, signals, time, logger);
             Task running = Task.Run(() => runner.RunAsync(Retire, _stopping.Token), CancellationToken.None);
             _runners[chat] = (runner, running);
             return runner;

@@ -19,12 +19,21 @@ internal sealed class ChatsDbContext(DbContextOptions<ChatsDbContext> options) :
 
     public DbSet<StoredEvent> Events => Set<StoredEvent>();
 
+    public DbSet<HarnessState> HarnessStates => Set<HarnessState>();
+
+    public DbSet<WorkspaceInstructions> WorkspaceInstructions => Set<WorkspaceInstructions>();
+
+    public DbSet<PersonalInstructions> PersonalInstructions => Set<PersonalInstructions>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfiguration(new ChatConfiguration());
         modelBuilder.ApplyConfiguration(new MessageConfiguration());
         modelBuilder.ApplyConfiguration(new StoredEventConfiguration());
+        modelBuilder.ApplyConfiguration(new HarnessStateConfiguration());
+        modelBuilder.ApplyConfiguration<WorkspaceInstructions>(new InstructionsConfiguration());
+        modelBuilder.ApplyConfiguration<PersonalInstructions>(new InstructionsConfiguration());
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

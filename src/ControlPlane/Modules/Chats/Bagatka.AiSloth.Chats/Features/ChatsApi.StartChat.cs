@@ -57,8 +57,9 @@ internal sealed partial class ChatsApi
         }
 
         // Every chat gets a nook of its own, so its agent never works on another agent's files. The nook
-        // stands on its own: should saving the chat fail, it stays until someone deletes it.
-        CreateNook nook = new CreateNook(command.WorkspaceId, command.Provider, harness.Id, command.Repositories, copyOf);
+        // stands on its own: should saving the chat fail, it stays until someone deletes it. Its
+        // checkpoints keep the agent's sessions, so a new agent can continue the conversation.
+        CreateNook nook = new CreateNook(command.WorkspaceId, command.Provider, harness.Id, command.Repositories, copyOf, command.Checkpoint, harness.SessionPaths);
         Result<NookSummary> created = await nooks.CreateAsync(actor, nook, ct);
         if (created.Failed)
         {
