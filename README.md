@@ -36,9 +36,11 @@ as well.
 `dotnet aspire deploy` deploys to Azure, into one resource group: the WebApi in Container Apps, nooks
 in a Container Apps sandbox group, and checkpoints in Blob Storage. Sign in with `az login` first.
 It asks for the subscription, resource group, and region, or takes them as `Azure__SubscriptionId`,
-`Azure__ResourceGroup`, and `Azure__Location`. Give the AppHost `Parameters:nook-image-repository`,
-a public repository with the nook images, and `Parameters:postgres-connection-string` to use a
-Postgres of your own; without it, the deployment gets an Azure Database for PostgreSQL server.
+`Azure__ResourceGroup`, and `Azure__Location`. Give the AppHost the nook images' public repository
+and tag, `Parameters:nook-image-repository` and `Parameters:nook-image-tag`: every push to main
+publishes them on GHCR as `ghcr.io/<owner>/aisloth-nook*`, tagged with its commit, so a fork gets
+its own. Give `Parameters:postgres-connection-string` to use a Postgres of your own; without it, the
+deployment gets an Azure Database for PostgreSQL server.
 A deployment also needs three keys that encrypt secrets at rest, `Parameters:agent-accounts-key`,
 `-sources-key`, and `-secrets-key`: make each once with `openssl rand -hex 32` and keep them, since
 losing one makes what it encrypted unreadable. Aspire keeps every parameter's value in its state,

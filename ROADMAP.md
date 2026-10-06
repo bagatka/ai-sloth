@@ -10,8 +10,8 @@ concepts. Providers for now: Azure Container Apps Sandboxes for the official hos
 machines, and local Docker for development, tests, and single-machine self-hosting.
 
 1. **Hosting.** Deploys that never interrupt nooks or chats, people's own machines connecting from
-   anywhere (Linux, Windows through WSL, Macs through a Linux VM), published nook images and CLI
-   binaries, self-hosting packaged for a VPS or a company network, nook images from a company's
+   anywhere (Linux, Windows through WSL, Macs through a Linux VM), published CLI binaries,
+   self-hosting packaged for a VPS or a company network, nook images from a company's
    private registry, such as Azure Container Registry through a managed identity kept out of its
    sandboxes, and a push-notification relay any host can use. Merging to main deploys the official
    host and its landing page. Before people are invited: logs, traces, metrics, and product analytics

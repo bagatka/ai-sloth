@@ -1,0 +1,83 @@
+name: Nook images / Publish
+run-name: Nook images / Publish / ${{ github.ref_name }}
+
+# Main's nook images, public on GHCR as ghcr.io/<owner>/aisloth-nook[-<harness>]:<commit>, each
+# with a signed build provenance attestation. Deployments pull them by commit (README.md, "Deploying").
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: nook-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Nook images / ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: nook
+            image: aisloth-nook
+          - target: claude-code
+            image: aisloth-nook-claude-code
+          - target: codex
+            image: aisloth-nook-codex
+          - target: pi
+            image: aisloth-nook-pi
+          - target: copilot
+            image: aisloth-nook-copilot
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # GHCR names are lowercase; an owner's name may not be.
+      - name: Name the repository
+        id: name
+        run: echo "repository=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Sign in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The harness images build on the base, so every job shares one layer cache.
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: src/Daemon/Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.name.outputs.repository }}/${{ matrix.image }}:${{ github.sha }}
+            ${{ steps.name.outputs.repository }}/${{ matrix.image }}:main
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=nook-images
+          cache-to: type=gha,scope=nook-images,mode=max
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.name.outputs.repository }}/${{ matrix.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

@@ -12,7 +12,6 @@ using Bagatka.AiSloth.AppHost;
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 string repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", ".."));
-const string NookImage = "aisloth-nook:dev";
 // The harnesses a nook can carry: the profiles in src/Harnesses, one image each; nook-harnesses names
 // fewer, comma-separated, such as for tests that push their images somewhere.
 string[] harnesses = builder.Configuration["Parameters:nook-harnesses"] is { Length: > 0 } chosen
@@ -75,6 +74,11 @@ IResourceBuilder<ParameterResource> sandboxScope = builder.AddParameter("sandbox
 
 // The repository nook images are pushed to, which nooks outside this computer pull them from.
 string? imageRepository = builder.Configuration["Parameters:nook-image-repository"];
+
+// The images' tag: dev for images built here, or the commit whose images main published
+// (README.md, "Deploying").
+string imageTag = builder.Configuration["Parameters:nook-image-tag"] ?? "dev";
+string nookImage = "aisloth-nook:" + imageTag;
 
 // The Docker Engine nooks run in and their images are built in when run here: DOCKER_HOST's, as for
 // the docker command, or the default one. It needs Sysbox (src/Sandboxing/README.md).
@@ -206,11 +210,11 @@ else
 
     // The images nooks start from: the base, and one per harness on top of it, pushed when there is a
     // repository for them. Docker's cache makes a rebuild without changes take seconds.
-    IResourceBuilder<ExecutableResource> nookImage = BuildImage("nook-image", "nook", NookImage, after: null);
-    IResourceBuilder<ExecutableResource>[] harnessImages = [.. harnesses.Select(harness => BuildImage("nook-image-" + harness, harness, HarnessImage(harness), nookImage))];
+    IResourceBuilder<ExecutableResource> nookImageBuilt = BuildImage("nook-image", "nook", nookImage, after: null);
+    IResourceBuilder<ExecutableResource>[] harnessImages = [.. harnesses.Select(harness => BuildImage("nook-image-" + harness, harness, HarnessImage(harness), nookImageBuilt))];
     IResourceBuilder<ExecutableResource>[] imagesReady = imageRepository is null
-        ? [nookImage, .. harnessImages]
-        : [PushImage("nook-image", NookImage, nookImage), .. harnesses.Select((harness, index) => PushImage("nook-image-" + harness, HarnessImage(harness), harnessImages[index]))];
+        ? [nookImageBuilt, .. harnessImages]
+        : [PushImage("nook-image", nookImage, nookImageBuilt), .. harnesses.Select((harness, index) => PushImage("nook-image-" + harness, HarnessImage(harness), harnessImages[index]))];
 
     // Kestrel listens on the endpoints set here, and only there: Aspire's own URL variables would be
     // overridden by them anyway.
@@ -280,7 +284,7 @@ foreach (IResourceBuilder<IResourceWithEnvironment> mode in modes)
         .WithEnvironment("Modules__Sources__EncryptionKey", sourcesKey)
         .WithEnvironment("ModelGateway__AllowPrivateNetworks", modelPrivateNetworks)
         .WithEnvironment("Modules__Nooks__DaemonUrl", daemonUrl)
-        .WithEnvironment("Modules__Nooks__Image", Published(NookImage))
+        .WithEnvironment("Modules__Nooks__Image", Published(nookImage))
         .WithEnvironment(environment =>
         {
             foreach (string harness in harnesses)
@@ -340,9 +344,9 @@ IResourceBuilder<ParameterResource> EncryptionKey(string name)
         : builder.AddParameter(name, new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
 }
 
-static string HarnessImage(string harness)
+string HarnessImage(string harness)
 {
-    return "aisloth-nook-" + harness + ":dev";
+    return "aisloth-nook-" + harness + ":" + imageTag;
 }
 
 // Where nooks find an image: in the repository it is pushed to, or in this computer's Docker.
