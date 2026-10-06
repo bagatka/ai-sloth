@@ -18,6 +18,7 @@ internal sealed partial class Sloth(
     Func<Uri, CancellationToken, Task> openBrowser,
     string device,
     string? dockerHost,
+    SlothBuild build,
     TimeProvider time)
 {
     private const string Usage = """
@@ -105,11 +106,24 @@ internal sealed partial class Sloth(
         Hosting
           sloth github create-app [--org <org>] [--name <name>] [--public]
                                      Make the host's GitHub App, which people connect GitHub through
+
+        sloth itself
+          sloth version
+          sloth update [<version>]   Install the newest sloth, or the version named
         """;
 
     private string HostsPath => Path.Combine(home, "hosts.json");
 
     public async Task<int> RunAsync(string[] args, CancellationToken ct)
+    {
+        using CancellationTokenSource stopping = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        Task<Version?> newer = NewerReleaseAsync(args, stopping.Token);
+        int exitCode = await CommandOrFailureAsync(args, ct);
+        await TellNewerReleaseAsync(newer, stopping);
+        return exitCode;
+    }
+
+    private async Task<int> CommandOrFailureAsync(string[] args, CancellationToken ct)
     {
         try
         {
@@ -183,6 +197,9 @@ internal sealed partial class Sloth(
             ["git", "author" or "committer" or "co-author" or "branch-prefix", string value] => SetGitSettingAsync(args[1], value, ct),
             ["machine", "connect", string url, string code] => ConnectMachineAsync(url, code, ct),
             ["machine", "run"] => RunMachineAsync(ct),
+            ["version" or "--version"] => ShowVersionAsync(),
+            ["update"] => UpdateAsync(wanted: null, ct),
+            ["update", string version] => UpdateAsync(version, ct),
             _ => UsageAsync(),
         };
     }

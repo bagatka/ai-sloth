@@ -8,6 +8,7 @@ namespace Bagatka.AiSloth.Cli;
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, WriteIndented = true)]
 [JsonSerializable(typeof(MachineCredential))]
 [JsonSerializable(typeof(HostsFile))]
+[JsonSerializable(typeof(UpdateCheck))]
 [JsonSerializable(typeof(Wire.HostDiscovery))]
 [JsonSerializable(typeof(Wire.CodeSignIn))]
 [JsonSerializable(typeof(Wire.TokenExchange))]

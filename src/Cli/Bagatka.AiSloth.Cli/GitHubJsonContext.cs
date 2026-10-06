@@ -6,4 +6,5 @@ namespace Bagatka.AiSloth.Cli;
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
 [JsonSerializable(typeof(GitHubAppManifest.Manifest))]
 [JsonSerializable(typeof(GitHubAppManifest.Conversion))]
+[JsonSerializable(typeof(GitHubRelease))]
 internal sealed partial class GitHubJsonContext : JsonSerializerContext;

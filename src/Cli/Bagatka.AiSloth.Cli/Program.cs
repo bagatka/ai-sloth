@@ -30,7 +30,8 @@ string folder = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
 Terminal terminal = new Terminal(Console.In, Console.Out, Console.Error, interactive: !Console.IsInputRedirected && !Console.IsOutputRedirected);
 using SocketsHttpHandler http = new SocketsHttpHandler();
 string? dockerHost = Environment.GetEnvironmentVariable("DOCKER_HOST") is { Length: > 0 } docker ? docker : null;
-Sloth sloth = new Sloth(terminal, folder, http, OpenBrowserAsync, "sloth on " + Environment.MachineName, dockerHost, TimeProvider.System);
+SlothBuild build = SlothBuild.Of(typeof(Sloth).Assembly, RuntimeInformation.RuntimeIdentifier, Environment.ProcessPath);
+Sloth sloth = new Sloth(terminal, folder, http, OpenBrowserAsync, "sloth on " + Environment.MachineName, dockerHost, build, TimeProvider.System);
 return await sloth.RunAsync(args, shutdown.Token);
 
 // Opens a web page in the person's browser where this computer has one; sloth shows the link too.

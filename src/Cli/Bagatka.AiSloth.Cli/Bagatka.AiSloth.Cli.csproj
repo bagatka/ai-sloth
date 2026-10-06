@@ -6,10 +6,16 @@
          run on every build. -->
     <PublishAot>true</PublishAot>
     <IsAotCompatible>true</IsAotCompatible>
-    <!-- Every restore includes these, so a publish for either one can skip restoring and the lock
-         file stays the same. -->
-    <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
+    <!-- Every restore includes these, so a publish for any one can skip restoring and the lock file
+         stays the same. -->
+    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64</RuntimeIdentifiers>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(SlothReleases)' != ''">
+    <!-- A release names the GitHub repository whose releases it updates from (CLI / Release sets it,
+         with the version); built from source, sloth has none. -->
+    <AssemblyMetadata Include="SlothReleases" Value="$(SlothReleases)" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- The end-to-end tests run sloth's commands and machine mode in their own process. -->

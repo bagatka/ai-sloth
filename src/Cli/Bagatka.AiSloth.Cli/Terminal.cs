@@ -79,6 +79,12 @@ internal sealed class Terminal(TextReader input, TextWriter output, TextWriter e
         await output.WriteAsync(text);
     }
 
+    // Something to know besides the command's output, such as a newer release, on standard error.
+    public async Task NoteAsync(string message)
+    {
+        await error.WriteLineAsync(message);
+    }
+
     // Why a command failed, as a sentence on standard error, with what to do about it where there is
     // something to do.
     public async Task FailAsync(string message)

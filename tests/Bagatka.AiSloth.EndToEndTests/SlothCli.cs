@@ -16,10 +16,14 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// <summary>
 /// <c>sloth</c> on one person's computer, run in this process: a folder of its own, input given as
 /// text, output read as text, and a browser that follows redirects the way a person's does. At the
-/// host's identity provider the browser signs in whoever <c>loginHint</c> names.
+/// host's identity provider the browser signs in whoever <c>loginHint</c> names. It is built from
+/// source and runs from a script, unless <paramref name="build"/> and <paramref name="interactive"/>
+/// say it is a release at a keyboard.
 /// </summary>
-internal sealed class SlothCli(string loginHint) : IAsyncDisposable
+internal sealed class SlothCli(string loginHint, SlothBuild? build = null, bool interactive = false) : IAsyncDisposable
 {
+    private static readonly SlothBuild FromSource = new SlothBuild(Release: null, "linux-x64", Executable: null);
+
     private readonly DirectoryInfo _folder = Directory.CreateTempSubdirectory("sloth-e2e-");
     private readonly SocketsHttpHandler _http = new SocketsHttpHandler();
     private readonly List<Task> _browsing = [];
@@ -36,8 +40,8 @@ internal sealed class SlothCli(string loginHint) : IAsyncDisposable
         using StringWriter output = new StringWriter();
         using StringWriter errors = new StringWriter();
         using StringReader reader = new StringReader(input);
-        Terminal terminal = new Terminal(reader, output, errors, interactive: false);
-        Sloth sloth = new Sloth(terminal, _folder.FullName, _http, Browse, "e2e", dockerHost: null, TimeProvider.System);
+        Terminal terminal = new Terminal(reader, output, errors, interactive);
+        Sloth sloth = new Sloth(terminal, _folder.FullName, _http, Browse, "e2e", dockerHost: null, build ?? FromSource, TimeProvider.System);
         int exit = await sloth.RunAsync(args, TestContext.Current.CancellationToken);
         Output = output.ToString();
         Errors = errors.ToString();

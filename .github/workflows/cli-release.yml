@@ -1,0 +1,108 @@
+name: CLI / Release
+run-name: CLI / Release / ${{ inputs.version }}
+
+# Releases sloth from main as sloth-v<version>: a Native AOT build for each platform, named
+# sloth-<runtime>, each with a signed build provenance attestation. A released sloth updates itself
+# from the releases of the repository that built it (sloth update), so a fork's come from its own.
+# On Windows, sloth runs in WSL.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to release, such as 0.2.0
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: CLI / Build ${{ matrix.runtime }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      matrix:
+        include:
+          - runtime: linux-x64
+            runner: ubuntu-24.04
+          - runtime: linux-arm64
+            runner: ubuntu-24.04-arm
+          - runtime: osx-arm64
+            runner: macos-15
+    steps:
+      - name: Check the version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$VERSION' isn't a version such as 0.2.0."
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install .NET SDK from global.json
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      # Native AOT links with clang against zlib on Linux; macOS runners have Xcode's tools.
+      - name: Install the Native AOT linker
+        if: runner.os == 'Linux'
+        run: sudo apt-get install --yes -o DPkg::Lock::Timeout=300 clang zlib1g-dev
+
+      - name: Restore locked NuGet packages
+        run: dotnet restore src/Cli/Bagatka.AiSloth.Cli --locked-mode
+
+      - name: Build sloth
+        env:
+          VERSION: ${{ inputs.version }}
+          RUNTIME: ${{ matrix.runtime }}
+        run: |
+          dotnet publish src/Cli/Bagatka.AiSloth.Cli --configuration Release --runtime "$RUNTIME" --no-restore \
+            -p:Version="$VERSION" -p:SlothReleases="$GITHUB_REPOSITORY" --output "$RUNNER_TEMP/publish"
+          mkdir -p "$RUNNER_TEMP/release"
+          mv "$RUNNER_TEMP/publish/Bagatka.AiSloth.Cli" "$RUNNER_TEMP/release/sloth-$RUNTIME"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/release/sloth-${{ matrix.runtime }}
+
+      - name: Keep the build for the release
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sloth-${{ matrix.runtime }}
+          path: ${{ runner.temp }}/release/sloth-${{ matrix.runtime }}
+          retention-days: 1
+          if-no-files-found: error
+
+  release:
+    name: CLI / Publish the release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Collect the builds
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: ${{ runner.temp }}/release
+          merge-multiple: true
+
+      # The tag goes on the commit the builds came from; an existing release of the version stops it.
+      - name: Publish sloth-v${{ inputs.version }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "sloth-v$VERSION" "$RUNNER_TEMP"/release/sloth-* \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "sloth $VERSION" \
+            --notes "Download sloth-<platform> for your computer, make it executable, and put it on your PATH as sloth; on Windows, use the Linux build in WSL. Once installed, sloth update installs the newest release."

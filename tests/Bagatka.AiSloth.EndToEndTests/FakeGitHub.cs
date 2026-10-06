@@ -24,7 +24,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// GitHub at the HTTP boundary, as a GitHub App acting for people sees it: the device flow signs in
 /// whoever approves a code, their tokens reach the repositories they collaborate on, pull requests
 /// open, and git clones and pushes over HTTP through the real <c>git http-backend</c>, with the
-/// token as the password. The site is at its root, the REST API under <c>/api/</c>.
+/// token as the password; releases list their files, with each one's SHA-256, for anyone to
+/// download. The site is at its root, the REST API under <c>/api/</c>.
 /// </summary>
 internal sealed class FakeGitHub : IAsyncDisposable
 {
@@ -45,6 +46,7 @@ internal sealed class FakeGitHub : IAsyncDisposable
     private readonly Dictionary<string, string> _tokens = new Dictionary<string, string>(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> _collaborators = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
     private readonly List<PullRequest> _pullRequests = [];
+    private readonly List<Release> _releases = [];
 
     private FakeGitHub(WebApplication app)
     {
@@ -74,6 +76,9 @@ internal sealed class FakeGitHub : IAsyncDisposable
         app.MapGet("/api/repos/{owner}/{name}", gitHub.Repository);
         app.MapGet("/api/repos/{owner}/{name}/pulls", gitHub.ListPullRequests);
         app.MapPost("/api/repos/{owner}/{name}/pulls", gitHub.OpenPullRequestAsync);
+        app.MapGet("/api/repos/{owner}/{name}/releases/latest", gitHub.LatestRelease);
+        app.MapGet("/api/repos/{owner}/{name}/releases/tags/{tag}", gitHub.ReleaseByTag);
+        app.MapGet("/{owner}/{name}/releases/download/{tag}/{file}", gitHub.DownloadReleaseFile);
         app.Map("/git/{**path}", gitHub.ServeGitAsync);
         await app.StartAsync();
         IServerAddressesFeature? addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
@@ -133,6 +138,18 @@ internal sealed class FakeGitHub : IAsyncDisposable
 
         await GitAsync(work, "-c", "user.name=Teammate", "-c", "user.email=teammate@example.com", "commit", "--quiet", "-m", message);
         await GitAsync(work, "push", "--quiet", "origin", branch);
+    }
+
+    /// <summary>
+    /// A release of the repository, its newest, with its files; with <paramref name="wrongDigests"/>, the
+    /// API reports SHA-256s that aren't the files', as when a download is damaged on the way.
+    /// </summary>
+    public void PublishRelease(string owner, string name, string tag, IReadOnlyDictionary<string, byte[]> files, bool wrongDigests = false)
+    {
+        lock (_lock)
+        {
+            _releases.Add(new Release(owner + "/" + name, tag, files, wrongDigests));
+        }
     }
 
     /// <summary>The person signs in at GitHub and approves the code.</summary>
@@ -343,6 +360,51 @@ internal sealed class FakeGitHub : IAsyncDisposable
         };
     }
 
+    private IResult LatestRelease(string owner, string name)
+    {
+        Release? newest;
+        lock (_lock)
+        {
+            newest = _releases.LastOrDefault(release => string.Equals(release.Repository, owner + "/" + name, StringComparison.Ordinal));
+        }
+
+        return newest is null ? Results.NotFound() : Results.Json(ReleaseJson(newest));
+    }
+
+    private IResult ReleaseByTag(string owner, string name, string tag)
+    {
+        Release? found;
+        lock (_lock)
+        {
+            found = _releases.LastOrDefault(release => string.Equals(release.Repository, owner + "/" + name, StringComparison.Ordinal) && string.Equals(release.Tag, tag, StringComparison.Ordinal));
+        }
+
+        return found is null ? Results.NotFound() : Results.Json(ReleaseJson(found));
+    }
+
+    private IResult DownloadReleaseFile(string owner, string name, string tag, string file)
+    {
+        byte[]? content;
+        lock (_lock)
+        {
+            content = _releases.LastOrDefault(release => string.Equals(release.Repository, owner + "/" + name, StringComparison.Ordinal) && string.Equals(release.Tag, tag, StringComparison.Ordinal))
+                ?.Files.GetValueOrDefault(file);
+        }
+
+        return content is null ? Results.NotFound() : Results.Bytes(content, "application/octet-stream");
+    }
+
+    private JsonObject ReleaseJson(Release release)
+    {
+        JsonArray assets = [.. release.Files.Select(file => (JsonNode)new JsonObject
+        {
+            ["name"] = file.Key,
+            ["browser_download_url"] = new Uri(Url, release.Repository + "/releases/download/" + release.Tag + "/" + file.Key).AbsoluteUri,
+            ["digest"] = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(release.WrongDigests ? [.. file.Value, 0] : file.Value)),
+        })];
+        return new JsonObject { ["tag_name"] = release.Tag, ["assets"] = assets };
+    }
+
     private IResult ListPullRequests(HttpRequest request, string owner, string name)
     {
         string head = request.Query["head"].ToString();
@@ -467,6 +529,8 @@ internal sealed class FakeGitHub : IAsyncDisposable
 
     /// <summary>A pull request someone opened.</summary>
     internal sealed record PullRequest(string Repository, int Number, string Head, string Base, string Title, string OpenedBy, Uri Url);
+
+    private sealed record Release(string Repository, string Tag, IReadOnlyDictionary<string, byte[]> Files, bool WrongDigests);
 
     private sealed class DeviceCode(string code, string userCode)
     {

@@ -2,6 +2,13 @@
 
 On-demand, disposable cloud development environments for AI coding agents.
 
+## Installing sloth
+
+Download `sloth-<platform>` from the
+[latest release](https://github.com/bagatka/ai-sloth-dotnet/releases/latest): Linux x64 or arm64, or
+macOS on Apple silicon; on Windows, the Linux build in WSL. Make it executable and put it on your
+PATH as `sloth`. `sloth update` installs newer releases, which sloth mentions once they're out.
+
 ## Development
 
 Install [Nix](https://nixos.org/download/), then run `./dev` to enter Nushell with
@@ -57,6 +64,9 @@ deployment's settings: the secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and
 the resource group and assign its roles, `AZURE_RESOURCE_GROUP`, `AZURE_LOCATION`, the three keys as
 `AGENT_ACCOUNTS_KEY`, `SOURCES_KEY`, and `SECRETS_KEY`, and `POSTGRES_CONNECTION_STRING`; and the
 variables `CUSTOM_DOMAIN`, `CUSTOM_DOMAIN_CERTIFICATE`, and `ALLOW_CHATGPT_PLANS`.
+
+The `CLI / Release` workflow releases sloth from main, run with its version in Actions or with
+`gh workflow run cli-release.yml -f version=<version>`.
 
 ### Amp orbs
 

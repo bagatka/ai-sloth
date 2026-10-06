@@ -4,7 +4,8 @@
 accounts and secrets, connect GitHub and add repositories, start, follow, and steer chats, see
 and prepare the setup of their files, push their changes or download their files, now or at any checkpoint, start
 chats from another's checkpoint, set the instructions every agent gets, and see or forget harness state. Its machine mode runs a workspace's nooks on the computer it
-runs on, and `github create-app` makes a host's GitHub App for its operator.
+runs on, and `github create-app` makes a host's GitHub App for its operator. A released sloth
+updates itself from its repository's releases.
 
 ## Parts
 
@@ -21,6 +22,9 @@ runs on, and `github create-app` makes a host's GitHub App for its operator.
 - **`PrivateFile`**, **`HostsFile`**: what lasts between runs, readable by its owner only.
 - **`MachineLink`** and `Bagatka.AiSloth.MachineProtocol`: machine mode, dialing the control plane's
   daemon endpoint.
+- **`SlothBuild`**, **`Releases`**: what this sloth is (a release with its version and repository,
+  or built from source) and its releases through GitHub's REST API, tagged `sloth-v<version>`, each
+  build checked against the SHA-256 GitHub keeps for it.
 - **`Program.cs`**: the composition root, the only code that reads the environment.
 
 Depends on: a host's public HTTP API (`/.well-known/aisloth` first), `Bagatka.Sandboxing.Docker` for
@@ -31,7 +35,8 @@ machine mode.
 In the operating system's per-user, non-roaming place: `$XDG_CONFIG_HOME/sloth` or `~/.config/sloth`
 on Linux, `~/Library/Application Support/sloth` on macOS, `%LOCALAPPDATA%\sloth` on Windows.
 `hosts.json` holds each host's session token, the person, the workspace in use, and the last chat's
-choices; `machine.json` holds a machine's token. Both are written whole and, on Linux and macOS, with
+choices; `machine.json` holds a machine's token; `update.json`, when sloth last looked for a newer
+release. Both are written whole and, on Linux and macOS, with
 mode 600.
 
 ## Decisions and constraints
@@ -57,6 +62,10 @@ mode 600.
   open` wakes the nook, so it's ready by the time a message is typed; any message wakes it anyway.
 - **`sloth chat prepare` follows until the setup's last test,** without taking input, and fails when
   the setup still fails; Ctrl+C leaves the agent working. `sloth chat open` follows and steers it.
+- **Updates are the person's to make.** At a keyboard, a released sloth looks for a newer release
+  at most once a day while a command runs, and mentions it after; a lookup that fails or takes more
+  than a second past the command says nothing. `sloth update [<version>]` replaces the file sloth
+  runs from, downgrades included, and never with a download whose SHA-256 isn't GitHub's.
 - **A nearly full disk is asked about** at the keyboard (y/N); otherwise the command fails with the
   reason, and `sloth chat send ... --anyway` sends.
 
@@ -64,7 +73,7 @@ mode 600.
 
 - Picking an account kind with the arrow keys; `sloth account add` lists the kinds.
 - Tokens in the operating system's keychain.
-- Published binaries for macOS and Windows: the project restores Linux runtimes only. Machine mode
-  on Windows runs inside WSL.
+- Native Windows builds and Intel Macs: on Windows, the Linux build runs in WSL, as machine mode does.
+- An install script; people download the first release by hand.
 - Commands for nooks without a chat, and for inviting people to one nook.
 - `sloth github create-app` for GitHub Enterprise Server: it makes apps on github.com only.
