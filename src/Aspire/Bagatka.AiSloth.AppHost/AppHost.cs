@@ -34,7 +34,7 @@ IResourceBuilder<ParameterResource> modelPrivateNetworks = builder.AddParameter(
 // Running AiSloth for yourself is the self-hosted use OpenAI allows ChatGPT plans for. Tests point
 // Sign in with ChatGPT and the plans' API at fakes.
 IResourceBuilder<ParameterResource> allowChatGptPlans = builder.AddParameter(
-    "allow-chatgpt-plans", builder.Configuration["Parameters:allow-chatgpt-plans"] ?? "true");
+    "allow-chatgpt-plans", builder.Configuration["Parameters:allow-chatgpt-plans"] is { Length: > 0 } allowed ? allowed : "true");
 string? chatGptAuthority = builder.Configuration["Parameters:chatgpt-authority"];
 string? chatGptApi = builder.Configuration["Parameters:chatgpt-api"];
 
@@ -106,13 +106,14 @@ if (builder.ExecutionContext.IsPublishMode)
     IResourceBuilder<AzureStorageResource> storage = builder.AddAzureStorage("storage");
     NookSandboxGroup.MakeWhenDeploying(builder, identity.Resource);
 
-    // Any Postgres by its connection string, or else a Flexible Server in the resource group.
-    database = builder.Configuration["Parameters:postgres-connection-string"] is not null
+    // Any Postgres by its connection string, or else a Flexible Server in the resource group. Settings
+    // left empty, as a deploy workflow passes ones a fork doesn't set, count as not given.
+    database = builder.Configuration["Parameters:postgres-connection-string"] is { Length: > 0 }
         ? ReferenceExpression.Create($"{builder.AddParameter("postgres-connection-string", secret: true)}")
         : builder.AddAzurePostgresFlexibleServer("postgres").WithPasswordAuthentication().AddDatabase("aisloth").Resource.ConnectionStringExpression;
 
     // A custom domain, such as app.example.com, comes with the name of its managed certificate.
-    IResourceBuilder<ParameterResource>? customDomain = builder.Configuration["Parameters:custom-domain"] is not null
+    IResourceBuilder<ParameterResource>? customDomain = builder.Configuration["Parameters:custom-domain"] is { Length: > 0 }
         ? builder.AddParameter("custom-domain")
         : null;
     IResourceBuilder<ParameterResource>? customDomainCertificate = customDomain is not null

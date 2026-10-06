@@ -50,6 +50,14 @@ log (`az containerapp logs show --name webapi --resource-group <group>`). For a 
 its records and managed certificate with `az containerapp hostname add` and `bind`, then deploy with
 `Parameters:custom-domain` and `Parameters:custom-domain-certificate`, the certificate's name.
 
+From GitHub, the `Control plane / Deploy` workflow deploys main, run by hand in Actions or with
+`gh workflow run control-plane-deploy.yml`. Its `production` environment, limited to main, holds the
+deployment's settings: the secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and
+`AZURE_SUBSCRIPTION_ID` of an Entra app that trusts the environment's GitHub token and may manage
+the resource group and assign its roles, `AZURE_RESOURCE_GROUP`, `AZURE_LOCATION`, the three keys as
+`AGENT_ACCOUNTS_KEY`, `SOURCES_KEY`, and `SECRETS_KEY`, and `POSTGRES_CONNECTION_STRING`; and the
+variables `CUSTOM_DOMAIN`, `CUSTOM_DOMAIN_CERTIFICATE`, and `ALLOW_CHATGPT_PLANS`.
+
 ### Amp orbs
 
 `.agents/setup` installs single-user Nix, materializes the existing locked flake,

@@ -1,0 +1,84 @@
+name: Control plane / Deploy
+run-name: Control plane / Deploy / production
+
+# Deploys main to Azure with `dotnet aspire deploy` (README.md, "Deploying"), with the nook images
+# main published for the same commit. The production environment holds the deployment's secrets
+# and settings, and only main deploys to it; GitHub's OIDC token signs in to Azure, so no Azure
+# secret is stored.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: control-plane-deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Control plane / Deploy to production
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # GHCR names are lowercase; an owner's name may not be.
+      - name: Name the image repository
+        id: images
+        run: echo "repository=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      # Nooks start from this commit's images, which Nook images / Publish makes after every push.
+      - name: Wait for this commit's nook images
+        env:
+          REPOSITORY: ${{ steps.images.outputs.repository }}
+        run: |
+          for image in aisloth-nook aisloth-nook-claude-code aisloth-nook-codex aisloth-nook-pi aisloth-nook-copilot; do
+            for attempt in $(seq 1 40); do
+              if docker manifest inspect "$REPOSITORY/$image:$GITHUB_SHA" > /dev/null 2>&1; then
+                break
+              fi
+              if [ "$attempt" = 40 ]; then
+                echo "::error::$REPOSITORY/$image:$GITHUB_SHA isn't published; run Nook images / Publish for this commit."
+                exit 1
+              fi
+              sleep 30
+            done
+          done
+
+      - name: Install .NET SDK from global.json
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore the pinned Aspire CLI
+        run: dotnet tool restore
+
+      - name: Sign in to Azure
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install Bicep
+        run: az bicep install
+
+      - name: Deploy
+        run: dotnet aspire deploy --non-interactive
+        env:
+          Azure__SubscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          Azure__ResourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          Azure__Location: ${{ secrets.AZURE_LOCATION }}
+          Parameters__nook-image-repository: ${{ steps.images.outputs.repository }}
+          Parameters__nook-image-tag: ${{ github.sha }}
+          Parameters__postgres-connection-string: ${{ secrets.POSTGRES_CONNECTION_STRING }}
+          Parameters__agent-accounts-key: ${{ secrets.AGENT_ACCOUNTS_KEY }}
+          Parameters__sources-key: ${{ secrets.SOURCES_KEY }}
+          Parameters__secrets-key: ${{ secrets.SECRETS_KEY }}
+          Parameters__custom-domain: ${{ vars.CUSTOM_DOMAIN }}
+          Parameters__custom-domain-certificate: ${{ vars.CUSTOM_DOMAIN_CERTIFICATE }}
+          Parameters__allow-chatgpt-plans: ${{ vars.ALLOW_CHATGPT_PLANS }}
