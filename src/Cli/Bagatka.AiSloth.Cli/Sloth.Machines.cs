@@ -114,10 +114,8 @@ internal sealed partial class Sloth
             return 0;
         }
 
-        string nooks = removed == 1 ? "nook" : "nooks";
-        await terminal.FailAsync(string.Create(
-            CultureInfo.InvariantCulture,
-            $"The control plane no longer accepts this machine: it was removed from its workspace. Its {removed} {nooks} on this computer were deleted."));
+        string deleted = removed == 1 ? "1 nook on this computer was" : string.Create(CultureInfo.InvariantCulture, $"{removed} nooks on this computer were");
+        await terminal.FailAsync("The control plane no longer accepts this machine: it was removed from its workspace. Its " + deleted + " deleted.");
         return 1;
     }
 
