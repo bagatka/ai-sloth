@@ -89,9 +89,8 @@ None. A connection lives as long as its gRPC call.
   without privileges on the machine; `sloth machine run` checks for it first. Each machine works in
   its own Docker scope, `m-<machine ID>`.
 - **Nooks never run directly on a machine's own operating system.** Linux nooks are containers under
-  Sysbox; on a Mac, the container engine already runs them inside a Linux VM. macOS nooks, for iOS
-  work, will be macOS virtual machines on Apple's Virtualization.framework (through Tart, after a
-  spike).
+  Sysbox, so machines run Linux, or Windows through WSL. Macs come later, with a VM per nook, Linux
+  or macOS (`ROADMAP.md`, "Macs").
 - **Lifecycle only.** The protocol carries sandbox lifecycle calls. A machine never accepts a
   command to run on its own operating system.
 - **One active instance at a time**, as for daemons: connections live in the instance they dialed,
