@@ -45,3 +45,13 @@ jobs:
 
       - name: Run tests
         run: dotnet test --solution AiSloth.slnx --configuration Release --no-build
+
+      # The end-to-end tests write each app's own output to files instead of the test output.
+      - name: Keep the apps' logs of a failed run
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: app-logs
+          path: tests/*/bin/Release/*/TestResults/logs/
+          retention-days: 14
+          if-no-files-found: ignore

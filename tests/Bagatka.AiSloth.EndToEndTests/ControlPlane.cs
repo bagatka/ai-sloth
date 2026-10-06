@@ -18,6 +18,7 @@ using Bagatka.AiSloth.Cli;
 using Bagatka.Sandboxing;
 using Bagatka.Sandboxing.Docker;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 [assembly: AssemblyFixture(typeof(Bagatka.AiSloth.EndToEndTests.ControlPlane))]
@@ -38,6 +39,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
     private FakeChatGpt? _chatGpt;
     private FakeGitHub? _gitHub;
     private DistributedApplication? _app;
+    private ResourceLogFiles? _logs;
 
     /// <summary>What <c>sloth machine connect</c> takes: the endpoint daemons and machines dial.</summary>
     public Uri MachinesUrl => new Uri(string.Create(CultureInfo.InvariantCulture, $"http://localhost:{_daemonPort}"));
@@ -164,6 +166,19 @@ public sealed partial class ControlPlane : IAsyncLifetime
                 .. _settings,
             ],
             ct);
+
+        // The app's own output goes to its files, by this run's scope, instead of the test output. So
+        // do this process's routine logs: its HTTP calls, Aspire starting, and health checks, which fail
+        // as every run stops its containers.
+        ResourceLogFiles logs = new ResourceLogFiles(Path.Combine(AppContext.BaseDirectory, "TestResults", "logs", Scope));
+        _logs = logs;
+        appHost.Services.AddLogging(logging => logging
+            .AddFilter(ResourceLogFiles.Category, LogLevel.None)
+            .AddFilter<ResourceLogFiles>(ResourceLogFiles.Category, LogLevel.Trace)
+            .AddFilter("System.Net.Http.HttpClient", LogLevel.Warning)
+            .AddFilter("Aspire.Hosting", LogLevel.Warning)
+            .AddFilter("Microsoft.Extensions.Diagnostics.HealthChecks", LogLevel.None)
+            .AddProvider(logs));
         _app = await appHost.BuildAsync(ct);
 
         await _app.StartAsync(ct);
@@ -263,6 +278,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
             }
         }
 
+        _logs?.Dispose();
         if (_issuer is not null)
         {
             await _issuer.DisposeAsync();
