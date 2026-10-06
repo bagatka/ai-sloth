@@ -49,13 +49,18 @@ jobs:
           docker info --format '{{.ServerVersion}} {{json .DriverStatus}}' | tee /dev/stderr | grep --quiet io.containerd.snapshotter
 
       # The Docker provider runs nooks under Sysbox, so their own Docker works without privileges.
-      # Its services start in the background; nooks fail until its socket, readable by root only, is
-      # up. When it doesn't come up, the step ends with what they logged.
+      # Sysbox 0.7.1's sysbox-fs can deadlock as it starts: it forks itself to probe the kernel without
+      # exec'ing, and the child can wait forever on a lock another thread held. Systemd kills it after
+      # its 10-second start timeout, and the drop-in restarts it (README.md, "Development"). Its
+      # services start in the background; nooks fail until its socket, readable by root only, is up.
+      # When it doesn't come up, the step ends with what they logged.
       - name: Install Sysbox
         run: |
           curl --fail --silent --show-error --location --output "$RUNNER_TEMP/sysbox.deb" \
             https://github.com/nestybox/sysbox/releases/download/v0.7.1/sysbox-ce_0.7.1.linux_amd64.deb
           echo "9d6d5484f980d0a17f86c492c1262015c2afb66280bdb97215b79fde6a0261c5  $RUNNER_TEMP/sysbox.deb" | sha256sum --check
+          sudo mkdir --parents /etc/systemd/system/sysbox-fs.service.d
+          printf '[Service]\nRestart=on-failure\nRestartSec=1\n' | sudo tee /etc/systemd/system/sysbox-fs.service.d/restart.conf
           logs() {
             sudo systemctl status sysbox sysbox-mgr sysbox-fs docker --no-pager || true
             sudo journalctl --unit sysbox --unit sysbox-mgr --unit sysbox-fs --unit docker --no-pager | tail -80

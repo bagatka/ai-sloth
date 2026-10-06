@@ -29,7 +29,10 @@ Nix can't provide: nooks run Docker of their own, and Sysbox lets them do it wit
 the host. On Linux, install Docker and Sysbox's package; on Windows, run a `dockerd` with Sysbox
 inside WSL, beside Docker Desktop, whose engine can't have it; on a Mac, the engine has to run in a
 Linux VM of your own (not tried yet). Point `DOCKER_HOST` at that engine when it isn't the default
-one: the AppHost, the tests, and `sloth machine run` use it, as the `docker` command does.
+one: the AppHost, the tests, and `sloth machine run` use it, as the `docker` command does. Sysbox
+0.7.1's `sysbox-fs` now and then hangs as it starts, and systemd stops it after 10 seconds; have
+systemd start it again, before installing the package or followed by `sudo systemctl daemon-reload`:
+`sudo mkdir -p /etc/systemd/system/sysbox-fs.service.d && printf '[Service]\nRestart=on-failure\nRestartSec=1\n' | sudo tee /etc/systemd/system/sysbox-fs.service.d/restart.conf`.
 
 Personal coding tools (Claude Code, Codex, etc.) are not managed by the flake.
 Install and update them using their own installers. `./dev` includes

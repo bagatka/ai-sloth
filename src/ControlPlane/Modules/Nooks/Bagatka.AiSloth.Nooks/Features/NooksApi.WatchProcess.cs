@@ -30,7 +30,19 @@ internal sealed partial class NooksApi
             return new Result<IAsyncEnumerable<ProcessEvent>>(NooksErrors.NotReady);
         }
 
-        return new Result<IAsyncEnumerable<ProcessEvent>>(WatchAsync(connection, found.Output.Id, Math.Max(command.FromOffset, 0), ct));
+        IAsyncEnumerable<ProcessEvent> events = WatchAsync(connection, found.Output.Id, Math.Max(command.FromOffset, 0), ct);
+        return new Result<IAsyncEnumerable<ProcessEvent>>(actor is UserActor ? KeptAwakeAsync(events, command.NookId, ct) : events);
+    }
+
+    // A person watching a process is using its nook, which stays awake while they watch. The control
+    // plane's own watches, such as a chat's of its agent, don't count: an idle chat's nook sleeps.
+    private async IAsyncEnumerable<ProcessEvent> KeptAwakeAsync(IAsyncEnumerable<ProcessEvent> events, NookId nookId, [EnumeratorCancellation] CancellationToken ct)
+    {
+        using IDisposable watching = activity.Watching(nookId);
+        await foreach (ProcessEvent processEvent in events.WithCancellation(ct))
+        {
+            yield return processEvent;
+        }
     }
 
     // Relays the daemon's uploads until one ends with the exit, which is recorded first, so whoever

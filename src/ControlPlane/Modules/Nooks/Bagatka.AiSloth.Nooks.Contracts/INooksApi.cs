@@ -102,7 +102,8 @@ public interface INooksApi
 
     /// <summary>
     /// Streams a process's output from an offset, first what was already written and then live, and
-    /// ends with <see cref="ProcessExited"/>. Any number of watchers may watch one process.
+    /// ends with <see cref="ProcessExited"/>. Any number of watchers may watch one process; while a
+    /// person watches, the nook stays awake.
     /// Cancelling <paramref name="ct"/> ends the watch, never the process. A watch also ends, without
     /// the exit, when the control-plane instance serving it hands over, as in a deploy: watch again
     /// from the offset after the last output.

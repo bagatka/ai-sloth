@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Nooks.Contracts;
@@ -15,13 +17,18 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// remembers. A busy nook stays awake beside an idle one that sleeps and wakes for its next message; a
 /// nook wakes early on request; one asleep for long is evicted and comes back from its latest
 /// checkpoint, through a ready copy when its setup left one; and one whose container is lost comes back
-/// too. On the sleepy app, whose nooks sleep after 8 idle seconds and are evicted after 20 asleep; the
-/// parts wait on those clocks, so they run at the same time, each as someone else.
+/// too; and one stays awake while someone watches its process. On the sleepy app, whose nooks sleep
+/// after 8 idle seconds and are evicted after 20 asleep; the parts wait on those clocks, so they run at
+/// the same time, each as someone else.
 /// </summary>
 public sealed class SleepJourney(SleepyControlPlane sleepy)
 {
     // Losing a nook is noticed on the reconciler's next pass, then a new one starts.
     private static readonly TimeSpan Recovery = TimeSpan.FromMinutes(3);
+
+    // Longer than the sleepy app's sleep period, 8 seconds, plus a pass of its sleep job, 10 seconds:
+    // an unwatched nook would be asleep by then.
+    private static readonly TimeSpan WatchedFor = TimeSpan.FromSeconds(30);
 
     [Fact]
     public async Task Nooks_sleep_when_unused_and_come_back_with_their_files_and_an_agent_that_remembers()
@@ -33,7 +40,8 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
             ANookWakesEarlyOnRequestAsync(app),
             ANookAsleepForLongIsEvictedAndComesBackFromItsLatestCheckpointAsync(app),
             AnEvictedNookComesBackThroughTheReadyCopyItsSlowSetupLeftAsync(app),
-            ANookWhoseContainerIsLostComesBackFromItsCheckpointAsync(app));
+            ANookWhoseContainerIsLostComesBackFromItsCheckpointAsync(app),
+            ANookStaysAwakeWhileSomeoneWatchesItsProcessAsync(app));
     }
 
     private static async Task ABusyNookStaysAwakeWhileAnIdleOneSleepsAndWakesForItsNextMessageAsync(ControlPlane app)
@@ -124,6 +132,41 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
         Assert.True(started.GetProperty("fromReadyCopy").GetBoolean());
         Assert.True(TimeSpan.Parse(ended.GetProperty("took").GetString()!, CultureInfo.InvariantCulture) < TimeSpan.FromSeconds(SlowSetupRepository.SetupSeconds));
         Assert.Equal(0, kept);
+    }
+
+    private static async Task ANookStaysAwakeWhileSomeoneWatchesItsProcessAsync(ControlPlane app)
+    {
+        using HttpClient frank = app.ClientFor("frank-" + Guid.CreateVersion7());
+        TestWorkspace acme = await TestWorkspace.CreateAsync(app, frank);
+        NookSummary nook = await Api.ReadAsync<NookSummary>(frank.SendPostAsync(acme.Path + "/nooks", new { provider = "docker" }), HttpStatusCode.Created);
+        ProcessSummary ticking = await NookProcesses.StartAsync(frank, nook.Id, "sh", "-c", "while true; do echo tick; sleep 1; done");
+
+        bool outputKeptComing = await WatchAsync(frank, nook.Id, ticking.Id, WatchedFor);
+        NookSummary watched = await acme.NookAsync(nook.Id);
+        NookStatus afterwards = await acme.StatusAsync(nook.Id, status => status is NookStatus.Stopped, SleepyControlPlane.Sleep);
+
+        Assert.True(outputKeptComing, "The process's output ended while it was watched.");
+        Assert.Equal((NookStatus.Running, NookStatus.Stopped), (watched.Status, afterwards));
+    }
+
+    // Reads the process's output for the time given, as a person watching it would; returns whether
+    // output was still coming when they stopped.
+    private static async Task<bool> WatchAsync(HttpClient person, NookId nook, ProcessId process, TimeSpan watchFor)
+    {
+        using CancellationTokenSource watching = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        await using IAsyncEnumerator<ProcessEvent> output = NookProcesses.WatchAsync(person, nook, process, fromOffset: 0, watching.Token).GetAsyncEnumerator(watching.Token);
+        long started = TimeProvider.System.GetTimestamp();
+        while (TimeProvider.System.GetElapsedTime(started) < watchFor)
+        {
+            bool more = await output.MoveNextAsync();
+            if (!more || output.Current.Value is not ProcessOutput)
+            {
+                return false;
+            }
+        }
+
+        await watching.CancelAsync();
+        return true;
     }
 
     private static async Task ANookWhoseContainerIsLostComesBackFromItsCheckpointAsync(ControlPlane app)

@@ -104,7 +104,8 @@ any ──user deletes──▶ Deleting ──provider confirms──▶ (recor
 A nook stays awake for the sleep period, two minutes by default, after anything uses it: a person
 reaching it through any operation, or a wake. Chats keeps a chat's nook awake while the chat has
 work, its agent's turn included, by waking it for 30 seconds every 10. A nook also stays awake while
-its setup runs. Services left running don't keep it awake: they sleep with it.
+its setup runs, and while a person watches one of its processes' output. Services left running
+don't keep it awake on their own: they sleep with it.
 
 When nobody used it for that long, the nook keeps its files as a checkpoint if they changed since
 the latest, then is Sleeping while its provider releases its compute: Paused, with memory, where the
