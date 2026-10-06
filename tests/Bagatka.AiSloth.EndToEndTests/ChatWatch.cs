@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.ServerSentEvents;
@@ -36,6 +37,12 @@ internal sealed class ChatWatch : IAsyncDisposable
 
     /// <summary>Every event read so far: its type and its <c>event</c> body.</summary>
     public List<(string Type, JsonElement Event)> Seen { get; } = [];
+
+    /// <summary>
+    /// What was read so far besides the agent's own updates: an agent still starting when a message
+    /// comes can send some, such as its commands, between any two of the chat's events.
+    /// </summary>
+    public List<(string Type, JsonElement Event)> SeenOfChat => [.. Seen.Where(seen => !string.Equals(seen.Type, "agent-update", StringComparison.Ordinal))];
 
     public static async Task<ChatWatch> OpenAsync(HttpClient client, ChatSummary chat)
     {

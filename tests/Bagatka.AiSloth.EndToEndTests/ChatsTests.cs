@@ -36,8 +36,8 @@ public sealed class ChatsTests(ControlPlane controlPlane) : IDisposable
         JsonElement ended = await watch.NextAsync("turn-ended");
         int? found = await NookProcesses.ExitCodeAsync(_alice, chat.NookId, "grep", "-q", "hi from the fake model", "/work/hello.txt");
 
-        Assert.Equal(["message-sent", "turn-started"], watch.Seen.Take(2).Select(seen => seen.Type), StringComparer.Ordinal);
-        Assert.Equal(sent.Id.Value, watch.Seen[0].Event.GetProperty("messageId").GetGuid());
+        Assert.Equal(["message-sent", "turn-started"], watch.SeenOfChat.Take(2).Select(seen => seen.Type), StringComparer.Ordinal);
+        Assert.Equal(sent.Id.Value, watch.SeenOfChat[0].Event.GetProperty("messageId").GetGuid());
         Assert.Contains(watch.Seen, seen => string.Equals(seen.Type, "agent-update", StringComparison.Ordinal)
             && string.Equals(seen.Event.GetProperty("update").GetProperty("sessionUpdate").GetString(), "tool_call", StringComparison.Ordinal));
         Assert.Equal("end_turn", ended.GetProperty("stopReason").GetString());
@@ -218,8 +218,8 @@ public sealed class ChatsTests(ControlPlane controlPlane) : IDisposable
         Assert.Equal(proposal.SentBy.Value, proposed.GetProperty("proposedBy").GetGuid());
         Assert.False(sent.IsProposal);
         Assert.Equal(proposal.Id.Value, messageSent.GetProperty("proposal").GetGuid());
-        Assert.Equal(["message-proposed", "message-sent", "turn-started"], watch.Seen.Take(3).Select(seen => seen.Type), StringComparer.Ordinal);
-        Assert.Equal(sent.Id.Value, watch.Seen[2].Event.GetProperty("messageId").GetGuid());
+        Assert.Equal(["message-proposed", "message-sent", "turn-started"], watch.SeenOfChat.Take(3).Select(seen => seen.Type), StringComparer.Ordinal);
+        Assert.Equal(sent.Id.Value, watch.SeenOfChat[2].Event.GetProperty("messageId").GetGuid());
         Assert.Equal("end_turn", ended.GetProperty("stopReason").GetString());
     }
 
