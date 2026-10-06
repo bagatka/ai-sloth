@@ -76,7 +76,10 @@ Nothing yet. `NookCreated` and `NookDeleted` come with their first consumer, usa
 
 ## Reacts to
 
-Nothing yet. Once workspaces can be deleted, `WorkspaceDeleted` deletes their nooks.
+`MachineRemoved` (Machines): the machine's nooks, except those being deleted, fail for good, and
+their daemons, which may run on that computer until its machine mode deletes them, are cut off and
+refused. Deleting one then removes only its record. Once workspaces can be deleted,
+`WorkspaceDeleted` deletes their nooks.
 
 ## Lifecycle
 
@@ -147,6 +150,11 @@ object storage under `nooks/<nook ID>/checkpoints/<number>/`.
 - **Sleeper** (`Jobs/NookSleeper.cs`): runs every 10 seconds, in bounded batches. Puts nooks nobody
   used for the sleep period to sleep, finishes those a failed pass left Sleeping, and evicts those
   asleep for the eviction period (see Sleep). It also wakes nooks for the operations that use them.
+- **Each nook on its own.** Both jobs work on each nook separately, so a slow or hung provider, such
+  as a machine pulling the nook image or one whose Docker Engine hangs, holds up only the nooks it
+  serves: one piece of work per nook at a time, at most 32 per job at once, each stopped after a
+  deadline (an hour for the reconciler, long enough for a first image pull on a slow connection; half
+  an hour for the sleeper) and tried again by a later pass. Pruning ready copies runs on its own too.
 
 ## Setup
 

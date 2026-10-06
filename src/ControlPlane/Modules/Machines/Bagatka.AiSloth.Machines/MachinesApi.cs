@@ -4,6 +4,7 @@ using Bagatka.AiSloth.Machines.Contracts;
 using Bagatka.AiSloth.Machines.Data;
 using Bagatka.AiSloth.Machines.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Microsoft.Extensions.Logging;
 
 namespace Bagatka.AiSloth.Machines;
 
@@ -13,8 +14,12 @@ internal sealed partial class MachinesApi(
     MachinesDbContext db,
     IWorkspacesApi workspaces,
     MachineConnections connections,
-    TimeProvider time) : IMachinesApi, IMachineConnectionsApi
+    TimeProvider time,
+    ILogger<MachinesApi> logger) : IMachinesApi, IMachineConnectionsApi
 {
+    private static readonly TimeSpan PingEvery = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan PingWithin = TimeSpan.FromSeconds(15);
+
     private MachineSummary Summary(Machine machine)
     {
         bool connected = connections.Find(machine.Id) is not null;

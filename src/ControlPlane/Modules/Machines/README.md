@@ -49,7 +49,7 @@ Workspaces (`GetAccessAsync`), on every call made for a user.
 
 ## Publishes
 
-Nothing yet.
+`MachineRemoved` when a machine is removed.
 
 ## Reacts to
 
@@ -59,11 +59,17 @@ Nothing yet. Once workspaces can be deleted, `WorkspaceDeleted` removes their ma
 
 Schema `machines`. Table `machines` (ID, workspace ID, name, added at, registration code hash and
 expiry, token hash; `xmin` as concurrency token, so two registrations with one code can't both win)
-and `placements` (sandbox or snapshot key, machine ID).
+and `placements` (sandbox or snapshot key, machine ID); `outbox_messages` holds its events until
+they are delivered.
 
 ## Background work
 
-None. A connection lives as long as its gRPC call.
+None outside connections. A connection lives as long as its gRPC call, which asks the machine every
+15 seconds whether it is there and ends when it doesn't answer within 15: a computer gone to sleep or
+off the network says nothing, and its machine goes offline within half a minute. The pings also keep
+proxies that end idle streams, such as Azure Container Apps' ingress after four minutes, from cutting
+a connection with nothing to do, or a call that takes longer, such as a first image pull. The machine
+answers pings however many calls it runs.
 
 ## Configuration
 
@@ -78,7 +84,9 @@ None. A connection lives as long as its gRPC call.
   usable once, compared without regard to case or surrounding spaces. Registering trades it for a
   random token. Only hashes are stored; the token stays on the machine, in
   `~/.config/sloth/machine.json`, readable by its owner only. Removing a machine makes its token
-  worthless at once and ends its connection; `sloth machine run` then stops.
+  worthless at once and ends its connection, and Nooks fails its nooks for good (`MachineRemoved`).
+  `sloth machine run`, then or whenever it runs next, is refused, deletes the machine's sandboxes and
+  snapshots from the computer, and stops.
 - **Placements are recorded before the call.** Creating a sandbox records its machine first, so a
   call by key finds it even if the create was interrupted. A snapshot's sandboxes start on the
   snapshot's machine. A disconnected machine makes calls for its sandboxes throw, as an unreachable
@@ -98,15 +106,6 @@ None. A connection lives as long as its gRPC call.
 
 ## Not built yet
 
-- **Slow and hung machines delay everyone.** The reconciler works on one nook at a time and waits
-  for each call, so a machine pulling the nook image for the first time delays every workspace's new
-  nooks for that long, and a machine whose Docker Engine hangs blocks them until it disconnects.
-  Calls need deadlines, and the reconciler needs to work on nooks independently, before many
-  workspaces share a control plane.
-- **Removing a machine leaves its nooks.** Their records stay, and their containers keep running
-  until someone stops them on the computer; their daemons still connect, because a daemon proves
-  itself with its nook's token. Removal should fail those nooks, through a `MachineRemoved` event
-  once the outbox exists. Deleting such a nook removes only its record.
 - **The nook image must be in a registry the machine can pull from.** The local development image,
   `aisloth-nook:dev`, exists only on the developer's Docker Engine.
 - **Network reach.** Nooks on a machine dial the control plane's daemon URL, which must be reachable

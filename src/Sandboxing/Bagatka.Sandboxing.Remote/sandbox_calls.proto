@@ -25,7 +25,12 @@ message SandboxCall {
     CreateSnapshot snapshot = 8;
     ListSnapshots list_snapshots = 9;
     string delete_snapshot = 10;
+    // Whether the other side is there: answered with done at once, without the provider.
+    Ping ping = 11;
   }
+}
+
+message Ping {
 }
 
 message SandboxSpec {
@@ -61,7 +66,7 @@ message SandboxCallResult {
     Sandboxes sandboxes = 4;
     Snapshot snapshot = 5;
     Snapshots snapshots = 6;
-    // Delete and delete snapshot.
+    // Delete, delete snapshot, and ping.
     Done done = 7;
     // An expected failure the provider returned.
     Error error = 8;

@@ -2,6 +2,7 @@ using Bagatka.AiSloth.Machines.Connections;
 using Bagatka.AiSloth.Machines.Contracts;
 using Bagatka.AiSloth.Machines.Data;
 using Bagatka.Foundation.Modules;
+using Bagatka.Foundation.Modules.Events;
 using Bagatka.Sandboxing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,7 +10,7 @@ namespace Bagatka.AiSloth.Machines;
 
 /// <summary>
 /// Registers the Machines module: <see cref="IMachinesApi"/>, <see cref="IMachineConnectionsApi"/>, their
-/// database, the connections this instance holds, and the <c>machine</c> sandbox provider.
+/// database and its outbox, the connections this instance holds, and the <c>machine</c> sandbox provider.
 /// </summary>
 public static class MachinesModule
 {
@@ -17,6 +18,7 @@ public static class MachinesModule
     public static IServiceCollection AddMachinesModule(this IServiceCollection services, MachinesSettings settings)
     {
         services.AddModuleDbContext<MachinesDbContext>(settings.ConnectionString, MachinesDbContext.Schema);
+        services.AddOutbox<MachinesDbContext>();
         services.AddSingleton<MachineConnections>();
         services.AddSingleton<ISandboxProvider, MachineSandboxProvider>();
         services.AddScoped<MachinesApi>();

@@ -11,16 +11,23 @@ using Bagatka.AiSloth.Machines.Contracts;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Grpc.Core;
+using Grpc.Net.Client;
+using Bagatka.Sandboxing.Remote.V1;
+using Bagatka.AiSloth.MachineProtocol.V1;
 using Xunit;
 using MachineCredential = Bagatka.AiSloth.Cli.MachineCredential;
+using MachinesClient = Bagatka.AiSloth.MachineProtocol.V1.Machines.MachinesClient;
 
 namespace Bagatka.AiSloth.EndToEndTests;
 
 /// <summary>
 /// Journey: Alice's workspace runs nooks on her own computer. She adds it, machine mode registers with
 /// a code that works once and connects, and nooks run there and nowhere else; outsiders can't see it;
-/// while it's away its nooks wait as unreachable and come back with it; and removing it stops its
-/// machine mode. Machine mode runs in the test process against the local Docker Engine.
+/// while it's away its nooks wait as unreachable and come back with it; a computer that stops answering
+/// without closing its connection, as one gone to sleep, goes offline; and removing it while machine mode
+/// is stopped fails its nooks at once and cuts off their daemons, still running there, and machine mode,
+/// run again, deletes them from the computer and stops. Machine mode runs in the test process against
+/// the local Docker Engine.
 /// </summary>
 public sealed class MachinesJourney(ControlPlane app) : IDisposable
 {
@@ -42,10 +49,18 @@ public sealed class MachinesJourney(ControlPlane app) : IDisposable
         }
 
         await NoOtherWorkspaceOrOutsiderUsesTheMachineAsync(acme, added);
+        await AMachineThatStopsAnsweringGoesOfflineAsync(acme);
         await ANookWhoseMachineIsAwayIsUnreachableAsync(acme, nook);
-        await using RunningMachine back = app.StartMachine(credential);
-        await TheNookComesBackWithItsMachineAndIsDeletedThereAsync(acme, nook);
-        await RemovingTheMachineStopsItsMachineModeAsync(added, back);
+        NookSummary left;
+        await using (RunningMachine back = app.StartMachine(credential))
+        {
+            await TheNookComesBackWithItsMachineAndIsDeletedThereAsync(acme, nook);
+            left = await Api.ReadAsync<NookSummary>(_alice.SendPostAsync(acme.Path + "/nooks", new { provider = ProviderId(added) }), HttpStatusCode.Created);
+            await acme.RunAsync(left.Id, "true");
+        }
+
+        await RemovingTheMachineFailsItsNooksAtOnceAsync(acme, added, left);
+        await MachineModeOfARemovedMachineDeletesItsNooksAndStopsAsync(acme, credential, left);
     }
 
     public void Dispose()
@@ -101,6 +116,32 @@ public sealed class MachinesJourney(ControlPlane app) : IDisposable
         Assert.Equal((MachinesErrors.NotFound.Code, MachinesErrors.NotFound.Code), (seen.Code, removed.Code));
     }
 
+    // A computer gone to sleep keeps its connection open and says nothing: it is asked every 15 seconds
+    // whether it is there and has 15 to answer, so it goes offline within half a minute.
+    private async Task AMachineThatStopsAnsweringGoesOfflineAsync(TestWorkspace acme)
+    {
+        MachineRegistration added = await Api.ReadAsync<MachineRegistration>(_alice.SendPostAsync(acme.Path + "/machines", new { name = "asleep" }), HttpStatusCode.Created);
+        MachineCredential credential = await MachineLink.RegisterAsync(app.MachinesUrl, added.Code, Ct);
+        using GrpcChannel channel = GrpcChannel.ForAddress(app.MachinesUrl);
+        Metadata authorization = new Metadata { { "authorization", "Bearer " + credential.Token } };
+        using AsyncDuplexStreamingCall<MachineMessage, SandboxCall> silent = new MachinesClient(channel).Connect(authorization, cancellationToken: Ct);
+        Hello hello = new Hello { MachineId = credential.MachineId.ToString("D", CultureInfo.InvariantCulture), SlothVersion = "silent" };
+        await silent.RequestStream.WriteAsync(new MachineMessage { Hello = hello }, Ct);
+
+        MachineSummary online = await Api.EventuallyAsync(async () =>
+        {
+            MachineSummary machine = await Api.ReadAsync<MachineSummary>(_alice.SendGetAsync(PathOf(added.Machine)), HttpStatusCode.OK);
+            return machine.Status == MachineStatus.Online ? machine : null;
+        });
+        MachineSummary offline = await Api.EventuallyAsync(async () =>
+        {
+            MachineSummary machine = await Api.ReadAsync<MachineSummary>(_alice.SendGetAsync(PathOf(added.Machine)), HttpStatusCode.OK);
+            return machine.Status == MachineStatus.Offline ? machine : null;
+        });
+
+        Assert.Equal((MachineStatus.Online, MachineStatus.Offline), (online.Status, offline.Status));
+    }
+
     // The machine is away, and its nook's daemon with it: nothing can say whether the nook is gone.
     private async Task ANookWhoseMachineIsAwayIsUnreachableAsync(TestWorkspace acme, NookSummary nook)
     {
@@ -121,12 +162,36 @@ public sealed class MachinesJourney(ControlPlane app) : IDisposable
         Assert.True(gone);
     }
 
-    private async Task RemovingTheMachineStopsItsMachineModeAsync(MachineRegistration added, RunningMachine machine)
+    // Machine mode is stopped, but the nook's container runs on, its daemon connected: removing the
+    // machine fails the nook at once and cuts the daemon off for good.
+    private async Task RemovingTheMachineFailsItsNooksAtOnceAsync(TestWorkspace acme, MachineRegistration added, NookSummary nook)
     {
         await Api.ExpectAsync(_alice.DeleteAsync(new Uri(PathOf(added.Machine), UriKind.Relative), Ct), HttpStatusCode.NoContent);
 
-        await machine.Running.WaitAsync(TimeSpan.FromSeconds(60), Ct);
+        NookStatus failed = await acme.StatusAsync(nook.Id, status => status is NookStatus.Failed, TimeSpan.FromSeconds(60));
+        bool stillThere = await app.SandboxExistsAsync(nook.Id.Value);
         await Api.ProblemAsync(_alice.SendGetAsync(PathOf(added.Machine)), HttpStatusCode.NotFound);
+
+        Assert.Equal(NookStatus.Failed, failed);
+        Assert.True(stillThere);
+    }
+
+    // The computer runs machine mode again: it is refused, deletes its nooks, and stops. The nook stays
+    // failed, as its daemon can't bring it back, and its record is deleted like any other.
+    private async Task MachineModeOfARemovedMachineDeletesItsNooksAndStopsAsync(TestWorkspace acme, MachineCredential credential, NookSummary nook)
+    {
+        await using RunningMachine again = app.StartMachine(credential);
+
+        int deleted = await again.Running.WaitAsync(TimeSpan.FromSeconds(60), Ct);
+        bool stillThere = await app.SandboxExistsAsync(nook.Id.Value);
+        NookSummary afterwards = await acme.NookAsync(nook.Id);
+        await Api.ExpectAsync(_alice.DeleteAsync(new Uri(Paths.Nook(nook.Id), UriKind.Relative), Ct), HttpStatusCode.NoContent);
+        bool gone = await Api.GoneOrDeletingAsync(_alice, nook.Id);
+
+        Assert.True(deleted >= 1, "Machine mode deleted none of its nooks.");
+        Assert.False(stillThere, "The nook's container is still on the computer.");
+        Assert.Equal(NookStatus.Failed, afterwards.Status);
+        Assert.True(gone);
     }
 
     private static string PathOf(MachineSummary machine)

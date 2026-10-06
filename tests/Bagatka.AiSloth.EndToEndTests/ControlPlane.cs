@@ -253,6 +253,24 @@ public sealed partial class ControlPlane : IAsyncLifetime
         }
     }
 
+    /// <summary>Whether a nook's container exists, on the docker provider or a machine.</summary>
+    internal async Task<bool> SandboxExistsAsync(Guid nookId)
+    {
+        foreach (string scope in new[] { Scope, MachineScope })
+        {
+            ServiceCollection services = new ServiceCollection();
+            services.AddDockerSandboxProvider(new DockerSandboxSettings(DockerEndpoint, scope));
+            await using ServiceProvider provider = services.BuildServiceProvider();
+            SandboxObservation? sandbox = await provider.GetRequiredService<ISandboxProvider>().ObserveAsync(SandboxKey.From(nookId), CancellationToken.None);
+            if (sandbox is not null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Replaces the WebApi as a deploy does: the running one is told to stop, and once it has stopped
     /// a new one starts; returns when the new one is healthy. <paramref name="whileStopping"/> runs once

@@ -26,8 +26,8 @@ public interface IMachinesApi
     public Task<Result<MachineSummary>> GetAsync(Actor actor, MachineId id, CancellationToken ct);
 
     /// <summary>
-    /// Removes a machine: its credential stops working at once and its connection ends. Nooks on it
-    /// stop being reachable. Only the workspace's managers remove machines.
+    /// Removes a machine: its credential stops working at once and its connection ends, and
+    /// <see cref="MachineRemoved"/> is published. Only the workspace's managers remove machines.
     /// </summary>
     public Task<Result> RemoveAsync(Actor actor, MachineId id, CancellationToken ct);
 }

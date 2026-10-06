@@ -20,7 +20,8 @@ namespace Bagatka.Sandboxing.Remote;
 /// One instance serves one connection. <see cref="Disconnect"/> fails the calls in flight, and calls
 /// made afterwards fail at once with <see cref="InvalidOperationException"/>, as an unreachable
 /// backend would. A cancelled call stops waiting, but the remote side may still finish it; provider
-/// operations are safe to repeat. Thread-safe.
+/// operations are safe to repeat. <see cref="KeepAliveAsync"/> disconnects when the other side falls
+/// silent. Thread-safe.
 /// </remarks>
 public sealed class RemoteSandboxProvider(string name) : ISandboxProvider
 {
@@ -67,6 +68,47 @@ public sealed class RemoteSandboxProvider(string name) : ISandboxProvider
         {
             call.TrySetException(Disconnected());
         }
+    }
+
+    /// <summary>
+    /// Asks the other side every <paramref name="every"/> whether it is there, and disconnects when it
+    /// doesn't answer within <paramref name="within"/>, as when the computer at the other end went to
+    /// sleep or off the network without closing the connection. Returns true then, and false when the
+    /// connection ended otherwise or <paramref name="ct"/> was cancelled. The pings also keep proxies,
+    /// which end streams idle for a few minutes, from cutting a connection that has nothing to do.
+    /// </summary>
+    public async Task<bool> KeepAliveAsync(TimeSpan every, TimeSpan within, TimeProvider time, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(time);
+        using PeriodicTimer timer = new PeriodicTimer(every, time);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                using CancellationTokenSource late = new CancellationTokenSource(within, time);
+                using CancellationTokenSource waiting = CancellationTokenSource.CreateLinkedTokenSource(ct, late.Token);
+                try
+                {
+                    // Any answer will do: a side that doesn't know pings answers with a failure.
+                    await CallAsync(new Wire.SandboxCall { Ping = new Wire.Ping() }, waiting.Token);
+                }
+                catch (OperationCanceledException) when (late.IsCancellationRequested && !ct.IsCancellationRequested)
+                {
+                    Disconnect();
+                    return true;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // The owner stopped keeping the connection alive.
+        }
+        catch (InvalidOperationException)
+        {
+            // The connection ended.
+        }
+
+        return false;
     }
 
     /// <inheritdoc />

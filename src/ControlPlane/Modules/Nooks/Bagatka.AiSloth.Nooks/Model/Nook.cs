@@ -261,6 +261,14 @@ internal sealed class Nook
         }
     }
 
+    // It can't run anywhere any more, such as when its machine was removed: it fails, and its daemon,
+    // which may still run out of reach, is refused from now on.
+    public void FailForGood()
+    {
+        DaemonTokenHash = null;
+        Fail();
+    }
+
     // Deleting again changes nothing.
     public void Delete()
     {

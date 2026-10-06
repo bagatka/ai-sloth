@@ -4,12 +4,19 @@
 # Add a line in the same change that introduces a new placeholder.
 Actor;System.String
 AgentAccountId;System.Guid
+Attempts;System.Int32
 ChatId;System.Guid
+Deadline;System.TimeSpan
+EventId;System.Guid
+EventType;System.String
 Instance;System.Guid
+MachineId;System.Guid
 Match;System.String
 NookId;System.Guid
+Outbox;System.String
 ProcessId;System.String
 Provider;System.String
+Reaction;System.String
 Reason;System.String
 RetryDelay;System.TimeSpan
 UserId;System.Guid

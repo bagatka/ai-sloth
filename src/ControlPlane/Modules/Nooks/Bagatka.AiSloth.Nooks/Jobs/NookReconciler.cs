@@ -21,8 +21,9 @@ namespace Bagatka.AiSloth.Nooks.Jobs;
 
 // Makes providers match the records: creates the sandboxes of new nooks, from a ready copy when one
 // matches, replaces those running nooks lost, deletes those of deleted ones, and hourly the ready copies
-// nobody uses (src/ControlPlane/Modules/Nooks/README.md, "Background work"). Not handled yet: sandboxes
-// without a record, which needs a comparison with each provider's ListAsync.
+// nobody uses (src/ControlPlane/Modules/Nooks/README.md, "Background work"). Each nook's work and each
+// pruning run on their own, so a slow or hung provider holds up only what it serves. Not handled yet:
+// sandboxes without a record, which needs a comparison with each provider's ListAsync.
 internal sealed class NookReconciler(
     IDbContextFactory<NooksDbContext> databases,
     IEnumerable<ISandboxProvider> providers,
@@ -35,8 +36,13 @@ internal sealed class NookReconciler(
     ILogger<NookReconciler> logger) : BackgroundService
 {
     private const int BatchSize = 20;
+    private const int Capacity = 32;
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan PruneInterval = TimeSpan.FromHours(1);
+
+    // Long enough for a machine on a slow connection to pull the nook image when it creates its first
+    // sandbox; work that takes longer is hung.
+    private static readonly TimeSpan Deadline = TimeSpan.FromHours(1);
 
     // When the next pass deletes the ready copies nobody uses: at the first after a start.
     private DateTimeOffset _nextPrune = DateTimeOffset.MinValue;
@@ -58,32 +64,50 @@ internal sealed class NookReconciler(
 
     private async Task WorkAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        NookWork work = new NookWork(Capacity, Deadline, time, logger);
+        Task pruning = Task.CompletedTask;
+        try
         {
-            await PassAsync(stoppingToken);
-            using CancellationTokenSource waiting = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-            await Task.WhenAny(_wake.Reader.WaitToReadAsync(waiting.Token).AsTask(), Task.Delay(Interval, time, waiting.Token));
-            await waiting.CancelAsync();
-            _wake.Reader.TryRead(out _);
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await PassAsync(work, stoppingToken);
+                if (time.GetUtcNow() >= _nextPrune && pruning.IsCompleted)
+                {
+                    _nextPrune = time.GetUtcNow() + PruneInterval;
+                    pruning = PruneAsync(stoppingToken);
+                }
+
+                using CancellationTokenSource waiting = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                await Task.WhenAny(_wake.Reader.WaitToReadAsync(waiting.Token).AsTask(), Task.Delay(Interval, time, waiting.Token));
+                await waiting.CancelAsync();
+                _wake.Reader.TryRead(out _);
+            }
+        }
+        finally
+        {
+            await work.StoppedAsync();
+            await pruning;
         }
     }
 
-    // One failure never stops the job: a failed nook or pass is logged and retried on the next pass.
-    private async Task PassAsync(CancellationToken ct)
+    // Starts work on the nooks due, except those with work running. One failure never stops the job:
+    // a failed nook or pass is logged and retried on the next pass.
+    private async Task PassAsync(NookWork work, CancellationToken ct)
     {
         try
         {
             foreach (NookStatus status in new[] { NookStatus.Deleting, NookStatus.Creating })
             {
+                List<NookId> busy = work.Busy();
                 List<NookId> due;
                 await using (NooksDbContext db = await databases.CreateDbContextAsync(ct))
                 {
-                    due = await db.Nooks.Where(nook => nook.Status == status).OrderBy(nook => nook.Id).Select(nook => nook.Id).Take(BatchSize).ToListAsync(ct);
+                    due = await db.Nooks.Where(nook => nook.Status == status && !busy.Contains(nook.Id)).OrderBy(nook => nook.Id).Select(nook => nook.Id).Take(BatchSize).ToListAsync(ct);
                 }
 
                 foreach (NookId nookId in due)
                 {
-                    await ReconcileAsync(nookId, ct);
+                    work.TryStart(nookId, nookCt => ReconcileAsync(nookId, nookCt), ct);
                 }
             }
 
@@ -96,20 +120,35 @@ internal sealed class NookReconciler(
                     .OrderBy(nook => nook.Id).Select(nook => nook.Id).ToListAsync(ct);
             }
 
-            foreach (NookId nookId in running.Where(nookId => !daemons.IsConnected(nookId)).Take(BatchSize))
+            HashSet<NookId> busyNow = [.. work.Busy()];
+            foreach (NookId nookId in running.Where(nookId => !daemons.IsConnected(nookId) && !busyNow.Contains(nookId)).Take(BatchSize))
             {
-                await ReconcileAsync(nookId, ct);
-            }
-
-            if (time.GetUtcNow() >= _nextPrune)
-            {
-                _nextPrune = time.GetUtcNow() + PruneInterval;
-                await readyCopies.PruneAsync(ct);
+                work.TryStart(nookId, nookCt => ReconcileAsync(nookId, nookCt), ct);
             }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             Log.PassFailed(logger, exception);
+        }
+    }
+
+    // A provider that doesn't answer stops only pruning, until the deadline.
+    private async Task PruneAsync(CancellationToken stoppingToken)
+    {
+        await Task.Yield();
+        using CancellationTokenSource late = new CancellationTokenSource(Deadline, time);
+        using CancellationTokenSource ending = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, late.Token);
+        try
+        {
+            await readyCopies.PruneAsync(ending.Token);
+        }
+        catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+        {
+            Log.PruningTooLong(logger, Deadline);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Log.PruneFailed(logger, exception);
         }
     }
 

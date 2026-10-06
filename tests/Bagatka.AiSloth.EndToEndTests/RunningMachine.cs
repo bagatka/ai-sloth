@@ -25,8 +25,11 @@ internal sealed class RunningMachine : IAsyncDisposable
         Running = link.RunAsync(_stopping.Token);
     }
 
-    /// <summary>Completes when machine mode stops on its own, which means the machine was removed.</summary>
-    public Task Running { get; }
+    /// <summary>
+    /// Completes when machine mode stops on its own, which means the machine was removed, with how many
+    /// of its nooks it deleted from the computer.
+    /// </summary>
+    public Task<int> Running { get; }
 
     public async ValueTask DisposeAsync()
     {

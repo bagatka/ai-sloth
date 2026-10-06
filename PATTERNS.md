@@ -615,8 +615,8 @@ internal sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) :
 }
 ```
 
-Canonical example: `Data/WorkspacesDbContext.cs` in the Workspaces module. The outbox in the snippet
-arrives with the first integration event.
+Canonical examples: `Data/WorkspacesDbContext.cs` in the Workspaces module, and
+`Data/MachinesDbContext.cs` in the Machines module for one with an outbox.
 
 - **One DbContext per module.** Each module has one `internal` `<Module>DbContext`, with its own
   schema and its migrations history table in that schema. `AddModuleDbContext` registers it and an
@@ -732,16 +732,26 @@ internal sealed class OnUserRegistered(BillingDbContext db) : IReaction<UserRegi
 }
 ```
 
+Canonical example: `MachineRemoved` in `Bagatka.AiSloth.Machines.Contracts`, added by `Machine.Remove`,
+and `Reactions/OnMachineRemoved.cs` in the Nooks module. Delivery is in
+`src/Foundation/Bagatka.Foundation.Modules/Events/`.
+
+- **Registration.** The publisher calls `services.AddOutbox<<Module>DbContext>()`, and its DbContext
+  maps `OutboxMessage` with `OutboxMessageConfiguration`. A reacting module calls
+  `services.AddReaction<TEvent, TReaction>()`.
 - **Event shape.**
   - Events are immutable records in the publisher's Contracts, named `<Noun><PastTenseVerb>`.
   - They carry IDs plus the facts consumers commonly need.
 - **Who emits.** Only entities add events, through the `IOutbox` they receive as a parameter.
   The rows commit with the change.
-- **Delivery and idempotency.** After commit, Foundation's dispatcher delivers events at least
-  once. Every reaction is idempotent, preferably check-then-act on a key protected by a unique
-  index.
-- **Failures.** A reaction that fails is retried with backoff. After repeated failures it is
-  parked and logged for an operator.
+- **Delivery and idempotency.** After commit, Foundation's dispatcher, on the active instance,
+  delivers events at least once: it looks every second, oldest first, and runs each reaction in a
+  scope of its own. Every reaction is idempotent, preferably check-then-act on a key protected by a
+  unique index.
+- **Failures.** A reaction that fails, by its result or an exception, has the event delivered again
+  with growing waits, its other reactions too, up to ten minutes apart. After ten failures the event
+  is parked in its outbox and logged for an operator. Events are stored under their type's full
+  name, so renaming one loses those published but not yet delivered.
 - **Reaction shape.**
   - One reaction per file in `Reactions/`, named `On<Event>`, registered explicitly in
     `<Module>Module`. Its parameter is named `integrationEvent`.

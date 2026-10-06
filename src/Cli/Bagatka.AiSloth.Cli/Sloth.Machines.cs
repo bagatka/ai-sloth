@@ -103,9 +103,10 @@ internal sealed partial class Sloth
             console.TimestampFormat = "yyyy-MM-dd'T'HH':'mm':'ss'.'fff'Z' ";
         }));
         MachineLink link = new MachineLink(credential, local, time, loggers.CreateLogger<MachineLink>());
+        int removed;
         try
         {
-            await link.RunAsync(ct);
+            removed = await link.RunAsync(ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -113,7 +114,10 @@ internal sealed partial class Sloth
             return 0;
         }
 
-        await terminal.FailAsync("The control plane no longer accepts this machine; it was removed from its workspace.");
+        string nooks = removed == 1 ? "nook" : "nooks";
+        await terminal.FailAsync(string.Create(
+            CultureInfo.InvariantCulture,
+            $"The control plane no longer accepts this machine: it was removed from its workspace. Its {removed} {nooks} on this computer were deleted."));
         return 1;
     }
 

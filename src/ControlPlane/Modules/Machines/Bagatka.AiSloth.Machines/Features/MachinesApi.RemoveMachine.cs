@@ -33,6 +33,7 @@ internal sealed partial class MachinesApi
 
         // A removed machine's sandboxes live nowhere AiSloth can reach, so their placements go with it.
         await db.Placements.Where(placement => placement.MachineId == id).ExecuteDeleteAsync(ct);
+        machine.Remove(db.Outbox);
         db.Machines.Remove(machine);
         Result removed = await db.SaveAsync(ct);
         connections.Disconnect(id);

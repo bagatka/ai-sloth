@@ -306,7 +306,7 @@ These decisions are fixed:
 | Project | Used by | Holds |
 |---|---|---|
 | `Bagatka.Foundation` | everyone, including Contracts and Sdk clients | `Result`, `Result<T>`, `Success`, `Error`, `ErrorKind`, `Actor`, `UserId`, `ITypedId<T>`, `TypedIdJsonConverter<T>`, `OneTimeCode`; later `Page<T>`, `PageRequest`, `FoundationJson`, `Money` |
-| `Bagatka.Foundation.Modules` | module projects | `AddModuleDbContext`, `ModuleDatabases.MigrateAsync`, `TypedIdConverter<T>`, `SaveAsync`, keyset pagination, `ActiveInstance`; `IOutbox`, the outbox dispatcher, and `IReaction<T>` come with the first integration event |
+| `Bagatka.Foundation.Modules` | module projects | `AddModuleDbContext`, `ModuleDatabases.MigrateAsync`, `TypedIdConverter<T>`, `SaveAsync`, keyset pagination, `ActiveInstance`; `IOutbox`, the outbox dispatcher, and `IReaction<T>` (`Events/`) |
 | `Bagatka.Foundation.Web` | WebApi hosts | `Result` → HTTP mapping as problem details, `ClaimsPrincipal` → `Actor`; unhandled exceptions use ASP.NET Core's built-in problem details |
 
 Foundation is plumbing only. A business concept never goes into Foundation. If two modules need
@@ -483,7 +483,7 @@ this table in the same change.
 | Module | Owns | Asks | Reacts to | Schema |
 |---|---|---|---|---|
 | Workspaces (contract only) | Workspaces, and who may do what with them and their nooks: access levels, invites | — | — | `workspaces` |
-| Nooks | Nooks, where each runs, their lifecycle and recovery, processes, their copies of sources, running setups, checkpoints, ready copies, daemon connections | Workspaces, Sources, Machines, Secrets | — | `nooks` |
+| Nooks | Nooks, where each runs, their lifecycle and recovery, processes, their copies of sources, running setups, checkpoints, ready copies, daemon connections | Workspaces, Sources, Machines, Secrets | Machines | `nooks` |
 | Secrets | Workspaces' environment variables for every process in their nooks, their sealed values | Workspaces | — | `secrets` |
 | Sources | GitHub repositories a workspace connected, people's GitHub connections and git settings, copying in and pushing out, push policy; folders (planned) | Workspaces | — | `sources` |
 | AgentAccounts | Accounts at agent vendors that pay for agents: a workspace's and people's own, their sealed secrets | Workspaces | — | `agent_accounts` |

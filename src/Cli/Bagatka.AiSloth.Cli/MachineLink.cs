@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -26,6 +27,7 @@ internal sealed class MachineLink(MachineCredential credential, ISandboxProvider
 {
     // Calls are short provider operations; the bound keeps a flood from opening unbounded work.
     private const int MaxConcurrentCalls = 32;
+    private const int MaxQueuedCalls = 256;
     private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(30);
 
     // A connection that lasted this long resets the backoff.
@@ -48,9 +50,11 @@ internal sealed class MachineLink(MachineCredential credential, ISandboxProvider
 
     /// <summary>
     /// Connects, and reconnects with backoff, until the control plane rejects the credential, which
-    /// means the machine was removed, or until <paramref name="ct"/> is cancelled.
+    /// means the machine was removed, or until <paramref name="ct"/> is cancelled. A removed machine's
+    /// nooks can't run anywhere any more, so their sandboxes and ready copies go from this computer
+    /// first; their files are in their checkpoints. Returns how many sandboxes went.
     /// </summary>
-    public async Task RunAsync(CancellationToken ct)
+    public async Task<int> RunAsync(CancellationToken ct)
     {
         using GrpcChannel channel = GrpcChannel.ForAddress(credential.ControlPlaneUrl, new GrpcChannelOptions
         {
@@ -76,7 +80,7 @@ internal sealed class MachineLink(MachineCredential credential, ISandboxProvider
             }
             catch (RpcException exception) when (exception.StatusCode == StatusCode.Unauthenticated)
             {
-                return;
+                return await RemoveNooksAsync(ct);
             }
             catch (Exception exception) when (exception is RpcException or HttpRequestException)
             {
@@ -93,6 +97,24 @@ internal sealed class MachineLink(MachineCredential credential, ISandboxProvider
         }
     }
 
+    // Only this machine's sandboxes and snapshots: the local provider works in the machine's own scope.
+    private async Task<int> RemoveNooksAsync(CancellationToken ct)
+    {
+        List<SandboxObservation> sandboxes = await local.ListAsync(ct).ToListAsync(ct);
+        foreach (SandboxObservation sandbox in sandboxes)
+        {
+            await local.DeleteAsync(sandbox.Key, ct);
+        }
+
+        List<SnapshotObservation> snapshots = await local.ListSnapshotsAsync(ct).ToListAsync(ct);
+        foreach (SnapshotObservation snapshot in snapshots)
+        {
+            await local.DeleteSnapshotAsync(snapshot.Key, ct);
+        }
+
+        return sandboxes.Count;
+    }
+
     private async Task RunConnectionAsync(Machines.MachinesClient client, CancellationToken ct)
     {
         using CancellationTokenSource connection = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -101,42 +123,51 @@ internal sealed class MachineLink(MachineCredential credential, ISandboxProvider
         await call.RequestStream.WriteAsync(new MachineMessage { Hello = hello }, connection.Token);
         Log.Connected(logger);
 
-        // At most MaxConcurrentCalls run, and a call ends once its result is queued, so the queue
-        // never holds more.
+        // Provider calls wait in a queue for one of MaxConcurrentCalls workers. Pings are answered as
+        // they are read, however busy the workers are: a machine that doesn't answer is offline to the
+        // control plane. A call ends once its result is queued, so the results never hold more than
+        // the calls running.
+        Channel<SandboxCall> queued = Channel.CreateBounded<SandboxCall>(
+            new BoundedChannelOptions(MaxQueuedCalls) { SingleWriter = true, FullMode = BoundedChannelFullMode.Wait });
         Channel<SandboxCallResult> results = Channel.CreateBounded<SandboxCallResult>(
             new BoundedChannelOptions(MaxConcurrentCalls) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
         Task sending = SendResultsAsync(call.RequestStream, results.Reader, connection.Token);
-        List<Task> running = [];
+        Task[] workers = [.. Enumerable.Range(0, MaxConcurrentCalls).Select(_ => WorkAsync(queued.Reader, results.Writer, connection.Token))];
         try
         {
             await foreach (SandboxCall sandboxCall in call.ResponseStream.ReadAllAsync(connection.Token))
             {
-                running.RemoveAll(task => task.IsCompleted);
-                if (running.Count == MaxConcurrentCalls)
+                if (sandboxCall.CallCase == SandboxCall.CallOneofCase.Ping)
                 {
-                    await Task.WhenAny(running);
-                    running.RemoveAll(task => task.IsCompleted);
+                    SandboxCallResult answer = await SandboxCalls.ExecuteAsync(local, sandboxCall, connection.Token);
+                    await results.Writer.WriteAsync(answer, connection.Token);
                 }
-
-                running.Add(ExecuteAsync(sandboxCall, results.Writer, connection.Token));
+                else
+                {
+                    await queued.Writer.WriteAsync(sandboxCall, connection.Token);
+                }
             }
         }
         finally
         {
             // The control plane fails whatever this connection left unanswered; its callers retry.
             await connection.CancelAsync();
-            await Task.WhenAll(running);
+            queued.Writer.TryComplete();
+            await Task.WhenAll(workers);
             results.Writer.TryComplete();
             await sending;
         }
     }
 
-    private async Task ExecuteAsync(SandboxCall sandboxCall, ChannelWriter<SandboxCallResult> results, CancellationToken ct)
+    private async Task WorkAsync(ChannelReader<SandboxCall> queued, ChannelWriter<SandboxCallResult> results, CancellationToken ct)
     {
         try
         {
-            SandboxCallResult result = await SandboxCalls.ExecuteAsync(local, sandboxCall, ct);
-            await results.WriteAsync(result, ct);
+            await foreach (SandboxCall sandboxCall in queued.ReadAllAsync(ct))
+            {
+                SandboxCallResult result = await SandboxCalls.ExecuteAsync(local, sandboxCall, ct);
+                await results.WriteAsync(result, ct);
+            }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

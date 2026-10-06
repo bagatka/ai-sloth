@@ -5,6 +5,8 @@ using Bagatka.AiSloth.Machines.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 
+using Bagatka.Foundation.Modules.Events;
+
 namespace Bagatka.AiSloth.Machines.Model;
 
 // A computer a workspace added to run its nooks. It registers once with a short-lived code, then
@@ -67,6 +69,12 @@ internal sealed class Machine
         CodeHash = null;
         CodeExpiresAt = null;
         return token;
+    }
+
+    // Removing a machine is a fact other modules act on: nooks on it can't run anywhere any more.
+    public void Remove(IOutbox outbox)
+    {
+        outbox.Add(new MachineRemoved(Id, WorkspaceId));
     }
 
     public bool AcceptsToken(string token)

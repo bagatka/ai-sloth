@@ -21,7 +21,8 @@ it doesn't have. Operations by key find the sandbox wherever it was created.
 `SandboxCalls.ExecuteAsync` runs it on a local provider and answers. Moving the messages is the
 caller's job: AiSloth's machines carry them over a gRPC stream (`src/Cli`), and the conformance
 suite over an in-memory loop. A remote provider that loses its connection fails the calls in
-flight, as an unreachable backend would.
+flight, as an unreachable backend would; its owner can ping the other side (`KeepAliveAsync`) to
+notice one that fell silent without closing the connection.
 
 ## Rules for providers
 

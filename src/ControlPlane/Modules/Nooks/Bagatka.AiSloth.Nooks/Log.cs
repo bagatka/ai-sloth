@@ -15,6 +15,9 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Warning, Message = "Nook {NookId} lost its sandbox; a new one starts from its latest checkpoint")]
     public static partial void NookReplaced(ILogger logger, Guid nookId);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Work on nook {NookId} took longer than {Deadline} and stopped; a later pass tries again")]
+    public static partial void NookWorkTooLong(ILogger logger, Guid nookId, TimeSpan deadline);
+
     [LoggerMessage(Level = LogLevel.Information, Message = "Deleted nook {NookId}")]
     public static partial void NookDeleted(ILogger logger, Guid nookId);
 
@@ -59,6 +62,12 @@ internal static partial class Log
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Nook {NookId}'s ready copy is gone at its provider; it starts from its image")]
     public static partial void ReadyCopyGone(ILogger logger, Guid nookId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Deleting unused ready copies took longer than {Deadline} and stopped; the next hour tries again")]
+    public static partial void PruningTooLong(ILogger logger, TimeSpan deadline);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Deleting unused ready copies failed; the next hour tries again")]
+    public static partial void PruneFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Deleting unused ready copies at provider {Provider} failed; the next hour tries again")]
     public static partial void PruningFailed(ILogger logger, Exception exception, string provider);

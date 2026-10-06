@@ -1,15 +1,18 @@
+using Bagatka.AiSloth.Machines.Contracts;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Daemons;
 using Bagatka.AiSloth.Nooks.Data;
 using Bagatka.AiSloth.Nooks.Jobs;
+using Bagatka.AiSloth.Nooks.Reactions;
 using Bagatka.Foundation.Modules;
+using Bagatka.Foundation.Modules.Events;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bagatka.AiSloth.Nooks;
 
 /// <summary>
 /// Registers the Nooks module: <see cref="INooksApi"/>, <see cref="INookDaemonsApi"/>, their database,
-/// the daemon connections this instance holds, and the reconciler.
+/// the daemon connections this instance holds, its jobs, and its reactions to other modules' events.
 /// </summary>
 public static class NooksModule
 {
@@ -34,6 +37,7 @@ public static class NooksModule
         services.AddScoped<NooksApi>();
         services.AddScoped<INooksApi>(provider => provider.GetRequiredService<NooksApi>());
         services.AddScoped<INookDaemonsApi>(provider => provider.GetRequiredService<NooksApi>());
+        services.AddReaction<MachineRemoved, OnMachineRemoved>();
         return services;
     }
 }

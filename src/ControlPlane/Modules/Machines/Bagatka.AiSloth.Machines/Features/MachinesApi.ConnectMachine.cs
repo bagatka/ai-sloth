@@ -26,12 +26,14 @@ internal sealed partial class MachinesApi
         return new Result<IAsyncEnumerable<Wire.SandboxCall>>(RelayAsync(machine.Id, results, ct));
     }
 
-    // The connection lasts until the caller stops reading calls or the machine stops sending results.
+    // The connection lasts until the caller stops reading calls, the machine stops sending results, or
+    // it stops answering.
     private async IAsyncEnumerable<Wire.SandboxCall> RelayAsync(MachineId machineId, IAsyncEnumerable<Wire.SandboxCallResult> results, [EnumeratorCancellation] CancellationToken ct)
     {
         RemoteSandboxProvider connection = connections.Connect(machineId);
         using CancellationTokenSource ending = CancellationTokenSource.CreateLinkedTokenSource(ct);
         Task receiving = ReceiveAsync(machineId, connection, results, ending.Token);
+        Task keepingAlive = KeepAliveAsync(machineId, connection, ending.Token);
         try
         {
             await foreach (Wire.SandboxCall call in connection.Calls.ReadAllAsync(ct))
@@ -44,6 +46,18 @@ internal sealed partial class MachinesApi
             connections.Disconnect(machineId, connection);
             await ending.CancelAsync();
             await receiving;
+            await keepingAlive;
+        }
+    }
+
+    // A machine that went to sleep or off the network says nothing, so it is asked whether it is there
+    // and goes offline within half a minute of falling silent.
+    private async Task KeepAliveAsync(MachineId machineId, RemoteSandboxProvider connection, CancellationToken ct)
+    {
+        bool silent = await connection.KeepAliveAsync(PingEvery, PingWithin, time, ct);
+        if (silent)
+        {
+            Log.MachineSilent(logger, machineId.Value);
         }
     }
 

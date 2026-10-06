@@ -21,7 +21,8 @@ namespace Bagatka.AiSloth.Nooks.Jobs;
 // (src/ControlPlane/Modules/Nooks/README.md, "Sleep"). A nook stays awake for the sleep period after
 // people reach it, as long as something keeps it awake, such as Chats while its agent works
 // (NookActivity), and while its setup runs. Going to sleep and waking hold the nook's file lock, so neither meets the other or a file
-// operation halfway.
+// operation halfway. Each nook goes to sleep or is evicted on its own (NookWork), so a slow or hung
+// provider holds up only the nooks it serves.
 internal sealed class NookSleeper(
     IDbContextFactory<NooksDbContext> databases,
     IServiceScopeFactory scopes,
@@ -36,7 +37,12 @@ internal sealed class NookSleeper(
     ILogger<NookSleeper> logger) : BackgroundService
 {
     private const int BatchSize = 20;
+    private const int Capacity = 32;
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
+
+    // Long enough to keep a checkpoint of many changed files before going to sleep; work that takes
+    // longer is hung.
+    private static readonly TimeSpan Deadline = TimeSpan.FromMinutes(30);
 
     // Only the active instance runs it (PATTERNS.md, entry 23).
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -46,12 +52,20 @@ internal sealed class NookSleeper(
 
     private async Task WorkAsync(CancellationToken stoppingToken)
     {
-        using PeriodicTimer timer = new PeriodicTimer(Interval, time);
-        do
+        NookWork work = new NookWork(Capacity, Deadline, time, logger);
+        try
         {
-            await PassAsync(stoppingToken);
+            using PeriodicTimer timer = new PeriodicTimer(Interval, time);
+            do
+            {
+                await PassAsync(work, stoppingToken);
+            }
+            while (await timer.WaitForNextTickAsync(stoppingToken));
         }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
+        finally
+        {
+            await work.StoppedAsync();
+        }
     }
 
     // Gives a sleeping nook compute again, for the actor: a Paused or Stopped one resumes, and its
@@ -94,27 +108,29 @@ internal sealed class NookSleeper(
         return true;
     }
 
-    // One failure never stops the job: a failed nook or pass is logged and retried on the next pass.
-    private async Task PassAsync(CancellationToken ct)
+    // Starts work on the nooks due, except those with work running. One failure never stops the job: a
+    // failed nook or pass is logged and retried on the next pass.
+    private async Task PassAsync(NookWork work, CancellationToken ct)
     {
         try
         {
-            List<NookId> idle = await IdleAsync(ct);
+            List<NookId> idle = await IdleAsync(work.Busy(), ct);
             foreach (NookId nookId in idle)
             {
-                await SleepAsync(nookId, ct);
+                work.TryStart(nookId, nookCt => SleepAsync(nookId, nookCt), ct);
             }
 
+            List<NookId> busy = work.Busy();
             List<NookId> longAsleep;
             await using (NooksDbContext db = await databases.CreateDbContextAsync(ct))
             {
                 DateTimeOffset since = time.GetUtcNow() - settings.EvictAfter;
-                longAsleep = await db.Nooks.Where(nook => nook.SleptAt < since).OrderBy(nook => nook.Id).Select(nook => nook.Id).Take(BatchSize).ToListAsync(ct);
+                longAsleep = await db.Nooks.Where(nook => nook.SleptAt < since && !busy.Contains(nook.Id)).OrderBy(nook => nook.Id).Select(nook => nook.Id).Take(BatchSize).ToListAsync(ct);
             }
 
             foreach (NookId nookId in longAsleep)
             {
-                await EvictAsync(nookId, ct);
+                work.TryStart(nookId, nookCt => EvictAsync(nookId, nookCt), ct);
             }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -124,12 +140,12 @@ internal sealed class NookSleeper(
     }
 
     // Running nooks with their daemon here that nobody used for the sleep period and whose setup
-    // isn't running, and nooks a failed pass left going to sleep.
-    private async Task<List<NookId>> IdleAsync(CancellationToken ct)
+    // isn't running, and nooks a failed pass left going to sleep; none with work running.
+    private async Task<List<NookId>> IdleAsync(List<NookId> busy, CancellationToken ct)
     {
         await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
         List<Candidate> candidates = await db.Nooks
-            .Where(nook => nook.Status == NookStatus.Running || nook.Status == NookStatus.Sleeping)
+            .Where(nook => (nook.Status == NookStatus.Running || nook.Status == NookStatus.Sleeping) && !busy.Contains(nook.Id))
             .OrderBy(nook => nook.Id)
             .Select(nook => new Candidate(nook.Id, nook.Status, nook.SetupProcessId))
             .ToListAsync(ct);

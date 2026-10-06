@@ -85,6 +85,8 @@ public static class SandboxCalls
             case Wire.SandboxCall.CallOneofCase.DeleteSnapshot:
                 await provider.DeleteSnapshotAsync(SnapshotKey.From(SandboxWire.Key(call.DeleteSnapshot)), ct);
                 return new Wire.SandboxCallResult { Done = new Wire.Done() };
+            case Wire.SandboxCall.CallOneofCase.Ping:
+                return new Wire.SandboxCallResult { Done = new Wire.Done() };
             case Wire.SandboxCall.CallOneofCase.None:
                 // A call from a newer caller than this provider knows.
                 return new Wire.SandboxCallResult { Failure = new Wire.Failure { Message = "This provider doesn't know the call." } };
