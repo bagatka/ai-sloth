@@ -6,28 +6,58 @@ run-name: >-
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+# A newer push to the same branch replaces the older run: its commit includes the older one.
+concurrency:
+  group: dotnet-solution-validate-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate-dotnet-solution:
     name: .NET solution / Build, audit, style & test
     runs-on: ubuntu-latest
-    # The end-to-end tests pull PostgreSQL and build the nook image (SDK image and an AOT compile).
+    # The journeys pull PostgreSQL and build the nook image (SDK image and an AOT compile).
     timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Docker 29 with the containerd image store, as on dev machines. On the runner's Docker 28, with
+      # its classic storage, a nook started from a ready copy lacked what the copy's setup installed.
+      - name: Install Docker 29
+        run: |
+          sudo install --mode 0755 --directory /etc/apt/keyrings
+          curl --fail --silent --show-error --location https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --output /etc/apt/keyrings/docker.gpg
+          gpg --show-keys --with-colons /etc/apt/keyrings/docker.gpg | grep --quiet '^fpr:::::::::9DC858229FC7DD38854AE2D88D81803C0EBFCD88:'
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" | sudo tee /etc/apt/sources.list.d/docker.list
+          sudo mkdir --parents /etc/docker
+          { sudo cat /etc/docker/daemon.json 2>/dev/null || echo '{}'; } | jq '.features["containerd-snapshotter"] = true' | sudo tee "$RUNNER_TEMP/daemon.json"
+          sudo mv "$RUNNER_TEMP/daemon.json" /etc/docker/daemon.json
+          sudo apt-get update
+          sudo apt-get install --yes --allow-downgrades docker-ce=5:29.8.2-1~ubuntu.24.04~noble docker-ce-cli=5:29.8.2-1~ubuntu.24.04~noble
+          sudo systemctl restart docker
+          docker info --format '{{.ServerVersion}} {{json .DriverStatus}}' | tee /dev/stderr | grep --quiet io.containerd.snapshotter
+
       # The Docker provider runs nooks under Sysbox, so their own Docker works without privileges.
+      # Its services start in the background, and nooks fail until its socket, readable by root
+      # only, is up.
       - name: Install Sysbox
         run: |
           curl --fail --silent --show-error --location --output "$RUNNER_TEMP/sysbox.deb" \
             https://github.com/nestybox/sysbox/releases/download/v0.7.1/sysbox-ce_0.7.1.linux_amd64.deb
           echo "9d6d5484f980d0a17f86c492c1262015c2afb66280bdb97215b79fde6a0261c5  $RUNNER_TEMP/sysbox.deb" | sha256sum --check
-          sudo apt-get update
           sudo apt-get install --yes "$RUNNER_TEMP/sysbox.deb"
+          for attempt in $(seq 1 30); do
+            if sudo test -S /run/sysbox/sysfs.sock; then
+              break
+            fi
+            sleep 1
+          done
+          sudo test -S /run/sysbox/sysfs.sock
 
       - name: Install .NET SDK from global.json
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -43,10 +73,22 @@ jobs:
       - name: Verify C# formatting and code style
         run: dotnet format AiSloth.slnx --verify-no-changes --no-restore
 
-      - name: Run tests
-        run: dotnet test --solution AiSloth.slnx --configuration Release --no-build
+      - name: Run the tests other than the journeys
+        run: |
+          for project in tests/*/*.csproj; do
+            if [ "$project" != tests/Bagatka.AiSloth.EndToEndTests/Bagatka.AiSloth.EndToEndTests.csproj ]; then
+              dotnet test --project "$project" --configuration Release --no-build
+            fi
+          done
 
-      # The end-to-end tests write each app's own output to files instead of the test output.
+      # The journeys run the real app with real nooks, so they run on main, which deploys only once
+      # they pass, and on any branch when this workflow is run by hand; day to day, run the journey
+      # closest to a change locally (PATTERNS.md, entry 26).
+      - name: Run the journeys
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        run: dotnet test --project tests/Bagatka.AiSloth.EndToEndTests --configuration Release --no-build
+
+      # The journeys write each app's own output to files instead of the test output.
       - name: Keep the apps' logs of a failed run
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -1,16 +1,17 @@
 name: Control plane / Deploy
 run-name: Control plane / Deploy / production
 
-# Deploys main to Azure with `dotnet aspire deploy` (README.md, "Deploying"), with the nook images
-# main published for the same commit. The production environment holds the deployment's secrets
-# and settings, and only main deploys to it; GitHub's OIDC token signs in to Azure, so no Azure
-# secret is stored.
+# Deploys main to Azure with `dotnet aspire deploy` (README.md, "Deploying") once main's journeys
+# pass, with the nook images main published for the same commit. The production environment holds
+# the deployment's secrets and settings, and only main deploys to it; GitHub's OIDC token signs in
+# to Azure, so no Azure secret is stored.
 on:
   workflow_dispatch:
 
 permissions:
   contents: read
   id-token: write
+  actions: read
 
 concurrency:
   group: control-plane-deploy-production
@@ -48,6 +49,25 @@ jobs:
               sleep 30
             done
           done
+
+      # Branches' validations skip the journeys, so only main's counts.
+      - name: Wait for this commit's validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in $(seq 1 60); do
+            conclusion=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow dotnet-solution-validate.yml --branch main --commit "$GITHUB_SHA" --json status,conclusion --jq 'map(select(.status == "completed")) | .[0].conclusion // ""')
+            if [ "$conclusion" = success ]; then
+              exit 0
+            fi
+            if [ -n "$conclusion" ]; then
+              echo "::error::.NET solution / Validate ended with '$conclusion' for $GITHUB_SHA; deploy a commit whose validation passed."
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "::error::.NET solution / Validate didn't finish for $GITHUB_SHA within 30 minutes."
+          exit 1
 
       - name: Install .NET SDK from global.json
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0

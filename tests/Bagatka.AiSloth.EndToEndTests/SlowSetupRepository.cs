@@ -4,10 +4,8 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Sources.Contracts;
-using Bagatka.AiSloth.Workspaces.Contracts;
 
 namespace Bagatka.AiSloth.EndToEndTests;
 
@@ -20,66 +18,51 @@ internal sealed class SlowSetupRepository
     // Longer than a setup must take to leave a ready copy.
     public const int SetupSeconds = 16;
 
-    private readonly ControlPlane _controlPlane;
-    private readonly HttpClient _person;
-
-    private SlowSetupRepository(ControlPlane controlPlane, HttpClient person, string owner, WorkspaceId workspace, RepositoryId repository, AgentAccountId account)
+    private SlowSetupRepository(TestWorkspace workspace, string owner, RepositoryId repository)
     {
-        _controlPlane = controlPlane;
-        _person = person;
-        Owner = owner;
         Workspace = workspace;
+        Owner = owner;
         Repository = repository;
-        Account = account;
     }
+
+    public TestWorkspace Workspace { get; }
 
     public string Owner { get; }
 
-    public WorkspaceId Workspace { get; }
-
     public RepositoryId Repository { get; }
 
-    public AgentAccountId Account { get; }
-
-    /// <summary>The person connects GitHub, and their new workspace adds the repository and an account with the fake model's key.</summary>
-    public static async Task<SlowSetupRepository> CreateAsync(ControlPlane controlPlane, HttpClient person)
+    /// <summary>The person connects GitHub, and their new workspace adds the repository.</summary>
+    public static async Task<SlowSetupRepository> CreateAsync(ControlPlane app, HttpClient person)
     {
         string suffix = Guid.CreateVersion7().ToString("N", CultureInfo.InvariantCulture)[^8..];
         string login = "dev-" + suffix;
         string owner = "acme-" + suffix;
-        await controlPlane.GitHub.CreateRepositoryAsync(owner, "api", login);
+        await app.GitHub.CreateRepositoryAsync(owner, "api", login);
         Dictionary<string, string> files = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             [".gitignore"] = "deps/\n",
             [".agents/setup"] = string.Create(CultureInfo.InvariantCulture, $"#!/bin/sh\nset -e\nif [ ! -f deps/installed ]; then sleep {SetupSeconds}; mkdir -p deps; touch deps/installed; fi\n"),
         };
-        await controlPlane.GitHub.CommitFilesAsync(owner, "api", "main", files, "Add a setup");
+        await app.GitHub.CommitFilesAsync(owner, "api", "main", files, "Add a setup");
 
         GitHubConnectionStarted started = await Api.ReadAsync<GitHubConnectionStarted>(person.SendPostAsync("/github/connections", new { }), HttpStatusCode.OK);
-        controlPlane.GitHub.Approve(started.UserCode, login);
+        app.GitHub.Approve(started.UserCode, login);
         await Api.ReadAsync<GitHubConnectionProgress>(person.SendPostAsync(string.Create(CultureInfo.InvariantCulture, $"/github/connections/{started.Id.Value}/complete"), new { }), HttpStatusCode.OK);
-        WorkspaceSummary workspace = await Api.ReadAsync<WorkspaceSummary>(person.SendPostAsync("/workspaces", new { name = "Acme" }), HttpStatusCode.Created);
-        string path = string.Create(CultureInfo.InvariantCulture, $"/workspaces/{workspace.Id.Value}");
-        RepositorySummary repository = await Api.ReadAsync<RepositorySummary>(person.SendPostAsync(path + "/repositories", new { fullName = owner + "/api" }), HttpStatusCode.Created);
-        AgentAccountSummary account = await Api.ReadAsync<AgentAccountSummary>(
-            person.SendPostAsync(path + "/agent-accounts", new { kind = "AnthropicApiKey", name = "Fake", secret = FakeModel.ApiKey, endpoint = controlPlane.Model.Url }), HttpStatusCode.Created);
-        return new SlowSetupRepository(controlPlane, person, owner, workspace.Id, repository.Id, account.Id);
+        TestWorkspace workspace = await TestWorkspace.CreateAsync(app, person);
+        RepositorySummary repository = await Api.ReadAsync<RepositorySummary>(person.SendPostAsync(workspace.Path + "/repositories", new { fullName = owner + "/api" }), HttpStatusCode.Created);
+        return new SlowSetupRepository(workspace, owner, repository.Id);
     }
 
     /// <summary>A chat whose nook starts with the repository, on the provider.</summary>
     public async Task<ChatSummary> StartChatAsync(string provider)
     {
-        return await Api.ReadAsync<ChatSummary>(
-            _person.SendPostAsync(
-                string.Create(CultureInfo.InvariantCulture, $"/workspaces/{Workspace.Value}/chats"),
-                new { provider, harness = "claude-code", account = Account, repositories = new[] { new { repository = Repository } } }),
-            HttpStatusCode.Created);
+        return await Workspace.StartChatAsync(repository: Repository, provider: provider);
     }
 
     /// <summary>A commit on main after the chats that came before.</summary>
     public async Task MoveOnAsync()
     {
         Dictionary<string, string> files = new Dictionary<string, string>(StringComparer.Ordinal) { ["LATEST.md"] = "latest\n" };
-        await _controlPlane.GitHub.CommitFilesAsync(Owner, "api", "main", files, "Move on");
+        await Workspace.App.GitHub.CommitFilesAsync(Owner, "api", "main", files, "Move on");
     }
 }

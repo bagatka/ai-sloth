@@ -410,6 +410,9 @@ internal sealed class ChatRunner(
             return;
         }
 
+        // Not handled: an account removed while its agent runs. The model gateway refuses the agent's
+        // calls, and its harness retries them for minutes before the turn fails with its own words;
+        // checking the account at every turn would end that turn at once with the reason.
         await using AsyncServiceScope scope = scopes.CreateAsyncScope();
         Result<AgentAccountCredential> used = await scope.ServiceProvider.GetRequiredService<IAgentAccountsApi>()
             .UseAsync(SystemActors.Harness, chat.AgentAccountId, chat.WorkspaceId, ct);

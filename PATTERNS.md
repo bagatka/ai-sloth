@@ -1046,31 +1046,38 @@ UserId;System.Guid
 
 Test what people and agents rely on, through the surface they use: the public API.
 
-- **End to end first** (`tests/Bagatka.AiSloth.EndToEndTests`). Aspire's test builder starts the
+- **Journeys** (`tests/Bagatka.AiSloth.EndToEndTests/Journeys`). Aspire's test builder starts the
   real app: PostgreSQL, the WebApi, and the Docker sandbox provider creating real nooks that run a
-  real daemon. Tests call the public API as a client would, so what is tested is what agents can do.
-  A fake OpenID Connect provider in the test process (`FakeIssuer`) signs people in through the
-  host's real sign-in, the host's first person takes its setup code, and the AppHost's
-  `sandbox-scope` parameter keeps each run's nooks apart. `sloth` runs in the test process the same
-  way, against the same host (`SlothCli`).
-- **Waiting has a deadline.** A test that waits for background work polls with a bounded patience,
-  so a broken test fails instead of hanging.
-- **Every feature** gets an end-to-end test of its normal path, its consequential failure, and its
-  authorization.
-- **Isolation without resets.** Each test creates its own workspace and works only inside it, so
-  tests run in parallel against one running app, with no database cleanup.
+  real daemon. A journey is one test: a real flow of someone using AiSloth through the public API and
+  `sloth`, as named steps that check what matters along the way, so what is tested is what people
+  and agents can do. Parts that wait on clocks run at the same time. A fake OpenID Connect provider
+  in the test process (`FakeIssuer`) signs people in through the host's real sign-in, the host's
+  first person takes its setup code, and the AppHost's `sandbox-scope` parameter keeps each run's
+  nooks apart. `sloth` runs in the test process the same way, against the same host (`SlothCli`).
+  Canonical example: `ChatJourney`.
+- **When journeys run.** On main, which deploys only once they pass. Day to day, build and run the
+  journey closest to the change:
+  `dotnet test --project tests/Bagatka.AiSloth.EndToEndTests --filter-class "*.ChatJourney"`.
+- **Waiting has a deadline.** A journey that waits for background work polls with a bounded
+  patience, so a broken one fails instead of hanging.
+- **Every feature** extends the journey it belongs to, or starts one for a new flow: its normal
+  path, its consequential failure, and who may use it. Rules of single inputs, page cursors, and
+  ordering details don't get steps; the code keeps them.
+- **Isolation without resets.** Each journey's people work in workspaces of their own, so journeys
+  run in parallel against one running app, with no database cleanup.
 - **Fakes only for paid or external services,** at the HTTP boundary: the test host gives the
   client settings that point at a local fake. Everything we run ourselves, such as PostgreSQL, the
   daemon, and Docker, is real.
-- **Smoke tests.** The same tests run against a deployed environment or real cloud providers, after
-  every deploy and on demand before a release.
+- **Smoke tests.** The same journeys run against a deployed environment or real cloud providers,
+  after every deploy and on demand before a release.
 - **Lower-level tests only where they pay:**
-  - the conformance suite every sandbox provider passes (`Bagatka.Sandboxing.ConformanceTests`);
+  - the conformance suite every sandbox provider passes (`Bagatka.Sandboxing.ConformanceTests`),
+    run with a change to a provider;
   - the architecture tests (`tests/Bagatka.AiSloth.ArchitectureTests`), which enforce
     `ARCHITECTURE.md`;
   - dense logic with many edge cases, such as git push policy or protocol parsing.
 
-  Don't unit-test what end-to-end tests already cover.
+  Don't unit-test what journeys already cover.
 - **Time.** Time-dependent behavior, such as idle suspension and timeouts, takes its durations from
   settings, which tests make short. Lower-level tests use `FakeTimeProvider`.
 - **One framework.** xUnit v3 on Microsoft Testing Platform, with xUnit's own assertions. Run

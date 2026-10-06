@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Cli;
+using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.Foundation;
 using Xunit;
 
 namespace Bagatka.AiSloth.EndToEndTests;
@@ -51,6 +55,14 @@ internal sealed class SlothCli(string loginHint) : IAsyncDisposable
     {
         HostsFile? hosts = await PrivateFile.ReadAsync(Path.Combine(_folder.FullName, "hosts.json"), CliJsonContext.Default.HostsFile, TestContext.Current.CancellationToken);
         return hosts?.Find(host)?.Token;
+    }
+
+    /// <summary>The chat sloth started last, as its person sees it through the API in their own workspace.</summary>
+    public static async Task<ChatSummary> NewestChatAsync(HttpClient person)
+    {
+        Page<WorkspaceSummary> workspaces = await Api.ReadAsync<Page<WorkspaceSummary>>(person.SendGetAsync("/workspaces"), HttpStatusCode.OK);
+        Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(person.SendGetAsync(Paths.Workspace(workspaces.Items[0].Id) + "/chats"), HttpStatusCode.OK);
+        return chats.Items[0];
     }
 
     public async ValueTask DisposeAsync()

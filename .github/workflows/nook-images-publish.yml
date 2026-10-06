@@ -14,9 +14,10 @@ permissions:
   id-token: write
   attestations: write
 
+# A newer push to main replaces the build of the commit it follows, which nobody deploys.
 concurrency:
   group: nook-images-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   publish:

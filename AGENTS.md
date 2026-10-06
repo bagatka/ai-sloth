@@ -291,6 +291,8 @@ conflict.
 - **Commands:**
   - Build: `dotnet build AiSloth.slnx`
   - Test: `dotnet test --solution AiSloth.slnx`
+  - Day to day, the journey closest to a change (`PATTERNS.md`, entry 26):
+    `dotnet test --project tests/Bagatka.AiSloth.EndToEndTests --filter-class "*.ChatJourney"`
   - Format check: `dotnet format AiSloth.slnx --verify-no-changes`
   - Aspire CLI (pinned in `dotnet-tools.json`): `dotnet tool restore` once, then
     `dotnet aspire run` to run locally and `dotnet aspire update` to upgrade Aspire
