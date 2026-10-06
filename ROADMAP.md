@@ -15,7 +15,8 @@ machines, and local Docker for development, tests, and single-machine self-hosti
 2. **Hosting.** The control plane deployed anywhere, object storage in Azure Blob Storage, people's
    own machines connecting from anywhere (Linux, Windows through WSL, Macs through a Linux VM),
    published nook images and CLI binaries, self-hosting packaged for a VPS or a company network,
-   and a push-notification relay any host can use. Anyone who clones runs `./dev`, adds their
+   nook images from a company's private registry, such as Azure Container Registry through a managed
+   identity kept out of its sandboxes, and a push-notification relay any host can use. Anyone who clones runs `./dev`, adds their
    secrets, and runs, tests, or deploys with one command; merging to main deploys the official host
    and its landing page.
 3. **Apps.** The web app, served by every host, and native iOS and Android apps that connect to any
