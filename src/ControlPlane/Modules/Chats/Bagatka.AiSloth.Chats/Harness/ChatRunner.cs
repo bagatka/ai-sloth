@@ -261,7 +261,7 @@ internal sealed class ChatRunner(
         else if (chat.SessionId is not null && chat.SetupTestAfter is null)
         {
             await CatchUpStateAsync(chat, queued, ct);
-            Deliver(db, chat, chat.SessionId, queued, outgoing);
+            await DeliverAsync(db, chat, chat.SessionId, queued, outgoing, ct);
         }
 
         await SaveAsync(db, ct);
@@ -374,12 +374,18 @@ internal sealed class ChatRunner(
 
     // With no turn running, the oldest queued message starts one; the rest join the running turn when
     // the agent supports steering, and otherwise wait for the next.
-    private void Deliver(ChatsDbContext db, Chat chat, string sessionId, List<Message> queued, List<string> outgoing)
+    private async Task DeliverAsync(ChatsDbContext db, Chat chat, string sessionId, List<Message> queued, List<string> outgoing, CancellationToken ct)
     {
         if (chat.TurnMessageId is null && queued.Count > 0)
         {
             Message first = queued[0];
             queued.RemoveAt(0);
+            bool served = await AccountServesAsync(db, chat, first, ct);
+            if (!served)
+            {
+                return;
+            }
+
             db.Events.Add(chat.Record(new ChatEventBody(new TurnStarted(first.Id)), time));
             first.Deliver();
             chat.TurnStarted(first.Id, testsSetup: first.SetupTest is not null);
@@ -397,6 +403,26 @@ internal sealed class ChatRunner(
         }
     }
 
+    // A running agent starts a turn only while its account serves it, as an agent starting does: once
+    // the account is removed or its sign-in ended, the model gateway refuses the agent's calls, which
+    // its harness retries for minutes. The message's turn fails at once with the reason instead, and
+    // the agent stops. Not handled: that happening mid-turn; the turn fails once the harness gives up,
+    // or when someone stops it.
+    private async Task<bool> AccountServesAsync(ChatsDbContext db, Chat chat, Message first, CancellationToken ct)
+    {
+        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
+        Result<AgentAccountCredential> used = await scope.ServiceProvider.GetRequiredService<IAgentAccountsApi>()
+            .UseAsync(SystemActors.Harness, chat.AgentAccountId, chat.WorkspaceId, ct);
+        if (!used.Failed)
+        {
+            return true;
+        }
+
+        Fail(db, chat, first, "The agent couldn't start: " + used.Error.Message);
+        await StopHarnessAsync(chat, ct);
+        return false;
+    }
+
     // Starts an agent with the chat, for the turn a lost one was working on, or for the first queued
     // message, once the nook's setup ended.
     private async Task StartHarnessAsync(ChatsDbContext db, Chat chat, Message? first, List<string> outgoing, CancellationToken ct)
@@ -410,9 +436,6 @@ internal sealed class ChatRunner(
             return;
         }
 
-        // Not handled: an account removed while its agent runs. The model gateway refuses the agent's
-        // calls, and its harness retries them for minutes before the turn fails with its own words;
-        // checking the account at every turn would end that turn at once with the reason.
         await using AsyncServiceScope scope = scopes.CreateAsyncScope();
         Result<AgentAccountCredential> used = await scope.ServiceProvider.GetRequiredService<IAgentAccountsApi>()
             .UseAsync(SystemActors.Harness, chat.AgentAccountId, chat.WorkspaceId, ct);

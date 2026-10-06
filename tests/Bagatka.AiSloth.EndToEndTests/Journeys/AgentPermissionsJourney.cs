@@ -40,7 +40,7 @@ public sealed class AgentPermissionsJourney(ControlPlane app) : IDisposable
         await SomeoneElsesMessageIsAProposalTheOwnerSendsOnAsync(acme, chat, watch);
         await AChatNeedsAHarnessThatTakesItsAccountAsync(acme);
         await ARefusedTokenEndsTheTurnWithTheReasonAsync(acme);
-        await ARemovedAccountRunsNoMoreAgentsAsync(acme);
+        await ARemovedAccountRunsNoMoreAgentsAsync(acme, chat, watch, own);
         await TheModelGatewayAnswersOnlyChatsAsync();
     }
 
@@ -116,21 +116,20 @@ public sealed class AgentPermissionsJourney(ControlPlane app) : IDisposable
         Assert.StartsWith("The agent couldn't start", ended.GetProperty("failure").GetString(), StringComparison.Ordinal);
     }
 
-    // Removed before the chat's agent starts, which waits for its nook; for an agent already running,
-    // see the note where ChatRunner uses the account.
-    private async Task ARemovedAccountRunsNoMoreAgentsAsync(TestWorkspace acme)
+    // The chat's agent runs when its account goes: its next turn fails at once, and so does every one
+    // after, whose agent can't start.
+    private async Task ARemovedAccountRunsNoMoreAgentsAsync(TestWorkspace acme, ChatSummary chat, ChatWatch watch, AgentAccountSummary own)
     {
-        AgentAccountSummary spare = await Api.ReadAsync<AgentAccountSummary>(
-            _alice.SendPostAsync("/agent-accounts", new { kind = "AnthropicApiKey", name = "Spare", secret = FakeModel.ApiKey, endpoint = app.Model.Url }), HttpStatusCode.Created);
-        ChatSummary chat = await acme.StartChatAsync(account: spare.Id);
-        await using ChatWatch watch = await ChatWatch.OpenAsync(_alice, chat);
-        await Api.ExpectAsync(_alice.DeleteAsync(new Uri(Paths.Account(spare.Id), UriKind.Relative), Ct), HttpStatusCode.NoContent);
+        await Api.ExpectAsync(_alice.DeleteAsync(new Uri(Paths.Account(own.Id), UriKind.Relative), Ct), HttpStatusCode.NoContent);
 
         await acme.SendAsync(chat, "hello");
-        JsonElement ended = await watch.NextAsync("turn-ended");
+        JsonElement next = await watch.NextAsync("turn-ended");
+        await acme.SendAsync(chat, "hello again");
+        JsonElement after = await watch.NextAsync("turn-ended");
 
-        Assert.Equal("failed", ended.GetProperty("stopReason").GetString());
-        Assert.Equal("The agent couldn't start: Agent account not found.", ended.GetProperty("failure").GetString());
+        Assert.All([next, after], ended => Assert.Equal(
+            ("failed", "The agent couldn't start: Agent account not found."),
+            (ended.GetProperty("stopReason").GetString(), ended.GetProperty("failure").GetString())));
     }
 
     private async Task TheModelGatewayAnswersOnlyChatsAsync()
