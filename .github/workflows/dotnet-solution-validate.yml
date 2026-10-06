@@ -41,17 +41,18 @@ jobs:
           sudo mv "$RUNNER_TEMP/daemon.json" /etc/docker/daemon.json
           sudo apt-get update
           sudo apt-get install --yes --allow-downgrades -o DPkg::Lock::Timeout=300 docker-ce=5:29.8.2-1~ubuntu.24.04~noble docker-ce-cli=5:29.8.2-1~ubuntu.24.04~noble
-          sudo systemctl restart docker
           docker info --format '{{.ServerVersion}} {{json .DriverStatus}}' | tee /dev/stderr | grep --quiet io.containerd.snapshotter
 
       # The Docker provider runs nooks under Sysbox, so their own Docker works without privileges.
-      # Its services start in the background, and nooks fail until its socket, readable by root
-      # only, is up.
+      # Its installer restarts Docker, which systemd refuses after three starts in a minute, so the
+      # count starts over first. Its services start in the background, and nooks fail until its
+      # socket, readable by root only, is up.
       - name: Install Sysbox
         run: |
           curl --fail --silent --show-error --location --output "$RUNNER_TEMP/sysbox.deb" \
             https://github.com/nestybox/sysbox/releases/download/v0.7.1/sysbox-ce_0.7.1.linux_amd64.deb
           echo "9d6d5484f980d0a17f86c492c1262015c2afb66280bdb97215b79fde6a0261c5  $RUNNER_TEMP/sysbox.deb" | sha256sum --check
+          sudo systemctl reset-failed docker.service
           sudo apt-get install --yes -o DPkg::Lock::Timeout=300 "$RUNNER_TEMP/sysbox.deb"
           for attempt in $(seq 1 30); do
             if sudo test -S /run/sysbox/sysfs.sock; then
