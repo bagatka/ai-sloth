@@ -60,9 +60,9 @@ flight, as an unreachable backend would.
 
 ## An Azure sandbox group
 
-Made once with the Azure CLI. The provider's identity (a managed identity when hosted, `az login` in
-development) needs the data plane role on it. Never give the group an identity: code in its sandboxes
-could use it.
+`dotnet aspire deploy` makes a deployment's own. For development and tests, make one once with the
+Azure CLI. The provider's identity (a managed identity when hosted, `az login` in development) needs
+the data plane role on it. Never give the group an identity: code in its sandboxes could use it.
 
 ```sh
 az group create --name <resource-group> --location eastus2

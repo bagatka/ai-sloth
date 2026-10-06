@@ -35,6 +35,9 @@
 
               # Native AOT publishing (slothd) compiles and links with clang.
               pkgs.clang
+
+              # `dotnet aspire deploy` signs in to Azure and compiles Bicep with the Azure CLI.
+              pkgs.azure-cli
             ];
 
             # Native AOT links against zlib.

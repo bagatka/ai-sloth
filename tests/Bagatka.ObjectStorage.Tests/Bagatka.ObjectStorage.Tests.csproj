@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Storage\Bagatka.ObjectStorage\Bagatka.ObjectStorage.csproj" />
+    <ProjectReference Include="..\..\src\Storage\Bagatka.ObjectStorage.AzureBlob\Bagatka.ObjectStorage.AzureBlob.csproj" />
+  </ItemGroup>
+
+</Project>

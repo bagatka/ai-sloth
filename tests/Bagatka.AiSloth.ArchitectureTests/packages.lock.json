@@ -25,6 +25,20 @@
           "xunit.v3.core.mtp-v2": "[4.0.1]"
         }
       },
+      "Apache.Arrow": {
+        "type": "Transitive",
+        "resolved": "22.1.0",
+        "contentHash": "mTdHWGsNCWpKyQxqyNcSS+q4BtBTSOUfhdG+Lwo6eAOznCLSwrZQ5VKtDG2G8VrUp1ul4DwWHefoBS1umjO/VQ=="
+      },
+      "Azure.Storage.Common": {
+        "type": "Transitive",
+        "resolved": "12.29.0",
+        "contentHash": "0VqPcAinzXFJDAELqC+VPFUL6AaU1mmIpDAHarr7DVw3zcJrlo4k3Xc3TCTVBkDgY6YUOjJ00Fd9ZB9En5H2Jg==",
+        "dependencies": {
+          "Azure.Core": "1.60.0",
+          "System.IO.Hashing": "10.0.9"
+        }
+      },
       "Grpc.Net.Common": {
         "type": "Transitive",
         "resolved": "2.84.0",
@@ -411,6 +425,11 @@
           "Microsoft.IdentityModel.Tokens": "8.23.0"
         }
       },
+      "System.IO.Hashing": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "vixglGnKEexAJDeIRhyayZYzxyrgK1K9GU3K/zRZVwDbaDcMkSqj4WDHoVmQMNfsdUtLALfNSJw6mBIpdxie4A=="
+      },
       "System.Memory.Data": {
         "type": "Transitive",
         "resolved": "10.0.10",
@@ -643,6 +662,7 @@
           "Bagatka.AiSloth.Workspaces": "[1.0.0, )",
           "Bagatka.Foundation.Web": "[1.0.0, )",
           "Bagatka.ObjectStorage": "[1.0.0, )",
+          "Bagatka.ObjectStorage.AzureBlob": "[1.0.0, )",
           "Bagatka.Sandboxing.Azure": "[1.0.0, )",
           "Bagatka.Sandboxing.Docker": "[1.0.0, )",
           "Bagatka.ServiceDefaults": "[1.0.0, )",
@@ -692,6 +712,13 @@
       },
       "bagatka.objectstorage": {
         "type": "Project"
+      },
+      "bagatka.objectstorage.azureblob": {
+        "type": "Project",
+        "dependencies": {
+          "Azure.Storage.Blobs": "[12.30.0, )",
+          "Bagatka.ObjectStorage": "[1.0.0, )"
+        }
       },
       "bagatka.sandboxing": {
         "type": "Project",
@@ -769,6 +796,17 @@
         "contentHash": "GeFv8sGwRKvDKwI2WFy8r0mhmlxEVZg24Sit2NogTjiSO8RVjllWM65OT6e1sKjOvG8V74y7hAbaELUUPjZQSw==",
         "dependencies": {
           "Azure.Core": "1.53.0"
+        }
+      },
+      "Azure.Storage.Blobs": {
+        "type": "CentralTransitive",
+        "requested": "[12.30.0, )",
+        "resolved": "12.30.0",
+        "contentHash": "pf6tqkzNANU5Fvfibse3fVRNWJol4jb9iA/wjHu1EHEpWpFHasHaiVNc11fncvOwnphzm4xaZwXzrg34yAI2hw==",
+        "dependencies": {
+          "Apache.Arrow": "22.1.0",
+          "Azure.Core": "1.60.0",
+          "Azure.Storage.Common": "12.29.0"
         }
       },
       "EFCore.NamingConventions": {

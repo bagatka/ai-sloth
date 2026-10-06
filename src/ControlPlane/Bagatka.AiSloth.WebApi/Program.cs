@@ -18,6 +18,7 @@ using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.Foundation.Web;
 using Bagatka.ObjectStorage;
+using Bagatka.ObjectStorage.AzureBlob;
 using Bagatka.Sandboxing.Azure;
 using Bagatka.Sandboxing.Docker;
 using Bagatka.Sdk.GitHub;
@@ -60,7 +61,9 @@ HostSettings host = builder.Configuration.GetRequired<HostSettings>("Host");
 SignInProviderSettings? signInProvider = builder.Configuration.GetSection("SignIn:Provider").Exists()
     ? builder.Configuration.GetRequired<SignInProviderSettings>("SignIn:Provider")
     : null;
-DockerSandboxSettings docker = builder.Configuration.GetRequired<DockerSandboxSettings>("Sandboxing:Docker");
+DockerSandboxSettings? docker = builder.Configuration.GetSection("Sandboxing:Docker").Exists()
+    ? builder.Configuration.GetRequired<DockerSandboxSettings>("Sandboxing:Docker")
+    : null;
 AzureSandboxSettings? azure = builder.Configuration.GetSection("Sandboxing:Azure").Exists()
     ? builder.Configuration.GetRequired<AzureSandboxSettings>("Sandboxing:Azure")
     : null;
@@ -73,7 +76,20 @@ SecretsSettings secrets = builder.Configuration.GetRequired<SecretsSettings>("Mo
 SourcesSettings sources = builder.Configuration.GetRequired<SourcesSettings>("Modules:Sources");
 GitHubSettings gitHub = builder.Configuration.GetSection("GitHub").Exists() ? builder.Configuration.GetRequired<GitHubSettings>("GitHub") : GitHubSettings.Public;
 ChatsSettings chats = builder.Configuration.GetRequired<ChatsSettings>("Modules:Chats");
-FileSystemObjectStorageSettings objectStorage = builder.Configuration.GetRequired<FileSystemObjectStorageSettings>("ObjectStorage:FileSystem");
+FileSystemObjectStorageSettings? folderStorage = builder.Configuration.GetSection("ObjectStorage:FileSystem").Exists()
+    ? builder.Configuration.GetRequired<FileSystemObjectStorageSettings>("ObjectStorage:FileSystem")
+    : null;
+AzureBlobObjectStorageSettings? blobStorage = builder.Configuration.GetSection("ObjectStorage:AzureBlob").Exists()
+    ? builder.Configuration.GetRequired<AzureBlobObjectStorageSettings>("ObjectStorage:AzureBlob")
+    : null;
+if ((folderStorage is null) == (blobStorage is null))
+{
+    throw new InvalidOperationException("Configure exactly one of the sections 'ObjectStorage:FileSystem' and 'ObjectStorage:AzureBlob'.");
+}
+
+// One Azure sign-in for whatever the host uses in Azure: its managed identity when hosted, or the
+// developer's Azure CLI.
+DefaultAzureCredential azureCredential = new DefaultAzureCredential();
 ModelGatewaySettings modelGateway = builder.Configuration.GetRequired<ModelGatewaySettings>("ModelGateway");
 
 builder.Services.AddSingleton(TimeProvider.System);
@@ -115,18 +131,30 @@ builder.Services.AddAuthorizationBuilder()
 // host's GitHub App, running git on this computer.
 builder.Services.AddGitHubClient(gitHub);
 
-// Checkpoints are kept in a folder of this computer; an S3-compatible bucket comes with hosting.
-builder.Services.AddFileSystemObjectStorage(objectStorage);
+// Checkpoints are kept in a folder of this computer, or in Azure Blob Storage when hosted.
+if (folderStorage is not null)
+{
+    builder.Services.AddFileSystemObjectStorage(folderStorage);
+}
+else
+{
+    builder.Services.AddAzureBlobObjectStorage(blobStorage!, azureCredential);
+}
 
 // Azure Container Apps Sandboxes when configured, signed in as the host's managed identity or the
 // developer's Azure CLI.
 if (azure is not null)
 {
-    builder.Services.AddAzureSandboxProvider(azure, new DefaultAzureCredential());
+    builder.Services.AddAzureSandboxProvider(azure, azureCredential);
+}
+
+// Nooks run on a Docker Engine too when the host has one, such as in development or on one server.
+if (docker is not null)
+{
+    builder.Services.AddDockerSandboxProvider(docker);
 }
 
 builder.Services
-    .AddDockerSandboxProvider(docker)
     .AddUsersModule(users)
     .AddWorkspacesModule(workspaces)
     .AddMachinesModule(machines)
@@ -175,12 +203,13 @@ app.MapSecretsEndpoints();
 app.MapSourcesEndpoints();
 app.MapChatsEndpoints();
 
-// Agents in nooks reach the model gateway on Kestrel's "Models" endpoint (appsettings.json); a call
-// carries its chat's token instead of a user's.
+// Kestrel's endpoints are the AppHost's choice. Agents in nooks reach the model gateway: run locally
+// on the "Models" endpoint, and deployed on the one public endpoint. A call carries its chat's token
+// instead of a user's.
 app.MapModelGateway();
 
-// Daemons and machines dial Kestrel's HTTP/2-only "Daemon" endpoint (appsettings.json) and prove
-// themselves with their own token instead of a user's.
+// Daemons and machines dial an HTTP/2 endpoint: run locally the "Daemon" endpoint, and deployed the
+// one public endpoint. They prove themselves with their own token instead of a user's.
 app.MapGrpcService<DaemonEndpoint>().AllowAnonymous();
 app.MapGrpcService<MachineEndpoint>().AllowAnonymous();
 

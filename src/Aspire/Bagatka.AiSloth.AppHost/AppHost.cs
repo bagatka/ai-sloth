@@ -4,6 +4,11 @@ using System.IO;
 using System.Linq;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Azure;
+using Azure.Provisioning.AppContainers;
+using Azure.Provisioning.Expressions;
+using Azure.Provisioning.Storage;
+using Bagatka.AiSloth.AppHost;
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 string repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", ".."));
@@ -34,29 +39,19 @@ IResourceBuilder<ParameterResource> allowChatGptPlans = builder.AddParameter(
 string? chatGptAuthority = builder.Configuration["Parameters:chatgpt-authority"];
 string? chatGptApi = builder.Configuration["Parameters:chatgpt-api"];
 
-// Encrypts agent accounts' secrets at rest; generated once and kept in this project's user secrets.
-IResourceBuilder<ParameterResource> agentAccountsKey = builder.AddParameter(
-    "agent-accounts-key", new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
+// Encrypt agent accounts' secrets, people's GitHub tokens, and secrets' values at rest. Losing one
+// makes what it encrypted unreadable. Run here, each is generated once and kept in this project's user
+// secrets. Deploying never generates one: a deployment without its keys stops instead of encrypting
+// with new ones (README.md, "Deploying").
+IResourceBuilder<ParameterResource> agentAccountsKey = EncryptionKey("agent-accounts-key");
+IResourceBuilder<ParameterResource> sourcesKey = EncryptionKey("sources-key");
+IResourceBuilder<ParameterResource> secretsKey = EncryptionKey("secrets-key");
 
 // People connect GitHub through the host's GitHub App, which `sloth github create-app` makes: give
 // github-app-client-id, -client-secret, and -slug as user secrets of this project. Tests point
 // github-api and github-web at a fake GitHub.
 string? gitHubAppClientId = builder.Configuration["Parameters:github-app-client-id"];
 string? gitHubApi = builder.Configuration["Parameters:github-api"];
-
-// Encrypts people's GitHub tokens at rest; generated once and kept in this project's user secrets.
-IResourceBuilder<ParameterResource> sourcesKey = builder.AddParameter(
-    "sources-key", new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
-
-// Encrypts secrets' values at rest; generated once and kept in this project's user secrets.
-IResourceBuilder<ParameterResource> secretsKey = builder.AddParameter(
-    "secrets-key", new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
-
-// Where checkpoints are kept: a folder of this computer, unless tests give their own.
-IResourceBuilder<ParameterResource> objectStorage = builder.AddParameter(
-    "object-storage",
-    builder.Configuration["Parameters:object-storage"]
-        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "aisloth", "objects"));
 
 // How full a nook's disk is when a message for its agent needs confirming. Docker nooks share this
 // computer's disk, so tests ask only for a full one.
@@ -74,87 +69,224 @@ IResourceBuilder<ParameterResource> nookEvictAfter = builder.AddParameter(
 IResourceBuilder<ParameterResource> chatDraftLifetime = builder.AddParameter(
     "chat-draft-lifetime", builder.Configuration["Parameters:chat-draft-lifetime"] ?? "00:15:00");
 
-// The Docker scope nooks run in, so test runs never touch a developer's nooks. A parameter given a
-// value can't be overridden, so the default is applied here.
+// The scope nooks run in, so test runs never touch a developer's nooks. A parameter given a value
+// can't be overridden, so the default is applied here.
 IResourceBuilder<ParameterResource> sandboxScope = builder.AddParameter("sandbox-scope", builder.Configuration["Parameters:sandbox-scope"] ?? "dev");
 
-// The Docker Engine nooks run in and their images are built in: DOCKER_HOST's, as for the docker
-// command, or the default one. It needs Sysbox (src/Sandboxing/README.md).
+// The repository nook images are pushed to, which nooks outside this computer pull them from.
+string? imageRepository = builder.Configuration["Parameters:nook-image-repository"];
+
+// The Docker Engine nooks run in and their images are built in when run here: DOCKER_HOST's, as for
+// the docker command, or the default one. It needs Sysbox (src/Sandboxing/README.md).
 string dockerHost = builder.Configuration["DOCKER_HOST"] is { Length: > 0 } host ? host : "unix:///var/run/docker.sock";
 
-// Nooks can also run in an Azure sandbox group, subscription/resource-group/group/region, signed in
-// with `az login`. They need the images in a public repository (nook-image-repository) and public
-// addresses for the daemon and model endpoints (nook-daemon-url, nook-models-url), such as a tunnel's.
-string? azureSandboxGroup = builder.Configuration["Parameters:azure-sandbox-group"];
-string? imageRepository = builder.Configuration["Parameters:nook-image-repository"];
-string? publicDaemonUrl = builder.Configuration["Parameters:nook-daemon-url"];
-string? publicModelsUrl = builder.Configuration["Parameters:nook-models-url"];
-
-IResourceBuilder<PostgresDatabaseResource> database = builder.AddPostgres("postgres")
-    .WithImageTag("18")
-    .AddDatabase("aisloth");
-
-// The images nooks start from: the base, and one per harness on top of it, pushed when there is a
-// repository for them. Docker's cache makes a rebuild without changes take seconds.
-IResourceBuilder<ExecutableResource> nookImage = BuildImage("nook-image", "nook", NookImage, after: null);
-IResourceBuilder<ExecutableResource>[] harnessImages = [.. harnesses.Select(harness => BuildImage("nook-image-" + harness, harness, HarnessImage(harness), nookImage))];
-IResourceBuilder<ExecutableResource>[] imagesReady = imageRepository is null
-    ? [nookImage, .. harnessImages]
-    : [PushImage("nook-image", NookImage, nookImage), .. harnesses.Select((harness, index) => PushImage("nook-image-" + harness, HarnessImage(harness), harnessImages[index]))];
-
-IResourceBuilder<ProjectResource> webApi = builder.AddProject<Projects.Bagatka_AiSloth_WebApi>("webapi")
-    .WithHttpHealthCheck("/health", endpointName: "Http");
-EndpointReference daemonEndpoint = NookFacing("Daemon", builder.Configuration["DaemonPort"]);
-EndpointReference modelsEndpoint = NookFacing("Models", builder.Configuration["ModelsPort"]);
-
-// The WebApi in migration mode: applies every module's migrations, then exits.
-IResourceBuilder<ProjectResource> migrations = builder.AddProject<Projects.Bagatka_AiSloth_WebApi>("migrations", options => options.ExcludeKestrelEndpoints = true)
-    .WithArgs("migrate")
-    .WaitFor(database);
-
-// Nooks reach the daemon and model endpoints at their public addresses, or through the Docker host.
-ReferenceExpression daemonUrl = publicDaemonUrl is not null
-    ? ReferenceExpression.Create($"{publicDaemonUrl}")
-    : ReferenceExpression.Create($"http://host.docker.internal:{daemonEndpoint.Property(EndpointProperty.Port)}");
-ReferenceExpression modelsUrl = publicModelsUrl is not null
-    ? ReferenceExpression.Create($"{publicModelsUrl.TrimEnd('/')}/models")
-    : ReferenceExpression.Create($"http://host.docker.internal:{modelsEndpoint.Property(EndpointProperty.Port)}/models");
-string[]? azureGroup = azureSandboxGroup?.Split('/');
-if (azureGroup is not null && azureGroup.Length != 4)
+// What differs between running here and deployed: what runs the WebApi and where it listens, the
+// database, where checkpoints are kept, where nooks run, and the addresses they reach the WebApi at.
+IResourceBuilder<IResourceWithEnvironment>[] modes;
+ReferenceExpression database;
+ReferenceExpression publicUrl;
+ReferenceExpression daemonUrl;
+ReferenceExpression modelsUrl;
+if (builder.ExecutionContext.IsPublishMode)
 {
-    throw new InvalidOperationException("azure-sandbox-group must be subscription/resource-group/group/region.");
+    // Deployed with `dotnet aspire deploy` (README.md, "Deploying"): the WebApi runs in Azure
+    // Container Apps, nooks in a sandbox group beside it, and checkpoints are kept in Blob Storage, all
+    // in one resource group. Nooks start from images in a public repository.
+    if (imageRepository is null)
+    {
+        throw new InvalidOperationException("Deploying needs nook-image-repository: a public repository with the nook images.");
+    }
+
+    builder.AddAzureContainerAppEnvironment("apps");
+    IResourceBuilder<AzureUserAssignedIdentityResource> identity = builder.AddAzureUserAssignedIdentity("webapi-identity");
+    IResourceBuilder<AzureStorageResource> storage = builder.AddAzureStorage("storage");
+    NookSandboxGroup.MakeWhenDeploying(builder, identity.Resource);
+
+    // Any Postgres by its connection string, or else a Flexible Server in the resource group.
+    database = builder.Configuration["Parameters:postgres-connection-string"] is not null
+        ? ReferenceExpression.Create($"{builder.AddParameter("postgres-connection-string", secret: true)}")
+        : builder.AddAzurePostgresFlexibleServer("postgres").WithPasswordAuthentication().AddDatabase("aisloth").Resource.ConnectionStringExpression;
+
+    // A custom domain, such as app.example.com, comes with the name of its managed certificate.
+    IResourceBuilder<ParameterResource>? customDomain = builder.Configuration["Parameters:custom-domain"] is not null
+        ? builder.AddParameter("custom-domain")
+        : null;
+    IResourceBuilder<ParameterResource>? customDomainCertificate = customDomain is not null
+        ? builder.AddParameter("custom-domain-certificate")
+        : null;
+
+    // One public HTTPS address for the API, daemons, machines, and the model gateway: Container Apps'
+    // ingress ends TLS and speaks HTTP/2 to Kestrel's "Public" endpoint, as gRPC needs. Health probes
+    // speak HTTP/1.1, so they get an endpoint of their own, which ingress doesn't expose. Git is in the
+    // image for Sources, so it's built from a Dockerfile.
+    IResourceBuilder<ContainerResource> webApi = builder.AddDockerfile("webapi", repositoryRoot, "src/ControlPlane/Bagatka.AiSloth.WebApi/Dockerfile")
+        .WithHttpEndpoint(targetPort: 8080, name: "Public")
+        .WithEndpoint("Public", endpoint =>
+        {
+            endpoint.Transport = "http2";
+            endpoint.IsExternal = true;
+        })
+        .WithEnvironment("Kestrel__Endpoints__Public__Url", "http://+:8080")
+        .WithEnvironment("Kestrel__Endpoints__Public__Protocols", "Http2")
+        .WithEnvironment("Kestrel__Endpoints__Health__Url", "http://+:8081")
+        .WithEnvironment("Kestrel__Endpoints__Health__Protocols", "Http1")
+        .WithAzureUserAssignedIdentity(identity)
+        .WithRoleAssignments(storage, StorageBuiltInRole.StorageBlobDataContributor)
+        .WithEnvironment("ObjectStorage__AzureBlob__ContainerUrl", ReferenceExpression.Create($"{storage.Resource.BlobEndpoint}checkpoints"))
+        .WithEnvironment("Sandboxing__Azure__SandboxGroup", NookSandboxGroup.Name)
+        .WithEnvironment("Sandboxing__Azure__Scope", sandboxScope)
+        .PublishAsAzureContainerApp((infrastructure, app) =>
+        {
+            // One replica: background work and daemons' connections aren't shared between replicas yet.
+            app.Template.Scale.MinReplicas = 1;
+            app.Template.Scale.MaxReplicas = 1;
+
+            // The sandbox group is in the deployment's own subscription, resource group, and location.
+            ContainerAppContainer container = app.Template.Containers.Single().Value!;
+            container.Env.Add(new ContainerAppEnvironmentVariable { Name = "Sandboxing__Azure__SubscriptionId", Value = BicepFunction.GetSubscription().SubscriptionId });
+            container.Env.Add(new ContainerAppEnvironmentVariable { Name = "Sandboxing__Azure__ResourceGroup", Value = BicepFunction.GetResourceGroup().Name });
+            container.Env.Add(new ContainerAppEnvironmentVariable { Name = "Sandboxing__Azure__Region", Value = BicepFunction.GetResourceGroup().Location });
+            container.Probes.Add(new ContainerAppProbe
+            {
+                ProbeType = ContainerAppProbeType.Liveness,
+                HttpGet = new ContainerAppHttpRequestInfo { Path = "/alive", Port = 8081 },
+            });
+            container.Probes.Add(new ContainerAppProbe
+            {
+                ProbeType = ContainerAppProbeType.Readiness,
+                HttpGet = new ContainerAppHttpRequestInfo { Path = "/health", Port = 8081 },
+            });
+
+            // Migrations are applied before a replica starts (PATTERNS.md, entry 14).
+            app.Template.InitContainers.Add(new ContainerAppInitContainer
+            {
+                Name = "migrations",
+                Image = container.Image,
+                Args = ["migrate"],
+                Env = container.Env,
+            });
+
+            if (customDomain is not null)
+            {
+                app.ConfigureCustomDomain(customDomain, customDomainCertificate!);
+            }
+        });
+
+    publicUrl = customDomain is not null
+        ? ReferenceExpression.Create($"https://{customDomain}")
+        : ReferenceExpression.Create($"{webApi.GetEndpoint("Public")}");
+    daemonUrl = publicUrl;
+    modelsUrl = ReferenceExpression.Create($"{publicUrl}/models");
+    modes = [webApi];
+}
+else
+{
+    // Run here: Postgres in a container, checkpoints in a folder of this computer unless tests give
+    // their own, and nooks on the Docker Engine, or in an Azure sandbox group too.
+    IResourceBuilder<PostgresDatabaseResource> postgres = builder.AddPostgres("postgres")
+        .WithImageTag("18")
+        .AddDatabase("aisloth");
+    database = postgres.Resource.ConnectionStringExpression;
+    IResourceBuilder<ParameterResource> objectStorage = builder.AddParameter(
+        "object-storage",
+        builder.Configuration["Parameters:object-storage"]
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "aisloth", "objects"));
+
+    // Nooks can also run in an Azure sandbox group, subscription/resource-group/group/region, signed in
+    // with `az login`. They need the images in a public repository (nook-image-repository) and public
+    // addresses for the daemon and model endpoints (nook-daemon-url, nook-models-url), such as a tunnel's.
+    string? azureSandboxGroup = builder.Configuration["Parameters:azure-sandbox-group"];
+    string? publicDaemonUrl = builder.Configuration["Parameters:nook-daemon-url"];
+    string? publicModelsUrl = builder.Configuration["Parameters:nook-models-url"];
+    string[]? azureGroup = azureSandboxGroup?.Split('/');
+    if (azureGroup is not null && azureGroup.Length != 4)
+    {
+        throw new InvalidOperationException("azure-sandbox-group must be subscription/resource-group/group/region.");
+    }
+
+    // The images nooks start from: the base, and one per harness on top of it, pushed when there is a
+    // repository for them. Docker's cache makes a rebuild without changes take seconds.
+    IResourceBuilder<ExecutableResource> nookImage = BuildImage("nook-image", "nook", NookImage, after: null);
+    IResourceBuilder<ExecutableResource>[] harnessImages = [.. harnesses.Select(harness => BuildImage("nook-image-" + harness, harness, HarnessImage(harness), nookImage))];
+    IResourceBuilder<ExecutableResource>[] imagesReady = imageRepository is null
+        ? [nookImage, .. harnessImages]
+        : [PushImage("nook-image", NookImage, nookImage), .. harnesses.Select((harness, index) => PushImage("nook-image-" + harness, HarnessImage(harness), harnessImages[index]))];
+
+    // Kestrel listens on the endpoints set here, and only there: Aspire's own URL variables would be
+    // overridden by them anyway.
+    IResourceBuilder<ProjectResource> webApi = builder.AddProject<Projects.Bagatka_AiSloth_WebApi>("webapi", options => options.ExcludeKestrelEndpoints = true)
+        .WithHttpEndpoint(port: 5170, name: "Http")
+        .WithEndpointsInEnvironment(_ => false)
+        .WithHttpHealthCheck("/health", endpointName: "Http");
+    EndpointReference httpEndpoint = webApi.GetEndpoint("Http");
+    webApi.WithEnvironment("Kestrel__Endpoints__Http__Url", ReferenceExpression.Create($"http://localhost:{httpEndpoint.Property(EndpointProperty.TargetPort)}"));
+    EndpointReference daemonEndpoint = NookFacing(webApi, "Daemon", builder.Configuration["DaemonPort"] ?? "5171");
+    webApi.WithEnvironment("Kestrel__Endpoints__Daemon__Protocols", "Http2");
+    EndpointReference modelsEndpoint = NookFacing(webApi, "Models", builder.Configuration["ModelsPort"] ?? "5172");
+
+    // The WebApi in migration mode: applies every module's migrations, then exits.
+    IResourceBuilder<ProjectResource> migrations = builder.AddProject<Projects.Bagatka_AiSloth_WebApi>("migrations", options => options.ExcludeKestrelEndpoints = true)
+        .WithArgs("migrate")
+        .WaitFor(postgres);
+    webApi.WaitForCompletion(migrations);
+    foreach (IResourceBuilder<ExecutableResource> image in imagesReady)
+    {
+        webApi.WaitForCompletion(image);
+    }
+
+    // Nooks reach the daemon and model endpoints at their public addresses, or through the Docker host.
+    publicUrl = ReferenceExpression.Create($"{httpEndpoint}");
+    daemonUrl = publicDaemonUrl is not null
+        ? ReferenceExpression.Create($"{publicDaemonUrl}")
+        : ReferenceExpression.Create($"http://host.docker.internal:{daemonEndpoint.Property(EndpointProperty.Port)}");
+    modelsUrl = publicModelsUrl is not null
+        ? ReferenceExpression.Create($"{publicModelsUrl.TrimEnd('/')}/models")
+        : ReferenceExpression.Create($"http://host.docker.internal:{modelsEndpoint.Property(EndpointProperty.Port)}/models");
+    modes = [webApi, migrations];
+    foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
+    {
+        mode.WithEnvironment("ObjectStorage__FileSystem__Root", objectStorage)
+            .WithEnvironment("Sandboxing__Docker__Endpoint", dockerHost)
+            .WithEnvironment("Sandboxing__Docker__Scope", sandboxScope);
+        if (azureGroup is not null)
+        {
+            mode.WithEnvironment("Sandboxing__Azure__SubscriptionId", azureGroup[0])
+                .WithEnvironment("Sandboxing__Azure__ResourceGroup", azureGroup[1])
+                .WithEnvironment("Sandboxing__Azure__SandboxGroup", azureGroup[2])
+                .WithEnvironment("Sandboxing__Azure__Region", azureGroup[3])
+                .WithEnvironment("Sandboxing__Azure__Scope", sandboxScope);
+        }
+    }
 }
 
 // Both modes read the same settings (PATTERNS.md, entry 20).
-foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
+foreach (IResourceBuilder<IResourceWithEnvironment> mode in modes)
 {
-    mode.WithEnvironment("Host__PublicUrl", webApi.GetEndpoint("Http"))
-        .WithEnvironment("Modules__Users__ConnectionString", database.Resource.ConnectionStringExpression)
-        .WithEnvironment("Modules__Workspaces__ConnectionString", database.Resource.ConnectionStringExpression)
-        .WithEnvironment("Modules__Machines__ConnectionString", database.Resource.ConnectionStringExpression)
-        .WithEnvironment("Modules__Nooks__ConnectionString", database.Resource.ConnectionStringExpression)
-        .WithEnvironment("Modules__Chats__ConnectionString", database.Resource.ConnectionStringExpression)
+    mode.WithEnvironment("Host__PublicUrl", publicUrl)
+        .WithEnvironment("Modules__Users__ConnectionString", database)
+        .WithEnvironment("Modules__Workspaces__ConnectionString", database)
+        .WithEnvironment("Modules__Machines__ConnectionString", database)
+        .WithEnvironment("Modules__Nooks__ConnectionString", database)
+        .WithEnvironment("Modules__Chats__ConnectionString", database)
         .WithEnvironment("Modules__Chats__ModelGatewayUrl", modelsUrl)
         .WithEnvironment("Modules__Chats__NearlyFullDisk", nearlyFullDisk)
         .WithEnvironment("Modules__Chats__DraftLifetime", chatDraftLifetime)
-        .WithEnvironment("Modules__AgentAccounts__ConnectionString", database.Resource.ConnectionStringExpression)
+        .WithEnvironment("Modules__AgentAccounts__ConnectionString", database)
         .WithEnvironment("Modules__AgentAccounts__EncryptionKey", agentAccountsKey)
         .WithEnvironment("Modules__AgentAccounts__AllowChatGptPlans", allowChatGptPlans)
-        .WithEnvironment("Modules__Secrets__ConnectionString", database.Resource.ConnectionStringExpression)
+        .WithEnvironment("Modules__Secrets__ConnectionString", database)
         .WithEnvironment("Modules__Secrets__EncryptionKey", secretsKey)
-        .WithEnvironment("Modules__Sources__ConnectionString", database.Resource.ConnectionStringExpression)
+        .WithEnvironment("Modules__Sources__ConnectionString", database)
         .WithEnvironment("Modules__Sources__EncryptionKey", sourcesKey)
         .WithEnvironment("ModelGateway__AllowPrivateNetworks", modelPrivateNetworks)
         .WithEnvironment("Modules__Nooks__DaemonUrl", daemonUrl)
         .WithEnvironment("Modules__Nooks__Image", Published(NookImage))
-        .WithEnvironment("ObjectStorage__FileSystem__Root", objectStorage)
         .WithEnvironment(environment =>
         {
             foreach (string harness in harnesses)
             {
                 environment.EnvironmentVariables["Modules__Nooks__HarnessImages__" + harness] = Published(HarnessImage(harness));
             }
-
 
             if (providerIssuer is not null)
             {
@@ -195,27 +327,18 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         .WithEnvironment("Modules__Nooks__CpuMillicores", "2000")
         .WithEnvironment("Modules__Nooks__MemoryMebibytes", "4096")
         .WithEnvironment("Modules__Nooks__SleepAfter", nookSleepAfter)
-        .WithEnvironment("Modules__Nooks__EvictAfter", nookEvictAfter)
-        .WithEnvironment("Sandboxing__Docker__Endpoint", dockerHost)
-        .WithEnvironment("Sandboxing__Docker__Scope", sandboxScope);
-    if (azureGroup is not null)
-    {
-        mode.WithEnvironment("Sandboxing__Azure__SubscriptionId", azureGroup[0])
-            .WithEnvironment("Sandboxing__Azure__ResourceGroup", azureGroup[1])
-            .WithEnvironment("Sandboxing__Azure__SandboxGroup", azureGroup[2])
-            .WithEnvironment("Sandboxing__Azure__Region", azureGroup[3])
-            .WithEnvironment("Sandboxing__Azure__Scope", sandboxScope);
-    }
-}
-
-webApi.WaitForCompletion(migrations);
-foreach (IResourceBuilder<ExecutableResource> image in imagesReady)
-{
-    webApi.WaitForCompletion(image);
+        .WithEnvironment("Modules__Nooks__EvictAfter", nookEvictAfter);
 }
 
 using DistributedApplication app = builder.Build();
 app.Run();
+
+IResourceBuilder<ParameterResource> EncryptionKey(string name)
+{
+    return builder.ExecutionContext.IsPublishMode
+        ? builder.AddParameter(name, secret: true)
+        : builder.AddParameter(name, new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
+}
 
 static string HarnessImage(string harness)
 {
@@ -247,17 +370,15 @@ IResourceBuilder<ExecutableResource> PushImage(string name, string image, IResou
 // Nooks are containers that reach these endpoints through the Docker host's gateway. On Linux the
 // gateway isn't localhost, where Aspire's proxy and Kestrel would listen, so the WebApi listens on
 // every IPv4 interface itself; Docker Desktop on WSL doesn't forward to dual-stack (`*`) listeners.
-// Without the proxy a port is fixed (appsettings.json), so tests pass free ones.
-EndpointReference NookFacing(string name, string? port)
+// Without the proxy a port is fixed, so tests pass free ones.
+static EndpointReference NookFacing(IResourceBuilder<ProjectResource> webApi, string name, string port)
 {
     webApi.WithEndpoint(name, endpoint =>
     {
+        endpoint.UriScheme = "http";
         endpoint.IsProxied = false;
-        if (port is not null)
-        {
-            endpoint.Port = int.Parse(port, CultureInfo.InvariantCulture);
-            endpoint.TargetPort = endpoint.Port;
-        }
+        endpoint.Port = int.Parse(port, CultureInfo.InvariantCulture);
+        endpoint.TargetPort = endpoint.Port;
     });
     EndpointReference reference = webApi.GetEndpoint(name);
     webApi.WithEnvironment("Kestrel__Endpoints__" + name + "__Url", ReferenceExpression.Create($"http://0.0.0.0:{reference.Property(EndpointProperty.TargetPort)}"));

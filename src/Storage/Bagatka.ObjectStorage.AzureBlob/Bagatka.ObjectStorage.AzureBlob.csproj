@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Bagatka.ObjectStorage\Bagatka.ObjectStorage.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The shared object storage tests run it against Azurite, which takes an account key. -->
+    <InternalsVisibleTo Include="Bagatka.ObjectStorage.Tests" />
+  </ItemGroup>
+
+</Project>

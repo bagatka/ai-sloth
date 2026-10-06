@@ -122,6 +122,157 @@
           "YamlDotNet": "18.1.0"
         }
       },
+      "Aspire.Hosting.Azure": {
+        "type": "Transitive",
+        "resolved": "13.6.0",
+        "contentHash": "V9TQnI0crwG+uaAS/ZJz+UUEDJQDTSe9ZwLDn19oyM37y16efgyPdiKthYZ++qdAXKKt2aNZanRULdrviQcb9Q==",
+        "dependencies": {
+          "AspNetCore.HealthChecks.Uris": "9.0.0",
+          "Aspire.Hosting": "13.6.0",
+          "Azure.Core": "1.62.0",
+          "Azure.Identity": "1.21.0",
+          "Azure.Provisioning": "1.6.0",
+          "Azure.Provisioning.KeyVault": "1.1.0",
+          "Azure.ResourceManager.Authorization": "1.1.7",
+          "Azure.ResourceManager.KeyVault": "1.4.0",
+          "Azure.ResourceManager.Resources.Deployments": "1.0.0",
+          "Azure.Security.KeyVault.Secrets": "4.11.1",
+          "Google.Protobuf": "3.36.1",
+          "Grpc.AspNetCore": "2.83.0",
+          "Grpc.Net.ClientFactory": "2.83.0",
+          "Grpc.Tools": "2.83.0",
+          "Hex1b": "0.168.0",
+          "KubernetesClient": "19.0.2",
+          "MessagePack": "2.5.302",
+          "ModelContextProtocol": "1.4.1",
+          "Newtonsoft.Json": "13.0.4",
+          "OpenTelemetry.Exporter.OpenTelemetryProtocol": "1.17.0",
+          "OpenTelemetry.Extensions.Hosting": "1.17.0",
+          "Polly.Core": "8.7.0",
+          "Semver": "3.0.0",
+          "StreamJsonRpc": "2.25.29",
+          "System.IO.Hashing": "10.0.12",
+          "YamlDotNet": "18.1.0"
+        }
+      },
+      "Aspire.Hosting.Azure.ContainerRegistry": {
+        "type": "Transitive",
+        "resolved": "13.6.0",
+        "contentHash": "0+eV+NydPZOq8EbzQq49/sQbsVL6+tAp//YToNCcX2MaLyqBFGXFp1BVXN6jXSkQRDAibFdNYnMlUsTa3d3n6g==",
+        "dependencies": {
+          "AspNetCore.HealthChecks.Uris": "9.0.0",
+          "Aspire.Hosting.Azure": "13.6.0",
+          "Azure.Core": "1.62.0",
+          "Azure.Identity": "1.21.0",
+          "Azure.Provisioning": "1.6.0",
+          "Azure.Provisioning.ContainerRegistry": "1.1.0",
+          "Azure.Provisioning.KeyVault": "1.1.0",
+          "Azure.ResourceManager.Authorization": "1.1.7",
+          "Azure.ResourceManager.KeyVault": "1.4.0",
+          "Azure.ResourceManager.Resources.Deployments": "1.0.0",
+          "Azure.Security.KeyVault.Secrets": "4.11.1",
+          "Google.Protobuf": "3.36.1",
+          "Grpc.AspNetCore": "2.83.0",
+          "Grpc.Net.ClientFactory": "2.83.0",
+          "Grpc.Tools": "2.83.0",
+          "Hex1b": "0.168.0",
+          "KubernetesClient": "19.0.2",
+          "MessagePack": "2.5.302",
+          "ModelContextProtocol": "1.4.1",
+          "NCrontab.Signed": "3.4.0",
+          "Newtonsoft.Json": "13.0.4",
+          "OpenTelemetry.Exporter.OpenTelemetryProtocol": "1.17.0",
+          "OpenTelemetry.Extensions.Hosting": "1.17.0",
+          "Polly.Core": "8.7.0",
+          "Semver": "3.0.0",
+          "StreamJsonRpc": "2.25.29",
+          "System.IO.Hashing": "10.0.12",
+          "YamlDotNet": "18.1.0"
+        }
+      },
+      "Aspire.Hosting.Azure.KeyVault": {
+        "type": "Transitive",
+        "resolved": "13.6.0",
+        "contentHash": "jKksr81dz89E7FYeut1WYjuGnL8WwYHJFKKXkddWqw/GclGOfjKC7F14YHybSNFwRwVHBHA7dY9m34ewHbpZcw==",
+        "dependencies": {
+          "AspNetCore.HealthChecks.Uris": "9.0.0",
+          "Aspire.Hosting.Azure": "13.6.0",
+          "Azure.Core": "1.62.0",
+          "Azure.Identity": "1.21.0",
+          "Azure.Provisioning": "1.6.0",
+          "Azure.Provisioning.KeyVault": "1.1.0",
+          "Azure.ResourceManager.Authorization": "1.1.7",
+          "Azure.ResourceManager.KeyVault": "1.4.0",
+          "Azure.ResourceManager.Resources.Deployments": "1.0.0",
+          "Azure.Security.KeyVault.Secrets": "4.11.1",
+          "Google.Protobuf": "3.36.1",
+          "Grpc.AspNetCore": "2.83.0",
+          "Grpc.Net.ClientFactory": "2.83.0",
+          "Grpc.Tools": "2.83.0",
+          "Hex1b": "0.168.0",
+          "KubernetesClient": "19.0.2",
+          "MessagePack": "2.5.302",
+          "ModelContextProtocol": "1.4.1",
+          "Newtonsoft.Json": "13.0.4",
+          "OpenTelemetry.Exporter.OpenTelemetryProtocol": "1.17.0",
+          "OpenTelemetry.Extensions.Hosting": "1.17.0",
+          "Polly.Core": "8.7.0",
+          "Semver": "3.0.0",
+          "StreamJsonRpc": "2.25.29",
+          "System.IO.Hashing": "10.0.12",
+          "YamlDotNet": "18.1.0"
+        }
+      },
+      "Aspire.Hosting.Azure.OperationalInsights": {
+        "type": "Transitive",
+        "resolved": "13.6.0",
+        "contentHash": "rjb5jjpg7ZqmV3kYxQMGkp7jlRcqQR++gP6f7LwAkQhMHKFRSL9H9kqeLATYdb8mYwISOMKN45Nsck4j7RaCTg==",
+        "dependencies": {
+          "AspNetCore.HealthChecks.Uris": "9.0.0",
+          "Aspire.Hosting.Azure": "13.6.0",
+          "Azure.Core": "1.62.0",
+          "Azure.Identity": "1.21.0",
+          "Azure.Provisioning": "1.6.0",
+          "Azure.Provisioning.KeyVault": "1.1.0",
+          "Azure.Provisioning.OperationalInsights": "1.1.0",
+          "Azure.ResourceManager.Authorization": "1.1.7",
+          "Azure.ResourceManager.KeyVault": "1.4.0",
+          "Azure.ResourceManager.Resources.Deployments": "1.0.0",
+          "Azure.Security.KeyVault.Secrets": "4.11.1",
+          "Google.Protobuf": "3.36.1",
+          "Grpc.AspNetCore": "2.83.0",
+          "Grpc.Net.ClientFactory": "2.83.0",
+          "Grpc.Tools": "2.83.0",
+          "Hex1b": "0.168.0",
+          "KubernetesClient": "19.0.2",
+          "MessagePack": "2.5.302",
+          "ModelContextProtocol": "1.4.1",
+          "Newtonsoft.Json": "13.0.4",
+          "OpenTelemetry.Exporter.OpenTelemetryProtocol": "1.17.0",
+          "OpenTelemetry.Extensions.Hosting": "1.17.0",
+          "Polly.Core": "8.7.0",
+          "Semver": "3.0.0",
+          "StreamJsonRpc": "2.25.29",
+          "System.IO.Hashing": "10.0.12",
+          "YamlDotNet": "18.1.0"
+        }
+      },
+      "AspNetCore.HealthChecks.Azure.Storage.Blobs": {
+        "type": "Transitive",
+        "resolved": "9.0.0",
+        "contentHash": "fORaHfhyerL+7Tu4lTyj5CBHEMPYdH0LS1bm9N2Wd/K4mgd/zzg+iXLFBYTNTbF+hLYpVNZyO2Tx/wU0/s4KqQ==",
+        "dependencies": {
+          "Azure.Storage.Blobs": "12.19.1"
+        }
+      },
+      "AspNetCore.HealthChecks.Azure.Storage.Queues": {
+        "type": "Transitive",
+        "resolved": "9.0.0",
+        "contentHash": "ne+XNpiO2yVH9g6x5B1SJBMzNz8JR0YRiBvJR9qGdpTsHtcTY8GhmA9+mznQ+nTLgUQNvEbr6Xj8Ha9zjW0QDQ==",
+        "dependencies": {
+          "Azure.Storage.Queues": "12.17.1"
+        }
+      },
       "AspNetCore.HealthChecks.NpgSql": {
         "type": "Transitive",
         "resolved": "9.0.0",
@@ -134,6 +285,139 @@
         "type": "Transitive",
         "resolved": "9.0.0",
         "contentHash": "XYdNlA437KeF8p9qOpZFyNqAN+c0FXt/JjTvzH/Qans0q0O3pPE8KPnn39ucQQjR/Roum1vLTP3kXiUs8VHyuA=="
+      },
+      "Azure.Provisioning": {
+        "type": "Transitive",
+        "resolved": "1.6.0",
+        "contentHash": "OIxY7GtfPcJxPIbgg76dmCNKr59ButpqS5lf9xsSEHmZ8D1puP4HiZu3anpCl0Y7qIatdBKR/06KaI5yLexaVg==",
+        "dependencies": {
+          "Azure.Core": "1.61.0"
+        }
+      },
+      "Azure.Provisioning.AppContainers": {
+        "type": "Transitive",
+        "resolved": "1.2.0",
+        "contentHash": "jhXq9p9/F5oimnIfWP2HmWssLJML17ibtjrIj6QemSGo1jEArd2p0vFhBXTtCaTsvcmFDYM30MRDzT2VptLrDw==",
+        "dependencies": {
+          "Azure.Core": "1.51.1",
+          "Azure.Provisioning": "1.5.0"
+        }
+      },
+      "Azure.Provisioning.ContainerRegistry": {
+        "type": "Transitive",
+        "resolved": "1.1.0",
+        "contentHash": "NgpzBt8Ly7r/8v4ndk7r4KBaa5N6fs+qpAHRLikigx65EDpT5f0lb1GoI+6MsygOCehOwweq98yTcYmSPG6OOg==",
+        "dependencies": {
+          "Azure.Core": "1.46.2",
+          "Azure.Provisioning": "1.1.0"
+        }
+      },
+      "Azure.Provisioning.KeyVault": {
+        "type": "Transitive",
+        "resolved": "1.1.0",
+        "contentHash": "n8SCJONrEU3w9lq/ZiQkxZ0L+Sv6RL2M95LSVYnwlYe84ww6jpo/djlfd835dh5cQvVrHgETi3UnRUcZn89J0w==",
+        "dependencies": {
+          "Azure.Core": "1.46.2",
+          "Azure.Provisioning": "1.1.0"
+        }
+      },
+      "Azure.Provisioning.OperationalInsights": {
+        "type": "Transitive",
+        "resolved": "1.1.0",
+        "contentHash": "2VzPvdGmVjHrRPKD2wrLlZVb2mJRiQqMV2kkTJPrDiZ/ijKr7VNOihhIvGJ6C6NWW398i49Y2wR05vDl3Mvt6w==",
+        "dependencies": {
+          "Azure.Core": "1.46.2",
+          "Azure.Provisioning": "1.1.0"
+        }
+      },
+      "Azure.Provisioning.PostgreSql": {
+        "type": "Transitive",
+        "resolved": "1.1.1",
+        "contentHash": "nAcxs1iRtbZHSwxKliHQz7GCQiNDhkUvL7tzLiKc7R2Kp7sO1k5Q6k8B77Ka2ul7eMHSmp5wtSmZiq8t2gqg5A==",
+        "dependencies": {
+          "Azure.Core": "1.46.2",
+          "Azure.Provisioning": "1.1.0"
+        }
+      },
+      "Azure.Provisioning.Storage": {
+        "type": "Transitive",
+        "resolved": "1.1.2",
+        "contentHash": "LiTtCCxVQrXPrvbZczd+Efo9qhPlTkL/xdvz+U2HNRU9EmEy4DryomInNMvqdLa0RgHHAybqckrJAr4rjclnRg==",
+        "dependencies": {
+          "Azure.Core": "1.47.0",
+          "Azure.Provisioning": "1.2.0"
+        }
+      },
+      "Azure.ResourceManager": {
+        "type": "Transitive",
+        "resolved": "1.14.0",
+        "contentHash": "i925pQG3EPXQ+jgTfO/26aODZ7IqWBo34nYg+kCgCPLGsMulbzjuJDiJH+PHV+xoWEjFKGvm1SBaAAXbG4887A==",
+        "dependencies": {
+          "Azure.Core": "1.51.1"
+        }
+      },
+      "Azure.ResourceManager.Authorization": {
+        "type": "Transitive",
+        "resolved": "1.1.7",
+        "contentHash": "qZepTHB3suLhOQCD4Gr9v7KoaKejzIlcSKnuj933/PwqH/1Wo8CLMtAyAXuMC2+AgiyAVOXFpNJKkT8rWcJ/pQ==",
+        "dependencies": {
+          "Azure.Core": "1.57.0",
+          "Azure.ResourceManager": "1.14.0"
+        }
+      },
+      "Azure.ResourceManager.KeyVault": {
+        "type": "Transitive",
+        "resolved": "1.4.0",
+        "contentHash": "kjEphMw5jYNmu9qjluad79gb5cCogzsJ8FEwD9JF6ou0M/KZ2TAmJO/HoR3qOyktgY0MTkb1IodG4xrjpN+WDA==",
+        "dependencies": {
+          "Azure.Core": "1.51.1",
+          "Azure.ResourceManager": "1.14.0"
+        }
+      },
+      "Azure.ResourceManager.Resources.Deployments": {
+        "type": "Transitive",
+        "resolved": "1.0.0",
+        "contentHash": "emWFlSmMOZvaoas9g1qKw2wFDfGYJ6qEPuXdYTosYiPRKR716ogXA5gMzKLBsKJPVe9NGkRtkohaURqKqnqoFQ==",
+        "dependencies": {
+          "Azure.Core": "1.62.0",
+          "Azure.ResourceManager": "1.14.0"
+        }
+      },
+      "Azure.Security.KeyVault.Secrets": {
+        "type": "Transitive",
+        "resolved": "4.11.1",
+        "contentHash": "/yFMJGQYPPvBSrupjJ388qqXZ1h70Yrer1vG+z+jddgovEmIE7IhShU6ZGIi24IPArY8HBH6FFtgVK369TWhmQ==",
+        "dependencies": {
+          "Azure.Core": "1.54.0"
+        }
+      },
+      "Azure.Storage.Common": {
+        "type": "Transitive",
+        "resolved": "12.28.0",
+        "contentHash": "5l8YhNrks38zKLGFW2BBFLwieyamH/xauABSASsdpZv79G0f+n2n22IjkRmUqCmALSupkwRHh2LOhbW3yj5Qgw==",
+        "dependencies": {
+          "Azure.Core": "1.55.0",
+          "System.IO.Hashing": "10.0.3"
+        }
+      },
+      "Azure.Storage.Files.DataLake": {
+        "type": "Transitive",
+        "resolved": "12.27.1",
+        "contentHash": "NVSGDPoK65WgPosYe/MuMbR1Je/+6LFue272zHty2rkE4a+N12PijYgBAfPp5tzU+Eo1MV7o515ApXH+lfOKsg==",
+        "dependencies": {
+          "Azure.Core": "1.55.0",
+          "Azure.Storage.Blobs": "12.29.1",
+          "Azure.Storage.Common": "12.28.0"
+        }
+      },
+      "Azure.Storage.Queues": {
+        "type": "Transitive",
+        "resolved": "12.27.1",
+        "contentHash": "uQgZ9bzwVJ8bqsWywzwkRt1lfusYPXJAPSb9yVlTsSmZtH+bnDb/RfQuHiuUmk3nlQbCOUGFdD0cRXn8uMiOHg==",
+        "dependencies": {
+          "Azure.Core": "1.55.0",
+          "Azure.Storage.Common": "12.28.0"
+        }
       },
       "Fractions": {
         "type": "Transitive",
@@ -405,6 +689,11 @@
           "Microsoft.Extensions.AI.Abstractions": "10.5.2"
         }
       },
+      "NCrontab.Signed": {
+        "type": "Transitive",
+        "resolved": "3.4.0",
+        "contentHash": "wmlQgd8QVU74L68wiMtiKKex4dr+YoowsJndS2xJcMEJ5265twZqJPawMghXaLdTxwfc6RvWAewMaX/Q8vdduw=="
+      },
       "Nerdbank.MessagePack": {
         "type": "Transitive",
         "resolved": "1.2.4",
@@ -617,6 +906,9 @@
         "type": "Project",
         "dependencies": {
           "Aspire.Hosting.AppHost": "[13.6.0, )",
+          "Aspire.Hosting.Azure.AppContainers": "[13.6.0, )",
+          "Aspire.Hosting.Azure.PostgreSQL": "[13.6.0, )",
+          "Aspire.Hosting.Azure.Storage": "[13.6.0, )",
           "Aspire.Hosting.PostgreSQL": "[13.6.0, )"
         }
       },
@@ -729,6 +1021,125 @@
           "Bagatka.Foundation": "[1.0.0, )"
         }
       },
+      "Aspire.Hosting.Azure.AppContainers": {
+        "type": "CentralTransitive",
+        "requested": "[13.6.0, )",
+        "resolved": "13.6.0",
+        "contentHash": "HqY6kZMgpoM4YZX6GwHadKvbf3b8Qp+bIYjxroc+jakw1HuB0G8f5t5GmzuuKLYi4TUWXSDxHqUgLzxil5OOIg==",
+        "dependencies": {
+          "AspNetCore.HealthChecks.Uris": "9.0.0",
+          "Aspire.Hosting.Azure": "13.6.0",
+          "Aspire.Hosting.Azure.ContainerRegistry": "13.6.0",
+          "Aspire.Hosting.Azure.OperationalInsights": "13.6.0",
+          "Azure.Core": "1.62.0",
+          "Azure.Identity": "1.21.0",
+          "Azure.Provisioning": "1.6.0",
+          "Azure.Provisioning.AppContainers": "1.2.0",
+          "Azure.Provisioning.ContainerRegistry": "1.1.0",
+          "Azure.Provisioning.KeyVault": "1.1.0",
+          "Azure.Provisioning.OperationalInsights": "1.1.0",
+          "Azure.Provisioning.Storage": "1.1.2",
+          "Azure.ResourceManager.Authorization": "1.1.7",
+          "Azure.ResourceManager.KeyVault": "1.4.0",
+          "Azure.ResourceManager.Resources.Deployments": "1.0.0",
+          "Azure.Security.KeyVault.Secrets": "4.11.1",
+          "Google.Protobuf": "3.36.1",
+          "Grpc.AspNetCore": "2.83.0",
+          "Grpc.Net.ClientFactory": "2.83.0",
+          "Grpc.Tools": "2.83.0",
+          "Hex1b": "0.168.0",
+          "KubernetesClient": "19.0.2",
+          "MessagePack": "2.5.302",
+          "ModelContextProtocol": "1.4.1",
+          "NCrontab.Signed": "3.4.0",
+          "Newtonsoft.Json": "13.0.4",
+          "OpenTelemetry.Exporter.OpenTelemetryProtocol": "1.17.0",
+          "OpenTelemetry.Extensions.Hosting": "1.17.0",
+          "Polly.Core": "8.7.0",
+          "Semver": "3.0.0",
+          "StreamJsonRpc": "2.25.29",
+          "System.IO.Hashing": "10.0.12",
+          "YamlDotNet": "18.1.0"
+        }
+      },
+      "Aspire.Hosting.Azure.PostgreSQL": {
+        "type": "CentralTransitive",
+        "requested": "[13.6.0, )",
+        "resolved": "13.6.0",
+        "contentHash": "PVMPxqJASiqj4TO0+zeKmfKqO+FYyFx/uiomWvV3t59MP+30RBGyhbHq8T+oE8KzuXmyU6x6pkwgG3zie/xMpA==",
+        "dependencies": {
+          "AspNetCore.HealthChecks.NpgSql": "9.0.0",
+          "AspNetCore.HealthChecks.Uris": "9.0.0",
+          "Aspire.Hosting.Azure": "13.6.0",
+          "Aspire.Hosting.Azure.KeyVault": "13.6.0",
+          "Aspire.Hosting.PostgreSQL": "13.6.0",
+          "Azure.Core": "1.62.0",
+          "Azure.Identity": "1.21.0",
+          "Azure.Provisioning": "1.6.0",
+          "Azure.Provisioning.KeyVault": "1.1.0",
+          "Azure.Provisioning.PostgreSql": "1.1.1",
+          "Azure.ResourceManager.Authorization": "1.1.7",
+          "Azure.ResourceManager.KeyVault": "1.4.0",
+          "Azure.ResourceManager.Resources.Deployments": "1.0.0",
+          "Azure.Security.KeyVault.Secrets": "4.11.1",
+          "Google.Protobuf": "3.36.1",
+          "Grpc.AspNetCore": "2.83.0",
+          "Grpc.Net.ClientFactory": "2.83.0",
+          "Grpc.Tools": "2.83.0",
+          "Hex1b": "0.168.0",
+          "KubernetesClient": "19.0.2",
+          "MessagePack": "2.5.302",
+          "ModelContextProtocol": "1.4.1",
+          "Newtonsoft.Json": "13.0.4",
+          "OpenTelemetry.Exporter.OpenTelemetryProtocol": "1.17.0",
+          "OpenTelemetry.Extensions.Hosting": "1.17.0",
+          "Polly.Core": "8.7.0",
+          "Semver": "3.0.0",
+          "StreamJsonRpc": "2.25.29",
+          "System.IO.Hashing": "10.0.12",
+          "YamlDotNet": "18.1.0"
+        }
+      },
+      "Aspire.Hosting.Azure.Storage": {
+        "type": "CentralTransitive",
+        "requested": "[13.6.0, )",
+        "resolved": "13.6.0",
+        "contentHash": "YWDZBMxIre4VnSZONEcYfoMbfHVNikdDUfF+ZxEm6DBwTv+55fDdt6JXyL8SfLJ4ITuQMiifRGXnA9NNIAf87w==",
+        "dependencies": {
+          "AspNetCore.HealthChecks.Azure.Storage.Blobs": "9.0.0",
+          "AspNetCore.HealthChecks.Azure.Storage.Queues": "9.0.0",
+          "AspNetCore.HealthChecks.Uris": "9.0.0",
+          "Aspire.Hosting.Azure": "13.6.0",
+          "Azure.Core": "1.62.0",
+          "Azure.Identity": "1.21.0",
+          "Azure.Provisioning": "1.6.0",
+          "Azure.Provisioning.KeyVault": "1.1.0",
+          "Azure.Provisioning.Storage": "1.1.2",
+          "Azure.ResourceManager.Authorization": "1.1.7",
+          "Azure.ResourceManager.KeyVault": "1.4.0",
+          "Azure.ResourceManager.Resources.Deployments": "1.0.0",
+          "Azure.Security.KeyVault.Secrets": "4.11.1",
+          "Azure.Storage.Blobs": "12.29.2",
+          "Azure.Storage.Files.DataLake": "12.27.1",
+          "Azure.Storage.Queues": "12.27.1",
+          "Google.Protobuf": "3.36.1",
+          "Grpc.AspNetCore": "2.83.0",
+          "Grpc.Net.ClientFactory": "2.83.0",
+          "Grpc.Tools": "2.83.0",
+          "Hex1b": "0.168.0",
+          "KubernetesClient": "19.0.2",
+          "MessagePack": "2.5.302",
+          "ModelContextProtocol": "1.4.1",
+          "Newtonsoft.Json": "13.0.4",
+          "OpenTelemetry.Exporter.OpenTelemetryProtocol": "1.17.0",
+          "OpenTelemetry.Extensions.Hosting": "1.17.0",
+          "Polly.Core": "8.7.0",
+          "Semver": "3.0.0",
+          "StreamJsonRpc": "2.25.29",
+          "System.IO.Hashing": "10.0.12",
+          "YamlDotNet": "18.1.0"
+        }
+      },
       "Aspire.Hosting.PostgreSQL": {
         "type": "CentralTransitive",
         "requested": "[13.6.0, )",
@@ -767,6 +1178,16 @@
           "Microsoft.Identity.Client.Extensions.Msal": "4.90.0",
           "System.ClientModel": "1.16.0",
           "System.Memory.Data": "10.0.10"
+        }
+      },
+      "Azure.Storage.Blobs": {
+        "type": "CentralTransitive",
+        "requested": "[12.30.0, )",
+        "resolved": "12.29.2",
+        "contentHash": "NeZmk7bphspT2BYn8XaNCTV4/9vQG+ea79F85MBTi2o2WiXIIJNsRBtFyeBrzK2HIk476rfSqLNwPt4vXgOEkQ==",
+        "dependencies": {
+          "Azure.Core": "1.55.0",
+          "Azure.Storage.Common": "12.28.0"
         }
       },
       "Google.Protobuf": {

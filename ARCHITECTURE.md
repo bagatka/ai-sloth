@@ -93,9 +93,9 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |
 | CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API: hosts, sign-in, agent accounts, secrets, and chats; its machine mode runs nooks on people's own computers (`src/Cli/README.md`) | Built |
 | Foundation | `Bagatka.Foundation` (+ `.Modules`, `.Web`) | Plumbing: results, errors, actors, typed IDs | Built |
-| Object storage | `Bagatka.ObjectStorage` (+ `.<Backend>` for cloud backends) | Store and read objects by key: checkpoints and harness state, folder versions later | Contract, and a folder of this computer as backend |
+| Object storage | `Bagatka.ObjectStorage` (+ `.<Backend>` for cloud backends) | Store and read objects by key: checkpoints and harness state, folder versions later | Contract; a folder of this computer and Azure Blob Storage as backends |
 | Sdk | `Bagatka.Sdk.<Vendor>`, `Bagatka.Azure.Sandboxes` | Clients for vendor APIs without an official .NET SDK | Docker Engine, Sign in with ChatGPT, GitHub, Azure Container Apps Sandboxes |
-| Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration; defaults every service host shares | Built |
+| Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration and the Azure deployment; defaults every service host shares | Built |
 
 The web and mobile apps are not in this repository. They use the same public HTTP API as the CLI.
 
@@ -112,7 +112,7 @@ analyzers/
   Bagatka.Analyzers/               our own code-shape rules, run on every project (PATTERNS.md, entry 27)
 src/
   Aspire/
-    Bagatka.AiSloth.AppHost/       local orchestration
+    Bagatka.AiSloth.AppHost/       local orchestration and the Azure deployment
     Bagatka.ServiceDefaults/       OpenTelemetry, health, service discovery
   ControlPlane/
     Bagatka.AiSloth.WebApi/        HTTP host + composition root
@@ -150,6 +150,7 @@ src/
     Bagatka.Sandboxing.Remote/     a provider's calls as messages, run on a provider elsewhere
   Storage/
     Bagatka.ObjectStorage/         general-purpose object storage: the contract, and a folder as backend
+    Bagatka.ObjectStorage.AzureBlob/  Azure Blob Storage as backend
   Foundation/
     Bagatka.Foundation/            primitives usable everywhere, including Contracts
     Bagatka.Foundation.Modules/    plumbing for module projects
@@ -316,7 +317,8 @@ vendor-shaped, product-agnostic, and used from module internals. Rules are in `s
 ### Aspire
 
 - **`Bagatka.AiSloth.AppHost`** runs the control plane and its dependencies on a developer
-  machine and in end-to-end tests. It is never deployed. The Aspire CLI is pinned in
+  machine and in end-to-end tests, and deploys them to Azure (README.md, "Deploying"): the WebApi
+  in Container Apps, nooks in a sandbox group, checkpoints in Blob Storage. The Aspire CLI is pinned in
   `dotnet-tools.json`, and `dotnet aspire update` upgrades both together.
 - **`Bagatka.ServiceDefaults`** gives every service host the same OpenTelemetry, health checks,
   and service discovery: the WebApi today, and each service extracted from it later. It is

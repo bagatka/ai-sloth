@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\Sandboxing\Bagatka.Sandboxing.Azure\Bagatka.Sandboxing.Azure.csproj" />
     <ProjectReference Include="..\..\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
     <ProjectReference Include="..\..\Storage\Bagatka.ObjectStorage\Bagatka.ObjectStorage.csproj" />
+    <ProjectReference Include="..\..\Storage\Bagatka.ObjectStorage.AzureBlob\Bagatka.ObjectStorage.AzureBlob.csproj" />
     <ProjectReference Include="..\Modules\AgentAccounts\Bagatka.AiSloth.AgentAccounts\Bagatka.AiSloth.AgentAccounts.csproj" />
     <ProjectReference Include="..\Modules\Secrets\Bagatka.AiSloth.Secrets\Bagatka.AiSloth.Secrets.csproj" />
     <ProjectReference Include="..\Modules\Sources\Bagatka.AiSloth.Sources\Bagatka.AiSloth.Sources.csproj" />

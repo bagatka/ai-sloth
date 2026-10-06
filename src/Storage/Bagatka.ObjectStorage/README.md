@@ -7,9 +7,12 @@ people's harness state. General-purpose: it knows nothing about AiSloth.
   delete everything under a prefix. Keys are lowercase segments separated by `/` (`ObjectKeys`).
   Who writes which keys, and in which order with their rows, is `PATTERNS.md`, entry 13.
 - **Backends:** `FileSystemObjectStorage`, one file per object in a directory of this computer, for
-  a host on one server and for development. An S3-compatible backend comes with hosting.
-- **Not encrypted here.** Objects hold people's code and conversations: the directory, or later the
-  bucket, is protected like the database.
+  a host on one server and for development; `Bagatka.ObjectStorage.AzureBlob`, one blob per object
+  in a container, signed in with a credential, for a hosted control plane.
+- **Not encrypted here.** Objects hold people's code and conversations: the directory or container
+  is protected like the database.
+- **Tests:** `tests/Bagatka.ObjectStorage.Tests` runs every backend through the same guarantees,
+  Azure Blob against its emulator, Azurite, in Docker.
 
 ## Not built yet
 

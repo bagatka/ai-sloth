@@ -80,6 +80,7 @@
     <Project Path="src/Sandboxing/Bagatka.Sandboxing/Bagatka.Sandboxing.csproj" />
   </Folder>
   <Folder Name="/src/Storage/">
+    <Project Path="src/Storage/Bagatka.ObjectStorage.AzureBlob/Bagatka.ObjectStorage.AzureBlob.csproj" />
     <Project Path="src/Storage/Bagatka.ObjectStorage/Bagatka.ObjectStorage.csproj" />
   </Folder>
   <Folder Name="/src/Sdk/">
@@ -97,6 +98,7 @@
     <Project Path="tests/Bagatka.AiSloth.EndToEndTests/Bagatka.AiSloth.EndToEndTests.csproj" />
     <Project Path="tests/Bagatka.Foundation.Tests/Bagatka.Foundation.Tests.csproj" />
     <Project Path="tests/Bagatka.Harnesses.Tests/Bagatka.Harnesses.Tests.csproj" />
+    <Project Path="tests/Bagatka.ObjectStorage.Tests/Bagatka.ObjectStorage.Tests.csproj" />
     <Project Path="tests/Bagatka.Sandboxing.ConformanceTests/Bagatka.Sandboxing.ConformanceTests.csproj" />
   </Folder>
 </Solution>

@@ -694,8 +694,9 @@ arrives with the first integration event.
   remove your migration, rebase, and regenerate.
 - **Applying them.**
   - `migrate`: the WebApi run with that single argument applies every module's migrations
-    (`ModuleDatabases.MigrateAsync`) and exits. Production runs it as a deployment step before the new
-    version starts; the AppHost runs it as the `migrations` resource. Nothing migrates on startup.
+    (`ModuleDatabases.MigrateAsync`) and exits. Deployed, it runs as the container app's init
+    container before each replica starts; run locally, the AppHost runs it as the `migrations`
+    resource. The WebApi itself never migrates on startup.
 - **Generating them.** Each module has a design-time factory (`Data/<Module>DbContextFactory.cs`),
   so `dotnet ef` needs no configuration. Migrations are generated code: `.editorconfig` marks them
   so, and analyzers skip them.
