@@ -65,9 +65,9 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
   people choose: they exist for
   the agent's tools, and everyone who may write in a nook can use the secrets in it.
 - **Starting is nearly instant.** The setup that comes with a chat's files prepares its nook, and a
-  nook whose setup took a while leaves a ready copy that the next nooks start from and catch up;
-  where the provider keeps memory, the copy's services are already running. Agents start when their chat does, before the
-  first message. The time from Send to the agent's first action is measured and kept low.
+  nook whose setup took a while leaves a ready copy that the next nooks start from and catch up. A
+  chat starts as its first message is typed, and its agent with it. The time from Send to the
+  agent's first action is measured and kept low.
 - **Running work never stops for us.** Deploys, restarts, and network blips never stop a process in
   a nook; agents may run for days. Suspension is invisible to callers.
 - **Nothing delivered is lost.** A nook is disposable, so what people can't afford to lose lives
@@ -257,8 +257,7 @@ A capability with one contract, `I<Module>Api`.
 
 Built: the Docker and Azure providers, the daemon and its image, the Nooks module from creating a nook to
 deleting it, setups, checkpoints and coming back from them, and machines, a workspace's
-own computers as a provider, nooks that sleep when nobody uses them, and ready copies on disk. Ready
-copies with memory are not built yet (`ROADMAP.md` has the order). The maps are `src/ControlPlane/Modules/Nooks/README.md`,
+own computers as a provider, nooks that sleep when nobody uses them, and ready copies. The maps are `src/ControlPlane/Modules/Nooks/README.md`,
 `src/ControlPlane/Modules/Machines/README.md`, `src/Sandboxing/README.md`, and `src/Daemon/README.md`.
 These decisions are fixed:
 

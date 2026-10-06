@@ -128,6 +128,11 @@ public sealed class ChatsTests(ControlPlane controlPlane) : IDisposable
 
         ChatSummary first = await StartChatAsync(workspace, account);
         ChatSummary second = await StartChatAsync(workspace, account);
+        foreach (ChatSummary written in new[] { first, second })
+        {
+            await Api.ReadAsync<ChatMessage>(_alice.SendPostAsync(string.Create(CultureInfo.InvariantCulture, $"/chats/{written.Id.Value}/messages"), new { text = "say hello" }), HttpStatusCode.OK);
+        }
+
         NookSummary nook = await Api.ReadAsync<NookSummary>(_alice.SendGetAsync(NookPath(first.NookId)), HttpStatusCode.OK);
         Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(_alice.SendGetAsync(ChatsPath(workspace.Id)), HttpStatusCode.OK);
 

@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.Foundation;
 using Xunit;
 
@@ -101,5 +102,18 @@ internal static class Api
         }
 
         throw new TimeoutException(string.Create(CultureInfo.InvariantCulture, $"The value didn't appear within {Patience}."));
+    }
+
+    /// <summary>Whether a nook is gone or being deleted, as the person sees it.</summary>
+    public static async Task<bool> GoneOrDeletingAsync(HttpClient client, NookId nook)
+    {
+        using HttpResponseMessage response = await client.SendGetAsync(string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Value}"));
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return true;
+        }
+
+        NookSummary? summary = await response.Content.ReadFromJsonAsync<NookSummary>(FoundationJson.Options, Ct);
+        return summary?.Status == NookStatus.Deleting;
     }
 }

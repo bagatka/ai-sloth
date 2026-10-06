@@ -23,7 +23,7 @@ internal sealed partial class ChatsApi
         }
 
         Result<IQueryable<Chat>> paged = db.Chats.AsNoTracking()
-            .Where(chat => chat.WorkspaceId == workspaceId)
+            .Where(chat => chat.WorkspaceId == workspaceId && !db.Drafts.Any(draft => draft.ChatId == chat.Id))
             .TakePage(chat => chat.Id, KeysetOrder.NewestFirst, page);
         if (paged.Failed)
         {

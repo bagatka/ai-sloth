@@ -26,7 +26,7 @@ public static class AzureSandboxProviderRegistration
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(credential);
         SandboxGroupClient client = new SandboxGroupClient(settings.Endpoint, settings.Group, credential);
-        services.AddSingleton<ISandboxProvider>(new AzureSandboxProvider(client, settings.Scope));
+        services.AddSingleton<ISandboxProvider>(new AzureSandboxProvider(client, settings.Scope, TimeProvider.System));
         return services;
     }
 }

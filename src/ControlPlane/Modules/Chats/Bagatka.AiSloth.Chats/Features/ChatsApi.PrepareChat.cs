@@ -42,7 +42,7 @@ internal sealed partial class ChatsApi
         }
 
         Message message = sent.Output;
-        db.Messages.Add(message);
+        await AddMessageAsync(message, ct);
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)
         {

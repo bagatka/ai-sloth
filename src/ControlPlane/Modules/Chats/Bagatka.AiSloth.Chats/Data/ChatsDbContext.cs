@@ -19,6 +19,8 @@ internal sealed class ChatsDbContext(DbContextOptions<ChatsDbContext> options) :
 
     public DbSet<StoredEvent> Events => Set<StoredEvent>();
 
+    public DbSet<Draft> Drafts => Set<Draft>();
+
     public DbSet<HarnessState> HarnessStates => Set<HarnessState>();
 
     public DbSet<WorkspaceInstructions> WorkspaceInstructions => Set<WorkspaceInstructions>();
@@ -31,6 +33,7 @@ internal sealed class ChatsDbContext(DbContextOptions<ChatsDbContext> options) :
         modelBuilder.ApplyConfiguration(new ChatConfiguration());
         modelBuilder.ApplyConfiguration(new MessageConfiguration());
         modelBuilder.ApplyConfiguration(new StoredEventConfiguration());
+        modelBuilder.ApplyConfiguration(new DraftConfiguration());
         modelBuilder.ApplyConfiguration(new HarnessStateConfiguration());
         modelBuilder.ApplyConfiguration<WorkspaceInstructions>(new InstructionsConfiguration());
         modelBuilder.ApplyConfiguration<PersonalInstructions>(new InstructionsConfiguration());

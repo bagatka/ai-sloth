@@ -1,23 +1,44 @@
+using System;
 using System.Threading.Tasks;
 using Xunit;
+
+[assembly: AssemblyFixture(typeof(Bagatka.AiSloth.EndToEndTests.SleepyControlPlane))]
 
 namespace Bagatka.AiSloth.EndToEndTests;
 
 /// <summary>
-/// A second app whose nooks fall asleep after 8 idle seconds and are evicted after 40 asleep, for the
-/// tests of sleep; the other tests' app keeps the defaults, so their nooks never sleep halfway.
+/// A second app whose nooks fall asleep after 8 idle seconds and are evicted after 20 asleep, and whose
+/// drafts go after 30 seconds, for the tests of nooks' lives; the other tests' app keeps the defaults,
+/// so their nooks never sleep halfway. It starts when a test first asks for it, so runs without those
+/// tests never wait for it, and every class that uses it runs at the same time as the others.
 /// </summary>
-public sealed class SleepyControlPlane : IAsyncLifetime
+public sealed class SleepyControlPlane : IAsyncDisposable
 {
-    public ControlPlane ControlPlane { get; } = new ControlPlane(["Parameters:nook-sleep-after=00:00:08", "Parameters:nook-evict-after=00:00:40"]);
+    /// <summary>How long tests wait for a nook to fall asleep or wake, and to be evicted.</summary>
+    public static readonly TimeSpan Sleep = TimeSpan.FromMinutes(1);
 
-    public async ValueTask InitializeAsync()
+    public static readonly TimeSpan Eviction = TimeSpan.FromMinutes(2);
+
+    private readonly ControlPlane _app = new ControlPlane(["Parameters:nook-sleep-after=00:00:08", "Parameters:nook-evict-after=00:00:20", "Parameters:chat-draft-lifetime=00:00:30"]);
+    private readonly Lazy<Task> _started;
+
+    public SleepyControlPlane()
     {
-        await ControlPlane.InitializeAsync();
+        _started = new Lazy<Task>(() => _app.InitializeAsync().AsTask());
+    }
+
+    /// <summary>The app, started by the first test that asks.</summary>
+    public async Task<ControlPlane> StartedAsync()
+    {
+        await _started.Value;
+        return _app;
     }
 
     public async ValueTask DisposeAsync()
     {
-        await ControlPlane.DisposeAsync();
+        if (_started.IsValueCreated)
+        {
+            await _app.DisposeAsync();
+        }
     }
 }

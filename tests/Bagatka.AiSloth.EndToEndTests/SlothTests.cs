@@ -102,6 +102,22 @@ public sealed partial class SlothTests(ControlPlane controlPlane)
     }
 
     [Fact]
+    public async Task A_chat_started_without_a_message_takes_the_one_typed_next()
+    {
+        await using SlothCli sloth = await SignedInAsync();
+        await sloth.RunWithInputAsync(FakeModel.ApiKey + "\n", "account", "add", "anthropic-api-key", "--name", "Fake", "--endpoint", controlPlane.Model.Url.AbsoluteUri);
+
+        int chatted = await sloth.RunWithInputAsync("Please write hello.txt for me\n", "chat", "--harness", "claude-code");
+        string chat = sloth.Output;
+        int nothing = await sloth.RunWithInputAsync(string.Empty, "chat");
+
+        Assert.Equal(0, chatted);
+        Assert.Contains("› You: Please write hello.txt for me\n  ▸ Write hello.txt\nDone.\n", chat, StringComparison.Ordinal);
+        Assert.Equal(1, nothing);
+        Assert.Contains("Nothing sent, so the chat isn't kept.", sloth.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_repository_goes_from_GitHub_into_a_chat_and_back_as_a_pull_request()
     {
         string person = "erin-" + Guid.CreateVersion7();

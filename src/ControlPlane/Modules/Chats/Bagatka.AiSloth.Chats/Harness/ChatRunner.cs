@@ -105,7 +105,19 @@ internal sealed class ChatRunner(
     {
         try
         {
-            Progress progress = await AdvanceAsync(waits, ct);
+            Progress? advanced = await AdvanceAsync(waits, ct);
+
+            // A draft that went with its nook leaves its runner nothing to do.
+            if (advanced is not Progress progress)
+            {
+                while (_inputs.Reader.TryRead(out _))
+                {
+                }
+
+                Interlocked.Exchange(ref _stopRequested, 0);
+                return retire(this);
+            }
+
             if (progress.Harness is not null)
             {
                 return await ServeAsync(progress, progress.Harness.Value, retire, waits, ct);
@@ -122,7 +134,15 @@ internal sealed class ChatRunner(
         }
         catch (Exception exception) when (!ct.IsCancellationRequested)
         {
-            Log.RunnerFailed(logger, exception, chatId.Value);
+            // A draft that went with its nook fails what its runner was doing; the next try retires it.
+            await using (ChatsDbContext db = await databases.CreateDbContextAsync(ct))
+            {
+                bool exists = await db.Chats.AnyAsync(found => found.Id == chatId, ct);
+                if (exists)
+                {
+                    Log.RunnerFailed(logger, exception, chatId.Value);
+                }
+            }
 
             // Lines already queued were read past the saved offset; the next reader reads them again.
             while (_inputs.Reader.TryRead(out _))
@@ -159,12 +179,13 @@ internal sealed class ChatRunner(
                 return false;
             }
 
-            progress = await AdvanceAsync(waits, ct);
-            bool replaced = progress.Harness != process;
-            if (replaced)
+            Progress? advanced = await AdvanceAsync(waits, ct);
+            if (advanced is null || advanced.Harness != process)
             {
                 return false;
             }
+
+            progress = advanced;
         }
     }
 
@@ -181,11 +202,22 @@ internal sealed class ChatRunner(
     }
 
     // Does whatever the chat's state calls for: stop, announce new messages, start the agent, start a
-    // turn, steer messages into the running one.
-    private async Task<Progress> AdvanceAsync(Waits waits, CancellationToken ct)
+    // turn, steer messages into the running one. Null when the chat is gone.
+    private async Task<Progress?> AdvanceAsync(Waits waits, CancellationToken ct)
     {
         await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
-        Chat chat = await db.Chats.SingleAsync(found => found.Id == chatId, ct);
+        Chat? chat = await db.Chats.SingleOrDefaultAsync(found => found.Id == chatId, ct);
+        if (chat is null)
+        {
+            return null;
+        }
+
+        Progress progress = await AdvanceAsync(db, chat, waits, ct);
+        return progress;
+    }
+
+    private async Task<Progress> AdvanceAsync(ChatsDbContext db, Chat chat, Waits waits, CancellationToken ct)
+    {
         List<Message> waiting = await db.Messages
             .Where(message => message.ChatId == chatId && (message.State == MessageState.New || message.State == MessageState.Queued || message.State == MessageState.Steering))
             .OrderBy(message => message.Id)
@@ -542,11 +574,16 @@ internal sealed class ChatRunner(
         }
     }
 
-    // Returns true when the agent's process ended.
+    // Returns true when the agent's process ended, or the chat is gone.
     private async Task<bool> HandleAsync(List<RunnerInput> batch, CancellationToken ct)
     {
         await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
-        Chat chat = await db.Chats.SingleAsync(found => found.Id == chatId, ct);
+        Chat? chat = await db.Chats.SingleOrDefaultAsync(found => found.Id == chatId, ct);
+        if (chat is null)
+        {
+            return true;
+        }
+
         List<string> outgoing = [];
         bool exited = false;
         foreach (RunnerInput input in batch)

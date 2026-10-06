@@ -44,6 +44,8 @@ mode 600.
   started together.
 - **Browser sign-ins always show their link,** and accept the address pasted back, so they work over
   SSH. The browser opens only http and https links.
+- **`sloth chat` without a message starts the chat, then takes the message:** the nook starts while
+  it is typed at the prompt, or reads it as a line of input.
 - **Without a person at the keyboard,** `sloth chat "<message>"` ends when that message's turn ends
   and its checkpoint is taken, with exit code 1 when the turn failed, for scripts.
 - **Checkpoints are `<chat>@<number>`** wherever a chat's files are named: `--from abc123@3`.

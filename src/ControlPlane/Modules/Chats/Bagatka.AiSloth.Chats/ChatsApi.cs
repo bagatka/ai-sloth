@@ -24,11 +24,24 @@ internal sealed partial class ChatsApi(
     INooksApi nooks,
     IAgentAccountsApi accounts,
     ChatRunners runners,
+    Drafts drafts,
     ChatSignals signals,
     IObjectStorage storage,
     ChatsSettings settings,
     TimeProvider time) : IChatsApi, IChatHarnessesApi
 {
+    // Adds a message to be saved. A chat's first message ends its draft in the same save, so a draft is
+    // never deleted with a message in it: when the draft went meanwhile, the save conflicts.
+    private async Task AddMessageAsync(Message message, CancellationToken ct)
+    {
+        db.Messages.Add(message);
+        Draft? draft = await db.Drafts.SingleOrDefaultAsync(found => found.ChatId == message.ChatId, ct);
+        if (draft is not null)
+        {
+            db.Drafts.Remove(draft);
+        }
+    }
+
     // The chat, if the actor may do at least `needed` with it: a chat is as open as its nook. Not found
     // when they may not see it, so nobody learns that it exists; forbidden when they may only read.
     private async Task<Result<Chat>> FindChatAsync(Actor actor, ChatId id, AccessLevel needed, CancellationToken ct)

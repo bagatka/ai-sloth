@@ -28,6 +28,8 @@ public static class ChatsModule
         services.AddSingleton<ChatsMeter>();
         services.AddSingleton<NookSetups>();
         services.AddSingleton<ChatRunners>();
+        services.AddSingleton<Drafts>();
+        services.AddHostedService(provider => provider.GetRequiredService<Drafts>());
         services.AddHostedService(provider => provider.GetRequiredService<ChatRunners>());
         services.AddScoped<ChatsApi>();
         services.AddScoped<IChatsApi>(provider => provider.GetRequiredService<ChatsApi>());

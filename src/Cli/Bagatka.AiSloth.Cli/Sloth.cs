@@ -65,11 +65,12 @@ internal sealed partial class Sloth(
           sloth git branch-prefix <prefix>
 
         Chats
-          sloth chat "<message>" [--harness <id>] [--account <name>] [--on <provider>]
+          sloth chat ["<message>"] [--harness <id>] [--account <name>] [--on <provider>]
                      [--repo <name>[@<branch>]]... [--from <chat>[@<checkpoint>]]
                                      Start a chat in a nook of its own, and follow it: with the
                                      workspace's repositories, or a copy of a chat's files, as
-                                     they are or at one of its checkpoints
+                                     they are or at one of its checkpoints. Without a message,
+                                     the nook starts while you type it
           sloth chat list
           sloth chat open <id>       Follow a chat; type to write to the agent, /stop to stop it
           sloth chat send <id> "<message>" [--anyway]
@@ -153,7 +154,7 @@ internal sealed partial class Sloth(
             ["secret"] or ["secret", "list"] => ListSecretsAsync(ct),
             ["secret", "set", string name] => SetSecretAsync(name, ct),
             ["secret", "remove", string name] => RemoveSecretAsync(name, ct),
-            ["chat"] or ["chat", "list"] => ListChatsAsync(ct),
+            ["chat", "list"] => ListChatsAsync(ct),
             ["chat", "open", string id] => OpenChatAsync(id, ct),
             ["chat", "send", string id, string text] => SendToChatAsync(id, text, anyway: false, ct),
             ["chat", "send", string id, string text, "--anyway"] => SendToChatAsync(id, text, anyway: true, ct),

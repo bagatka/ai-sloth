@@ -8,8 +8,11 @@ using Aspire.Hosting.ApplicationModel;
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 string repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", ".."));
 const string NookImage = "aisloth-nook:dev";
-// The harnesses a nook can carry: the profiles in src/Harnesses, one image each.
-string[] harnesses = ["claude-code", "codex", "pi", "copilot"];
+// The harnesses a nook can carry: the profiles in src/Harnesses, one image each; nook-harnesses names
+// fewer, comma-separated, such as for tests that push their images somewhere.
+string[] harnesses = builder.Configuration["Parameters:nook-harnesses"] is { Length: > 0 } chosen
+    ? chosen.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+    : ["claude-code", "codex", "pi", "copilot"];
 
 // Sign-in: with codes always (the WebApi prints the first person's setup code to its console), and
 // with an OpenID Connect provider when one is configured, such as a WorkOS staging environment: set
@@ -66,6 +69,10 @@ IResourceBuilder<ParameterResource> nookSleepAfter = builder.AddParameter(
     "nook-sleep-after", builder.Configuration["Parameters:nook-sleep-after"] ?? "00:02:00");
 IResourceBuilder<ParameterResource> nookEvictAfter = builder.AddParameter(
     "nook-evict-after", builder.Configuration["Parameters:nook-evict-after"] ?? "1.00:00:00");
+
+// How long a chat nobody wrote in yet keeps its nook before both go. Tests give a short one.
+IResourceBuilder<ParameterResource> chatDraftLifetime = builder.AddParameter(
+    "chat-draft-lifetime", builder.Configuration["Parameters:chat-draft-lifetime"] ?? "00:15:00");
 
 // The Docker scope nooks run in, so test runs never touch a developer's nooks. A parameter given a
 // value can't be overridden, so the default is applied here.
@@ -129,6 +136,7 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         .WithEnvironment("Modules__Chats__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Chats__ModelGatewayUrl", modelsUrl)
         .WithEnvironment("Modules__Chats__NearlyFullDisk", nearlyFullDisk)
+        .WithEnvironment("Modules__Chats__DraftLifetime", chatDraftLifetime)
         .WithEnvironment("Modules__AgentAccounts__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__AgentAccounts__EncryptionKey", agentAccountsKey)
         .WithEnvironment("Modules__AgentAccounts__AllowChatGptPlans", allowChatGptPlans)

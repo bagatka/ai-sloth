@@ -100,7 +100,8 @@ proposal it sends on, where each is on its way to the agent, or that it is a pro
 setup test its turn's end calls for), `events`
 (chat and sequence number as key, kind, and the body as `jsonb`; an agent update is the ACP update
 as the agent sent it), `workspace_instructions` and `personal_instructions` (the text, when, and for
-a workspace's who last changed it), and `harness_states` (person, workspace, and harness as key, when
+a workspace's who last changed it), `drafts` (a chat nobody wrote in yet: its nook, workspace, who
+started it and when), and `harness_states` (person, workspace, and harness as key, when
 and from which chat it was saved, its size, its version: the SHA-256 of its file list; `xmin` as
 concurrency token). Archives are in object storage under
 `people/<user ID>/workspaces/<workspace ID>/harness-state/<harness>/<version>/`.
@@ -116,15 +117,22 @@ concurrency token). Archives are in object storage under
   read, so a restart continues exactly where it stopped. It reaches the agent's process only through
   `Harness/AgentProcess.cs`, which turns the process into lines of text. After each turn it takes
   the nook's checkpoint and syncs the harness state (`Harness/HarnessStates.cs`) before the next
-  turn starts.
+  turn starts. A runner whose chat is gone retires.
+- **Drafts** (`Drafts.cs`): every 10 seconds, deletes drafts older than the draft lifetime, with
+  their nooks.
 
 ## Configuration
 
 `ChatsSettings`, passed by the host (`PATTERNS.md`, entry 20): the connection string, the model
-gateway's URL as an agent in a nook reaches it, and how full a nook's disk is when a message needs
-confirming (0.9 by default). The host also registers the object storage harness state is kept in.
+gateway's URL as an agent in a nook reaches it, how full a nook's disk is when a message needs
+confirming (0.9 by default), and the draft lifetime (15 minutes by default). The host also registers the object storage harness state is kept in.
 
 ## Decisions and constraints
+
+- **A chat is a draft until its first message.** Apps start a chat as someone starts writing, so its
+  nook and agent are ready when they send. A draft isn't listed, goes with its nook after the draft
+  lifetime, and a person keeps at most two in a workspace, the oldest going when they start another.
+  The first message ends the draft in the same save, so a draft is never deleted with a message in it.
 
 - **One chat, one nook, one agent.** Starting a chat creates its nook, so no two agents ever work on
   the same files. Nooks may still exist without a chat, for processes only, but a chat never joins a

@@ -26,7 +26,7 @@ internal sealed partial class Sloth
     private async Task<int> StartChatAsync(string[] words, CancellationToken ct)
     {
         CommandLine? line = CommandLine.Parse(words, ["--harness", "--account", "--on", "--from"], [], repeatable: ["--repo"]);
-        if (line is not { Arguments: [string message] })
+        if (line is not { Arguments: [] or [_] })
         {
             return await UsageAsync();
         }
@@ -66,6 +66,21 @@ internal sealed partial class Sloth
         string starting = line.Values("--repo").Count > 0 ? " · " + string.Join(", ", line.Values("--repo")) : copyOf is null ? string.Empty : " · a copy of " + ShortId(copyOf.Id) + at;
         await terminal.WriteLineAsync("Chat " + ShortId(chat.Id) + " · " + harness.Name + " · " + account.Name + " · " + provider.Name + starting);
         ChatPrinter printer = new ChatPrinter(terminal, api, host.UserId, chat.Id, suggestPrepare: repositories.Count > 0 || copyOf is not null);
+
+        // Without a message, the chat's nook starts while it is typed: at a prompt, or as a line of input.
+        string? message = line.Arguments is [string given] ? given : null;
+        if (message is null && terminal.Interactive)
+        {
+            await terminal.WriteAsync("› ");
+        }
+
+        message ??= await terminal.ReadLineAsync(ct);
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            await terminal.WriteLineAsync("Nothing sent, so the chat isn't kept.");
+            return 1;
+        }
+
         Wire.SentMessage sent = await SendMessageAsync(api, chat.Id, message, anyway: false, ct);
         return await FollowAsync(api, chat, printer, terminal.Interactive ? null : sent.Id, ct);
     }

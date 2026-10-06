@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,13 +23,14 @@ namespace Bagatka.Sandboxing.Azure;
 /// its memory (<see cref="SandboxState.Paused"/>), and snapshots are committed disk images. The
 /// service chooses IDs, so every resource is found by its labels.
 /// </summary>
-internal sealed class AzureSandboxProvider(SandboxGroupClient client, string scope) : ISandboxProvider
+internal sealed class AzureSandboxProvider(SandboxGroupClient client, string scope, TimeProvider time) : ISandboxProvider
 {
     private const string ScopeLabel = "sandboxing-scope";
     private const string KeyLabel = "sandboxing-key";
     private const string SpecLabel = "sandboxing-spec";
     private const string SnapshotLabel = "sandboxing-snapshot";
     private const string SourceLabel = "sandboxing-source";
+    private const string ImageLabel = "sandboxing-image";
 
     // Labels hold at most 63 characters; half the fingerprint tells specs apart as well.
     private const int SpecLabelLength = 32;
@@ -36,6 +40,10 @@ internal sealed class AzureSandboxProvider(SandboxGroupClient client, string sco
 
     // A safety net for a control plane that is down: the service suspends a sandbox idle this long.
     private static readonly TimeSpan SafetySuspend = TimeSpan.FromMinutes(30);
+
+    // How long an image's disk image is used before it is made again, so a tag that moves reaches new
+    // sandboxes within a day.
+    private static readonly TimeSpan ImageFreshFor = TimeSpan.FromDays(1);
 
     private static readonly Error SandboxNotFound =
         Error.NotFound("sandboxing.sandbox_not_found", "The sandbox doesn't exist.");
@@ -137,12 +145,6 @@ internal sealed class AzureSandboxProvider(SandboxGroupClient client, string sco
         {
             await client.DeleteSandboxAsync(sandbox.Id, ct);
         }
-
-        // The disk image of a create that ended before deleting it.
-        await foreach (DiskImage image in client.GetDiskImagesAsync(Labels((KeyLabel, Format(key.Value))), ct))
-        {
-            await client.DeleteDiskImageAsync(image.Id, ct);
-        }
     }
 
     public async Task<Result<SnapshotObservation>> SnapshotAsync(SandboxKey sandbox, SnapshotKey snapshot, CancellationToken ct)
@@ -199,32 +201,62 @@ internal sealed class AzureSandboxProvider(SandboxGroupClient client, string sco
         }
     }
 
-    // A disk image for this sandbox alone, deleted once the sandbox exists, which never needs it again.
-    // It carries the key, so deleting the sandbox deletes one left behind.
     private async Task<Result<SandboxObservation>> CreateFromImageAsync(SandboxSpec spec, SandboxImage image, string specLabel, CancellationToken ct)
     {
+        Result<string> diskImage = await DiskImageOfAsync(image, ct);
+        if (diskImage.Failed)
+        {
+            return new Result<SandboxObservation>(diskImage.Error);
+        }
+
+        return await CreateSandboxAsync(spec, AzureSource.FromDiskImage(diskImage.Output), specLabel, ct);
+    }
+
+    // The image's disk image, which Azure takes about ten seconds to make even from an image it has
+    // seen, so one per image is shared by every deployment of the sandbox group: the same public image
+    // is the same disk image for all. One that is a day old is made again; the older ones go then, and
+    // sandboxes made from them keep working.
+    private async Task<Result<string>> DiskImageOfAsync(SandboxImage image, CancellationToken ct)
+    {
+        string imageLabel = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(image.Reference)))[..SpecLabelLength];
+        Dictionary<string, string> labels = new Dictionary<string, string>(StringComparer.Ordinal) { [ImageLabel] = imageLabel };
+        List<DiskImage> made = await client.GetDiskImagesAsync(labels, ct).ToListAsync(ct);
+        DiskImage? newest = made.Where(found => found.State == DiskImageState.Ready).MaxBy(found => found.CreatedAt);
+        if (newest is { CreatedAt: DateTimeOffset createdAt } && time.GetUtcNow() - createdAt < ImageFreshFor)
+        {
+            return new Result<string>(newest.Id);
+        }
+
         DiskImageCreateOptions options = new DiskImageCreateOptions(image.Reference);
-        options.Labels[ScopeLabel] = scope;
-        options.Labels[KeyLabel] = Format(spec.Key.Value);
-        Operation<DiskImage> made;
+        options.Labels[ImageLabel] = imageLabel;
+        Operation<DiskImage> making;
         try
         {
-            made = await client.CreateDiskImageAsync(WaitUntil.Completed, options, ct);
+            making = await client.CreateDiskImageAsync(WaitUntil.Completed, options, ct);
         }
         catch (RequestFailedException failed) when (failed.ErrorCode is "ImageNotFound" or "RegistryAuthFailed" or "InvalidRequest")
         {
             // Registries answer a missing repository as one that needs signing in.
-            return new Result<SandboxObservation>(Error.Validation("image", "Azure can't pull the image " + image.Reference + " (" + failed.ErrorCode + "); it must exist and be public."));
+            return new Result<string>(Error.Validation("image", "Azure can't pull the image " + image.Reference + " (" + failed.ErrorCode + "); it must exist and be public."));
         }
 
-        try
+        foreach (DiskImage older in made)
         {
-            return await CreateSandboxAsync(spec, AzureSource.FromDiskImage(made.Value.Id), specLabel, ct);
+            await client.DeleteDiskImageAsync(older.Id, ct);
         }
-        finally
+
+        // Those of images no sandbox was made from for two days go too, such as an older version's: one
+        // in use is made again daily.
+        DateTimeOffset unusedSince = time.GetUtcNow() - (2 * ImageFreshFor);
+        await foreach (DiskImage unused in client.GetDiskImagesAsync(labels: null, ct))
         {
-            await client.DeleteDiskImageAsync(made.Value.Id, CancellationToken.None);
+            if (unused.Labels.ContainsKey(ImageLabel) && unused.CreatedAt < unusedSince)
+            {
+                await client.DeleteDiskImageAsync(unused.Id, ct);
+            }
         }
+
+        return new Result<string>(making.Value.Id);
     }
 
     private async Task<Result<SandboxObservation>> CreateFromSnapshotAsync(SandboxSpec spec, SnapshotKey snapshot, string specLabel, CancellationToken ct)

@@ -17,7 +17,10 @@ public sealed record ChatsSettings
     /// How full a nook's disk is, from 0 to 1, when a message for its agent needs the sender's
     /// confirmation; 1 asks only for a full disk.
     /// </param>
-    public ChatsSettings(string connectionString, Uri modelGatewayUrl, double nearlyFullDisk = 0.9)
+    /// <param name="draftLifetime">
+    /// How long a chat nobody wrote in yet, a draft, keeps its nook before both go; 15 minutes unless given.
+    /// </param>
+    public ChatsSettings(string connectionString, Uri modelGatewayUrl, double nearlyFullDisk = 0.9, TimeSpan? draftLifetime = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         ArgumentNullException.ThrowIfNull(modelGatewayUrl);
@@ -28,6 +31,8 @@ public sealed record ChatsSettings
 
         ArgumentOutOfRangeException.ThrowIfNegative(nearlyFullDisk);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(nearlyFullDisk, 1);
+        DraftLifetime = draftLifetime ?? TimeSpan.FromMinutes(15);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(DraftLifetime, TimeSpan.Zero, nameof(draftLifetime));
         ConnectionString = connectionString;
         ModelGatewayUrl = modelGatewayUrl;
         NearlyFullDisk = nearlyFullDisk;
@@ -41,4 +46,7 @@ public sealed record ChatsSettings
 
     /// <summary>How full a nook's disk is, from 0 to 1, when a message for its agent needs the sender's confirmation.</summary>
     public double NearlyFullDisk { get; }
+
+    /// <summary>How long a draft keeps its nook before both go.</summary>
+    public TimeSpan DraftLifetime { get; }
 }

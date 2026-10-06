@@ -54,6 +54,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Nook | Where an agent works: an isolated machine with its files and processes, owned by a workspace, created by its chat; with it, the basic unit. A nook without a chat runs processes only. A provider's sandbox underneath. | Nooks | sandbox, orb, VM, container, environment, workspace |
 | Chat | A conversation between people and one coding agent, in the nook the chat creates for it; one chat per nook | Chats | thread, session, conversation |
 | Turn | One message in a chat and everything the agent did in reply, ending with a stop reason | Chats | step, exchange |
+| Draft | A chat nobody wrote in yet, started as someone starts writing so its nook is ready when they send; not listed, and gone with its nook after a while unsent | Chats | — |
 | Steering | A message sent during a turn going into that turn, so the agent reads it while it works | Chats | interrupt, injection |
 | Stop | Ending the running turn at once; messages the agent hasn't received are cancelled | Chats | cancel (in the product), abort, interrupt |
 | Model gateway | The WebApi endpoint agents call their model through; it forwards each call to their chat's agent account's endpoint with the headers that pay for it, so no nook holds a key or a plan's token | WebApi, Chats | LLM proxy, API proxy |

@@ -28,6 +28,12 @@ public interface IChatsApi
     /// the agent runs on the account, and starts now, once the nook's setup ended, while people
     /// write. Other people reach the chat through its nook's access.
     /// </summary>
+    /// <remarks>
+    /// Apps start a chat as someone starts writing its first message, so it is ready when they send it.
+    /// Until its first message the chat is a draft: it isn't listed, it goes with its nook after the
+    /// draft lifetime (15 minutes unless the host says otherwise), and a person keeps at most two in a
+    /// workspace, the oldest going when they start another.
+    /// </remarks>
     /// <returns>
     /// The chat, with its nook; a validation error for an unknown harness or provider, or an account the
     /// actor can't use or the harness doesn't take; forbidden without Write on the workspace; or not found
@@ -38,7 +44,7 @@ public interface IChatsApi
     /// <summary>The chat. Not found when it doesn't exist or the actor has no access to its nook.</summary>
     public Task<Result<ChatSummary>> GetAsync(Actor actor, ChatId id, CancellationToken ct);
 
-    /// <summary>The workspace's chats, newest first. Not found for anyone without access to the workspace, such as a nook's guest.</summary>
+    /// <summary>The workspace's chats someone wrote in, newest first. Not found for anyone without access to the workspace, such as a nook's guest.</summary>
     public Task<Result<Page<ChatSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, PageRequest page, CancellationToken ct);
 
     /// <summary>

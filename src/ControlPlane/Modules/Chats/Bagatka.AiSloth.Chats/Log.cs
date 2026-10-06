@@ -20,4 +20,13 @@ internal static partial class Log
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't delete nook {NookId}, which tested a setup; it stays in its workspace: {Reason}")]
     public static partial void TestNookKept(ILogger logger, Guid nookId, string reason);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Chat {ChatId} went with its nook, nobody having written in it")]
+    public static partial void DraftDropped(ILogger logger, Guid chatId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't delete nook {NookId} of a chat nobody wrote in; it stays in its workspace: {Reason}")]
+    public static partial void DraftNookKept(ILogger logger, Guid nookId, string reason);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "A pass deleting chats nobody wrote in failed; the next tries again")]
+    public static partial void DraftsFailed(ILogger logger, Exception exception);
 }

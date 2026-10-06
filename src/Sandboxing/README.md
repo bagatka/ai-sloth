@@ -55,7 +55,7 @@ flight, as an unreachable backend would.
 | Provider | Status | Suspends to | Notes |
 |---|---|---|---|
 | Docker | Built | `Stopped` (`docker stop`) | Local development, CI, single-machine deployments, and machines. Stopping frees a sandbox's memory, which matters on people's machines; a container whose entry point exited cleanly, as it does when asked to stop, is `Stopped`, and any other end is `Failed`. Runs sandboxes under Sysbox (`sysbox-runc`), which the engine must have; creating fails with `sandboxing.sysbox_missing` otherwise. Snapshots are committed images, with the sandbox's environment values kept out. Sandboxes can reach the host as `host.docker.internal`. |
-| Azure Container Apps Sandboxes | Built | `Paused` | The official host: microVMs with Docker inside. Images must be public. Disks get 20 GiB per core. The service suspends a sandbox idle for 30 minutes, in case the control plane is down. Snapshots are committed disk images. Through `Bagatka.Azure.Sandboxes` (`src/Sdk`) |
+| Azure Container Apps Sandboxes | Built | `Paused` | The official host: microVMs with Docker inside. Images must be public; an image's disk image is shared by the deployments of a sandbox group, made again daily, and deleted after two days unused. Disks get 20 GiB per core. The service suspends a sandbox idle for 30 minutes, in case the control plane is down. Snapshots are committed disk images. Through `Bagatka.Azure.Sandboxes` (`src/Sdk`) |
 | macOS virtual machines | After a spike | To be measured | On people's Macs only, through machines (`src/ControlPlane/Modules/Machines`), for iOS and macOS work; Apple's Virtualization.framework through Tart |
 
 ## An Azure sandbox group
@@ -75,7 +75,7 @@ az role assignment create --role "Container Apps SandboxGroup Data Owner" \
 The AppHost takes it as `azure-sandbox-group` (`subscription/resource-group/group/region`). Nooks
 there need the images in a public repository (`nook-image-repository`) and public addresses for this
 computer's daemon and model endpoints (`nook-daemon-url`, `nook-models-url`). We test with ngrok and
-ttl.sh, and anyone can: the end-to-end suite's `AzureTests` run when `BAGATKA_AZURE_SANDBOXES_GROUP`
+ttl.sh, and anyone can: the end-to-end suite's Azure tests run when `BAGATKA_AZURE_SANDBOXES_GROUP`
 is set and `BAGATKA_NGROK_ENV_FILE` names an env file with `NGROK_AUTHTOKEN`.
 
 ## Tests
