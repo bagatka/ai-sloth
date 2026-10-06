@@ -19,7 +19,8 @@ concurrency:
 jobs:
   validate-dotnet-solution:
     name: .NET solution / Build, audit, style & test
-    runs-on: ubuntu-latest
+    # Docker's and Sysbox's packages below are Ubuntu 24.04's.
+    runs-on: ubuntu-24.04
     # The journeys pull PostgreSQL and build the nook image (SDK image and an AOT compile).
     timeout-minutes: 25
     steps:
@@ -28,6 +29,7 @@ jobs:
 
       # Docker 29 with the containerd image store, as on dev machines. On the runner's Docker 28, with
       # its classic storage, a nook started from a ready copy lacked what the copy's setup installed.
+      # The runner's own updates may hold the package lock for a while after it starts.
       - name: Install Docker 29
         run: |
           sudo install --mode 0755 --directory /etc/apt/keyrings
@@ -38,7 +40,7 @@ jobs:
           { sudo cat /etc/docker/daemon.json 2>/dev/null || echo '{}'; } | jq '.features["containerd-snapshotter"] = true' | sudo tee "$RUNNER_TEMP/daemon.json"
           sudo mv "$RUNNER_TEMP/daemon.json" /etc/docker/daemon.json
           sudo apt-get update
-          sudo apt-get install --yes --allow-downgrades docker-ce=5:29.8.2-1~ubuntu.24.04~noble docker-ce-cli=5:29.8.2-1~ubuntu.24.04~noble
+          sudo apt-get install --yes --allow-downgrades -o DPkg::Lock::Timeout=300 docker-ce=5:29.8.2-1~ubuntu.24.04~noble docker-ce-cli=5:29.8.2-1~ubuntu.24.04~noble
           sudo systemctl restart docker
           docker info --format '{{.ServerVersion}} {{json .DriverStatus}}' | tee /dev/stderr | grep --quiet io.containerd.snapshotter
 
@@ -50,7 +52,7 @@ jobs:
           curl --fail --silent --show-error --location --output "$RUNNER_TEMP/sysbox.deb" \
             https://github.com/nestybox/sysbox/releases/download/v0.7.1/sysbox-ce_0.7.1.linux_amd64.deb
           echo "9d6d5484f980d0a17f86c492c1262015c2afb66280bdb97215b79fde6a0261c5  $RUNNER_TEMP/sysbox.deb" | sha256sum --check
-          sudo apt-get install --yes "$RUNNER_TEMP/sysbox.deb"
+          sudo apt-get install --yes -o DPkg::Lock::Timeout=300 "$RUNNER_TEMP/sysbox.deb"
           for attempt in $(seq 1 30); do
             if sudo test -S /run/sysbox/sysfs.sock; then
               break
