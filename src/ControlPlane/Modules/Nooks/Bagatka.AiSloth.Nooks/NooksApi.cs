@@ -113,7 +113,7 @@ internal sealed partial class NooksApi(
 
         if (status is NookStatus.Sleeping or NookStatus.Paused or NookStatus.Stopped or NookStatus.Evicted)
         {
-            bool woke = await sleeper.WakeAsync(nookId, ct);
+            bool woke = await sleeper.WakeAsync(nookId, actor, ct);
             if (!woke)
             {
                 return null;

@@ -54,10 +54,10 @@ internal sealed class NookSleeper(
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
-    // Gives a sleeping nook compute again: a Paused or Stopped one resumes, and its resume scripts run
-    // before anything else; an evicted one starts again from its latest checkpoint. Returns false when
-    // its provider can't be asked, such as for a machine that is offline.
-    public async Task<bool> WakeAsync(NookId nookId, CancellationToken ct)
+    // Gives a sleeping nook compute again, for the actor: a Paused or Stopped one resumes, and its
+    // resume scripts run before anything else; an evicted one starts again from its latest checkpoint.
+    // Returns false when its provider can't be asked, such as for a machine that is offline.
+    public async Task<bool> WakeAsync(NookId nookId, Actor actor, CancellationToken ct)
     {
         activity.Used(nookId);
         using IDisposable held = await fileLocks.AcquireAsync(nookId, ct);
@@ -73,6 +73,8 @@ internal sealed class NookSleeper(
             int? latest = await db.Checkpoints.Where(checkpoint => checkpoint.NookId == nookId).MaxAsync(checkpoint => (int?)checkpoint.Number, ct);
             await ChangeAsync(db, nook, evicted => { evicted.Replace(latest); return true; }, ct);
             reconciler.Wake();
+            string wokenFor = actor.ToLogValue();
+            Log.NookWoke(logger, nookId.Value, wokenFor);
             return true;
         }
 
@@ -87,6 +89,8 @@ internal sealed class NookSleeper(
         }
 
         await ChangeAsync(db, nook, woken => { woken.Woke(); return true; }, ct);
+        string resumedFor = actor.ToLogValue();
+        Log.NookWoke(logger, nookId.Value, resumedFor);
         return true;
     }
 

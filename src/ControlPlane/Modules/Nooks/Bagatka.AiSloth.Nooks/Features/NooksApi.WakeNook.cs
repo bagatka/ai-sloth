@@ -39,7 +39,7 @@ internal sealed partial class NooksApi
             return new Result(new Success());
         }
 
-        bool woke = await sleeper.WakeAsync(id, ct);
+        bool woke = await sleeper.WakeAsync(id, actor, ct);
         return woke ? new Result(new Success()) : new Result(NooksErrors.NotReady);
     }
 }

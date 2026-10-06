@@ -29,7 +29,9 @@ jobs:
 
       # Docker 29 with the containerd image store, as on dev machines. On the runner's Docker 28, with
       # its classic storage, a nook started from a ready copy lacked what the copy's setup installed.
-      # The runner's own updates may hold the package lock for a while after it starts.
+      # Docker starts once, already set up as Sysbox's installer would set it up (its runtime and
+      # networks), so the installer has nothing to change and doesn't restart it. The runner's own
+      # updates may hold the package lock for a while after it starts.
       - name: Install Docker 29
         run: |
           sudo install --mode 0755 --directory /etc/apt/keyrings
@@ -37,36 +39,38 @@ jobs:
           gpg --show-keys --with-colons /etc/apt/keyrings/docker.gpg | grep --quiet '^fpr:::::::::9DC858229FC7DD38854AE2D88D81803C0EBFCD88:'
           echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" | sudo tee /etc/apt/sources.list.d/docker.list
           sudo mkdir --parents /etc/docker
-          { sudo cat /etc/docker/daemon.json 2>/dev/null || echo '{}'; } | jq '.features["containerd-snapshotter"] = true' | sudo tee "$RUNNER_TEMP/daemon.json"
+          { sudo cat /etc/docker/daemon.json 2>/dev/null || echo '{}'; } | jq '.features["containerd-snapshotter"] = true
+            | .runtimes["sysbox-runc"] = {"path": "/usr/bin/sysbox-runc"}
+            | .bip = "172.20.0.1/16"
+            | ."default-address-pools" = [{"base": "172.25.0.0/16", "size": 24}]' | sudo tee "$RUNNER_TEMP/daemon.json"
           sudo mv "$RUNNER_TEMP/daemon.json" /etc/docker/daemon.json
           sudo apt-get update
           sudo apt-get install --yes --allow-downgrades -o DPkg::Lock::Timeout=300 docker-ce=5:29.8.2-1~ubuntu.24.04~noble docker-ce-cli=5:29.8.2-1~ubuntu.24.04~noble
           docker info --format '{{.ServerVersion}} {{json .DriverStatus}}' | tee /dev/stderr | grep --quiet io.containerd.snapshotter
 
       # The Docker provider runs nooks under Sysbox, so their own Docker works without privileges.
-      # Its installer restarts Docker, which systemd refuses after three starts in a minute, so the
-      # count starts over first. Its services start in the background and sometimes not at all the
-      # first time, so they get two more starts before the step gives up with what they logged;
-      # nooks fail until its socket, readable by root only, is up.
+      # Its services start in the background; nooks fail until its socket, readable by root only, is
+      # up. When it doesn't come up, the step ends with what they logged.
       - name: Install Sysbox
         run: |
           curl --fail --silent --show-error --location --output "$RUNNER_TEMP/sysbox.deb" \
             https://github.com/nestybox/sysbox/releases/download/v0.7.1/sysbox-ce_0.7.1.linux_amd64.deb
           echo "9d6d5484f980d0a17f86c492c1262015c2afb66280bdb97215b79fde6a0261c5  $RUNNER_TEMP/sysbox.deb" | sha256sum --check
-          sudo systemctl reset-failed docker.service
-          sudo apt-get install --yes -o DPkg::Lock::Timeout=300 "$RUNNER_TEMP/sysbox.deb" || true
-          for start in 1 2 3; do
-            for attempt in $(seq 1 20); do
-              if sudo test -S /run/sysbox/sysfs.sock; then
-                exit 0
-              fi
-              sleep 1
-            done
-            echo "::warning::Sysbox isn't up; starting it again."
-            sudo dpkg --configure --pending || true
-            sudo systemctl restart sysbox || true
+          logs() {
+            sudo systemctl status sysbox sysbox-mgr sysbox-fs docker --no-pager || true
+            sudo journalctl --unit sysbox --unit sysbox-mgr --unit sysbox-fs --unit docker --no-pager | tail -80
+          }
+          if ! sudo apt-get install --yes -o DPkg::Lock::Timeout=300 "$RUNNER_TEMP/sysbox.deb"; then
+            logs
+            exit 1
+          fi
+          for attempt in $(seq 1 30); do
+            if sudo test -S /run/sysbox/sysfs.sock; then
+              exit 0
+            fi
+            sleep 1
           done
-          sudo journalctl --unit sysbox --unit sysbox-mgr --unit sysbox-fs --unit docker --no-pager | tail -80
+          logs
           exit 1
 
       - name: Install .NET SDK from global.json
@@ -103,7 +107,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: app-logs
+          name: app-logs-attempt-${{ github.run_attempt }}
           path: tests/*/bin/Release/*/TestResults/logs/
           retention-days: 14
           if-no-files-found: ignore

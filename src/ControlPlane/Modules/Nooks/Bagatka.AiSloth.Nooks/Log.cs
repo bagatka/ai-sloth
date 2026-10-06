@@ -36,6 +36,9 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Error, Message = "Putting nook {NookId} to sleep, or evicting it, failed; the next pass tries again")]
     public static partial void SleepingFailed(ILogger logger, Exception exception, Guid nookId);
 
+    [LoggerMessage(Level = LogLevel.Information, Message = "Nook {NookId} woke for {Actor}")]
+    public static partial void NookWoke(ILogger logger, Guid nookId, string actor);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Waking nook {NookId} failed; its next use tries again")]
     public static partial void WakingFailed(ILogger logger, Exception exception, Guid nookId);
 
