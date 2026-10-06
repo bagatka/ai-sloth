@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Bagatka.AiSloth.Nooks.Contracts;
@@ -12,4 +13,9 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// </summary>
 /// <param name="Scripts">The scripts, as paths in the nook's files, in the order they run; empty when there are none.</param>
 /// <param name="Run">Their latest run, or <see langword="null"/> when there are no scripts.</param>
-public sealed record NookSetup(IReadOnlyList<string> Scripts, SetupRun? Run);
+/// <param name="ReadyCopyMadeAt">
+/// When the ready copy the latest run set the nook up from was made: a copy of a nook with the same
+/// files right after a setup that took a while, which leaves this setup little to do. <see langword="null"/>
+/// when the run set it up from scratch, or only resumed it.
+/// </param>
+public sealed record NookSetup(IReadOnlyList<string> Scripts, SetupRun? Run, DateTimeOffset? ReadyCopyMadeAt);

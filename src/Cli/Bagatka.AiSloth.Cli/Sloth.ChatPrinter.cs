@@ -92,7 +92,8 @@ internal sealed partial class Sloth
             {
                 case "setup-started":
                     List<string> scripts = [.. body.GetProperty("scripts").EnumerateArray().Select(script => script.GetString() ?? string.Empty)];
-                    await LineAsync("Setting up: " + string.Join(", ", scripts));
+                    bool fromCopy = body.GetProperty("fromReadyCopy").GetBoolean();
+                    await LineAsync((fromCopy ? "Setting up from a ready copy: " : "Setting up: ") + string.Join(", ", scripts));
                     _setUp = true;
                     break;
                 case "setup-ended":

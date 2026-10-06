@@ -6,6 +6,7 @@ AgentAccountId;System.Guid
 ChatId;System.Guid
 NookId;System.Guid
 ProcessId;System.String
+Provider;System.String
 Reason;System.String
 RetryDelay;System.TimeSpan
 UserId;System.Guid

@@ -36,6 +36,7 @@ internal sealed partial class NooksApi(
     NookReconciler reconciler,
     NookSleeper sleeper,
     NookActivity activity,
+    ReadyCopies readyCopies,
     NooksSettings settings,
     TimeProvider time) : INooksApi, INookDaemonsApi
 {

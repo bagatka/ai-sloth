@@ -5,9 +5,12 @@ using System.Threading;
 using System;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Daemons;
+using Bagatka.AiSloth.Nooks.Data;
 using Bagatka.AiSloth.Nooks.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
+using Bagatka.Foundation.Modules;
+using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Nooks;
 
@@ -30,9 +33,10 @@ internal sealed partial class NooksApi
         return new Result<IAsyncEnumerable<ProcessEvent>>(WatchAsync(connection, found.Output.Id, Math.Max(command.FromOffset, 0), ct));
     }
 
-    // Relays the daemon's uploads until one ends with the exit. An upload that breaks off, because
-    // the daemon's connection ended, is asked for again from where it stopped on the next connection,
-    // so the watcher sees every byte once.
+    // Relays the daemon's uploads until one ends with the exit, which is recorded first, so whoever
+    // learns of an exit here finds it recorded, as the daemon's own report may not be yet. An upload
+    // that breaks off, because the daemon's connection ended, is asked for again from where it stopped
+    // on the next connection, so the watcher sees every byte once.
     private async IAsyncEnumerable<ProcessEvent> WatchAsync(DaemonConnection connection, ProcessId processId, long offset, [EnumeratorCancellation] CancellationToken ct)
     {
         while (true)
@@ -46,6 +50,11 @@ internal sealed partial class NooksApi
                     {
                         await foreach (ProcessEvent processEvent in receiver.Events.ReadAllAsync(ct))
                         {
+                            if (processEvent.Value is ProcessExited exited)
+                            {
+                                await RecordExitAsync(connection.NookId, exited, ct);
+                            }
+
                             yield return processEvent;
                             if (processEvent.Value is not ProcessOutput output)
                             {
@@ -70,5 +79,16 @@ internal sealed partial class NooksApi
 
             connection = reconnected;
         }
+    }
+
+    // Records a process's exit, from the daemon's report or a watch, whichever comes first.
+    private async Task RecordExitAsync(NookId nookId, ProcessExited exited, CancellationToken ct)
+    {
+        await using NooksDbContext current = await databases.CreateDbContextAsync(ct);
+        Process? process = await current.Processes.SingleOrDefaultAsync(found => found.Id == exited.ProcessId && found.NookId == nookId, ct);
+        process?.Exited(exited.ExitCode, time);
+
+        // A conflict means the other one recorded it.
+        await current.SaveAsync(ct);
     }
 }

@@ -31,6 +31,10 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// Absolute paths outside <c>/work</c> the nook's checkpoints keep too, such as where its agent keeps
 /// its sessions; at most 10. Empty for none.
 /// </param>
+/// <param name="FromScratch">
+/// Whether the nook starts from its image even when a ready copy of a nook with the same files would
+/// start it faster, such as to test that a setup works from scratch.
+/// </param>
 public sealed record CreateNook(
     WorkspaceId WorkspaceId,
     string Provider,
@@ -38,4 +42,5 @@ public sealed record CreateNook(
     IReadOnlyList<NookRepository> Repositories,
     NookId? CopyOf,
     int? Checkpoint,
-    IReadOnlyList<string> KeptPaths);
+    IReadOnlyList<string> KeptPaths,
+    bool FromScratch);

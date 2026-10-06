@@ -59,20 +59,21 @@ internal sealed partial class NooksApi
         {
             await foreach (DaemonReport report in reports.WithCancellation(ct))
             {
-                await using NooksDbContext current = await databases.CreateDbContextAsync(ct);
                 switch (report)
                 {
                     case ProcessExited exited:
-                        Process? process = await current.Processes.SingleOrDefaultAsync(found => found.Id == exited.ProcessId && found.NookId == nookId, ct);
-                        process?.Exited(exited.ExitCode, time);
-                        await current.SaveAsync(ct);
+                        await RecordExitAsync(nookId, exited, ct);
                         break;
                     case DiskUsage disk:
-                        Nook? nook = await current.Nooks.SingleOrDefaultAsync(found => found.Id == nookId, ct);
-                        nook?.ReportDisk(disk);
+                        await using (NooksDbContext current = await databases.CreateDbContextAsync(ct))
+                        {
+                            Nook? nook = await current.Nooks.SingleOrDefaultAsync(found => found.Id == nookId, ct);
+                            nook?.ReportDisk(disk);
 
-                        // A conflict means the nook changed meanwhile; the next report, 30 seconds on, wins.
-                        await current.SaveAsync(ct);
+                            // A conflict means the nook changed meanwhile; the next report, 30 seconds on, wins.
+                            await current.SaveAsync(ct);
+                        }
+
                         break;
                 }
             }

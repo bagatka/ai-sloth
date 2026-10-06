@@ -9,6 +9,8 @@ using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Daemons;
 using Bagatka.AiSloth.Nooks.Model;
 using Bagatka.Foundation;
+using Bagatka.Foundation.Modules;
+using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Nooks;
 
@@ -101,6 +103,40 @@ internal sealed partial class NooksApi
         }
 
         return new Result<SetupStart>(new SetupStart(scripts, process.Id));
+    }
+
+    // Before anything touches a nook after its setup started: once the setup ended, takes the nook's
+    // ready copy if the setup earned one, by succeeding after a while. Something touching the nook while
+    // its setup runs would leave more than the setup's work in a copy, so then there is none.
+    private async Task KeepReadyCopyAsync(Nook nook, CancellationToken ct)
+    {
+        if (!nook.ReadyCopyDue)
+        {
+            return;
+        }
+
+        using IDisposable held = await fileLocks.AcquireAsync(nook.Id, ct);
+        await db.Entry(nook).ReloadAsync(ct);
+        if (!nook.ReadyCopyDue)
+        {
+            return;
+        }
+
+        Process? setup = await db.Processes.AsNoTracking().SingleOrDefaultAsync(process => process.Id == nook.SetupProcessId, ct);
+        bool earned = setup is { ExitCode: 0, ExitedAt: DateTimeOffset ended } && ended - setup.StartedAt >= ReadyCopy.WorthKeeping;
+        if (earned)
+        {
+            await readyCopies.TakeAsync(nook, ct);
+        }
+
+        // The daemon's disk reports change the nook meanwhile: the change is applied again on their conflict.
+        Result saved = new Result(ModuleDbContextExtensions.ConcurrencyConflict);
+        for (int attempt = 0; attempt < 3 && saved.Failed && saved.Error == ModuleDbContextExtensions.ConcurrencyConflict; attempt++)
+        {
+            await db.Entry(nook).ReloadAsync(ct);
+            nook.ReadyCopyHandled();
+            saved = await db.SaveAsync(ct);
+        }
     }
 
     private sealed record SetupStart(List<string> Scripts, ProcessId? Process);

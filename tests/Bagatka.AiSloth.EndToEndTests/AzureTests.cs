@@ -68,6 +68,27 @@ public sealed class AzureTests(AzureControlPlane azure) : IClassFixture<AzureCon
         Assert.Equal(0, fresh);
     }
 
+    [Fact]
+    public async Task The_next_chat_on_Azure_with_a_repository_sets_up_from_the_ready_copy_its_slow_setup_left()
+    {
+        SlowSetupRepository repository = await SlowSetupRepository.CreateAsync(azure.ControlPlane!, Alice);
+        ChatSummary first = await repository.StartChatAsync("azure");
+        await using ChatWatch firstWatch = await ChatWatch.OpenAsync(Alice, first);
+        await firstWatch.NextAsync("setup-ended", FirstTurn);
+        await SendAsync(first, "Please write hello.txt for me");
+        await firstWatch.NextAsync("checkpoint-saved");
+
+        ChatSummary second = await repository.StartChatAsync("azure");
+        await using ChatWatch watch = await ChatWatch.OpenAsync(Alice, second);
+        JsonElement started = await watch.NextAsync("setup-started", FirstTurn);
+        JsonElement ended = await watch.NextAsync("setup-ended");
+        int? installed = await NookProcesses.ExitCodeAsync(Alice, second.NookId, "test", "-f", "/work/api/deps/installed");
+
+        Assert.True(started.GetProperty("fromReadyCopy").GetBoolean());
+        Assert.True(TimeSpan.Parse(ended.GetProperty("took").GetString()!, CultureInfo.InvariantCulture) < TimeSpan.FromSeconds(SlowSetupRepository.SetupSeconds));
+        Assert.Equal(0, installed);
+    }
+
     public void Dispose()
     {
         _alice?.Dispose();

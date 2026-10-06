@@ -19,21 +19,26 @@ using Microsoft.Extensions.Logging;
 
 namespace Bagatka.AiSloth.Nooks.Jobs;
 
-// Makes providers match the records: creates the sandboxes of new nooks, replaces those running nooks
-// lost, and deletes those of deleted ones (src/ControlPlane/Modules/Nooks/README.md, "Background
-// work"). Not handled yet: sandboxes without a record, which needs a comparison with each provider's
-// ListAsync.
+// Makes providers match the records: creates the sandboxes of new nooks, from a ready copy when one
+// matches, replaces those running nooks lost, deletes those of deleted ones, and hourly the ready copies
+// nobody uses (src/ControlPlane/Modules/Nooks/README.md, "Background work"). Not handled yet: sandboxes
+// without a record, which needs a comparison with each provider's ListAsync.
 internal sealed class NookReconciler(
     IDbContextFactory<NooksDbContext> databases,
     IEnumerable<ISandboxProvider> providers,
     DaemonConnections daemons,
     IObjectStorage storage,
+    ReadyCopies readyCopies,
     NooksSettings settings,
     TimeProvider time,
     ILogger<NookReconciler> logger) : BackgroundService
 {
     private const int BatchSize = 20;
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan PruneInterval = TimeSpan.FromHours(1);
+
+    // When the next pass deletes the ready copies nobody uses: at the first after a start.
+    private DateTimeOffset _nextPrune = DateTimeOffset.MinValue;
 
     private readonly Channel<bool> _wake = Channel.CreateBounded<bool>(
         new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
@@ -88,6 +93,12 @@ internal sealed class NookReconciler(
             {
                 await ReconcileAsync(nookId, ct);
             }
+
+            if (time.GetUtcNow() >= _nextPrune)
+            {
+                _nextPrune = time.GetUtcNow() + PruneInterval;
+                await readyCopies.PruneAsync(ct);
+            }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -129,7 +140,8 @@ internal sealed class NookReconciler(
         }
     }
 
-    // Creates the sandbox unless it exists. The daemon connecting then makes the nook Running.
+    // Creates the sandbox unless it exists, from the ready copy matching the nook's files, with its
+    // setup's work done, or from its image. The daemon connecting then makes the nook Running.
     private async Task EnsureSandboxAsync(NooksDbContext db, ISandboxProvider provider, Nook nook, CancellationToken ct)
     {
         SandboxObservation? sandbox = await provider.ObserveAsync(SandboxKey.From(nook.Id.Value), ct);
@@ -144,12 +156,15 @@ internal sealed class NookReconciler(
         }
 
         // A harness the deployment stopped offering has no image to start from.
-        string? image = nook.Harness is null ? settings.Image : settings.HarnessImages.GetValueOrDefault(nook.Harness);
+        string? image = settings.ImageOf(nook.Harness);
         if (image is null)
         {
             await FailAsync(db, nook, "The deployment no longer offers its harness.", ct);
             return;
         }
+
+        ReadyCopy? copy = await readyCopies.FindAsync(db, nook, image, ct);
+        nook.StartsFrom(copy?.MadeAt);
 
         // Saved first, so the daemon of the sandbox about to exist can prove itself.
         string token = nook.IssueDaemonToken();
@@ -159,7 +174,24 @@ internal sealed class NookReconciler(
             return;
         }
 
-        Result<SandboxObservation> created = await provider.CreateAsync(Spec(nook, image, token), ct);
+        SandboxSource fromImage = new SandboxSource(new SandboxImage(image));
+        Result<SandboxObservation> created = await provider.CreateAsync(Spec(nook, copy is null ? fromImage : new SandboxSource(SnapshotKey.From(copy.Snapshot)), token), ct);
+
+        // A copy whose snapshot is gone at the provider goes, and the nook starts from its image.
+        if (created.Failed && created.Error.Kind == ErrorKind.NotFound && copy is not null)
+        {
+            Log.ReadyCopyGone(logger, nook.Id.Value);
+            db.ReadyCopies.Remove(copy);
+            nook.StartsFrom(null);
+            Result forgotten = await db.SaveAsync(ct);
+            if (forgotten.Failed)
+            {
+                return;
+            }
+
+            created = await provider.CreateAsync(Spec(nook, fromImage, token), ct);
+        }
+
         if (created.Failed)
         {
             await FailAsync(db, nook, created.Error.Message, ct);
@@ -275,11 +307,11 @@ internal sealed class NookReconciler(
         }
     }
 
-    private SandboxSpec Spec(Nook nook, string image, string token)
+    private SandboxSpec Spec(Nook nook, SandboxSource source, string token)
     {
         return new SandboxSpec(
             SandboxKey.From(nook.Id.Value),
-            new SandboxSource(new SandboxImage(image)),
+            source,
             new SandboxResources(settings.CpuMillicores, settings.MemoryMebibytes),
             new Dictionary<string, string>(StringComparer.Ordinal)
             {

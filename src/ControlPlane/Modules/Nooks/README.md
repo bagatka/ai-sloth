@@ -5,14 +5,14 @@ provider someone who works in a workspace chooses. A chat and the nook it create
 unit, one agent per nook; a nook without a chat runs processes only. A project may group nooks, but a
 nook never needs one. This module tracks nooks' lifecycle, runs processes in them through their
 daemons, checkpoints their files and brings a lost nook back from its latest checkpoint, and
-later starts them fast from templates.
+starts them fast from ready copies.
 
 ## Owns
 
 - **Data:** nook records (workspace, provider, harness, who created it, what it copies, its kept
   paths, status, latest disk usage), the hash of each nook's daemon token, its copies of its sources
   (each repository's name, branch, and the commit it started from), the processes started in each
-  nook, and its checkpoints, whose bundles are in object storage; templates later.
+  nook, its checkpoints, whose bundles are in object storage, and ready copies.
 - **Rules:** what each access level allows with a nook (Read sees it and watches its processes; Write
   starts, feeds, and stops processes and deletes it; the control plane's own processes, such as Chats
   running an agent, may do anything), the lifecycle below, when a nook nobody uses falls asleep and
@@ -122,17 +122,20 @@ neither meets the other or a file operation halfway. People see every sleeping s
 Schema `nooks`. Tables `nooks` (ID, workspace ID, provider name and location, status, created at and
 by, the nook and checkpoint it copies, its kept paths, whether its sources are in place, the setup
 scripts found then and the process running them, when it fell asleep, whether its resume scripts are
-due after waking, daemon token hash; a concurrency token), `source_copies` (nook ID and name, repository, branch, the commit
+due after waking, whether it starts from scratch, when its ready copy was made, whether one is due, daemon token hash; a concurrency token), `source_copies` (nook ID and name, repository, branch, the commit
 it started from), `processes` (ID, nook ID, command, arguments, started at, exit code and when it came),
-`checkpoints` (ID, nook ID, number, taken at, note), and `checkpoint_parts` (checkpoint, the place it
-keeps, its snapshot commit, the commit its bundle builds on, the bundle's object key). Bundles are in
+`checkpoints` (ID, nook ID, number, taken at, note), `checkpoint_parts` (checkpoint, the place it
+keeps, its snapshot commit, the commit its bundle builds on, the bundle's object key), and
+`ready_copies` (the hash of what nooks must share to start from it, its workspace, provider and
+place, snapshot, the nook it was made from, when it was made and last used). Bundles are in
 object storage under `nooks/<nook ID>/checkpoints/<number>/`.
 
 ## Background work
 
 - **Reconciler** (`Jobs/NookReconciler.cs`): runs every 10 seconds, and at once after a nook is
   recorded or deleted, in bounded batches. Recorded `Creating` and missing at the provider: issue a
-  daemon token and call `CreateAsync`. Recorded `Running` or `Unreachable` without a daemon
+  daemon token and call `CreateAsync`, from a matching ready copy when there is one. Hourly: delete
+  ready copies nobody uses (see Ready copies). Recorded `Running` or `Unreachable` without a daemon
   connection here: ask the provider, and when the sandbox is gone or failed, delete what is left of
   it, end the processes that ran there with exit code -1, and create it again from the latest
   checkpoint; when the provider can't be asked, mark it `Unreachable`, logged once. Recorded `Deleting`:
@@ -156,8 +159,19 @@ then every resume: `/work`'s own before each folder's, by name, each in its own 
 workspace's secrets, 30 minutes for a setup and 5 for a resume. One process runs them all, so people
 see it, and its output also goes to `/var/log/aisloth/setup.log` for the agent. A failure fails the
 run with the first failing script's exit code, after the others ran; the nook works either way.
-Scripts must be safe to run again, because ready copies (planned) will run them again on top of an
+Scripts must be safe to run again, because a nook from a ready copy runs them again on top of an
 earlier run.
+
+## Ready copies
+
+A run of setup scripts that succeeded after 15 seconds or more leaves a ready copy: a snapshot of the
+nook taken before anything else touches it, so it holds only the setup's work. Something touching the
+nook while its setup runs means no copy this time. The next nooks of the workspace with the same
+provider and place, image, and repositories start from the newest copy. Their repositories catch up
+to their branch, keeping only what git ignores of the copy's, such as installed dependencies, and a
+checkpoint's files come back the same way; then the whole setup runs again, quickly. Nooks without
+repositories don't share copies, and a nook created `FromScratch`, such as Preparing's test, ignores
+them. A copy unused for a week is deleted, and so is a snapshot no copy holds after an hour.
 
 ## Checkpoints
 
@@ -257,7 +271,6 @@ checkpoints are kept in.
 - **Lost processes.** Processes a restarted daemon lost in the same sandbox never report an exit:
   watching one ends at once with exit code -1, but the process list still shows it running. Handling
   it means marking them exited on the daemon's next hello. A replaced sandbox's processes are marked.
-- **Ready copies,** which would make waking an evicted nook as fast as a new one from a copy.
 - **What checkpoints leave out.** Ignored files; git's settings besides remotes, which a restored
   source gets again from its creator; tags; repositories deeper than directly in `/work`, and
   submodules' files. Folders whose names hold a tab or a line break fail the checkpoint, as do more

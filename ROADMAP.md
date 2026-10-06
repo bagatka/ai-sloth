@@ -9,9 +9,9 @@ after it adds entries to existing lists (a provider, an account kind, a harness)
 concepts. Providers for now: Azure Container Apps Sandboxes for the official host, people's own
 machines, and local Docker for development, tests, and single-machine self-hosting.
 
-1. **Fast start: ready copies.** A nook whose setup took a while leaves a copy of itself right after
-   setup, matched by its setup and harness, that the next nooks, and nooks waking from a long sleep,
-   start from and catch up; on Azure a memory snapshot with its services running.
+1. **Fast start: instant nooks.** Ready copies that keep their memory where the provider can, as on
+   Azure, so a nook starts with its services already running; and a new chat's nook starting while
+   its first message is typed, falling asleep and going away when it isn't sent.
 2. **Hosting.** The control plane deployed anywhere, object storage in Azure Blob Storage, people's
    own machines connecting from anywhere (Linux, Windows through WSL, Macs through a Linux VM),
    published nook images and CLI binaries, self-hosting packaged for a VPS or a company network,

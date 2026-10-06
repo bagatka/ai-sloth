@@ -317,7 +317,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
         return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
-    // Whatever tests left behind, including after a failure.
+    // Whatever tests left behind, including after a failure: sandboxes, and the ready copies' snapshots.
     private static async Task DeleteSandboxesAsync(string scope)
     {
         ServiceCollection services = new ServiceCollection();
@@ -327,6 +327,11 @@ public sealed partial class ControlPlane : IAsyncLifetime
         await foreach (SandboxObservation sandbox in docker.ListAsync(CancellationToken.None))
         {
             await docker.DeleteAsync(sandbox.Key, CancellationToken.None);
+        }
+
+        await foreach (SnapshotObservation snapshot in docker.ListSnapshotsAsync(CancellationToken.None))
+        {
+            await docker.DeleteSnapshotAsync(snapshot.Key, CancellationToken.None);
         }
     }
 }

@@ -55,6 +55,8 @@ internal sealed partial class NooksApi
             return new Result<ProcessSummary>(prepared.Error);
         }
 
+        await KeepReadyCopyAsync(nook.Output, ct);
+
         db.Processes.Add(process);
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)

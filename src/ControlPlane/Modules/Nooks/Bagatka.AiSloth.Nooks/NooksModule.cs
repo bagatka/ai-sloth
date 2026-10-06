@@ -25,6 +25,7 @@ public static class NooksModule
         services.AddSingleton<DaemonConnections>();
         services.AddSingleton<InputFeeds>();
         services.AddSingleton<FileLocks>();
+        services.AddSingleton<ReadyCopies>();
         services.AddSingleton<NookReconciler>();
         services.AddHostedService(provider => provider.GetRequiredService<NookReconciler>());
         services.AddSingleton<NookActivity>();

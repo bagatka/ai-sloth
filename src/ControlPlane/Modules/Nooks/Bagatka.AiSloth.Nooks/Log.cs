@@ -41,4 +41,16 @@ internal static partial class Log
 
     [LoggerMessage(Level = LogLevel.Error, Message = "A pass putting nooks to sleep failed; the next tries again")]
     public static partial void SleepPassFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Nook {NookId}'s setup left a ready copy")]
+    public static partial void ReadyCopyTaken(ILogger logger, Guid nookId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Nook {NookId}'s setup left no ready copy, so nooks with its files keep setting up from scratch")]
+    public static partial void ReadyCopyFailed(ILogger logger, Exception exception, Guid nookId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Nook {NookId}'s ready copy is gone at its provider; it starts from its image")]
+    public static partial void ReadyCopyGone(ILogger logger, Guid nookId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Deleting unused ready copies at provider {Provider} failed; the next hour tries again")]
+    public static partial void PruningFailed(ILogger logger, Exception exception, string provider);
 }

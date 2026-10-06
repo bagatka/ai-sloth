@@ -38,7 +38,8 @@ FROM node:22-slim AS copilot-install
 RUN npm install --global --prefix /opt/harness @github/copilot@1.0.91
 
 # Plain Ubuntu: slothd needs only libc, and OpenSSL with the CA certificates for TLS to the control
-# plane; it runs without ICU. tini runs as PID 1 and reaps the orphaned processes agents leave behind.
+# plane; it runs without ICU. tini reaps the orphaned processes agents leave behind, as PID 1 or, where
+# the provider runs its own init as PID 1, as a subreaper (-s).
 # Docker is Ubuntu's; it runs without privileges because providers run nooks under Sysbox or in VMs.
 # systemd is there only for systemd-socket-activate, which starts Docker on first use; tini stays init.
 FROM ubuntu:26.04 AS nook
@@ -50,7 +51,7 @@ COPY --from=build /out/Bagatka.AiSloth.Daemon /usr/local/bin/slothd
 COPY --chmod=755 src/Daemon/start-nook.sh /usr/local/bin/start-nook
 RUN mkdir -p /work /var/lib/slothd
 WORKDIR /work
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/start-nook"]
+ENTRYPOINT ["/usr/bin/tini", "-s", "--", "/usr/local/bin/start-nook"]
 
 # Harnesses run on Node.js; every harness image shares this layer.
 FROM nook AS node

@@ -17,7 +17,7 @@ internal sealed class Nook
     public const int MaxHarnessLength = 32;
 
     // Used by Create and by EF: parameter names match property names.
-    private Nook(NookId id, WorkspaceId workspaceId, string provider, string? location, string? harness, NookStatus status, DateTimeOffset createdAt, UserId? createdBy, NookId? copyOf, int? copyCheckpoint, List<string> keptPaths)
+    private Nook(NookId id, WorkspaceId workspaceId, string provider, string? location, string? harness, NookStatus status, DateTimeOffset createdAt, UserId? createdBy, NookId? copyOf, int? copyCheckpoint, List<string> keptPaths, bool fromScratch)
     {
         Id = id;
         WorkspaceId = workspaceId;
@@ -30,6 +30,7 @@ internal sealed class Nook
         CopyOf = copyOf;
         CopyCheckpoint = copyCheckpoint;
         KeptPaths = keptPaths;
+        FromScratch = fromScratch;
     }
 
     public NookId Id { get; private set; }
@@ -60,6 +61,16 @@ internal sealed class Nook
     // Absolute paths outside /work its checkpoints keep too.
     public List<string> KeptPaths { get; private set; }
 
+    // Whether its sandbox starts from its image even when a ready copy would match, such as to test a
+    // setup from scratch.
+    public bool FromScratch { get; private set; }
+
+    // When the ready copy its sandbox started from was made; none when it started from its image.
+    public DateTimeOffset? ReadyCopyMadeAt { get; private set; }
+
+    // Whether its setup started after its files arrived and a ready copy may be taken once it ended.
+    public bool ReadyCopyDue { get; private set; }
+
     // Whether its sources are in place: its repositories copied in, or another nook's files, and the
     // agents' guide to them.
     // Nothing else runs in it before.
@@ -87,18 +98,36 @@ internal sealed class Nook
     // PostgreSQL's xmin: concurrent changes to one nook conflict instead of overwriting each other.
     public uint Version { get; private set; }
 
-    public static Nook Create(WorkspaceId workspaceId, ProviderId provider, string? harness, UserId? createdBy, NookId? copyOf, int? copyCheckpoint, List<string> keptPaths, TimeProvider time)
+    public static Nook Create(WorkspaceId workspaceId, ProviderId provider, string? harness, UserId? createdBy, NookId? copyOf, int? copyCheckpoint, List<string> keptPaths, bool fromScratch, TimeProvider time)
     {
-        return new Nook(NookId.New(), workspaceId, provider.Name, provider.Location, harness, NookStatus.Creating, time.GetUtcNow(), createdBy, copyOf, copyCheckpoint, keptPaths);
+        return new Nook(NookId.New(), workspaceId, provider.Name, provider.Location, harness, NookStatus.Creating, time.GetUtcNow(), createdBy, copyOf, copyCheckpoint, keptPaths, fromScratch);
     }
 
-    // Its files are in place, and its setup, if it has one, runs in the process.
+    // Its sandbox is about to be created, from the ready copy made then, or from its image.
+    public void StartsFrom(DateTimeOffset? readyCopyMadeAt)
+    {
+        ReadyCopyMadeAt = readyCopyMadeAt;
+    }
+
+    // Its files are in place, and its setup, if it has one, runs in the process. A run of setup
+    // scripts, not only resume ones, may earn a ready copy.
     public void SourcesPrepared(List<string> setupScripts, ProcessId? setupProcess)
     {
         SourcesReady = true;
         ResumeDue = false;
         SetupScripts = setupScripts;
         SetupProcessId = setupProcess;
+        ReadyCopyDue = setupProcess is not null && RunsSetup(setupScripts);
+    }
+
+    // When the ready copy its latest setup run set it up from was made: none when the run set it up from
+    // scratch, or only resumed it.
+    public DateTimeOffset? SetUpFromReadyCopyMadeAt => RunsSetup(SetupScripts) ? ReadyCopyMadeAt : null;
+
+    // Its ready copy was taken, or its setup didn't earn one.
+    public void ReadyCopyHandled()
+    {
+        ReadyCopyDue = false;
     }
 
     // Nobody used it for a while, so its provider releases its compute. Returns whether it was awake.
@@ -145,6 +174,7 @@ internal sealed class Nook
         Status = NookStatus.Evicted;
         SleptAt = null;
         ResumeDue = false;
+        ReadyCopyDue = false;
         SourcesReady = false;
         SetupScripts = [];
         SetupProcessId = null;
@@ -166,6 +196,7 @@ internal sealed class Nook
         Status = NookStatus.Creating;
         SourcesReady = false;
         ResumeDue = false;
+        ReadyCopyDue = false;
         SleptAt = null;
         SetupScripts = [];
         SetupProcessId = null;
@@ -246,6 +277,12 @@ internal sealed class Nook
     {
         DiskUsage? disk = DiskTotalBytes is long total && DiskAvailableBytes is long available ? new DiskUsage(total, available) : null;
         return new NookSummary(Id, WorkspaceId, new ProviderId(Provider, Location).ToString(), Status, CreatedAt, disk, Harness, copies);
+    }
+
+    // Whether the scripts of a run set the nook up, rather than only resume it.
+    private static bool RunsSetup(List<string> scripts)
+    {
+        return scripts.Exists(script => script.EndsWith("/setup", StringComparison.Ordinal));
     }
 
     private static byte[] Hash(string token)

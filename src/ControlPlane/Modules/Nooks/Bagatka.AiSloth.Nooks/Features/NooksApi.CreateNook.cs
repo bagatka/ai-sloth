@@ -56,7 +56,7 @@ internal sealed partial class NooksApi
         }
 
         UserId? createdBy = actor is UserActor user ? user.UserId : null;
-        Nook nook = Nook.Create(command.WorkspaceId, provider.Value, command.Harness, createdBy, command.CopyOf, command.Checkpoint, [.. command.KeptPaths], time);
+        Nook nook = Nook.Create(command.WorkspaceId, provider.Value, command.Harness, createdBy, command.CopyOf, command.Checkpoint, [.. command.KeptPaths], command.FromScratch, time);
         List<SourceCopy> copies = [.. planned.Output.Select(repository => SourceCopy.Planned(nook.Id, repository.Name, repository.Repository, repository.Branch))];
 
         // Recorded before the nook is saved: a record for a nook that never got saved stands alone harmlessly.

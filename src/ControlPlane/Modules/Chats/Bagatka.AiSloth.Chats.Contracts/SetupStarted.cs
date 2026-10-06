@@ -7,4 +7,8 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// once it ended.
 /// </summary>
 /// <param name="Scripts">The scripts it runs, as paths in the nook's files, in order.</param>
-public sealed record SetupStarted(IReadOnlyList<string> Scripts);
+/// <param name="FromReadyCopy">
+/// Whether it sets the nook up from a ready copy, a copy of a nook with the same files right after
+/// its setup, so it has little left to do.
+/// </param>
+public sealed record SetupStarted(IReadOnlyList<string> Scripts, bool FromReadyCopy);

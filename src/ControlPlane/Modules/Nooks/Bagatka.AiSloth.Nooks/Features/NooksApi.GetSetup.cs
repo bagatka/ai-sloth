@@ -57,6 +57,8 @@ internal sealed partial class NooksApi
             return new Result<NookSetup>(prepared.Error);
         }
 
+        await KeepReadyCopyAsync(nook.Output, ct);
+
         // One run at a time: they share the log, and a second would race the first.
         using IDisposable held = await fileLocks.AcquireAsync(id, ct);
         await db.Entry(nook.Output).ReloadAsync(ct);
@@ -86,7 +88,7 @@ internal sealed partial class NooksApi
     {
         if (nook.SetupProcessId is not ProcessId processId)
         {
-            return new NookSetup(nook.SetupScripts, Run: null);
+            return new NookSetup(nook.SetupScripts, Run: null, nook.SetUpFromReadyCopyMadeAt);
         }
 
         Process? process = await db.Processes.AsNoTracking().SingleOrDefaultAsync(found => found.Id == processId, ct);
@@ -95,6 +97,6 @@ internal sealed partial class NooksApi
             throw new InvalidOperationException("Nook " + nook.Id.Value + "'s setup process " + processId.Value + " isn't recorded.");
         }
 
-        return new NookSetup(nook.SetupScripts, new SetupRun(process.Id, process.StartedAt, process.ExitedAt, process.ExitCode));
+        return new NookSetup(nook.SetupScripts, new SetupRun(process.Id, process.StartedAt, process.ExitedAt, process.ExitCode), nook.SetUpFromReadyCopyMadeAt);
     }
 }

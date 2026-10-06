@@ -86,6 +86,7 @@ internal sealed partial class NooksApi
             return prepared;
         }
 
+        await KeepReadyCopyAsync(nook.Output, ct);
         ProcessRun copied = await RunAsync(connection, CopyInScript, command.Replacing, NoVariables, async (stream, token) => { await archive.CopyToAsync(stream, token); }, output: null, ct);
         return copied.Succeeded
             ? new Result(new Success())

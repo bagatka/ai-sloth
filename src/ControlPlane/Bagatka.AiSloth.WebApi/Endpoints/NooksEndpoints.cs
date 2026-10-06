@@ -66,7 +66,7 @@ internal static class NooksEndpoints
         [FromServices] INooksApi api,
         CancellationToken ct)
     {
-        Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider, Harness: null, request.Repositories ?? [], request.CopyOf, request.Checkpoint, KeptPaths: []), ct);
+        Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider, Harness: null, request.Repositories ?? [], request.CopyOf, request.Checkpoint, KeptPaths: [], FromScratch: false), ct);
         return result.ToCreated(nook => string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Id.Value}"));
     }
 

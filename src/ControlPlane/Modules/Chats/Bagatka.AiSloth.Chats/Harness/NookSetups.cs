@@ -99,7 +99,7 @@ internal sealed class NookSetups(IServiceScopeFactory scopes, TimeProvider time,
 
         Result<Page<CheckpointSummary>> checkpoints = await nooks.ListCheckpointsAsync(person, chatNook, new PageRequest(cursor: null, limit: 1), ct);
         int? latest = checkpoints.Failed || checkpoints.Output.Items.Count == 0 ? null : checkpoints.Output.Items[0].Number;
-        CreateNook fresh = new CreateNook(source.Output.WorkspaceId, source.Output.Provider, harness, [], CopyOf: chatNook, Checkpoint: latest, KeptPaths: []);
+        CreateNook fresh = new CreateNook(source.Output.WorkspaceId, source.Output.Provider, harness, [], CopyOf: chatNook, Checkpoint: latest, KeptPaths: [], FromScratch: true);
         Result<NookSummary> created = await nooks.CreateAsync(person, fresh, ct);
         return created.Failed ? new Result<NookId>(created.Error) : new Result<NookId>(created.Output.Id);
     }

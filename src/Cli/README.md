@@ -47,7 +47,8 @@ mode 600.
 - **Without a person at the keyboard,** `sloth chat "<message>"` ends when that message's turn ends
   and its checkpoint is taken, with exit code 1 when the turn failed, for scripts.
 - **Checkpoints are `<chat>@<number>`** wherever a chat's files are named: `--from abc123@3`.
-- **A setup shows one line while it runs, and one when it ended;** a failed one adds the end of its
+- **A setup shows one line while it runs, saying when it sets up from a ready copy, and one when it
+  ended;** a failed one adds the end of its
   output, and `sloth chat setup <id>` prints all of it, following it while it runs. A chat that
   started with files without a setup suggests `sloth chat prepare <id>` after its first turn.
 - **Asleep is invisible but shown.** `sloth chat list` marks chats whose nook sleeps; `sloth chat

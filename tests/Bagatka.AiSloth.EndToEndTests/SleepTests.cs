@@ -104,6 +104,31 @@ public sealed class SleepTests(SleepyControlPlane sleepy) : IClassFixture<Sleepy
         Assert.Equal(0, fresh);
     }
 
+    [Fact]
+    public async Task An_evicted_nook_comes_back_through_the_ready_copy_its_slow_setup_left()
+    {
+        SlowSetupRepository repository = await SlowSetupRepository.CreateAsync(sleepy.ControlPlane, _alice);
+        ChatSummary chat = await repository.StartChatAsync("docker");
+        await using ChatWatch watch = await ChatWatch.OpenAsync(_alice, chat);
+        await watch.NextAsync("setup-ended", TimeSpan.FromMinutes(2));
+        await SendAsync(chat, "Please write hello.txt for me");
+        await watch.NextAsync("checkpoint-saved");
+
+        NookStatus evicted = await StatusAsync(chat, status => status is NookStatus.Evicted, Eviction);
+        await SendAsync(chat, "What was my first message?");
+        JsonElement started = await watch.NextAsync("setup-started", Sleep);
+        JsonElement ended = await watch.NextAsync("setup-ended");
+        await watch.NextAsync("turn-ended");
+        int? installed = await NookProcesses.ExitCodeAsync(_alice, chat.NookId, "test", "-f", "/work/api/deps/installed");
+        int? restored = await NookProcesses.ExitCodeAsync(_alice, chat.NookId, "grep", "-q", "hi from the fake model", "/work/hello.txt");
+
+        Assert.Equal(NookStatus.Evicted, evicted);
+        Assert.True(started.GetProperty("fromReadyCopy").GetBoolean());
+        Assert.True(TimeSpan.Parse(ended.GetProperty("took").GetString()!, CultureInfo.InvariantCulture) < TimeSpan.FromSeconds(SlowSetupRepository.SetupSeconds));
+        Assert.Equal(0, installed);
+        Assert.Equal(0, restored);
+    }
+
     public void Dispose()
     {
         _alice.Dispose();

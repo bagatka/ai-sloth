@@ -453,7 +453,7 @@ internal sealed class ChatRunner(
         bool news = chat.SetupRunSeen(run.Process);
         if (news)
         {
-            db.Events.Add(chat.Record(new ChatEventBody(new SetupStarted(setup.Output.Scripts)), time));
+            db.Events.Add(chat.Record(new ChatEventBody(new SetupStarted(setup.Output.Scripts, setup.Output.ReadyCopyMadeAt is not null)), time));
         }
 
         if (!chat.WaitsForSetup)

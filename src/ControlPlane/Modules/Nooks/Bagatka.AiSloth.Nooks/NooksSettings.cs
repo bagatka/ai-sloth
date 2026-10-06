@@ -56,6 +56,12 @@ public sealed record NooksSettings
     /// <summary>The image for each harness a nook can carry, by harness ID.</summary>
     public IReadOnlyDictionary<string, string> HarnessImages { get; }
 
+    // The image a nook with the harness starts from; none when the deployment no longer offers it.
+    internal string? ImageOf(string? harness)
+    {
+        return harness is null ? Image : HarnessImages.GetValueOrDefault(harness);
+    }
+
     /// <summary>The CPU each nook gets, in thousandths of a core.</summary>
     public int CpuMillicores { get; }
 

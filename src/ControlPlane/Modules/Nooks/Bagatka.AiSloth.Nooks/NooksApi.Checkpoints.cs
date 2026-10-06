@@ -121,9 +121,27 @@ internal sealed partial class NooksApi
         if [ -n "$archive" ]; then
           root="$in/root"
         else
-          # Nothing ran in the nook before its files come back, apart from an earlier try at this.
+          # Nothing ran in the nook before its files come back, apart from an earlier try at this, or
+          # the setup of the ready copy it started from: of the repositories coming back, what git
+          # ignores stays, such as installed dependencies; everything else goes.
           root=""
-          find /work -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          coming_back() {
+            wanted=$1
+            shift
+            while [ $# -ge 3 ]; do
+              if [ "$1" = "$wanted" ]; then return 0; fi
+              shift 3
+            done
+            return 1
+          }
+          for entry in /work/* /work/.[!.]* /work/..?*; do
+            [ -e "$entry" ] || continue
+            if [ -d "$entry/.git" ] && coming_back "$entry" "$@"; then
+              (cd "$entry" && git clean -fdq && git ls-files -z | xargs -0 -r rm -f -- && rm -rf .git)
+            else
+              rm -rf "$entry"
+            fi
+          done
           rm -rf /var/lib/aisloth/work.git /var/lib/aisloth/kept.git
         fi
         place=0

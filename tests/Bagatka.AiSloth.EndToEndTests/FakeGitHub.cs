@@ -118,6 +118,23 @@ internal sealed class FakeGitHub : IAsyncDisposable
         await GitAsync(work, "push", "--quiet", "origin", branch);
     }
 
+    /// <summary>A commit adding or changing files on an existing branch, as when someone pushed to it.</summary>
+    public async Task CommitFilesAsync(string owner, string name, string branch, IReadOnlyDictionary<string, string> files, string message)
+    {
+        string work = Path.Combine(_root.FullName, "elsewhere-" + Guid.CreateVersion7().ToString("N", CultureInfo.InvariantCulture));
+        await GitAsync(_root.FullName, "clone", "--quiet", "--branch", branch, BarePath(owner, name), work);
+        foreach (KeyValuePair<string, string> file in files)
+        {
+            string path = Path.Combine(work, file.Key);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await File.WriteAllTextAsync(path, file.Value);
+            await GitAsync(work, "add", file.Key);
+        }
+
+        await GitAsync(work, "-c", "user.name=Teammate", "-c", "user.email=teammate@example.com", "commit", "--quiet", "-m", message);
+        await GitAsync(work, "push", "--quiet", "origin", branch);
+    }
+
     /// <summary>The person signs in at GitHub and approves the code.</summary>
     public void Approve(string userCode, string login)
     {

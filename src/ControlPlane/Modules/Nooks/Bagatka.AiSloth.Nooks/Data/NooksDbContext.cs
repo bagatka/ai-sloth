@@ -22,6 +22,8 @@ internal sealed class NooksDbContext(DbContextOptions<NooksDbContext> options) :
 
     public DbSet<CheckpointPart> CheckpointParts => Set<CheckpointPart>();
 
+    public DbSet<ReadyCopy> ReadyCopies => Set<ReadyCopy>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -30,6 +32,7 @@ internal sealed class NooksDbContext(DbContextOptions<NooksDbContext> options) :
         modelBuilder.ApplyConfiguration(new SourceCopyConfiguration());
         modelBuilder.ApplyConfiguration(new CheckpointConfiguration());
         modelBuilder.ApplyConfiguration(new CheckpointPartConfiguration());
+        modelBuilder.ApplyConfiguration(new ReadyCopyConfiguration());
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

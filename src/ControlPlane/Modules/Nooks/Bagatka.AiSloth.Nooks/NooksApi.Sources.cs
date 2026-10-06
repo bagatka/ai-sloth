@@ -17,7 +17,9 @@ namespace Bagatka.AiSloth.Nooks;
 internal sealed partial class NooksApi
 {
     // Clones a repository from the bundle on standard input into /work/<name>, all or nothing: into a
-    // folder beside it first, so a broken copy never looks like a finished one.
+    // folder beside it first, so a broken copy never looks like a finished one. A repository already
+    // there, from the ready copy the nook started from, catches up to the bundle's branch instead,
+    // keeping only what git ignores of the copy's work, such as installed dependencies.
     private const string CloneScript = """
         set -eu
         incoming="/work/.aisloth-incoming-$1"
@@ -25,6 +27,16 @@ internal sealed partial class NooksApi
         mkdir -p /work
         cat > "$incoming.bundle"
         branch=$(git bundle list-heads "$incoming.bundle" | sed -n 's#^[0-9a-f]* refs/heads/##p' | head -n 1)
+        if [ -d "/work/$1/.git" ]; then
+            cd "/work/$1"
+            git fetch --quiet --force --prune "$incoming.bundle" "+refs/heads/*:refs/remotes/origin/*"
+            git checkout --quiet --force -B "$branch" "refs/remotes/origin/$branch"
+            git branch --quiet --set-upstream-to "origin/$branch"
+            git clean -fdq
+            git for-each-ref --format='%(refname:short)' refs/heads | grep -vxF "$branch" | xargs -r git branch -q -D
+            rm -f "$incoming.bundle"
+            exit 0
+        fi
         git clone --quiet --branch "$branch" "$incoming.bundle" "$incoming"
         rm -f "$incoming.bundle"
         rm -rf "/work/$1"

@@ -168,7 +168,8 @@ confirming (0.9 by default). The host also registers the object storage harness 
 - **Preparing is the agent's work, proven by AiSloth.** Preparing a chat sends the agent AiSloth's
   request, as a message from the person, to write a setup for the chat's files, run it, and commit it. After
   that turn's checkpoint, a fresh nook on the chat's provider, with its harness's image and the
-  checkpoint's files, runs the setup from scratch, then again, as a ready copy will; it is deleted
+  checkpoint's files, runs the setup from scratch, then again, as a nook from a ready copy does,
+  leaving a fresh ready copy when it took a while; it is deleted
   afterwards, and the next turn waits meanwhile. A failed test goes back to the agent as a message
   with the end of its output, and its turn is tested again, three tests at most. Only someone who
   may use the chat's account prepares, because the agent and the tests spend that person's account
