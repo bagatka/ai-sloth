@@ -54,8 +54,12 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Restore the pinned Aspire CLI
-        run: dotnet tool restore
+      # Only the Aspire CLI, at the version dotnet-tools.json pins: restoring every tool at once mixed
+      # up their packages on the runner.
+      - name: Install the pinned Aspire CLI
+        run: |
+          dotnet tool install aspire.cli --tool-path "$RUNNER_TEMP/tools" --version "$(jq -r '.tools["aspire.cli"].version' dotnet-tools.json)"
+          echo "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
 
       - name: Sign in to Azure
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
@@ -68,7 +72,7 @@ jobs:
         run: az bicep install
 
       - name: Deploy
-        run: dotnet aspire deploy --non-interactive
+        run: aspire deploy --non-interactive
         env:
           Azure__SubscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           Azure__ResourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
