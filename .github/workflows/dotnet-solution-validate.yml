@@ -45,22 +45,29 @@ jobs:
 
       # The Docker provider runs nooks under Sysbox, so their own Docker works without privileges.
       # Its installer restarts Docker, which systemd refuses after three starts in a minute, so the
-      # count starts over first. Its services start in the background, and nooks fail until its
-      # socket, readable by root only, is up.
+      # count starts over first. Its services start in the background and sometimes not at all the
+      # first time, so they get two more starts before the step gives up with what they logged;
+      # nooks fail until its socket, readable by root only, is up.
       - name: Install Sysbox
         run: |
           curl --fail --silent --show-error --location --output "$RUNNER_TEMP/sysbox.deb" \
             https://github.com/nestybox/sysbox/releases/download/v0.7.1/sysbox-ce_0.7.1.linux_amd64.deb
           echo "9d6d5484f980d0a17f86c492c1262015c2afb66280bdb97215b79fde6a0261c5  $RUNNER_TEMP/sysbox.deb" | sha256sum --check
           sudo systemctl reset-failed docker.service
-          sudo apt-get install --yes -o DPkg::Lock::Timeout=300 "$RUNNER_TEMP/sysbox.deb"
-          for attempt in $(seq 1 30); do
-            if sudo test -S /run/sysbox/sysfs.sock; then
-              break
-            fi
-            sleep 1
+          sudo apt-get install --yes -o DPkg::Lock::Timeout=300 "$RUNNER_TEMP/sysbox.deb" || true
+          for start in 1 2 3; do
+            for attempt in $(seq 1 20); do
+              if sudo test -S /run/sysbox/sysfs.sock; then
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "::warning::Sysbox isn't up; starting it again."
+            sudo dpkg --configure --pending || true
+            sudo systemctl restart sysbox || true
           done
-          sudo test -S /run/sysbox/sysfs.sock
+          sudo journalctl --unit sysbox --unit sysbox-mgr --unit sysbox-fs --unit docker --no-pager | tail -80
+          exit 1
 
       - name: Install .NET SDK from global.json
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
