@@ -4,6 +4,7 @@
 # Add a line in the same change that introduces a new placeholder.
 AgentAccountId;System.Guid
 ChatId;System.Guid
+Match;System.String
 NookId;System.Guid
 ProcessId;System.String
 Provider;System.String

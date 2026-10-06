@@ -77,7 +77,7 @@ internal sealed class ReadyCopies(
                 await provider.DeleteSnapshotAsync(SnapshotKey.From(old), ct);
             }
 
-            Log.ReadyCopyTaken(logger, nook.Id.Value);
+            Log.ReadyCopyTaken(logger, nook.Id.Value, match);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -108,7 +108,14 @@ internal sealed class ReadyCopies(
 
         string match = ReadyCopy.MatchOf(nook, image, repositories);
         ReadyCopy? copy = await db.ReadyCopies.SingleOrDefaultAsync(found => found.Match == match, ct);
-        copy?.Used(time);
+        if (copy is null)
+        {
+            Log.ReadyCopyMissing(logger, nook.Id.Value, match);
+            return null;
+        }
+
+        Log.ReadyCopyFound(logger, nook.Id.Value, match);
+        copy.Used(time);
         return copy;
     }
 
