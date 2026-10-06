@@ -60,8 +60,10 @@ log (`az containerapp logs show --name webapi --resource-group <group>`). For a 
 its records and managed certificate with `az containerapp hostname add` and `bind`, then deploy with
 `Parameters:custom-domain` and `Parameters:custom-domain-certificate`, the certificate's name.
 
-From GitHub, the `Control plane / Deploy` workflow deploys main, run by hand in Actions or with
-`gh workflow run control-plane-deploy.yml`. Its `production` environment, limited to main, holds the
+From GitHub, the `Control plane / Deploy` workflow deploys every push to main once its journeys pass
+and its nook images are published; a newer push replaces one still waiting, and a deploy that started
+always finishes. Run it by hand in Actions or with `gh workflow run control-plane-deploy.yml` to deploy
+main again. Its `production` environment, limited to main, holds the
 deployment's settings: the secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and
 `AZURE_SUBSCRIPTION_ID` of an Entra app that trusts the environment's GitHub token and may manage
 the resource group and assign its roles, `AZURE_RESOURCE_GROUP`, `AZURE_LOCATION`, the three keys as

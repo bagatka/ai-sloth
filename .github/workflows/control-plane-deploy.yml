@@ -1,32 +1,33 @@
 name: Control plane / Deploy
 run-name: Control plane / Deploy / production
 
-# Deploys main to Azure with `dotnet aspire deploy` (README.md, "Deploying") once main's journeys
-# pass, with the nook images main published for the same commit. The production environment holds
-# the deployment's secrets and settings, and only main deploys to it; GitHub's OIDC token signs in
-# to Azure, so no Azure secret is stored.
+# Deploys main to Azure with `dotnet aspire deploy` (README.md, "Deploying") after every push to it,
+# once its journeys pass, with the nook images main published for the same commit; run by hand, it
+# deploys main again. The production environment holds the deployment's secrets and settings, and
+# only main deploys to it; GitHub's OIDC token signs in to Azure, so no Azure secret is stored.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
-  actions: read
-
-concurrency:
-  group: control-plane-deploy-production
-  cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Control plane / Deploy to production
+  # A newer push replaces a run still waiting here, so only the newest commit deploys.
+  ready:
+    name: Control plane / Wait for images and journeys
     runs-on: ubuntu-latest
-    environment: production
-    timeout-minutes: 45
+    timeout-minutes: 35
+    concurrency:
+      group: control-plane-deploy-ready
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      repository: ${{ steps.images.outputs.repository }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       # GHCR names are lowercase; an owner's name may not be.
       - name: Name the image repository
         id: images
@@ -69,6 +70,23 @@ jobs:
           echo "::error::.NET solution / Validate didn't finish for $GITHUB_SHA within 30 minutes."
           exit 1
 
+  # A deploy that started always finishes; the next one waits for it.
+  deploy:
+    name: Control plane / Deploy to production
+    needs: ready
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+    concurrency:
+      group: control-plane-deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Install .NET SDK from global.json
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
@@ -97,7 +115,7 @@ jobs:
           Azure__SubscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           Azure__ResourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
           Azure__Location: ${{ secrets.AZURE_LOCATION }}
-          Parameters__nook-image-repository: ${{ steps.images.outputs.repository }}
+          Parameters__nook-image-repository: ${{ needs.ready.outputs.repository }}
           Parameters__nook-image-tag: ${{ github.sha }}
           Parameters__postgres-connection-string: ${{ secrets.POSTGRES_CONNECTION_STRING }}
           Parameters__agent-accounts-key: ${{ secrets.AGENT_ACCOUNTS_KEY }}
