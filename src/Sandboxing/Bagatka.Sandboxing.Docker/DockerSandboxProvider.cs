@@ -209,10 +209,13 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
             return new Result<SnapshotObservation>(SandboxNotFound);
         }
 
+        // Not handled: a sandbox whose image a newer build or pull replaced, which Docker's containerd
+        // image store then forgets, so it can't commit the sandbox either; handling it would take
+        // pinning each sandbox's image with a tag of this provider's own.
         ImageDetails? image = await docker.InspectImageAsync(container.ImageId, ct);
         if (image is null)
         {
-            throw new InvalidOperationException("The image of sandbox " + Format(sandbox.Value) + " is missing.");
+            throw new InvalidOperationException("The image of sandbox " + Format(sandbox.Value) + " is gone, as when a newer build or pull takes its tag, so Docker can't snapshot it.");
         }
 
         CommitConfiguration configuration = new CommitConfiguration(

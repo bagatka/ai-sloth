@@ -357,9 +357,12 @@ string Published(string image)
 
 IResourceBuilder<ExecutableResource> BuildImage(string name, string target, string image, IResourceBuilder<ExecutableResource>? after)
 {
+    // Without a provenance attestation, which records each build, an unchanged rebuild is the same
+    // image, so its tag never moves away from running nooks: Docker forgets a replaced image, and
+    // can't snapshot nooks made from it.
     string[] tags = imageRepository is null ? ["--tag", image] : ["--tag", image, "--tag", Published(image)];
     IResourceBuilder<ExecutableResource> build = builder.AddExecutable(
-            name, "docker", repositoryRoot, ["build", "--file", "src/Daemon/Dockerfile", "--target", target, .. tags, "."])
+            name, "docker", repositoryRoot, ["build", "--provenance=false", "--file", "src/Daemon/Dockerfile", "--target", target, .. tags, "."])
         .WithEnvironment("DOCKER_HOST", dockerHost);
     return after is null ? build : build.WaitForCompletion(after);
 }
