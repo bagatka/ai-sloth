@@ -126,7 +126,9 @@ public interface IChatsApi
 
     /// <summary>
     /// Streams the chat's events after a sequence number, first those already saved and then live.
-    /// Cancelling <paramref name="ct"/> ends the watch, never the chat.
+    /// Cancelling <paramref name="ct"/> ends the watch, never the chat. A watch also ends when the
+    /// control-plane instance serving it hands over, as in a deploy: watch again after the last
+    /// sequence number.
     /// </summary>
     public Task<Result<IAsyncEnumerable<ChatEvent>>> WatchAsync(Actor actor, WatchChat command, CancellationToken ct);
 }

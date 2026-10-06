@@ -14,8 +14,11 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// </summary>
 public sealed class SleepyControlPlane : IAsyncDisposable
 {
-    /// <summary>How long tests wait for a nook to fall asleep or wake, and to be evicted.</summary>
-    public static readonly TimeSpan Sleep = TimeSpan.FromMinutes(1);
+    /// <summary>
+    /// How long tests wait for a nook to fall asleep or wake, and to be evicted. A chat keeps its nook
+    /// awake for half a minute after its last work, before the 8 idle seconds start.
+    /// </summary>
+    public static readonly TimeSpan Sleep = TimeSpan.FromMinutes(2);
 
     public static readonly TimeSpan Eviction = TimeSpan.FromMinutes(2);
 

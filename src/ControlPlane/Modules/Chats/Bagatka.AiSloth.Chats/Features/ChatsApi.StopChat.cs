@@ -17,8 +17,8 @@ internal sealed partial class ChatsApi
             return new Result(chat.Error);
         }
 
-        // Not handled: a restart between this call and the runner taking it loses the stop; the
-        // person stops again.
+        // Not handled: a restart between this call and the runner taking it loses the stop, and so
+        // does an instance that isn't active yet, during a deploy's handover; the person stops again.
         runners.Stop(id);
         return new Result(new Success());
     }

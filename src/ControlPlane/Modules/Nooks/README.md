@@ -251,9 +251,10 @@ checkpoints are kept in.
   on the control plane's disk first, so a run that writes more than 4 GiB is stopped and fails.
 - **Watches survive reconnects.** A watch asks the daemon for output from the last offset it
   relayed, again after every reconnect, so a watcher sees each byte once.
-- **One active instance for now.** Daemon connections live in the instance they dialed. A deploy
-  hands them over with `ReconnectInstruction`; several active instances are designed when capacity
-  requires them.
+- **One active instance at a time** (`ActiveInstance`). Daemon connections live in the instance
+  they dialed; one that hands over sends its daemons `ReconnectInstruction`, ends its output
+  watches so watchers resume on the next, and answers calls that need a daemon as not ready.
+  Several active instances are designed when capacity requires them.
 
 ## Not built yet
 
@@ -264,7 +265,7 @@ checkpoints are kept in.
   no nook awake: it sleeps with the nook, and ends with it where the provider keeps only files.
 - **Handover.** A control-plane instance that shuts down doesn't send `ReconnectInstruction`;
   daemons notice the lost connection and reconnect with backoff, within about a second.
-- **Reconciler gaps.** Sandboxes without a record aren't deleted. Nooks aren't claimed atomically, so only one instance may run the job. Nooks
+- **Reconciler gaps.** Sandboxes without a record aren't deleted. Nooks aren't claimed atomically: only the active instance runs the job. Nooks
   are reconciled one at a time without deadlines, so a slow call, such as the first image pull on a
   fresh host or machine, delays every other nook, and a provider that hangs blocks them. A nook on
   a machine that is offline stays Creating, and its retries log an error every pass.

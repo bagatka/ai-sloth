@@ -170,6 +170,10 @@ public sealed partial class ControlPlane : IAsyncLifetime
         ResourceLogFiles logs = new ResourceLogFiles(Path.Combine(AppContext.BaseDirectory, "TestResults", "logs", Scope));
         _logs = logs;
         appHost.Services.AddLogging(logs.Route);
+
+        // No dashboard runs in tests to send telemetry to; flushing it would hold every stop of the
+        // WebApi for seconds.
+        appHost.CreateResourceBuilder<ProjectResource>("webapi").WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", string.Empty);
         _app = await appHost.BuildAsync(ct);
 
         await _app.StartAsync(ct);
@@ -247,6 +251,24 @@ public sealed partial class ControlPlane : IAsyncLifetime
             await using ServiceProvider provider = services.BuildServiceProvider();
             await provider.GetRequiredService<ISandboxProvider>().DeleteAsync(SandboxKey.From(nookId), CancellationToken.None);
         }
+    }
+
+    /// <summary>
+    /// Replaces the WebApi as a deploy does: the running one is told to stop, and once it has stopped
+    /// a new one starts; returns when the new one is healthy. <paramref name="whileStopping"/> runs once
+    /// the old one is stopping, while it finishes its requests in flight.
+    /// </summary>
+    internal async Task ReplaceWebApiAsync(Action whileStopping)
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        Task stopping = App.ResourceNotifications.WaitForResourceAsync("webapi", KnownResourceStates.Stopping, ct);
+        IResource webApi = App.Services.GetRequiredService<DistributedApplicationModel>().Resources.Single(resource => string.Equals(resource.Name, "webapi", StringComparison.Ordinal));
+        Task<ExecuteCommandResult> restarting = App.ResourceCommands.ExecuteCommandAsync(webApi, KnownResourceCommands.RestartCommand, ct);
+        await stopping;
+        whileStopping();
+        ExecuteCommandResult restarted = await restarting;
+        Assert.True(restarted.Success, restarted.Message);
+        await App.ResourceNotifications.WaitForResourceHealthyAsync("webapi", ct);
     }
 
     /// <summary>Runs machine mode in this process, as <c>sloth machine run</c> would.</summary>

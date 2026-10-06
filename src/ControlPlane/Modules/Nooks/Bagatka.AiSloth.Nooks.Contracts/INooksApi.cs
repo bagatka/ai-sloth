@@ -103,7 +103,9 @@ public interface INooksApi
     /// <summary>
     /// Streams a process's output from an offset, first what was already written and then live, and
     /// ends with <see cref="ProcessExited"/>. Any number of watchers may watch one process.
-    /// Cancelling <paramref name="ct"/> ends the watch, never the process.
+    /// Cancelling <paramref name="ct"/> ends the watch, never the process. A watch also ends, without
+    /// the exit, when the control-plane instance serving it hands over, as in a deploy: watch again
+    /// from the offset after the last output.
     /// </summary>
     /// <remarks>
     /// What can be replayed depends on the process's <see cref="OutputRetention"/>. Watching from an

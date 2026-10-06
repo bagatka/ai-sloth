@@ -291,18 +291,22 @@ These decisions are fixed:
 - **The daemon dials out,** over a protocol defined once in `daemon.proto`: a small control stream,
   plus one stream per bulk transfer so a busy process never delays instructions. Previews of web
   servers running in a nook will use the same connection.
-- **One active control-plane instance for now.** A deploy starts the new instance and switches
-  traffic; the old instance tells its daemons to reconnect, then exits. Calls in the few seconds
-  between wait for the daemon, as they do for a resume. Several active instances would need each
-  instruction routed to the instance holding that nook's connection; that is designed when
-  capacity requires it.
+- **One active control-plane instance at a time.** Every instance serves requests; the one holding
+  the lease in the shared database (`ActiveInstance`) runs the background work: chat runners and
+  the nook and draft jobs. A deploy starts the new instance beside the old one. The old one hands
+  its work over, so the new one takes the lease within a second, tells its daemons and machines to
+  reconnect, ends its watches so clients resume on the new one, and finishes its requests in
+  flight, agents' model calls among them, for up to ten minutes. Calls in the seconds between wait
+  for the daemon, as they do for a resume. Several active instances would need each instruction
+  routed to the instance holding that nook's connection; that is designed when capacity requires
+  it.
 
 ### Foundation: three small projects, split by who may use them
 
 | Project | Used by | Holds |
 |---|---|---|
 | `Bagatka.Foundation` | everyone, including Contracts and Sdk clients | `Result`, `Result<T>`, `Success`, `Error`, `ErrorKind`, `Actor`, `UserId`, `ITypedId<T>`, `TypedIdJsonConverter<T>`, `OneTimeCode`; later `Page<T>`, `PageRequest`, `FoundationJson`, `Money` |
-| `Bagatka.Foundation.Modules` | module projects | `AddModuleDbContext`, `ModuleDatabases.MigrateAsync`, `TypedIdConverter<T>`, `SaveAsync`, keyset pagination; `IOutbox`, the outbox dispatcher, and `IReaction<T>` come with the first integration event |
+| `Bagatka.Foundation.Modules` | module projects | `AddModuleDbContext`, `ModuleDatabases.MigrateAsync`, `TypedIdConverter<T>`, `SaveAsync`, keyset pagination, `ActiveInstance`; `IOutbox`, the outbox dispatcher, and `IReaction<T>` come with the first integration event |
 | `Bagatka.Foundation.Web` | WebApi hosts | `Result` → HTTP mapping as problem details, `ClaimsPrincipal` → `Actor`; unhandled exceptions use ASP.NET Core's built-in problem details |
 
 Foundation is plumbing only. A business concept never goes into Foundation. If two modules need

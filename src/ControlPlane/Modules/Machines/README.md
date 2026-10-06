@@ -94,7 +94,8 @@ None. A connection lives as long as its gRPC call.
   spike).
 - **Lifecycle only.** The protocol carries sandbox lifecycle calls. A machine never accepts a
   command to run on its own operating system.
-- **One active instance for now**, as for daemons: connections live in the instance they dialed.
+- **One active instance at a time**, as for daemons: connections live in the instance they dialed,
+  and one that hands over ends them, so machines dial the active one.
 
 ## Not built yet
 

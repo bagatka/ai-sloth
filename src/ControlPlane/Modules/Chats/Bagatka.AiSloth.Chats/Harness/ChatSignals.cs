@@ -5,8 +5,10 @@ using Bagatka.AiSloth.Chats.Contracts;
 
 namespace Bagatka.AiSloth.Chats.Harness;
 
-// Wakes a chat's watchers when its runner saved new events. In memory: one active control-plane
-// instance for now. An entry lives until the chat's next event.
+// Wakes a chat's watchers when its runner saved new events. In memory: runners run on the active
+// instance and wake its watchers. An instance that becomes active wakes all of its own, to read what
+// the one before saved; an instance that hands over ends its watches (ActiveInstance.Leaving), and
+// their clients resume on the next. An entry lives until the chat's next event.
 internal sealed class ChatSignals
 {
     private readonly Lock _gate = new Lock();
@@ -25,6 +27,22 @@ internal sealed class ChatSignals
             }
 
             return next.Task;
+        }
+    }
+
+    // Wakes every watcher, to read what it may have missed.
+    public void NotifyAll()
+    {
+        List<TaskCompletionSource> waiting;
+        lock (_gate)
+        {
+            waiting = [.. _waiting.Values];
+            _waiting.Clear();
+        }
+
+        foreach (TaskCompletionSource next in waiting)
+        {
+            next.TrySetResult();
         }
     }
 

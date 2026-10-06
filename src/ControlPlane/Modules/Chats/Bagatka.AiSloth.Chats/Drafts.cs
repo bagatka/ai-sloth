@@ -8,6 +8,7 @@ using Bagatka.AiSloth.Chats.Model;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
+using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -22,6 +23,7 @@ internal sealed class Drafts(
     IDbContextFactory<ChatsDbContext> databases,
     IServiceScopeFactory scopes,
     ChatsSettings settings,
+    ActiveInstance active,
     TimeProvider time,
     ILogger<Drafts> logger) : BackgroundService
 {
@@ -49,8 +51,14 @@ internal sealed class Drafts(
         }
     }
 
+    // Only the active instance runs it (PATTERNS.md, entry 23).
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        return active.RunAsync(WorkAsync, stoppingToken);
+    }
+
     // One failure never stops the job: a failed pass is logged and the next tries again.
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    private async Task WorkAsync(CancellationToken stoppingToken)
     {
         using PeriodicTimer timer = new PeriodicTimer(Interval, time);
         while (await timer.WaitForNextTickAsync(stoppingToken))

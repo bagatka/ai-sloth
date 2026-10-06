@@ -143,8 +143,12 @@ if (builder.ExecutionContext.IsPublishMode)
         .PublishAsAzureContainerApp((infrastructure, app) =>
         {
             // One replica: background work and daemons' connections aren't shared between replicas yet.
+            // A deploy runs the new one beside the old one, which hands its work over and then gets
+            // the longest grace Container Apps allows to finish requests in flight, such as agents'
+            // model calls (the WebApi's shutdown timeout is a little shorter).
             app.Template.Scale.MinReplicas = 1;
             app.Template.Scale.MaxReplicas = 1;
+            app.Template.TerminationGracePeriodSeconds = 600;
 
             // The sandbox group is in the deployment's own subscription, resource group, and location.
             ContainerAppContainer container = app.Template.Containers.Single().Value!;
@@ -268,6 +272,7 @@ else
 foreach (IResourceBuilder<IResourceWithEnvironment> mode in modes)
 {
     mode.WithEnvironment("Host__PublicUrl", publicUrl)
+        .WithEnvironment("ActiveInstance__ConnectionString", database)
         .WithEnvironment("Modules__Users__ConnectionString", database)
         .WithEnvironment("Modules__Workspaces__ConnectionString", database)
         .WithEnvironment("Modules__Machines__ConnectionString", database)

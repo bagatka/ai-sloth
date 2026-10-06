@@ -30,6 +30,7 @@ internal sealed class NookReconciler(
     IObjectStorage storage,
     ReadyCopies readyCopies,
     NooksSettings settings,
+    ActiveInstance active,
     TimeProvider time,
     ILogger<NookReconciler> logger) : BackgroundService
 {
@@ -49,7 +50,13 @@ internal sealed class NookReconciler(
         _wake.Writer.TryWrite(true);
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    // Only the active instance runs it (PATTERNS.md, entry 23).
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        return active.RunAsync(WorkAsync, stoppingToken);
+    }
+
+    private async Task WorkAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {

@@ -93,6 +93,18 @@ DefaultAzureCredential azureCredential = new DefaultAzureCredential();
 ModelGatewaySettings modelGateway = builder.Configuration.GetRequired<ModelGatewaySettings>("ModelGateway");
 
 builder.Services.AddSingleton(TimeProvider.System);
+
+// One instance at a time does background work (ActiveInstance). One told to stop hands it over at
+// once, then lets requests in flight finish, agents' model calls among them, for up to this long;
+// the deployment waits a little longer before it kills the instance (the AppHost's grace period).
+builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(570));
+string? sharedDatabase = builder.Configuration["ActiveInstance:ConnectionString"];
+if (sharedDatabase is null)
+{
+    throw new InvalidOperationException("Configure 'ActiveInstance:ConnectionString', the database the instances share.");
+}
+
+builder.Services.AddActiveInstance(sharedDatabase);
 builder.Services.ConfigureHttpJsonOptions(json => FoundationJson.Configure(json.SerializerOptions));
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();

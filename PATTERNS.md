@@ -693,13 +693,16 @@ arrives with the first integration event.
 - **Snapshot conflicts.** Never hand-edit the model snapshot. After a merge conflict in it,
   remove your migration, rebase, and regenerate.
 - **Applying them.**
-  - `migrate`: the WebApi run with that single argument applies every module's migrations
-    (`ModuleDatabases.MigrateAsync`) and exits. Deployed, it runs as the container app's init
+  - `migrate`: the WebApi run with that single argument applies every module's migrations, the
+    instance lease's in `Bagatka.Foundation.Modules` included (`ModuleDatabases.MigrateAsync`), and
+    exits. Deployed, it runs as the container app's init
     container before each replica starts; run locally, the AppHost runs it as the `migrations`
     resource. The WebApi itself never migrates on startup.
 - **Generating them.** Each module has a design-time factory (`Data/<Module>DbContextFactory.cs`),
   so `dotnet ef` needs no configuration. Migrations are generated code: `.editorconfig` marks them
   so, and analyzers skip them.
+- **The version before keeps working.** A deploy runs the previous version against the new schema
+  for a moment, so a migration never breaks it, such as with a new required column it doesn't set.
 - **Destructive changes use expand–contract across releases.** Add the new shape, migrate the
   data, switch the code, and remove the old shape in a later release.
 
@@ -1017,8 +1020,14 @@ UserId;System.Guid
   - Create one DI scope or context per item, and pass `stoppingToken` everywhere.
 - **One failure never stops a job.** Catch per item and per pass, log, and let the next pass retry.
 - **Bounded batches.** Each iteration processes a limited batch.
-- **Assume several instances run the same job.** Work must be idempotent, and items are claimed
-  atomically.
+- **The active instance runs it.** A job's `ExecuteAsync` returns
+  `active.RunAsync(WorkAsync, stoppingToken)` (`ActiveInstance`, `Bagatka.Foundation.Modules`): its
+  work starts when the instance takes the lease and stops when it hands over, so no two instances
+  run it at once. Work is still idempotent, since an instance may stop at any point and the next one
+  starts from what was saved. Canonical example: `Jobs/NookReconciler.cs` in the Nooks module.
+- **Long-lived connections move with the work.** A stream that lasts, such as a watch or a daemon's
+  or machine's connection, ends on `ActiveInstance.Leaving`, and its other end resumes on the active
+  instance from where it was: after the last event, from the next offset, or by dialing again.
 - **Actor.** Jobs use a named system actor when calling contracts.
 - **Schedulers.** If you need cron schedules or durable job queues, choose one library, record
   it here, and use it everywhere.

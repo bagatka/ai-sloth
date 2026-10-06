@@ -109,8 +109,8 @@ concurrency token). Archives are in object storage under
 ## Background work
 
 - **Runners** (`Harness/ChatRunners.cs`, `Harness/ChatRunner.cs`): one per chat with work, started
-  by a new chat, a message, or a stop, ending when the chat is idle. At startup, chats that had work
-  get their runner back. A runner starts the agent once the nook's setup ended, following the setup
+  by a new chat, a message, or a stop, ending when the chat is idle, on the active instance only.
+  When an instance becomes active, chats that had work get their runner back. A runner starts the agent once the nook's setup ended, following the setup
   run meanwhile, keeps the nook awake while the chat has work, tests a setup the agent prepared
   (`Harness/NookSetups.cs`), delivers messages, answers the
   agent's requests, and saves each batch of updates with the offset of the agent's output it has
@@ -239,5 +239,6 @@ confirming (0.9 by default), and the draft lifetime (15 minutes by default). The
   a state over 1,000 files or 16 MiB isn't kept; and a save that loses a race leaves its archive
   behind in object storage.
 - **Event volume.** Every streamed text chunk is a row; nothing merges them yet.
-- **One active instance.** Runners and watch signals live in the instance's memory, as daemon
-  connections do.
+- **One active instance at a time** (`ActiveInstance`). Runners and watch signals live in the
+  active instance's memory, as daemon connections do; one that hands over ends its watches, and
+  their clients resume on the next. A stop sent to an instance not yet active is lost.

@@ -36,6 +36,13 @@ internal sealed class DaemonConnection(NookId nookId)
         }
     }
 
+    // Tells the daemon to dial again, which reaches the instance that is active now, then ends.
+    public void Move()
+    {
+        _instructions.Writer.TryWrite(new DaemonInstruction(new ReconnectInstruction()));
+        Close();
+    }
+
     public void Close()
     {
         _instructions.Writer.TryComplete();

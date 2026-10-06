@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -50,8 +51,28 @@ internal sealed partial class ChatsApi
 
             if (batch.Count == 0)
             {
-                await next.WaitAsync(ct);
+                bool more = await NextEventAsync(next, ct);
+                if (!more)
+                {
+                    yield break;
+                }
             }
+        }
+    }
+
+    // Waits for the chat's next event; false when this instance hands over instead, which ends the
+    // watch so its client resumes on the next instance.
+    private async Task<bool> NextEventAsync(Task next, CancellationToken ct)
+    {
+        using CancellationTokenSource waiting = CancellationTokenSource.CreateLinkedTokenSource(ct, active.Leaving);
+        try
+        {
+            await next.WaitAsync(waiting.Token);
+            return true;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return false;
         }
     }
 }

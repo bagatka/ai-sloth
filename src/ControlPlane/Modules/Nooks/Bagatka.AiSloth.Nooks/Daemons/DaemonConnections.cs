@@ -4,26 +4,49 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Nooks.Contracts;
+using Bagatka.Foundation.Modules;
 
 namespace Bagatka.AiSloth.Nooks.Daemons;
 
-// The daemon connections and output uploads this instance holds. There is one active control-plane
-// instance for now (ARCHITECTURE.md); several would need each nook's calls routed to the instance
-// its daemon dialed.
-internal sealed class DaemonConnections(TimeProvider time)
+// The daemon connections and output uploads this instance holds. Calls to a nook go through the
+// instance its daemon dialed, so the active instance runs chats (ActiveInstance); when an instance
+// hands over, its daemons are told to dial again, and reach the next one. Several instances working
+// at once would need each nook's calls routed to the instance its daemon dialed.
+internal sealed class DaemonConnections : IDisposable
 {
+    private readonly TimeProvider _time;
     private readonly Lock _gate = new Lock();
     private readonly Dictionary<NookId, DaemonConnection> _connections = [];
     private readonly Dictionary<WatchId, OutputReceiver> _receivers = [];
+    private readonly CancellationTokenRegistration _leaving;
     private TaskCompletionSource _connected = NewSignal();
+    private bool _left;
 
-    // A newer connection for a nook replaces an older one, whose instruction stream ends.
+    public DaemonConnections(ActiveInstance active, TimeProvider time)
+    {
+        _time = time;
+        _leaving = active.Leaving.Register(MoveAll);
+    }
+
+    public void Dispose()
+    {
+        _leaving.Dispose();
+    }
+
+    // A newer connection for a nook replaces an older one, whose instruction stream ends. One that
+    // reaches an instance that handed over is told to dial again at once.
     public DaemonConnection Connect(NookId nookId)
     {
         DaemonConnection connection = new DaemonConnection(nookId);
         DaemonConnection? replaced;
         lock (_gate)
         {
+            if (_left)
+            {
+                connection.Move();
+                return connection;
+            }
+
             replaced = _connections.GetValueOrDefault(nookId);
             _connections[nookId] = connection;
             TaskCompletionSource connected = _connected;
@@ -70,6 +93,41 @@ internal sealed class DaemonConnections(TimeProvider time)
         }
     }
 
+    // Whether this instance handed over: its daemons dial the next one, and none comes back here.
+    public bool Left
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _left;
+            }
+        }
+    }
+
+    // This instance handed over: every daemon dials again, and reaches the instance that is active.
+    // Whoever waits for a daemon here stops waiting.
+    private void MoveAll()
+    {
+        List<DaemonConnection> moving;
+        TaskCompletionSource waiting;
+        lock (_gate)
+        {
+            _left = true;
+            moving = [.. _connections.Values];
+            _connections.Clear();
+            waiting = _connected;
+        }
+
+        waiting.TrySetResult();
+
+        foreach (DaemonConnection connection in moving)
+        {
+            connection.Move();
+            End(connection);
+        }
+    }
+
     public bool IsConnected(NookId nookId)
     {
         lock (_gate)
@@ -78,15 +136,21 @@ internal sealed class DaemonConnections(TimeProvider time)
         }
     }
 
-    // The nook's connection, waiting up to `timeout` for its daemon to dial in; null if it doesn't.
+    // The nook's connection, waiting up to `timeout` for its daemon to dial in; null if it doesn't, and
+    // at once on an instance that handed over.
     public async Task<DaemonConnection?> WaitAsync(NookId nookId, TimeSpan timeout, CancellationToken ct)
     {
-        long started = time.GetTimestamp();
+        long started = _time.GetTimestamp();
         while (true)
         {
             Task connected;
             lock (_gate)
             {
+                if (_left)
+                {
+                    return null;
+                }
+
                 DaemonConnection? connection = _connections.GetValueOrDefault(nookId);
                 if (connection is not null)
                 {
@@ -96,13 +160,13 @@ internal sealed class DaemonConnections(TimeProvider time)
                 connected = _connected.Task;
             }
 
-            TimeSpan left = timeout - time.GetElapsedTime(started);
+            TimeSpan left = timeout - _time.GetElapsedTime(started);
             if (left <= TimeSpan.Zero)
             {
                 return null;
             }
 
-            Task first = await Task.WhenAny(connected, Task.Delay(left, time, ct));
+            Task first = await Task.WhenAny(connected, Task.Delay(left, _time, ct));
             if (first != connected)
             {
                 ct.ThrowIfCancellationRequested();

@@ -31,13 +31,20 @@ internal sealed class NookSleeper(
     FileLocks fileLocks,
     NookReconciler reconciler,
     NooksSettings settings,
+    ActiveInstance active,
     TimeProvider time,
     ILogger<NookSleeper> logger) : BackgroundService
 {
     private const int BatchSize = 20;
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    // Only the active instance runs it (PATTERNS.md, entry 23).
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        return active.RunAsync(WorkAsync, stoppingToken);
+    }
+
+    private async Task WorkAsync(CancellationToken stoppingToken)
     {
         using PeriodicTimer timer = new PeriodicTimer(Interval, time);
         do

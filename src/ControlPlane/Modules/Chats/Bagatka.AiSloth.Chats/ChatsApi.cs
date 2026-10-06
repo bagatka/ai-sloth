@@ -11,6 +11,7 @@ using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.ObjectStorage;
+using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Chats;
@@ -26,6 +27,7 @@ internal sealed partial class ChatsApi(
     ChatRunners runners,
     Drafts drafts,
     ChatSignals signals,
+    ActiveInstance active,
     IObjectStorage storage,
     ChatsSettings settings,
     TimeProvider time) : IChatsApi, IChatHarnessesApi

@@ -36,7 +36,8 @@ internal sealed partial class NooksApi
     // Relays the daemon's uploads until one ends with the exit, which is recorded first, so whoever
     // learns of an exit here finds it recorded, as the daemon's own report may not be yet. An upload
     // that breaks off, because the daemon's connection ended, is asked for again from where it stopped
-    // on the next connection, so the watcher sees every byte once.
+    // on the next connection, so the watcher sees every byte once; on an instance that handed over,
+    // the watch ends instead, and the watcher resumes on the next.
     private async IAsyncEnumerable<ProcessEvent> WatchAsync(DaemonConnection connection, ProcessId processId, long offset, [EnumeratorCancellation] CancellationToken ct)
     {
         while (true)
@@ -72,6 +73,11 @@ internal sealed partial class NooksApi
             }
 
             DaemonConnection? reconnected = await daemons.WaitAsync(connection.NookId, ReadyTimeout, ct);
+            if (reconnected is null && daemons.Left)
+            {
+                yield break;
+            }
+
             if (reconnected is null)
             {
                 throw new InvalidOperationException("Nook " + connection.NookId.Value + "'s daemon didn't reconnect in time; watch the process again later.");

@@ -39,25 +39,50 @@ internal sealed partial class Sloth
             return 0;
         }
 
-        string path = string.Create(CultureInfo.InvariantCulture, $"/nooks/{chat.NookId}/processes/{setup.Run.Process}/output?fromOffset=0");
-        using HttpResponseMessage response = await api.SendAsync(HttpMethod.Get, path, content: null, ct, HttpCompletionOption.ResponseHeadersRead);
-        await api.EnsureSuccessAsync(response, ct);
-        await using Stream stream = await response.Content.ReadAsStreamAsync(ct);
-        await foreach (SseItem<string> item in SseParser.Create(stream).EnumerateAsync(ct))
+        return await FollowSetupAsync(api, chat, setup.Run.Process, ct);
+    }
+
+    // Prints the setup run's output until it exits, resuming after the last byte shown when the
+    // connection drops, as when the host is replaced by a deploy; the run's exit decides the code.
+    private async Task<int> FollowSetupAsync(HostApi api, Wire.Chat chat, Guid process, CancellationToken ct)
+    {
+        long offset = 0;
+        int reconnects = 0;
+        string lost = "the host ended the output";
+        while (reconnects <= MaxReconnects)
         {
-            if (item.EventType is "output")
+            try
             {
-                Wire.ProcessOutput output = JsonSerializer.Deserialize(item.Data, CliJsonContext.Default.ProcessOutput)!;
-                await terminal.WriteAsync(Encoding.UTF8.GetString(output.Data));
+                string path = string.Create(CultureInfo.InvariantCulture, $"/nooks/{chat.NookId}/processes/{process}/output?fromOffset={offset}");
+                using HttpResponseMessage response = await api.SendAsync(HttpMethod.Get, path, content: null, ct, HttpCompletionOption.ResponseHeadersRead);
+                await api.EnsureSuccessAsync(response, ct);
+                await using Stream stream = await response.Content.ReadAsStreamAsync(ct);
+                await foreach (SseItem<string> item in SseParser.Create(stream).EnumerateAsync(ct))
+                {
+                    reconnects = 0;
+                    if (item.EventType is "output")
+                    {
+                        Wire.ProcessOutput output = JsonSerializer.Deserialize(item.Data, CliJsonContext.Default.ProcessOutput)!;
+                        await terminal.WriteAsync(Encoding.UTF8.GetString(output.Data));
+                        offset = output.Offset + output.Data.Length;
+                    }
+                    else if (item.EventType is "exit")
+                    {
+                        Wire.ProcessExit exit = JsonSerializer.Deserialize(item.Data, CliJsonContext.Default.ProcessExit)!;
+                        return exit.ExitCode == 0 ? 0 : 1;
+                    }
+                }
             }
-            else if (item.EventType is "exit")
+            catch (Exception exception) when (exception is IOException or HttpRequestException { StatusCode: null })
             {
-                Wire.ProcessExit exit = JsonSerializer.Deserialize(item.Data, CliJsonContext.Default.ProcessExit)!;
-                return exit.ExitCode == 0 ? 0 : 1;
+                lost = exception.Message;
             }
+
+            reconnects++;
+            await Task.Delay(TimeSpan.FromSeconds(reconnects), time, ct);
         }
 
-        await terminal.FailAsync("The host ended the output before the setup ended. Try again: sloth chat setup " + ShortId(chat.Id));
+        await terminal.FailAsync("Lost the setup's output (" + lost + "). Follow it again: sloth chat setup " + ShortId(chat.Id));
         return 1;
     }
 

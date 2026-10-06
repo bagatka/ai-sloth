@@ -37,6 +37,8 @@ internal sealed class FakeModel : IAsyncDisposable
     private readonly WebApplication _app;
     private readonly Channel<bool> _holds = Channel.CreateUnbounded<bool>();
     private TaskCompletionSource _released = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    private bool _holding = true;
+    private int _cut;
 
     private FakeModel(WebApplication app)
     {
@@ -51,6 +53,9 @@ internal sealed class FakeModel : IAsyncDisposable
 
     /// <summary>One item for every call that started holding, so a test knows the agent's turn is running.</summary>
     public ChannelReader<bool> Holds => _holds.Reader;
+
+    /// <summary>Held calls whose caller gave up before the release, as when something between them stopped.</summary>
+    public int Cut => Volatile.Read(ref _cut);
 
     /// <summary>Forgets holds earlier tests left, so the next one read is the caller's own.</summary>
     public void ForgetHolds()
@@ -97,10 +102,36 @@ internal sealed class FakeModel : IAsyncDisposable
         Interlocked.Exchange(ref _released, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
     }
 
+    /// <summary>
+    /// Answers the calls held so far and every later one at once, as a model does: an agent's own side
+    /// calls, such as one for a chat's title, carry the message that held its turn.
+    /// </summary>
+    public void ReleaseForGood()
+    {
+        Volatile.Write(ref _holding, false);
+        Release();
+    }
+
     public async ValueTask DisposeAsync()
     {
         Release();
         await _app.DisposeAsync();
+    }
+
+    // Holds the call until the next release; one whose caller gives up first counts as cut.
+    private async Task HoldAsync(CancellationToken callerLeft)
+    {
+        Task released = Volatile.Read(ref _released).Task;
+        _holds.Writer.TryWrite(true);
+        try
+        {
+            await released.WaitAsync(callerLeft);
+        }
+        catch (OperationCanceledException) when (callerLeft.IsCancellationRequested)
+        {
+            Interlocked.Increment(ref _cut);
+            throw;
+        }
     }
 
     private async Task MessagesAsync(HttpContext context)
@@ -140,11 +171,9 @@ internal sealed class FakeModel : IAsyncDisposable
             JsonNode? firstUser = messages.FirstOrDefault(message => string.Equals((string?)message!["role"], "user", StringComparison.Ordinal));
             (blocks, stopReason) = ([Text("You first said: " + LatestText(firstUser))], "end_turn");
         }
-        else if (Says(lastUser, "wait"))
+        else if (Says(lastUser, "wait") && Volatile.Read(ref _holding))
         {
-            Task released = Volatile.Read(ref _released).Task;
-            _holds.Writer.TryWrite(true);
-            await released.WaitAsync(context.RequestAborted);
+            await HoldAsync(context.RequestAborted);
             (blocks, stopReason) = ([Text("Released.")], "end_turn");
         }
         else
