@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Bagatka.Sandboxing\Bagatka.Sandboxing.csproj" />
+    <ProjectReference Include="..\..\Sdk\Bagatka.Azure.Sandboxes\Bagatka.Azure.Sandboxes.csproj" />
+  </ItemGroup>
+
+</Project>

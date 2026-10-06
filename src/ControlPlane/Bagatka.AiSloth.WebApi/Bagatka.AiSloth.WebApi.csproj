@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Grpc.AspNetCore.Server" />
     <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
@@ -13,6 +14,7 @@
     <ProjectReference Include="..\..\Cli\Bagatka.AiSloth.MachineProtocol\Bagatka.AiSloth.MachineProtocol.csproj" />
     <ProjectReference Include="..\..\Daemon\Bagatka.AiSloth.DaemonProtocol\Bagatka.AiSloth.DaemonProtocol.csproj" />
     <ProjectReference Include="..\..\Foundation\Bagatka.Foundation.Web\Bagatka.Foundation.Web.csproj" />
+    <ProjectReference Include="..\..\Sandboxing\Bagatka.Sandboxing.Azure\Bagatka.Sandboxing.Azure.csproj" />
     <ProjectReference Include="..\..\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
     <ProjectReference Include="..\..\Storage\Bagatka.ObjectStorage\Bagatka.ObjectStorage.csproj" />
     <ProjectReference Include="..\Modules\AgentAccounts\Bagatka.AiSloth.AgentAccounts\Bagatka.AiSloth.AgentAccounts.csproj" />

@@ -1,0 +1,54 @@
+{
+  "id": "3e355780-b2d2-414e-865e-d6586e0ddd06",
+  "labels": {
+    "probe": "aisloth",
+    "key": "one"
+  },
+  "sourcesRef": {
+    "diskImage": {
+      "id": "cea1bc8d-edcd-42f3-8e98-e77e680a7677",
+      "isPublic": false
+    }
+  },
+  "resources": {
+    "cpu": "250m",
+    "memory": "512Mi",
+    "disk": "5120Mi"
+  },
+  "createdAt": "2026-10-05T23:00:23.900242+00:00",
+  "state": "Stopped",
+  "stateDetails": {
+    "stoppedReason": "UserStopped",
+    "stoppedAt": "2026-10-05T23:00:43.3859564+00:00"
+  },
+  "snapshotId": "bb923a91-1630-44f3-83e6-6bb709f7665b",
+  "coldStorageSizeInMB": 39,
+  "ports": [],
+  "connections": [],
+  "credentialRefs": [],
+  "lifecycle": {
+    "autoSuspendPolicy": {
+      "enabled": true,
+      "interval": 1800,
+      "mode": "Memory"
+    },
+    "autoDeletePolicy": {
+      "enabled": false
+    }
+  },
+  "managementUrl": "https://management.eastus2.azuredevcompute.io",
+  "volumes": [],
+  "contentPackageDownloads": [],
+  "outboundIpAddresses": [
+    "172.203.106.72",
+    "20.242.33.177",
+    "20.110.249.71",
+    "137.116.44.238",
+    "20.110.56.185",
+    "137.116.52.61",
+    "137.116.33.195",
+    "20.98.227.178",
+    "20.65.66.13",
+    "20.114.235.111"
+  ]
+}

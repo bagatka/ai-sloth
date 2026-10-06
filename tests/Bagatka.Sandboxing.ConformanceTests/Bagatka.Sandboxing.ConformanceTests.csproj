@@ -2,9 +2,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <!-- Azure runs sign in as the person running them (az login), and only when asked. -->
+    <PackageReference Include="Azure.Identity" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Azure\Bagatka.Sandboxing.Azure.csproj" />
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Remote\Bagatka.Sandboxing.Remote.csproj" />
   </ItemGroup>

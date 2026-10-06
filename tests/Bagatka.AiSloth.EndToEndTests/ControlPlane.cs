@@ -31,8 +31,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// </summary>
 public sealed partial class ControlPlane : IAsyncLifetime
 {
-    private readonly int _daemonPort = FreePort();
-    private readonly int _modelsPort = FreePort();
+    private readonly int _daemonPort;
+    private readonly int _modelsPort;
     private FakeIssuer? _issuer;
     private FakeModel? _model;
     private FakeChatGpt? _chatGpt;
@@ -46,9 +46,9 @@ public sealed partial class ControlPlane : IAsyncLifetime
     // the default one.
     private static Uri DockerEndpoint { get; } = new Uri(Environment.GetEnvironmentVariable("DOCKER_HOST") is { Length: > 0 } host ? host : "unix:///var/run/docker.sock");
 
-    // This run's nooks live in Docker scopes of their own, away from a developer's: one for the
-    // docker provider, one for every machine the tests run.
-    private string Scope { get; } = "e2e-" + RandomNumberGenerator.GetHexString(12, lowercase: true);
+    // This run's nooks live in scopes of their own, away from a developer's: one for the docker and
+    // azure providers, one for every machine the tests run.
+    internal string Scope { get; } = "e2e-" + RandomNumberGenerator.GetHexString(12, lowercase: true);
 
     private string MachineScope => Scope + "-m";
 
@@ -187,8 +187,16 @@ public sealed partial class ControlPlane : IAsyncLifetime
 
     /// <summary>The app with settings of its own, as AppHost arguments, for tests that need them.</summary>
     internal ControlPlane(IReadOnlyList<string> settings)
+        : this(settings, FreePort(), FreePort())
+    {
+    }
+
+    /// <summary>The app with settings of its own, its nook-facing endpoints on given ports, such as ports a tunnel forwards to.</summary>
+    internal ControlPlane(IReadOnlyList<string> settings, int daemonPort, int modelsPort)
     {
         _settings = settings;
+        _daemonPort = daemonPort;
+        _modelsPort = modelsPort;
     }
 
     /// <summary>The setup code the host printed when nobody had signed up; its first person used it.</summary>
@@ -302,7 +310,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
     private static partial Regex SetupLine();
 
     // The daemon endpoint gets a port of its own, so tests run while the app runs for development.
-    private static int FreePort()
+    internal static int FreePort()
     {
         using TcpListener listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();

@@ -28,8 +28,10 @@
     <ProjectReference Include="..\..\src\Daemon\Bagatka.AiSloth.DaemonProtocol\Bagatka.AiSloth.DaemonProtocol.csproj" />
     <ProjectReference Include="..\..\src\Harnesses\Bagatka.Harnesses\Bagatka.Harnesses.csproj" />
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing\Bagatka.Sandboxing.csproj" />
+    <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Azure\Bagatka.Sandboxing.Azure.csproj" />
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Remote\Bagatka.Sandboxing.Remote.csproj" />
+    <ProjectReference Include="..\..\src\Sdk\Bagatka.Azure.Sandboxes\Bagatka.Azure.Sandboxes.csproj" />
     <ProjectReference Include="..\..\src\Sdk\Bagatka.Sdk.Docker\Bagatka.Sdk.Docker.csproj" />
     <ProjectReference Include="..\..\src\Sdk\Bagatka.Sdk.GitHub\Bagatka.Sdk.GitHub.csproj" />
     <ProjectReference Include="..\..\src\Sdk\Bagatka.Sdk.OpenAI\Bagatka.Sdk.OpenAI.csproj" />

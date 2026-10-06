@@ -1,0 +1,17 @@
+{
+  "id": "cea1bc8d-edcd-42f3-8e98-e77e680a7677",
+  "name": "probe-pause",
+  "labels": {
+    "probe": "aisloth"
+  },
+  "image": {
+    "base": "registry.k8s.io/pause:3.10"
+  },
+  "status": {
+    "state": "Ready",
+    "errorMessage": "",
+    "createdAt": "2026-10-05T23:00:11.9495386+00:00",
+    "updatedAt": "2026-10-05T23:00:12.3642659+00:00"
+  },
+  "sizeInMB": 56
+}

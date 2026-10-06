@@ -2,6 +2,8 @@ using System;
 using System.Globalization;
 using System.Net.Http;
 using System.Threading;
+using Azure.Identity;
+using Bagatka.Azure.Sandboxes;
 using Bagatka.AiSloth.AgentAccounts;
 using Bagatka.AiSloth.Chats;
 using Bagatka.AiSloth.Machines;
@@ -16,6 +18,7 @@ using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.Foundation.Web;
 using Bagatka.ObjectStorage;
+using Bagatka.Sandboxing.Azure;
 using Bagatka.Sandboxing.Docker;
 using Bagatka.Sdk.GitHub;
 using Bagatka.ServiceDefaults;
@@ -44,11 +47,13 @@ builder.Host.UseDefaultServiceProvider(provider =>
     provider.ValidateScopes = true;
 });
 
-// Npgsql traces its commands; collecting them puts database time into each request's trace.
-builder.Services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddSource("Npgsql"));
+// Npgsql traces its commands and the Azure sandboxes client its calls, so each request's trace shows
+// their time.
+builder.Services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddSource("Npgsql", SandboxesDiagnostics.Name));
 
-// Modules' own measurements, such as how long a message waits for its agent's first action.
-builder.Services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddMeter("Bagatka.AiSloth.*"));
+// Modules' own measurements, such as how long a message waits for its agent's first action, and Azure
+// sandbox calls' durations.
+builder.Services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddMeter("Bagatka.AiSloth.*", SandboxesDiagnostics.Name));
 
 // The only place that reads configuration (PATTERNS.md, entry 20).
 HostSettings host = builder.Configuration.GetRequired<HostSettings>("Host");
@@ -56,6 +61,9 @@ SignInProviderSettings? signInProvider = builder.Configuration.GetSection("SignI
     ? builder.Configuration.GetRequired<SignInProviderSettings>("SignIn:Provider")
     : null;
 DockerSandboxSettings docker = builder.Configuration.GetRequired<DockerSandboxSettings>("Sandboxing:Docker");
+AzureSandboxSettings? azure = builder.Configuration.GetSection("Sandboxing:Azure").Exists()
+    ? builder.Configuration.GetRequired<AzureSandboxSettings>("Sandboxing:Azure")
+    : null;
 UsersSettings users = builder.Configuration.GetRequired<UsersSettings>("Modules:Users");
 WorkspacesSettings workspaces = builder.Configuration.GetRequired<WorkspacesSettings>("Modules:Workspaces");
 MachinesSettings machines = builder.Configuration.GetRequired<MachinesSettings>("Modules:Machines");
@@ -109,6 +117,13 @@ builder.Services.AddGitHubClient(gitHub);
 
 // Checkpoints are kept in a folder of this computer; an S3-compatible bucket comes with hosting.
 builder.Services.AddFileSystemObjectStorage(objectStorage);
+
+// Azure Container Apps Sandboxes when configured, signed in as the host's managed identity or the
+// developer's Azure CLI.
+if (azure is not null)
+{
+    builder.Services.AddAzureSandboxProvider(azure, new DefaultAzureCredential());
+}
 
 builder.Services
     .AddDockerSandboxProvider(docker)

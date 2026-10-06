@@ -162,6 +162,24 @@ public sealed class SandboxProviderConformanceTests
 
     [Theory]
     [MemberData(nameof(ProvidersUnderTest.Names), MemberType = typeof(ProvidersUnderTest))]
+    public async Task A_suspended_sandbox_can_be_snapshotted_and_stays_suspended(string provider)
+    {
+        await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);
+        SandboxSpec source = Spec();
+        await TestResults.ValueAsync(under.Provider.CreateAsync(source, Ct));
+        await WaitForAsync(under.Provider, source.Key, SandboxState.Running);
+        SandboxObservation suspended = await TestResults.ValueAsync(under.Provider.SuspendAsync(source.Key, Ct));
+        SnapshotKey snapshot = SnapshotKey.From(Guid.CreateVersion7());
+
+        SnapshotObservation taken = await TestResults.ValueAsync(under.Provider.SnapshotAsync(source.Key, snapshot, Ct));
+        SandboxObservation? after = await under.Provider.ObserveAsync(source.Key, Ct);
+
+        Assert.Equal(source.Key, taken.Source);
+        Assert.Equal(suspended.State, after?.State);
+    }
+
+    [Theory]
+    [MemberData(nameof(ProvidersUnderTest.Names), MemberType = typeof(ProvidersUnderTest))]
     public async Task A_snapshot_key_taken_from_another_sandbox_is_a_conflict(string provider)
     {
         await using ProviderUnderTest under = ProvidersUnderTest.Create(provider);

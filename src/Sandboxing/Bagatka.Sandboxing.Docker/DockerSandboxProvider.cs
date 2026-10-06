@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.Foundation;
@@ -68,7 +66,7 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
         }
 
         string name = ContainerName(spec.Key);
-        string specHash = Hash(spec);
+        string specHash = spec.Fingerprint();
         ContainerDetails? existing = await docker.InspectContainerAsync(name, ct);
         if (existing is not null)
         {
@@ -335,26 +333,6 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
     {
         int equals = variable.IndexOf('=', StringComparison.Ordinal);
         return equals < 0 ? variable : variable[..equals];
-    }
-
-    // Identifies a spec so that a repeated create can tell "same sandbox" from "different spec".
-    private static string Hash(SandboxSpec spec)
-    {
-        StringBuilder canonical = new StringBuilder();
-        canonical.Append(spec.Source.Value switch
-        {
-            SandboxImage image => "image:" + image.Reference,
-            SnapshotKey snapshot => "snapshot:" + Format(snapshot.Value),
-            _ => throw new InvalidOperationException("The sandbox source is default."),
-        });
-        canonical.Append('\n').Append(spec.Resources.CpuMillicores.ToString(CultureInfo.InvariantCulture));
-        canonical.Append('\n').Append(spec.Resources.MemoryMebibytes.ToString(CultureInfo.InvariantCulture));
-        foreach (KeyValuePair<string, string> variable in spec.Environment.OrderBy(variable => variable.Key, StringComparer.Ordinal))
-        {
-            canonical.Append('\n').Append(variable.Key).Append('=').Append(variable.Value);
-        }
-
-        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
     }
 
     private static string? Label(IReadOnlyDictionary<string, string> labels, string name)

@@ -14,6 +14,8 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Testing" />
+    <!-- The Azure tests clean up as the person running them (az login). -->
+    <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
   </ItemGroup>
 
@@ -27,7 +29,8 @@
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Machines\Bagatka.AiSloth.Machines.Contracts\Bagatka.AiSloth.Machines.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Nooks\Bagatka.AiSloth.Nooks.Contracts\Bagatka.AiSloth.Nooks.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ControlPlane\Modules\Users\Bagatka.AiSloth.Users.Contracts\Bagatka.AiSloth.Users.Contracts.csproj" />
-    <!-- Deletes whatever nooks a failed run left in its Docker scope. -->
+    <!-- Delete whatever nooks a failed run left in its scope. -->
+    <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Azure\Bagatka.Sandboxing.Azure.csproj" />
     <ProjectReference Include="..\..\src\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
   </ItemGroup>
 

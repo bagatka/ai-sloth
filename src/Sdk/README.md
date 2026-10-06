@@ -11,6 +11,10 @@ and record why in the client's README.
 
 ## Rules
 
+A client meant for NuGet, such as `Bagatka.Azure.Sandboxes`, follows its vendor's SDK conventions
+instead (for Azure, the Azure SDK guidelines on Azure.Core), without `Bagatka.Foundation` or `Sdk`
+in its name, with its public API tracked by PublicApiAnalyzers. Its caller translates to `Result<T>`.
+
 - **Naming and dependencies.**
   - Name the project `Bagatka.Sdk.<Vendor>`.
   - It references only .NET, approved packages, and `Bagatka.Foundation`. Never `Bagatka.AiSloth.*`.

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Sdk\Bagatka.Azure.Sandboxes\Bagatka.Azure.Sandboxes.csproj" />
+    <!-- Live tests sign in as the person running them (az login); they run only when asked. -->
+    <PackageReference Include="Azure.Identity" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Recorded\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

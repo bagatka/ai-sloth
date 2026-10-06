@@ -1,0 +1,19 @@
+{
+  "diskImage": {
+    "id": "fde3dcc5-6ec7-4185-bc8a-2907efa9a9c3",
+    "labels": {
+      "probe": "aisloth",
+      "snapshot": "s1"
+    },
+    "image": {
+      "base": "registry.k8s.io/pause:3.10"
+    },
+    "status": {
+      "state": "Ready",
+      "errorMessage": "",
+      "createdAt": "2026-10-05T23:00:59.1885091+00:00",
+      "updatedAt": "2026-10-05T23:00:59.1885091+00:00"
+    },
+    "sizeInMB": 5120
+  }
+}

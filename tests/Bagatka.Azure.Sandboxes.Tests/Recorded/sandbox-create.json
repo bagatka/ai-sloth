@@ -1,0 +1,40 @@
+{
+  "id": "3e355780-b2d2-414e-865e-d6586e0ddd06",
+  "labels": {
+    "probe": "aisloth",
+    "key": "one"
+  },
+  "entrypoint": [
+    "/pause"
+  ],
+  "sourcesRef": {
+    "diskImage": {
+      "id": "cea1bc8d-edcd-42f3-8e98-e77e680a7677",
+      "isPublic": false
+    }
+  },
+  "resources": {
+    "cpu": "250m",
+    "memory": "512Mi",
+    "disk": "5120Mi"
+  },
+  "createdAt": "2026-10-05T23:00:23.900242+00:00",
+  "state": "Running",
+  "ports": [],
+  "connections": [],
+  "credentialRefs": [],
+  "region": "eastus2",
+  "lifecycle": {
+    "autoSuspendPolicy": {
+      "enabled": true,
+      "interval": 1800,
+      "mode": "Memory"
+    },
+    "autoDeletePolicy": {
+      "enabled": false
+    }
+  },
+  "managementUrl": "https://management.eastus2.azuredevcompute.io",
+  "volumes": [],
+  "contentPackageDownloads": []
+}

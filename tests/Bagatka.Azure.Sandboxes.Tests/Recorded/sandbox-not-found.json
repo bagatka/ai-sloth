@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "SandboxNotFound",
+    "message": "Requested document not found."
+  }
+}

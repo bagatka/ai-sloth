@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "SandboxNotRunning",
+    "message": "Sandbox '3e355780-b2d2-414e-865e-d6586e0ddd06' is not in Running state"
+  }
+}

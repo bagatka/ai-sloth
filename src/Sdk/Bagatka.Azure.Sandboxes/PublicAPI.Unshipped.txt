@@ -1,0 +1,125 @@
+#nullable enable
+Bagatka.Azure.Sandboxes.Models.DiskImage
+Bagatka.Azure.Sandboxes.Models.DiskImage.BaseImage.get -> string?
+Bagatka.Azure.Sandboxes.Models.DiskImage.CreatedAt.get -> System.DateTimeOffset?
+Bagatka.Azure.Sandboxes.Models.DiskImage.ErrorMessage.get -> string?
+Bagatka.Azure.Sandboxes.Models.DiskImage.Id.get -> string!
+Bagatka.Azure.Sandboxes.Models.DiskImage.Labels.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Bagatka.Azure.Sandboxes.Models.DiskImage.Name.get -> string?
+Bagatka.Azure.Sandboxes.Models.DiskImage.SizeInMegabytes.get -> long?
+Bagatka.Azure.Sandboxes.Models.DiskImage.State.get -> Bagatka.Azure.Sandboxes.Models.DiskImageState
+Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions
+Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions.DiskImageCreateOptions(string! imageReference) -> void
+Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions.ImageReference.get -> string!
+Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions.Labels.get -> System.Collections.Generic.IDictionary<string!, string!>!
+Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions.Name.get -> string?
+Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions.Name.set -> void
+Bagatka.Azure.Sandboxes.Models.DiskImageState
+Bagatka.Azure.Sandboxes.Models.DiskImageState.DiskImageState() -> void
+Bagatka.Azure.Sandboxes.Models.DiskImageState.DiskImageState(string! value) -> void
+Bagatka.Azure.Sandboxes.Models.DiskImageState.Equals(Bagatka.Azure.Sandboxes.Models.DiskImageState other) -> bool
+Bagatka.Azure.Sandboxes.Models.Sandbox
+Bagatka.Azure.Sandboxes.Models.Sandbox.CreatedAt.get -> System.DateTimeOffset?
+Bagatka.Azure.Sandboxes.Models.Sandbox.DiskImageId.get -> string?
+Bagatka.Azure.Sandboxes.Models.Sandbox.Id.get -> string!
+Bagatka.Azure.Sandboxes.Models.Sandbox.Labels.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Bagatka.Azure.Sandboxes.Models.Sandbox.Region.get -> string?
+Bagatka.Azure.Sandboxes.Models.Sandbox.Resources.get -> Bagatka.Azure.Sandboxes.Models.SandboxResources?
+Bagatka.Azure.Sandboxes.Models.Sandbox.SnapshotId.get -> string?
+Bagatka.Azure.Sandboxes.Models.Sandbox.State.get -> Bagatka.Azure.Sandboxes.Models.SandboxState
+Bagatka.Azure.Sandboxes.Models.SandboxAutoSuspend
+Bagatka.Azure.Sandboxes.Models.SandboxAutoSuspend.After.get -> System.TimeSpan?
+Bagatka.Azure.Sandboxes.Models.SandboxAutoSuspend.Enabled.get -> bool
+Bagatka.Azure.Sandboxes.Models.SandboxAutoSuspend.Mode.get -> Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode?
+Bagatka.Azure.Sandboxes.Models.SandboxCreateOptions
+Bagatka.Azure.Sandboxes.Models.SandboxCreateOptions.AutoSuspend.get -> Bagatka.Azure.Sandboxes.Models.SandboxAutoSuspend?
+Bagatka.Azure.Sandboxes.Models.SandboxCreateOptions.AutoSuspend.set -> void
+Bagatka.Azure.Sandboxes.Models.SandboxCreateOptions.Command.get -> System.Collections.Generic.IList<string!>!
+Bagatka.Azure.Sandboxes.Models.SandboxCreateOptions.Entrypoint.get -> System.Collections.Generic.IList<string!>!
+Bagatka.Azure.Sandboxes.Models.SandboxCreateOptions.Environment.get -> System.Collections.Generic.IDictionary<string!, string!>!
+Bagatka.Azure.Sandboxes.Models.SandboxCreateOptions.Labels.get -> System.Collections.Generic.IDictionary<string!, string!>!
+Bagatka.Azure.Sandboxes.Models.SandboxCreateOptions.Resources.get -> Bagatka.Azure.Sandboxes.Models.SandboxResources!
+Bagatka.Azure.Sandboxes.Models.SandboxCreateOptions.SandboxCreateOptions(Bagatka.Azure.Sandboxes.Models.SandboxSource! source, Bagatka.Azure.Sandboxes.Models.SandboxResources! resources) -> void
+Bagatka.Azure.Sandboxes.Models.SandboxCreateOptions.Source.get -> Bagatka.Azure.Sandboxes.Models.SandboxSource!
+Bagatka.Azure.Sandboxes.Models.SandboxResources
+Bagatka.Azure.Sandboxes.Models.SandboxResources.Cpu.get -> string!
+Bagatka.Azure.Sandboxes.Models.SandboxResources.Disk.get -> string?
+Bagatka.Azure.Sandboxes.Models.SandboxResources.Memory.get -> string!
+Bagatka.Azure.Sandboxes.Models.SandboxResources.SandboxResources(string! cpu, string! memory, string? disk = null) -> void
+Bagatka.Azure.Sandboxes.Models.SandboxSource
+Bagatka.Azure.Sandboxes.Models.SandboxSource.DiskImageId.get -> string?
+Bagatka.Azure.Sandboxes.Models.SandboxSource.SnapshotId.get -> string?
+Bagatka.Azure.Sandboxes.Models.SandboxState
+Bagatka.Azure.Sandboxes.Models.SandboxState.Equals(Bagatka.Azure.Sandboxes.Models.SandboxState other) -> bool
+Bagatka.Azure.Sandboxes.Models.SandboxState.SandboxState() -> void
+Bagatka.Azure.Sandboxes.Models.SandboxState.SandboxState(string! value) -> void
+Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode
+Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode.Equals(Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode other) -> bool
+Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode.SandboxSuspendMode() -> void
+Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode.SandboxSuspendMode(string! value) -> void
+Bagatka.Azure.Sandboxes.Models.SandboxesModelFactory
+Bagatka.Azure.Sandboxes.SandboxGroupClient
+Bagatka.Azure.Sandboxes.SandboxGroupClient.SandboxGroupClient() -> void
+Bagatka.Azure.Sandboxes.SandboxGroupClient.SandboxGroupClient(System.Uri! endpoint, Bagatka.Azure.Sandboxes.SandboxGroupId! group, Azure.Core.TokenCredential! credential, Bagatka.Azure.Sandboxes.SandboxesClientOptions? options = null) -> void
+Bagatka.Azure.Sandboxes.SandboxGroupId
+Bagatka.Azure.Sandboxes.SandboxGroupId.ResourceGroupName.get -> string!
+Bagatka.Azure.Sandboxes.SandboxGroupId.SandboxGroupId(string! subscriptionId, string! resourceGroupName, string! sandboxGroupName) -> void
+Bagatka.Azure.Sandboxes.SandboxGroupId.SandboxGroupName.get -> string!
+Bagatka.Azure.Sandboxes.SandboxGroupId.SubscriptionId.get -> string!
+Bagatka.Azure.Sandboxes.SandboxesClientOptions
+Bagatka.Azure.Sandboxes.SandboxesClientOptions.SandboxesClientOptions(Bagatka.Azure.Sandboxes.SandboxesClientOptions.ServiceVersion version = Bagatka.Azure.Sandboxes.SandboxesClientOptions.ServiceVersion.V2026_09_01_Preview) -> void
+Bagatka.Azure.Sandboxes.SandboxesClientOptions.Scope.get -> string!
+Bagatka.Azure.Sandboxes.SandboxesClientOptions.Scope.set -> void
+Bagatka.Azure.Sandboxes.SandboxesClientOptions.ServiceVersion
+Bagatka.Azure.Sandboxes.SandboxesClientOptions.ServiceVersion.V2026_09_01_Preview = 1 -> Bagatka.Azure.Sandboxes.SandboxesClientOptions.ServiceVersion
+Bagatka.Azure.Sandboxes.SandboxesDiagnostics
+const Bagatka.Azure.Sandboxes.SandboxesClientOptions.LatestVersion = Bagatka.Azure.Sandboxes.SandboxesClientOptions.ServiceVersion.V2026_09_01_Preview -> Bagatka.Azure.Sandboxes.SandboxesClientOptions.ServiceVersion
+const Bagatka.Azure.Sandboxes.SandboxesDiagnostics.Name = "Bagatka.Azure.Sandboxes" -> string!
+override Bagatka.Azure.Sandboxes.Models.DiskImageState.Equals(object? obj) -> bool
+override Bagatka.Azure.Sandboxes.Models.DiskImageState.GetHashCode() -> int
+override Bagatka.Azure.Sandboxes.Models.DiskImageState.ToString() -> string!
+override Bagatka.Azure.Sandboxes.Models.SandboxState.Equals(object? obj) -> bool
+override Bagatka.Azure.Sandboxes.Models.SandboxState.GetHashCode() -> int
+override Bagatka.Azure.Sandboxes.Models.SandboxState.ToString() -> string!
+override Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode.Equals(object? obj) -> bool
+override Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode.GetHashCode() -> int
+override Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode.ToString() -> string!
+override Bagatka.Azure.Sandboxes.SandboxGroupId.ToString() -> string!
+static Bagatka.Azure.Sandboxes.Models.DiskImageState.Failed.get -> Bagatka.Azure.Sandboxes.Models.DiskImageState
+static Bagatka.Azure.Sandboxes.Models.DiskImageState.Ready.get -> Bagatka.Azure.Sandboxes.Models.DiskImageState
+static Bagatka.Azure.Sandboxes.Models.DiskImageState.operator !=(Bagatka.Azure.Sandboxes.Models.DiskImageState left, Bagatka.Azure.Sandboxes.Models.DiskImageState right) -> bool
+static Bagatka.Azure.Sandboxes.Models.DiskImageState.operator ==(Bagatka.Azure.Sandboxes.Models.DiskImageState left, Bagatka.Azure.Sandboxes.Models.DiskImageState right) -> bool
+static Bagatka.Azure.Sandboxes.Models.SandboxAutoSuspend.AfterIdle(System.TimeSpan after, Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode mode) -> Bagatka.Azure.Sandboxes.Models.SandboxAutoSuspend!
+static Bagatka.Azure.Sandboxes.Models.SandboxAutoSuspend.Disabled.get -> Bagatka.Azure.Sandboxes.Models.SandboxAutoSuspend!
+static Bagatka.Azure.Sandboxes.Models.SandboxSource.FromDiskImage(string! diskImageId) -> Bagatka.Azure.Sandboxes.Models.SandboxSource!
+static Bagatka.Azure.Sandboxes.Models.SandboxSource.FromSnapshot(string! snapshotId) -> Bagatka.Azure.Sandboxes.Models.SandboxSource!
+static Bagatka.Azure.Sandboxes.Models.SandboxState.Creating.get -> Bagatka.Azure.Sandboxes.Models.SandboxState
+static Bagatka.Azure.Sandboxes.Models.SandboxState.Idle.get -> Bagatka.Azure.Sandboxes.Models.SandboxState
+static Bagatka.Azure.Sandboxes.Models.SandboxState.Running.get -> Bagatka.Azure.Sandboxes.Models.SandboxState
+static Bagatka.Azure.Sandboxes.Models.SandboxState.StopFailed.get -> Bagatka.Azure.Sandboxes.Models.SandboxState
+static Bagatka.Azure.Sandboxes.Models.SandboxState.Stopped.get -> Bagatka.Azure.Sandboxes.Models.SandboxState
+static Bagatka.Azure.Sandboxes.Models.SandboxState.Stopping.get -> Bagatka.Azure.Sandboxes.Models.SandboxState
+static Bagatka.Azure.Sandboxes.Models.SandboxState.operator !=(Bagatka.Azure.Sandboxes.Models.SandboxState left, Bagatka.Azure.Sandboxes.Models.SandboxState right) -> bool
+static Bagatka.Azure.Sandboxes.Models.SandboxState.operator ==(Bagatka.Azure.Sandboxes.Models.SandboxState left, Bagatka.Azure.Sandboxes.Models.SandboxState right) -> bool
+static Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode.Disk.get -> Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode
+static Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode.Memory.get -> Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode
+static Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode.None.get -> Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode
+static Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode.operator !=(Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode left, Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode right) -> bool
+static Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode.operator ==(Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode left, Bagatka.Azure.Sandboxes.Models.SandboxSuspendMode right) -> bool
+static Bagatka.Azure.Sandboxes.Models.SandboxesModelFactory.DiskImage(string! id, Bagatka.Azure.Sandboxes.Models.DiskImageState state, string? name = null, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? labels = null, string? baseImage = null, string? errorMessage = null, System.DateTimeOffset? createdAt = null, long? sizeInMegabytes = null) -> Bagatka.Azure.Sandboxes.Models.DiskImage!
+static Bagatka.Azure.Sandboxes.Models.SandboxesModelFactory.Sandbox(string! id, Bagatka.Azure.Sandboxes.Models.SandboxState state, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? labels = null, Bagatka.Azure.Sandboxes.Models.SandboxResources? resources = null, System.DateTimeOffset? createdAt = null, string? diskImageId = null, string? snapshotId = null, string? region = null) -> Bagatka.Azure.Sandboxes.Models.Sandbox!
+static Bagatka.Azure.Sandboxes.SandboxGroupClient.GetEndpoint(string! region) -> System.Uri!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.CommitSandboxAsync(Azure.WaitUntil waitUntil, string! sandboxId, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? labels = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Azure.Operation<Bagatka.Azure.Sandboxes.Models.DiskImage!>!>!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.CreateDiskImageAsync(Azure.WaitUntil waitUntil, Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Azure.Operation<Bagatka.Azure.Sandboxes.Models.DiskImage!>!>!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.CreateSandboxAsync(Azure.WaitUntil waitUntil, Bagatka.Azure.Sandboxes.Models.SandboxCreateOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Azure.Operation<Bagatka.Azure.Sandboxes.Models.Sandbox!>!>!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.DeleteDiskImageAsync(string! diskImageId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Azure.Response!>!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.DeleteSandboxAsync(string! sandboxId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Azure.Response!>!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.GetDiskImageAsync(string! diskImageId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Azure.Response<Bagatka.Azure.Sandboxes.Models.DiskImage!>!>!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.GetDiskImageIfExistsAsync(string! diskImageId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Azure.NullableResponse<Bagatka.Azure.Sandboxes.Models.DiskImage!>!>!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.GetDiskImagesAsync(System.Collections.Generic.IReadOnlyDictionary<string!, string!>? labels = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> Azure.AsyncPageable<Bagatka.Azure.Sandboxes.Models.DiskImage!>!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.GetSandboxAsync(string! sandboxId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Azure.Response<Bagatka.Azure.Sandboxes.Models.Sandbox!>!>!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.GetSandboxIfExistsAsync(string! sandboxId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Azure.NullableResponse<Bagatka.Azure.Sandboxes.Models.Sandbox!>!>!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.GetSandboxesAsync(System.Collections.Generic.IReadOnlyDictionary<string!, string!>? labels = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> Azure.AsyncPageable<Bagatka.Azure.Sandboxes.Models.Sandbox!>!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.Group.get -> Bagatka.Azure.Sandboxes.SandboxGroupId!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.ResumeSandboxAsync(Azure.WaitUntil waitUntil, string! sandboxId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Azure.Operation<Bagatka.Azure.Sandboxes.Models.Sandbox!>!>!
+virtual Bagatka.Azure.Sandboxes.SandboxGroupClient.StopSandboxAsync(Azure.WaitUntil waitUntil, string! sandboxId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Azure.Operation<Bagatka.Azure.Sandboxes.Models.Sandbox!>!>!

@@ -1,0 +1,12 @@
+{
+  "id": "bb923a91-1630-44f3-83e6-6bb709f7665b",
+  "labels": {},
+  "sandboxId": "3e355780-b2d2-414e-865e-d6586e0ddd06",
+  "createdAtUtc": "2026-10-05T23:00:43.3770054Z",
+  "resources": {
+    "cpu": "250m",
+    "memory": "512Mi",
+    "disk": "5120Mi"
+  },
+  "sizeInMB": 39
+}

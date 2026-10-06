@@ -89,12 +89,12 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 | WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Sign-in, public API for users, workspaces, machines, nooks, agent accounts, and chats, the gRPC endpoint daemons and machines dial, the model gateway, `migrate` |
 | Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, Machines, Nooks, Secrets, AgentAccounts, and Chats built |
 | Harnesses | `Bagatka.Harnesses` | The programs that run coding agents, how to start and pay for each, and the client's side of ACP | Claude Code, Codex, pi, and GitHub Copilot |
-| Sandboxing | `Bagatka.Sandboxing` + `.<Provider>`, `.Remote` | Provider contract, conformance tests, one project per compute backend, remote calls | Contract, Docker provider, remote calls |
+| Sandboxing | `Bagatka.Sandboxing` + `.<Provider>`, `.Remote` | Provider contract, conformance tests, one project per compute backend, remote calls | Contract, Docker and Azure providers, remote calls |
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |
 | CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API: hosts, sign-in, agent accounts, secrets, and chats; its machine mode runs nooks on people's own computers (`src/Cli/README.md`) | Built |
 | Foundation | `Bagatka.Foundation` (+ `.Modules`, `.Web`) | Plumbing: results, errors, actors, typed IDs | Built |
 | Object storage | `Bagatka.ObjectStorage` (+ `.<Backend>` for cloud backends) | Store and read objects by key: checkpoints and harness state, folder versions later | Contract, and a folder of this computer as backend |
-| Sdk | `Bagatka.Sdk.<Vendor>` | Clients for vendor APIs without an official .NET SDK | Docker Engine, Sign in with ChatGPT, GitHub |
+| Sdk | `Bagatka.Sdk.<Vendor>`, `Bagatka.Azure.Sandboxes` | Clients for vendor APIs without an official .NET SDK | Docker Engine, Sign in with ChatGPT, GitHub, Azure Container Apps Sandboxes |
 | Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration; defaults every service host shares | Built |
 
 The web and mobile apps are not in this repository. They use the same public HTTP API as the CLI.
@@ -146,7 +146,7 @@ src/
   Sandboxing/
     README.md
     Bagatka.Sandboxing/            the provider contract
-    Bagatka.Sandboxing.<Backend>/  one provider per compute backend: Docker
+    Bagatka.Sandboxing.<Backend>/  one provider per compute backend: Docker, Azure
     Bagatka.Sandboxing.Remote/     a provider's calls as messages, run on a provider elsewhere
   Storage/
     Bagatka.ObjectStorage/         general-purpose object storage: the contract, and a folder as backend
@@ -157,10 +157,12 @@ src/
   Sdk/
     README.md
     Bagatka.Sdk.<Vendor>/          general-purpose third-party API clients
+    Bagatka.Azure.Sandboxes/       a client for Azure Container Apps Sandboxes, written to publish on NuGet
 tests/
   Bagatka.AiSloth.EndToEndTests/   the main suite: the real app through its public API
   Bagatka.AiSloth.Daemon.Tests/    the real daemon against a fake control plane
   Bagatka.Sandboxing.ConformanceTests/  one suite every sandbox provider passes
+  Bagatka.Azure.Sandboxes.Tests/   the Azure client against recorded responses, and live on demand
   Bagatka.AiSloth.ArchitectureTests/
   Bagatka.Analyzers.Tests/
   Bagatka.Foundation.Tests/
@@ -253,7 +255,7 @@ A capability with one contract, `I<Module>Api`.
 
 ### Nooks, providers, and the daemon
 
-Built: the Docker provider, the daemon and its image, the Nooks module from creating a nook to
+Built: the Docker and Azure providers, the daemon and its image, the Nooks module from creating a nook to
 deleting it, setups, checkpoints and coming back from them, and machines, a workspace's
 own computers as a provider, and nooks that sleep when nobody uses them. Ready copies are not built
 yet (`ROADMAP.md` has the order). The maps are `src/ControlPlane/Modules/Nooks/README.md`,
@@ -267,8 +269,9 @@ These decisions are fixed:
   wakes a sleeping nook first, so callers only notice latency, and people see it only as asleep.
 - **Providers do lifecycle only.** Every operation is safe to repeat, and every provider passes the
   same conformance suite. `Bagatka.Sandboxing.Docker` serves local development, CI, single-machine
-  deployments, and machines; the official host runs nooks on Azure Container Apps Sandboxes,
-  microVMs that keep memory when suspended and in snapshots. Self-hosting stays on any provider.
+  deployments, and machines; `Bagatka.Sandboxing.Azure` runs the official host's nooks on Azure
+  Container Apps Sandboxes, microVMs that keep memory when suspended. Self-hosting stays on any
+  provider.
 - **Every Linux nook runs Docker,** so code uses compose, Testcontainers, and builds as on a
   laptop. A provider gives each nook its own kernel or a runtime that makes Docker safe inside a
   container (Sysbox for the Docker provider); nothing grants a nook privileges on its host.
@@ -309,6 +312,7 @@ one, one module owns it and exposes it through its contract.
 
 General-purpose clients for third-party APIs without a usable official .NET SDK. They are
 vendor-shaped, product-agnostic, and used from module internals. Rules are in `src/Sdk/README.md`.
+`Bagatka.Azure.Sandboxes` is meant for NuGet, so it follows the Azure SDK's conventions.
 
 ### Aspire
 

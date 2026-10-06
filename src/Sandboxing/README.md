@@ -28,9 +28,10 @@ flight, as an unreachable backend would.
 - **Naming and dependencies.** `Bagatka.Sandboxing.<Backend>` references `Bagatka.Sandboxing`,
   `Bagatka.Foundation`, .NET, and the backend's official SDK or its client in `src/Sdk`. Never
   `Bagatka.AiSloth.*`. Its registration is `<Backend>SandboxProviderRegistration`.
-- **Settings.** One immutable settings record (credentials, region, deployment scope), passed by
-  the host: `services.Add<Backend>SandboxProvider(settings)` (`PATTERNS.md`, entry 20). Cloud
-  credentials are credential objects that refresh themselves, never strings.
+- **Settings.** One immutable settings record (region, deployment scope), passed by the host:
+  `services.Add<Backend>SandboxProvider(settings)` (`PATTERNS.md`, entry 20). Cloud credentials are
+  objects that refresh themselves, never strings, passed beside it:
+  `AddAzureSandboxProvider(settings, credential)`.
 - **Files survive until deletion.** A backend that can't keep a suspended sandbox's disk must keep
   the files some other way, such as object storage, or it can't be a provider.
 - **Memory is best effort.** Suspend with memory where the backend can, report `Paused`; otherwise
@@ -54,14 +55,34 @@ flight, as an unreachable backend would.
 | Provider | Status | Suspends to | Notes |
 |---|---|---|---|
 | Docker | Built | `Stopped` (`docker stop`) | Local development, CI, single-machine deployments, and machines. Stopping frees a sandbox's memory, which matters on people's machines; a container whose entry point exited cleanly, as it does when asked to stop, is `Stopped`, and any other end is `Failed`. Runs sandboxes under Sysbox (`sysbox-runc`), which the engine must have; creating fails with `sandboxing.sysbox_missing` otherwise. Snapshots are committed images, with the sandbox's environment values kept out. Sandboxes can reach the host as `host.docker.internal`. |
-| Azure Container Apps Sandboxes | Planned | `Paused` | The official host. MicroVMs with Docker inside; memory snapshots restore in under a second once warm |
+| Azure Container Apps Sandboxes | Built | `Paused` | The official host: microVMs with Docker inside. Images must be public. Disks get 20 GiB per core. The service suspends a sandbox idle for 30 minutes, in case the control plane is down. Snapshots are committed disk images. Through `Bagatka.Azure.Sandboxes` (`src/Sdk`) |
 | macOS virtual machines | After a spike | To be measured | On people's Macs only, through machines (`src/ControlPlane/Modules/Machines`), for iOS and macOS work; Apple's Virtualization.framework through Tart |
+
+## An Azure sandbox group
+
+Made once with the Azure CLI. The provider's identity (a managed identity when hosted, `az login` in
+development) needs the data plane role on it. Never give the group an identity: code in its sandboxes
+could use it.
+
+```sh
+az group create --name <resource-group> --location eastus2
+az rest --method put --body '{"location":"eastus2"}' \
+  --url "https://management.azure.com/subscriptions/<subscription>/resourceGroups/<resource-group>/providers/Microsoft.App/sandboxGroups/<group>?api-version=2026-07-01"
+az role assignment create --role "Container Apps SandboxGroup Data Owner" \
+  --assignee <object-id> --scope /subscriptions/<subscription>/resourceGroups/<resource-group>
+```
+
+The AppHost takes it as `azure-sandbox-group` (`subscription/resource-group/group/region`). Nooks
+there need the images in a public repository (`nook-image-repository`) and public addresses for this
+computer's daemon and model endpoints (`nook-daemon-url`, `nook-models-url`). We test with ngrok and
+ttl.sh, and anyone can: the end-to-end suite's `AzureTests` run when `BAGATKA_AZURE_SANDBOXES_GROUP`
+is set and `BAGATKA_NGROK_ENV_FILE` names an env file with `NGROK_AUTHTOKEN`.
 
 ## Tests
 
 One conformance suite (`tests/Bagatka.Sandboxing.ConformanceTests`) runs against every provider
-listed in `ProvidersUnderTest`: Docker in CI, directly and through remote calls, and clouds on
-demand. It tests the contract only, so
+listed in `ProvidersUnderTest`: Docker in CI, directly and through remote calls, and Azure when
+`BAGATKA_AZURE_SANDBOXES_GROUP` is set. It tests the contract only, so
 swapping providers is safe. Each test works in a scope of its own and deletes everything in it
 afterwards. Behavior the contract can't observe, such as what a provider's images contain, gets
 tests of that provider next to the suite.

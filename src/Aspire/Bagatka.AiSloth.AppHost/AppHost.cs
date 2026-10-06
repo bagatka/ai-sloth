@@ -75,19 +75,25 @@ IResourceBuilder<ParameterResource> sandboxScope = builder.AddParameter("sandbox
 // command, or the default one. It needs Sysbox (src/Sandboxing/README.md).
 string dockerHost = builder.Configuration["DOCKER_HOST"] is { Length: > 0 } host ? host : "unix:///var/run/docker.sock";
 
+// Nooks can also run in an Azure sandbox group, subscription/resource-group/group/region, signed in
+// with `az login`. They need the images in a public repository (nook-image-repository) and public
+// addresses for the daemon and model endpoints (nook-daemon-url, nook-models-url), such as a tunnel's.
+string? azureSandboxGroup = builder.Configuration["Parameters:azure-sandbox-group"];
+string? imageRepository = builder.Configuration["Parameters:nook-image-repository"];
+string? publicDaemonUrl = builder.Configuration["Parameters:nook-daemon-url"];
+string? publicModelsUrl = builder.Configuration["Parameters:nook-models-url"];
+
 IResourceBuilder<PostgresDatabaseResource> database = builder.AddPostgres("postgres")
     .WithImageTag("18")
     .AddDatabase("aisloth");
 
-// The images nooks start from: the base, and one per harness on top of it. Docker's cache makes a
-// rebuild without changes take seconds.
-IResourceBuilder<ExecutableResource> nookImage = builder.AddExecutable(
-    "nook-image", "docker", repositoryRoot, "build", "--file", "src/Daemon/Dockerfile", "--target", "nook", "--tag", NookImage, ".")
-    .WithEnvironment("DOCKER_HOST", dockerHost);
-IResourceBuilder<ExecutableResource>[] harnessImages = [.. harnesses.Select(harness => builder.AddExecutable(
-        "nook-image-" + harness, "docker", repositoryRoot, "build", "--file", "src/Daemon/Dockerfile", "--target", harness, "--tag", HarnessImage(harness), ".")
-    .WithEnvironment("DOCKER_HOST", dockerHost)
-    .WaitForCompletion(nookImage))];
+// The images nooks start from: the base, and one per harness on top of it, pushed when there is a
+// repository for them. Docker's cache makes a rebuild without changes take seconds.
+IResourceBuilder<ExecutableResource> nookImage = BuildImage("nook-image", "nook", NookImage, after: null);
+IResourceBuilder<ExecutableResource>[] harnessImages = [.. harnesses.Select(harness => BuildImage("nook-image-" + harness, harness, HarnessImage(harness), nookImage))];
+IResourceBuilder<ExecutableResource>[] imagesReady = imageRepository is null
+    ? [nookImage, .. harnessImages]
+    : [PushImage("nook-image", NookImage, nookImage), .. harnesses.Select((harness, index) => PushImage("nook-image-" + harness, HarnessImage(harness), harnessImages[index]))];
 
 IResourceBuilder<ProjectResource> webApi = builder.AddProject<Projects.Bagatka_AiSloth_WebApi>("webapi")
     .WithHttpHealthCheck("/health", endpointName: "Http");
@@ -99,8 +105,20 @@ IResourceBuilder<ProjectResource> migrations = builder.AddProject<Projects.Bagat
     .WithArgs("migrate")
     .WaitFor(database);
 
-// Both modes read the same settings (PATTERNS.md, entry 20). Nooks reach the daemon endpoint
-// through the Docker host.
+// Nooks reach the daemon and model endpoints at their public addresses, or through the Docker host.
+ReferenceExpression daemonUrl = publicDaemonUrl is not null
+    ? ReferenceExpression.Create($"{publicDaemonUrl}")
+    : ReferenceExpression.Create($"http://host.docker.internal:{daemonEndpoint.Property(EndpointProperty.Port)}");
+ReferenceExpression modelsUrl = publicModelsUrl is not null
+    ? ReferenceExpression.Create($"{publicModelsUrl.TrimEnd('/')}/models")
+    : ReferenceExpression.Create($"http://host.docker.internal:{modelsEndpoint.Property(EndpointProperty.Port)}/models");
+string[]? azureGroup = azureSandboxGroup?.Split('/');
+if (azureGroup is not null && azureGroup.Length != 4)
+{
+    throw new InvalidOperationException("azure-sandbox-group must be subscription/resource-group/group/region.");
+}
+
+// Both modes read the same settings (PATTERNS.md, entry 20).
 foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
 {
     mode.WithEnvironment("Host__PublicUrl", webApi.GetEndpoint("Http"))
@@ -109,7 +127,7 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         .WithEnvironment("Modules__Machines__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Nooks__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Chats__ConnectionString", database.Resource.ConnectionStringExpression)
-        .WithEnvironment("Modules__Chats__ModelGatewayUrl", ReferenceExpression.Create($"http://host.docker.internal:{modelsEndpoint.Property(EndpointProperty.Port)}/models"))
+        .WithEnvironment("Modules__Chats__ModelGatewayUrl", modelsUrl)
         .WithEnvironment("Modules__Chats__NearlyFullDisk", nearlyFullDisk)
         .WithEnvironment("Modules__AgentAccounts__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__AgentAccounts__EncryptionKey", agentAccountsKey)
@@ -119,15 +137,16 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         .WithEnvironment("Modules__Sources__ConnectionString", database.Resource.ConnectionStringExpression)
         .WithEnvironment("Modules__Sources__EncryptionKey", sourcesKey)
         .WithEnvironment("ModelGateway__AllowPrivateNetworks", modelPrivateNetworks)
-        .WithEnvironment("Modules__Nooks__DaemonUrl", ReferenceExpression.Create($"http://host.docker.internal:{daemonEndpoint.Property(EndpointProperty.Port)}"))
-        .WithEnvironment("Modules__Nooks__Image", NookImage)
+        .WithEnvironment("Modules__Nooks__DaemonUrl", daemonUrl)
+        .WithEnvironment("Modules__Nooks__Image", Published(NookImage))
         .WithEnvironment("ObjectStorage__FileSystem__Root", objectStorage)
         .WithEnvironment(environment =>
         {
             foreach (string harness in harnesses)
             {
-                environment.EnvironmentVariables["Modules__Nooks__HarnessImages__" + harness] = HarnessImage(harness);
+                environment.EnvironmentVariables["Modules__Nooks__HarnessImages__" + harness] = Published(HarnessImage(harness));
             }
+
 
             if (providerIssuer is not null)
             {
@@ -171,12 +190,20 @@ foreach (IResourceBuilder<ProjectResource> mode in new[] { webApi, migrations })
         .WithEnvironment("Modules__Nooks__EvictAfter", nookEvictAfter)
         .WithEnvironment("Sandboxing__Docker__Endpoint", dockerHost)
         .WithEnvironment("Sandboxing__Docker__Scope", sandboxScope);
+    if (azureGroup is not null)
+    {
+        mode.WithEnvironment("Sandboxing__Azure__SubscriptionId", azureGroup[0])
+            .WithEnvironment("Sandboxing__Azure__ResourceGroup", azureGroup[1])
+            .WithEnvironment("Sandboxing__Azure__SandboxGroup", azureGroup[2])
+            .WithEnvironment("Sandboxing__Azure__Region", azureGroup[3])
+            .WithEnvironment("Sandboxing__Azure__Scope", sandboxScope);
+    }
 }
 
-webApi.WaitForCompletion(migrations).WaitForCompletion(nookImage);
-foreach (IResourceBuilder<ExecutableResource> harnessImage in harnessImages)
+webApi.WaitForCompletion(migrations);
+foreach (IResourceBuilder<ExecutableResource> image in imagesReady)
 {
-    webApi.WaitForCompletion(harnessImage);
+    webApi.WaitForCompletion(image);
 }
 
 using DistributedApplication app = builder.Build();
@@ -185,6 +212,28 @@ app.Run();
 static string HarnessImage(string harness)
 {
     return "aisloth-nook-" + harness + ":dev";
+}
+
+// Where nooks find an image: in the repository it is pushed to, or in this computer's Docker.
+string Published(string image)
+{
+    return imageRepository is null ? image : imageRepository + "/" + image;
+}
+
+IResourceBuilder<ExecutableResource> BuildImage(string name, string target, string image, IResourceBuilder<ExecutableResource>? after)
+{
+    string[] tags = imageRepository is null ? ["--tag", image] : ["--tag", image, "--tag", Published(image)];
+    IResourceBuilder<ExecutableResource> build = builder.AddExecutable(
+            name, "docker", repositoryRoot, ["build", "--file", "src/Daemon/Dockerfile", "--target", target, .. tags, "."])
+        .WithEnvironment("DOCKER_HOST", dockerHost);
+    return after is null ? build : build.WaitForCompletion(after);
+}
+
+IResourceBuilder<ExecutableResource> PushImage(string name, string image, IResourceBuilder<ExecutableResource> build)
+{
+    return builder.AddExecutable(name + "-push", "docker", repositoryRoot, "push", "--quiet", Published(image))
+        .WithEnvironment("DOCKER_HOST", dockerHost)
+        .WaitForCompletion(build);
 }
 
 // Nooks are containers that reach these endpoints through the Docker host's gateway. On Linux the
