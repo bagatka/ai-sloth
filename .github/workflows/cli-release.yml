@@ -105,4 +105,4 @@ jobs:
         run: |
           gh release create "sloth-v$VERSION" "$RUNNER_TEMP"/release/sloth-* \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "sloth $VERSION" \
-            --notes "Download sloth-<platform> for your computer, make it executable, and put it on your PATH as sloth; on Windows, use the Linux build in WSL. Once installed, sloth update installs the newest release."
+            --notes "Download the build for your computer, \`sloth-linux-x64\`, \`sloth-linux-arm64\`, or \`sloth-osx-arm64\` for a Mac with Apple silicon, make it executable, and put it on your PATH as \`sloth\`. On Windows, use the Linux build in WSL. Once it's installed, \`sloth update\` installs the newest release."
