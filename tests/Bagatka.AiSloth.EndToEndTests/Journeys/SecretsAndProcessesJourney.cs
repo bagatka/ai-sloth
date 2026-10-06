@@ -81,16 +81,20 @@ public sealed class SecretsAndProcessesJourney(ControlPlane app) : IDisposable
         Assert.DoesNotContain("ghp_example", listBody, StringComparison.Ordinal);
     }
 
+    // Offsets count a process's output in the order the daemon read it, which interleaves standard
+    // output and standard error as they arrive, so the replay reads a process writing one of them.
     private async Task ANewNooksProcessGetsTheSecretsAndItsOutputReplaysFromAnyOffsetAsync(TestWorkspace acme, NookSummary nook)
     {
-        ProcessSummary process = await NookProcesses.StartAsync(Alice, nook.Id, "sh", "-c", "printf %s \"$GH_TOKEN\"; echo oops >&2; exit 3");
-        ProcessRun run = await NookProcesses.OutputAsync(Alice, nook.Id, process.Id, fromOffset: 0);
-        ProcessRun replay = await NookProcesses.OutputAsync(Alice, nook.Id, process.Id, fromOffset: 4);
+        ProcessRun run = await NookProcesses.RunAsync(Alice, nook.Id, "sh", "-c", "echo hello; echo oops >&2; exit 3");
+        ProcessSummary secret = await NookProcesses.StartAsync(Alice, nook.Id, "sh", "-c", "printf %s \"$GH_TOKEN\"");
+        ProcessRun read = await NookProcesses.OutputAsync(Alice, nook.Id, secret.Id, fromOffset: 0);
+        ProcessRun replay = await NookProcesses.OutputAsync(Alice, nook.Id, secret.Id, fromOffset: 4);
         NookSummary after = await acme.NookAsync(nook.Id);
 
         Assert.Equal(NookStatus.Creating, nook.Status);
-        Assert.Equal(new ProcessRun("ghp_example value", "oops\n", 3), run);
-        Assert.Equal(("example value", 3), (replay.StandardOutput, replay.ExitCode));
+        Assert.Equal(new ProcessRun("hello\n", "oops\n", 3), run);
+        Assert.Equal(new ProcessRun("ghp_example value", string.Empty, 0), read);
+        Assert.Equal(new ProcessRun("example value", string.Empty, 0), replay);
         Assert.Equal(NookStatus.Running, after.Status);
     }
 

@@ -99,11 +99,13 @@ public sealed class ChatJourney(ControlPlane app) : IDisposable
         Assert.Equal("end_turn", ended.GetProperty("stopReason").GetString());
     }
 
+    // The model holds a call that says "wait", so the turn runs until stopped. The agent's own side
+    // calls from the turn before, such as for a title, can be held too, so the journey waits for the
+    // turn itself rather than a hold.
     private async Task StoppingEndsTheTurnAndTheNextMessageWorksAsync(TestWorkspace acme, ChatSummary chat, ChatWatch watch)
     {
-        app.Model.ForgetHolds();
         await acme.SendAsync(chat, "wait for me");
-        await app.Model.Holds.ReadAsync(Ct);
+        await watch.NextAsync("turn-started");
 
         await Api.ExpectAsync(_alice.SendPostAsync(Paths.Chat(chat) + "/stop", new { }), HttpStatusCode.NoContent);
         JsonElement stopped = await watch.NextAsync("turn-ended");

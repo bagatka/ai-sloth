@@ -20,7 +20,7 @@ public sealed class SleepyControlPlane : IAsyncDisposable
     /// </summary>
     public static readonly TimeSpan Sleep = TimeSpan.FromMinutes(2);
 
-    public static readonly TimeSpan Eviction = TimeSpan.FromMinutes(2);
+    public static readonly TimeSpan Eviction = TimeSpan.FromMinutes(3);
 
     private readonly ControlPlane _app = new ControlPlane(["Parameters:nook-sleep-after=00:00:08", "Parameters:nook-evict-after=00:00:20", "Parameters:chat-draft-lifetime=00:00:30"]);
     private readonly Lazy<Task> _started;
