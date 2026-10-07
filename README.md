@@ -95,3 +95,8 @@ No resume script is needed: there is no authentication or service state to repai
 The flake supplies the Docker client, not a Docker daemon; container workloads
 would need a separately configured engine. Setup does not launch application
 servers.
+
+## License
+
+MIT, in [LICENSE](LICENSE). The landing page's fonts, in `site/public/fonts`, keep their own SIL Open
+Font License, beside them.
