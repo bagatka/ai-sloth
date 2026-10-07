@@ -73,9 +73,9 @@ function tiles(): string {
     <div class="page">
       <div class="text">
         <header>
-          <a class="name" href="/" aria-label="AiSloth">
-            <span aria-hidden="true">Ai<span class="slop">Slop<svg viewBox="0 0 48 10" preserveAspectRatio="none"><path d="M1 6.5C10 3.5 18 8 26 5.2S40 3.6 47 3.8" pathLength="1" /></svg></span><span class="sloth">Sloth</span></span>
-          </a>
+          <button class="name" type="button" aria-label="AiSloth">
+            <span aria-hidden="true">Ai<span class="slop">Slop<svg viewBox="0 0 48 10" preserveAspectRatio="none"><path d="M1 6.5C10 3.5 18 8 26 5.2S40 3.6 47 3.8" pathLength="1" /></svg></span><span class="sloth">Sloth<svg viewBox="0 0 48 10" preserveAspectRatio="none"><path d="M1 4.2C12 6.6 21 3.2 30 5.4S42 6.2 47 4.4" pathLength="1" /></svg></span></span>
+          </button>
           <nav aria-label="AiSloth elsewhere">
             <a href={repository} aria-label="AiSloth on GitHub" title="GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={githubMark} /></svg></a>
             <a href="https://x.com/AiSlothDev" aria-label="AiSloth on X, @AiSlothDev" title="@AiSlothDev"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={xMark} /></svg></a>
@@ -116,9 +116,9 @@ function tiles(): string {
     </div>
 
     <script is:inline>
-      // Replays the session once: commands type out, their output follows. Hidden lines keep their
-      // space, so nothing around the terminal moves. Each word of a command stays whole when the line
-      // wraps, so a flag like --repo never breaks after its dashes.
+      const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
       // Copies the install command; where the page may not write the clipboard, selects it instead.
       const copy = document.getElementById("copy");
       copy.addEventListener("click", async () => {
@@ -133,7 +133,171 @@ function tiles(): string {
       });
 
       const terminal = document.querySelector(".terminal");
-      if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const code = terminal.querySelector("code");
+      const session = code.innerHTML;
+
+      // The name's easter egg: a click turns the page into AI slop, the name AiSlop with Sloth struck
+      // out, until the next click, when the pen strikes the slop out and AiSloth comes back.
+      const slop = {
+        title: "AiSlop — Revolutionize Your Workflow with AI ✨",
+        heading: "Unlock the Power of Seamless, AI-Driven Synergy ✨",
+        text: "In today’s fast-paced world, it’s not just about coding — it’s about elevating your workflow to the next level. 🚀 Delve into a rich tapestry of cutting-edge, robust, AI-powered solutions that empower you to navigate the ever-evolving landscape of software development — seamlessly.",
+        badge: "✨ Introducing AiSlop 2.0 — now with AGI",
+        start: "🚀 Get Started — It’s Free!",
+        beta: "✨ Trusted by 10,000+ forward-thinking developers worldwide — and counting.",
+        footer: "© 2026 AiSlop Inc. — Made with ❤️ and AI.",
+        bar: "✨ AI Terminal Pro",
+        terminal: [
+          "$ npx create-ai-slop@latest --yes",
+          "✨ Leveraging cutting-edge AI…",
+          "🔍 Delving into your codebase…",
+          "🧠 Synthesizing a holistic strategy…",
+          "🚀 Unlocking 10x productivity…",
+          "✅ Done! Your code is now 100% more synergistic.",
+          "💡 Remember: it’s not just code — it’s a journey.",
+        ],
+      };
+      const heading = document.querySelector("main h1");
+      const text = document.querySelector("main > p");
+      const beta = document.querySelector(".beta");
+      const footer = document.querySelector("footer > span");
+      const bar = terminal.querySelector(".bar span");
+      const install = document.querySelector(".install");
+      const real = { title: document.title, heading: heading.innerHTML, text: text.innerHTML, beta: beta.innerHTML, footer: footer.textContent, bar: bar.textContent };
+      const start = document.createElement("button");
+      start.type = "button";
+      start.className = "slop-start";
+      start.textContent = slop.start;
+      const badge = document.createElement("span");
+      badge.className = "slop-badge";
+      badge.textContent = slop.badge;
+      // The slop goes away by itself after 10 seconds, or when the name or its own Get Started button
+      // is clicked.
+      let slopped = false;
+      let busy = false;
+      let back = 0;
+      document.querySelector(".name").addEventListener("click", flip);
+      start.addEventListener("click", flip);
+
+      async function flip() {
+        if (busy) {
+          return;
+        }
+        busy = true;
+        clearTimeout(back);
+        slopped = !slopped;
+        if (slopped) {
+          await toSlop();
+          back = setTimeout(flip, 10000);
+        } else {
+          await toSloth();
+        }
+        busy = false;
+      }
+
+      async function toSlop() {
+        const heard = struckOut("");
+        const words = document.createElement("span");
+        words.className = "slop-words";
+        heard.append(words);
+        const said = struckOut("");
+        await crossfade(() => {
+          document.documentElement.classList.add("slopped");
+          document.title = slop.title;
+          bar.textContent = slop.bar;
+          footer.textContent = slop.footer;
+          install.after(start);
+          heading.before(badge);
+          beta.replaceChildren(struckOut(slop.beta));
+          code.replaceChildren();
+          heading.replaceChildren(heard);
+          text.replaceChildren(said);
+        });
+        typeSlop();
+        await stream(words, slop.heading);
+        await stream(said, slop.text);
+      }
+
+      async function toSloth() {
+        for (const line of document.querySelectorAll(".slop-strike")) {
+          line.classList.add("struck");
+        }
+        await pause(still ? 0 : 1000);
+        await crossfade(() => {
+          document.documentElement.classList.remove("slopped");
+          document.title = real.title;
+          heading.innerHTML = real.heading;
+          text.innerHTML = real.text;
+          beta.innerHTML = real.beta;
+          footer.textContent = real.footer;
+          bar.textContent = real.bar;
+          start.remove();
+          badge.remove();
+          code.innerHTML = session;
+          for (const line of code.querySelectorAll(".line")) {
+            line.classList.add("shown");
+          }
+          code.querySelector(".end").classList.add("typing");
+        });
+      }
+
+      // Changes the page in one step that the browser crossfades, or a plain fade where it can't.
+      async function crossfade(change) {
+        if (still) {
+          change();
+          return;
+        }
+        if (document.startViewTransition) {
+          await document.startViewTransition(change).finished;
+          return;
+        }
+        const page = document.querySelector(".page");
+        const out = page.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: "forwards" });
+        await out.finished;
+        change();
+        await page.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 450, easing: "ease-out" }).finished;
+        out.cancel();
+      }
+
+      // A span the pen can strike out when AiSloth comes back.
+      function struckOut(words) {
+        const span = document.createElement("span");
+        span.className = "slop-strike";
+        span.textContent = words;
+        return span;
+      }
+
+      // Writes text a word at a time, as a chatbot streams its answer.
+      async function stream(element, words) {
+        const cursor = document.createElement("span");
+        cursor.className = "slop-cursor";
+        cursor.textContent = "▍";
+        const all = words.split(" ");
+        for (let i = 1; i <= all.length; i++) {
+          element.textContent = all.slice(0, i).join(" ") + " ";
+          element.append(cursor);
+          await pause(still ? 0 : 35 + Math.random() * 45);
+        }
+        cursor.remove();
+      }
+
+      async function typeSlop() {
+        for (const [i, words] of slop.terminal.entries()) {
+          if (!slopped) {
+            return;
+          }
+          const line = document.createElement("span");
+          line.className = i === 0 ? "line shown command" : "line shown output";
+          line.textContent = words;
+          code.append(line);
+          await pause(still ? 0 : i === 0 ? 700 : 450);
+        }
+      }
+
+      // Replays the session once: commands type out, their output follows. Hidden lines keep their
+      // space, so nothing around the terminal moves. Each word of a command stays whole when the line
+      // wraps, so a flag like --repo never breaks after its dashes.
+      if (!still) {
         terminal.classList.add("playing");
         play();
       }
@@ -158,8 +322,7 @@ function tiles(): string {
       }
 
       async function play() {
-        const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-        await wait(500);
+        await pause(500);
         for (const line of terminal.querySelectorAll(".line")) {
           const typed = line.querySelector(".typed");
           if (typed) {
@@ -167,18 +330,18 @@ function tiles(): string {
             const length = words.join(" ").length;
             show(typed, words, 0);
             line.classList.add("shown", "typing");
-            await wait(400);
+            await pause(400);
             for (let i = 1; i <= length; i++) {
               show(typed, words, i);
-              await wait(22 + Math.random() * 28);
+              await pause(22 + Math.random() * 28);
             }
             if (!line.classList.contains("end")) {
               line.classList.remove("typing");
             }
-            await wait(300);
+            await pause(300);
           } else {
             line.classList.add("shown");
-            await wait(line.classList.contains("left") ? 900 : 500);
+            await pause(line.classList.contains("left") ? 900 : 500);
           }
         }
       }
@@ -208,6 +371,8 @@ function tiles(): string {
     --soft: #5b5d57;
     --line: #dcddd7;
     --algae: #3f7d20;
+    --pen: #3f7d20;
+    --slop: #9333ea;
     --on-algae: #ffffff;
     --panel: linear-gradient(180deg, #d3e9a8 0%, #8fc25a 42%, #4f8d2b 72%, #2f6316 100%);
     color-scheme: light dark;
@@ -219,6 +384,8 @@ function tiles(): string {
       --soft: #a2a49d;
       --line: #2a2c28;
       --algae: #9ccf6a;
+      --pen: #9ccf6a;
+      --slop: #c084fc;
       --on-algae: #10140f;
       --panel: linear-gradient(180deg, #b7da8b 0%, #78b246 42%, #427f22 72%, #24510f 100%);
     }
@@ -259,20 +426,32 @@ function tiles(): string {
   header nav a:hover, footer nav a:hover { color: var(--ink); }
   header nav svg { width: 1.25rem; height: 1.25rem; fill: currentColor; }
   footer nav svg { width: 1.05rem; height: 1.05rem; fill: currentColor; }
-  header .name { color: var(--ink); font-weight: 700; font-size: 1.25rem; letter-spacing: -0.02em; }
+  header .name {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: 700 1.25rem/1.6 "Hanken Grotesk", system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    cursor: pointer;
+  }
+  header .name:focus-visible { outline: 2px solid var(--algae); outline-offset: 4px; border-radius: 4px; }
 
   /* The name strikes itself out: AiSlop becomes AiSloth. On load the line draws through "Slop" and
      "Sloth" arrives; without motion, it shows the end. */
-  .slop { position: relative; color: var(--soft); font-weight: 600; margin-right: 0.18em; animation: dim 300ms 700ms both; }
-  .slop svg { position: absolute; left: -2%; top: 50%; width: 106%; height: 0.5em; transform: translateY(-38%); overflow: visible; }
+  .slop { position: relative; display: inline-block; color: var(--soft); font-weight: 600; margin-right: 0.18em; animation: dim 300ms 700ms both; }
   .slop path { fill: none; stroke: var(--algae); stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: strike 420ms 700ms cubic-bezier(0.6, 0, 0.25, 1) forwards; }
-  .sloth { display: inline-block; animation: arrive 380ms 1050ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .sloth { position: relative; display: inline-block; animation: arrive 380ms 1050ms cubic-bezier(0.2, 0.8, 0.2, 1) both; transition: color 300ms ease; }
+  .slop svg, .sloth svg { position: absolute; left: -2%; top: 50%; width: 106%; height: 0.5em; transform: translateY(-38%); overflow: visible; }
+  .sloth path { fill: none; stroke: var(--slop); stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 420ms cubic-bezier(0.6, 0, 0.25, 1); }
   @keyframes dim { from { color: var(--ink); font-weight: 700; } }
   @keyframes strike { to { stroke-dashoffset: 0; } }
   @keyframes arrive { from { opacity: 0; transform: translateY(0.3em); } }
   @media (prefers-reduced-motion: reduce) {
     .slop, .sloth { animation: none; }
     .slop path { animation: none; stroke-dashoffset: 0; }
+    .slopped .slop path { stroke-dashoffset: 1; }
+    .sloth path, .slop-strike { transition: none; }
   }
 
   main { margin-block: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; max-width: 36rem; }
@@ -390,6 +569,58 @@ function tiles(): string {
     animation: blink 1.1s steps(1) infinite;
   }
   @keyframes blink { 50% { opacity: 0; } }
+
+  /* The easter egg's AI-slop look: everything this page avoids, on purpose. */
+  .slopped { --algae: var(--slop); }
+  .slopped body {
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, "Hanken Grotesk", sans-serif;
+    background: radial-gradient(60rem 40rem at 10% 0%, #ede9fe, transparent 65%), radial-gradient(50rem 40rem at 90% 100%, #fce7f3, transparent 65%), #faf7ff;
+  }
+  .slopped .slop { color: var(--ink); }
+  .slopped .slop path { animation: unstrike 300ms cubic-bezier(0.6, 0, 0.25, 1) forwards; }
+  .slopped .sloth { color: var(--soft); }
+  .slopped .sloth path { stroke-dashoffset: 0; transition-delay: 250ms; }
+  @keyframes unstrike { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 1; } }
+  .slopped h1 { font-weight: 800; letter-spacing: -0.03em; }
+  .slop-words { background: linear-gradient(90deg, #7c3aed, #db2777 55%, #2563eb); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .slop-cursor { color: #a855f7; font-weight: 400; animation: blink 0.8s steps(1) infinite; }
+  .slop-strike { background: linear-gradient(var(--pen), var(--pen)) no-repeat 0 58% / 0% 3px; -webkit-box-decoration-break: clone; box-decoration-break: clone; transition: background-size 800ms cubic-bezier(0.6, 0, 0.25, 1); }
+  .slop-strike.struck { background-size: 100% 3px; }
+  .slopped .install { display: none; }
+  .slop-badge { justify-self: start; padding: 0.35rem 0.85rem; border: 1px solid rgb(168 85 247 / 0.45); border-radius: 999px; background: rgb(168 85 247 / 0.1); color: var(--slop); font-size: 0.85rem; font-weight: 600; }
+  .slop-start {
+    justify-self: start;
+    margin-top: 0.75rem;
+    padding: 1rem 1.75rem;
+    border: 0;
+    border-radius: 999px;
+    color: #fff;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    background: linear-gradient(90deg, #7c3aed, #db2777);
+    box-shadow: 0 10px 40px -6px rgb(168 85 247 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.35);
+    animation: glow 1.8s ease-in-out infinite alternate;
+  }
+  .slop-start:focus-visible { outline: 2px solid var(--slop); outline-offset: 3px; }
+  @keyframes glow { to { box-shadow: 0 14px 60px -4px rgb(236 72 153 / 0.85), inset 0 1px 0 rgb(255 255 255 / 0.35); } }
+  .slopped .beta { color: var(--slop); font-weight: 600; }
+  .slopped .pattern { opacity: 0; }
+  .slopped .algae { background: linear-gradient(135deg, #8b5cf6, #ec4899 45%, #3b82f6); background-size: 220% 220%; animation: shimmer 7s ease-in-out infinite alternate; }
+  @keyframes shimmer { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
+  .slopped .terminal { border-radius: 22px; background: rgb(255 255 255 / 0.14); border-color: rgb(255 255 255 / 0.35); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: 0 0 80px -10px rgb(236 72 153 / 0.7); }
+  .slopped .terminal pre, .slopped .bar span { color: #fff; }
+  .slopped .bar i:nth-child(1) { background: #ff5f57; }
+  .slopped .bar i:nth-child(2) { background: #febc2e; }
+  .slopped .bar i:nth-child(3) { background: #28c840; }
+  @media (prefers-color-scheme: dark) {
+    .slopped body { background: radial-gradient(60rem 40rem at 10% 0%, #2e1065, transparent 65%), radial-gradient(50rem 40rem at 90% 100%, #500724, transparent 65%), #0c0614; }
+  }
+
+  /* Between the two looks, the old page blurs as it fades into the new one. */
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 700ms; animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+  ::view-transition-old(root) { animation-name: dissolve; }
+  @keyframes dissolve { to { opacity: 0; filter: blur(8px); } }
 
   /* On a phone the page is one column: the words, the panel, then who builds it. */
   @media (max-width: 52rem) {
