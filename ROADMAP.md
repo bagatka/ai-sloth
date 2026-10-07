@@ -9,13 +9,11 @@ after it adds entries to existing lists (a provider, an account kind, a harness)
 concepts. Providers for now: Azure Container Apps Sandboxes for the official host, people's own
 machines, and local Docker for development, tests, and single-machine self-hosting.
 
-1. **Hosting.** People's own machines connecting from anywhere (Linux, and Windows through WSL),
-   self-hosting packaged for a VPS or a company network, nook images from a
-   company's private registry, such as Azure Container Registry through a managed identity kept out
-   of its sandboxes, and a push-notification relay any host can use. Merging to main deploys the official
-   host and its landing page. Before people are invited: logs, traces, metrics, and product analytics
-   from the control plane and every client in PostHog, through a .NET PostHog SDK of our own that
-   works with Native AOT and anyone can use.
+1. **Hosting.** Self-hosting packaged for a VPS or a company network, nook images from a company's
+   private registry, such as Azure Container Registry through a managed identity kept out of its
+   sandboxes, and a push-notification relay any host can use. Before people are invited: logs,
+   traces, metrics, and product analytics from the control plane and every client in PostHog,
+   through a .NET PostHog SDK of our own that works with Native AOT and anyone can use.
 2. **Apps.** The web app, served by every host, and native iOS and Android apps that connect to any
    number of hosts.
 3. **Working together.** A chat brings in another chat's changes; agents use AiSloth's own API

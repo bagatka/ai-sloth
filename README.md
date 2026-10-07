@@ -73,6 +73,10 @@ variables `CUSTOM_DOMAIN`, `CUSTOM_DOMAIN_CERTIFICATE`, and `ALLOW_CHATGPT_PLANS
 The `CLI / Release` workflow releases sloth from main, run with its version in Actions or with
 `gh workflow run cli-release.yml -f version=<version>`.
 
+The landing page at aisloth.dev is an Astro site in `site/`: run `npm ci` and `npm run dev` there to
+work on it. The `Site / Publish` workflow publishes it to GitHub Pages whenever a push to main
+changes it; the custom domain is a setting of the repository's Pages.
+
 ### Amp orbs
 
 `.agents/setup` installs single-user Nix, materializes the existing locked flake,

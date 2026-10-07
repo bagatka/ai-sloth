@@ -38,6 +38,9 @@
 
               # `dotnet aspire deploy` signs in to Azure and compiles Bicep with the Azure CLI.
               pkgs.azure-cli
+
+              # The landing page (site/) builds with Astro.
+              pkgs.nodejs_24
             ];
 
             # Native AOT links against zlib.
