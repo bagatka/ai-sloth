@@ -1,58 +1,43 @@
 ---
-// The landing page. Its words are the product's: only what AiSloth does today, or says is coming.
+// The landing page, in the Zine world: risograph pink and blue overprinted on paper. Its words claim
+// only what AiSloth does today; the example agents on it are illustrations.
 const repository = "https://github.com/bagatka/ai-sloth-dotnet";
-const download = `${repository}/releases/latest`;
+const start = `${repository}#installing-sloth`;
 
-// A real session, replayed once on arrival at about the pace it ran (milliseconds after load).
-const session = [
-  { at: 0, parts: [["prompt", "$ "], ["", 'sloth chat "Create hello.txt containing the word hi, then reply with just: done" --harness codex']] },
-  { at: 700, parts: [["dim", "Chat ac97fd · Codex · OpenRouter · laptop"]] },
-  { at: 950, parts: [["you", "› You: "], ["", "Create hello.txt containing the word hi, then reply with just: done"]] },
-  { at: 1700, parts: [["", "I’ll create hello.txt with the word hi."]] },
-  { at: 2200, parts: [["dim", "  ▸ printf 'hi' > hello.txt"]] },
-  { at: 3000, parts: [["", "done"]] },
-  { at: 3250, parts: [["dim", "── done · 5s ──"]] },
-  { at: 3450, parts: [["dim", "  (files saved as checkpoint 1)"]] },
+const today = [
+  "Agents share one checkout and trip over each other.",
+  "Close the lid, and they stop.",
+  "A fresh sandbox spends minutes installing.",
+];
+
+const withNooks = [
+  "Each agent gets a computer of its own.",
+  "They keep going while you’re away.",
+  "Ready in seconds, with your setup already done.",
 ];
 
 const places = [
-  {
-    title: "In our cloud",
-    text: "Each nook is a small virtual machine of its own. Nothing to install or keep running on your side.",
-  },
-  {
-    title: "On your own computer",
-    text: "Connect a Linux computer, or Windows through WSL, with <code>sloth machine connect</code>. Your agents run on your hardware, and you follow them from anywhere while it’s online.",
-  },
-  {
-    title: "On your own server",
-    text: "Run all of AiSloth on a server or inside your company’s network. A packaged setup is on its way.",
-  },
+  { title: "In our cloud", text: "Each agent on a small virtual machine of its own. Nothing to set up." },
+  { title: "On your computers", text: "Connect a Linux machine, or Windows through WSL. Your hardware runs the agents." },
+  { title: "On your servers", text: "Host all of AiSloth yourself, inside your own network." },
 ];
 
-const facts = [
-  {
-    title: "Ready copies",
-    text: "Once a repository’s setup has run, new nooks start from a copy with it done. The agent acts within seconds of your message.",
-  },
-  {
-    title: "Sleep and wake",
-    text: "Nooks nobody uses go to sleep and wake in a few seconds, with their files and an agent that remembers the conversation.",
-  },
-  {
-    title: "A checkpoint every turn",
-    text: "The files are saved after each turn. A lost sandbox comes back where it was, and any checkpoint can start a new chat.",
-  },
-  {
-    title: "Docker inside",
-    text: "Every nook runs its own Docker, so compose files, Testcontainers and image builds work as they do on your laptop.",
-  },
+const trust = [
+  { title: "Read every line", text: "The code is on GitHub, the hosted service included." },
+  { title: "Your accounts", text: "Claude Code, Codex, pi and Copilot, with your own API keys or Copilot plan." },
+  { title: "Keys stay out", text: "API keys never enter a nook. Agents reach models through a gateway that holds them." },
+  { title: "Your machines", text: "Keep the code on computers you own, and still reach it from anywhere." },
 ];
 
-const accounts = [
-  "A GitHub Copilot plan",
-  "An OpenAI or Anthropic API key",
-  "A key from any compatible provider, such as OpenRouter",
+// The pile of computers in the hero, one per agent (illustration).
+const pile = [
+  { task: "fix flaky test", ink: "b", x: 2, y: 4, r: -5 },
+  { task: "react 19", ink: "p", x: 34, y: 0, r: 4 },
+  { task: "write docs", ink: "b", x: 64, y: 10, r: -3 },
+  { task: "triage issues", ink: "p", x: 6, y: 38, r: 6 },
+  { task: "speed up ci", ink: "b", x: 38, y: 34, r: -6 },
+  { task: "billing tests", ink: "p", x: 66, y: 46, r: 3 },
+  { task: "retry webhooks", ink: "b", x: 30, y: 68, r: -2 },
 ];
 ---
 <!doctype html>
@@ -61,301 +46,303 @@ const accounts = [
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>AiSloth</title>
-    <meta name="description" content="AiSloth runs Claude Code, Codex, pi and GitHub Copilot in sandboxes of their own that start in seconds and keep working while you're away." />
+    <meta name="description" content="Every coding agent gets its own computer, ready in seconds. Run as many as you like, in our cloud or on your own machines." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="preload" href="/fonts/recursive-latin.woff2" as="font" type="font/woff2" crossorigin />
-    <meta name="theme-color" content="#edf0e6" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#1a1612" media="(prefers-color-scheme: dark)" />
+    <link rel="preload" href="/fonts/bagel-fat-one-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/hanken-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <meta name="theme-color" content="#fbfbf9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f141c" media="(prefers-color-scheme: dark)" />
   </head>
   <body>
+    <svg width="0" height="0" class="defs" aria-hidden="true">
+      <defs>
+        <clipPath id="mark-clip"><rect width="512" height="512" rx="114" /></clipPath>
+        <path id="stripe" d="M0 0 C42 -12 112 -18 152 -3 C163 5 157 25 138 28 C98 32 38 17 0 0 Z" />
+      </defs>
+      <symbol id="mark" viewBox="0 0 512 512">
+        <g clip-path="url(#mark-clip)">
+          <rect width="512" height="512" fill="#0078bf" />
+          <ellipse cx="268" cy="280" rx="178" ry="158" fill="#ff48b0" />
+          <ellipse cx="256" cy="268" rx="178" ry="158" fill="#fbfbf9" />
+          <g fill="#0078bf" stroke="#0078bf">
+            <use href="#stripe" transform="translate(270 256) rotate(9)" />
+            <use href="#stripe" transform="translate(242 256) scale(-1 1) rotate(9)" />
+            <ellipse cx="256" cy="298" rx="28" ry="19" />
+            <path d="M226 330 Q256 348 286 330" fill="none" stroke-width="10" stroke-linecap="round" />
+          </g>
+        </g>
+      </symbol>
+    </svg>
+
     <div class="page">
       <header class="top">
-        <a class="wordmark" href="/">AiSloth</a>
-        <nav aria-label="Elsewhere">
-          <a href={repository}>GitHub</a>
-          <a href={download}>Download sloth</a>
+        <a class="brand" href="/" aria-label="AiSloth home"><svg aria-hidden="true"><use href="#mark" /></svg><span>AiSloth</span></a>
+        <nav aria-label="Main">
+          <a class="quiet" href={repository}>GitHub</a>
+          <a class="button small" href={start}>Get started</a>
         </nav>
       </header>
 
       <main>
         <section class="hero" aria-labelledby="promise">
           <div class="pitch">
-            <h1 id="promise">Your coding agents keep going when you close the laptop.</h1>
-            <p>AiSloth runs Claude Code, Codex, pi and GitHub Copilot in nooks: sandboxes of their own that start in seconds, save their work after every turn, and wait for you wherever you pick it up.</p>
+            <p class="stamp" aria-hidden="true">Laziness, at scale.</p>
+            <h1 id="promise" class="print" data-text="Every agent gets its own computer.">Every agent gets its own computer.</h1>
+            <p class="lede">Start as many coding agents as you like, each on a computer of its own, ready in seconds.</p>
             <div class="actions">
-              <a class="button primary" href={download}>Download sloth</a>
-              <a class="button secondary" href={repository}>Read the code</a>
+              <a class="button" href={start}>Get started</a>
+              <a class="button outline" href={repository}>GitHub</a>
             </div>
           </div>
-          <figure class="terminal" aria-label="A chat started with sloth, the AiSloth command line">
-            <div class="session" data-replay>
-              {session.map((line) => (
-                <div class="line" data-at={line.at}>
-                  {line.parts.map(([kind, text]) => (kind ? <span class={kind}>{text}</span> : text))}
+          <div class="pile-wrap">
+            <div class="pile" aria-label="A pile of computers, one per agent (illustration)" role="img">
+              {pile.map((sheet, i) => (
+                <div class={`sheet ${sheet.ink}`} style={`--x:${sheet.x}%;--y:${sheet.y}%;--r:${sheet.r}deg;--i:${i}`}>
+                  <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <b>{sheet.task}</b>
                 </div>
               ))}
-              <div class="line" data-at="3700"><span class="prompt">$ </span><span class="cursor" aria-hidden="true"></span></div>
             </div>
-          </figure>
+            <button class="another" type="button">Start another</button>
+          </div>
         </section>
 
-        <section aria-labelledby="where">
-          <h2 id="where">Run your agents where it suits you</h2>
-          <p class="lead">Each chat gets a nook of its own. Pick where it runs; the chat works the same everywhere.</p>
-          <ul class="places">
-            {places.map((place) => (
-              <li>
-                <h3>{place.title}</h3>
-                <p set:html={place.text} />
-              </li>
-            ))}
-          </ul>
+        <section class="problem" aria-labelledby="problem">
+          <h2 id="problem" class="print" data-text="Your laptop is one computer.">Your laptop is one computer.</h2>
+          <div class="versus">
+            <div>
+              <h3>Today</h3>
+              <ul class="struck">{today.map((line) => <li><span>{line}</span></li>)}</ul>
+            </div>
+            <div>
+              <h3>With AiSloth</h3>
+              <ul>{withNooks.map((line) => <li>{line}</li>)}</ul>
+            </div>
+          </div>
         </section>
 
-        <section aria-labelledby="fast">
-          <h2 id="fast">Built to start fast and stay put</h2>
-          <p class="lead">Waiting for a sandbox to boot and install your dependencies is the slow part of cloud agents. Nooks skip it.</p>
-          <div class="facts">
-            {facts.map((fact) => (
-              <div>
-                <h3>{fact.title}</h3>
-                <p>{fact.text}</p>
+        <section class="places" aria-labelledby="places">
+          <div class="places-in">
+            <h2 id="places" class="print on-blue" data-text="Run them anywhere.">Run them anywhere.</h2>
+            <div class="three">
+              {places.map((place) => (
+                <div>
+                  <h3>{place.title}</h3>
+                  <p>{place.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section class="trust" aria-labelledby="trust">
+          <h2 id="trust" class="print" data-text="Built to be trusted.">Built to be trusted.</h2>
+          <div class="bento">
+            {trust.map((item, i) => (
+              <div class={`cell c${i}`}>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <section class="accounts" aria-labelledby="accounts">
-          <div>
-            <h2 id="accounts">Your agents, your accounts</h2>
-            <p>Use the plan you already pay for, or an API key. A workspace can share accounts and secrets with everyone in it, and each person can keep their own.</p>
+        <section class="close" aria-labelledby="close">
+          <h2 id="close" class="print" data-text="Start your first agents.">Start your first agents.</h2>
+          <div class="actions">
+            <a class="button" href={start}>Get started</a>
+            <a class="button outline" href={repository}>GitHub</a>
           </div>
-          <ul>
-            {accounts.map((account) => <li>{account}</li>)}
-          </ul>
         </section>
       </main>
 
-      <footer>
-        <p>Web and phone apps that connect to any AiSloth host are next. Until then, <code>sloth</code> does everything from your terminal.</p>
-        <nav aria-label="Project">
-          <a href={repository}>GitHub</a>
-          <a href={`${repository}/releases`}>Releases</a>
-        </nav>
+      <footer class="foot">
+        <span>AiSloth. Web and phone apps are coming.</span>
+        <nav aria-label="Project"><a href={repository}>GitHub</a><a href={`${repository}/releases`}>Releases</a></nav>
       </footer>
     </div>
 
     <script>
-      // Replays the session once, each line at the moment it came. The lines are already on the page,
-      // so without this script, or with reduced motion, it shows whole.
-      const lines = document.querySelectorAll<HTMLElement>("[data-replay] .line");
-      const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (!still) {
-        for (const line of lines) {
-          line.classList.add("waiting");
-          window.setTimeout(() => line.classList.remove("waiting"), Number(line.dataset.at));
-        }
-      }
+      // "Start another" prints one more computer onto the pile; the oldest falls off past nine.
+      const pile = document.querySelector<HTMLElement>(".pile");
+      const button = document.querySelector<HTMLButtonElement>(".another");
+      const tasks = ["port the cli", "fix safari", "cover billing", "add retries", "bump deps", "explain auth"];
+      let next = 0;
+      button?.addEventListener("click", () => {
+        if (!pile) return;
+        const sheet = document.createElement("div");
+        const task = tasks[next % tasks.length];
+        sheet.className = `sheet fresh ${next % 2 ? "p" : "b"}`;
+        sheet.style.setProperty("--x", `${8 + ((next * 29) % 56)}%`);
+        sheet.style.setProperty("--y", `${6 + ((next * 37) % 64)}%`);
+        sheet.style.setProperty("--r", `${((next * 7) % 13) - 6}deg`);
+        sheet.innerHTML = `<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><b></b>`;
+        sheet.querySelector("b")!.textContent = task;
+        pile.append(sheet);
+        next++;
+        while (pile.children.length > 9) pile.firstElementChild?.remove();
+      });
     </script>
   </body>
 </html>
 
 <style is:global>
-  /* Layout: a left-aligned page; the hero pairs the promise with a real sloth session, and the rest
-     reads as short lists. One family, Recursive, in three voices: casual and heavy for display, linear
-     for reading, mono for anything typed. The ground is lichen and bark; a sloth's fur grows algae,
-     hence the moss accent, the page's only color. */
+  /* Layout: a print zine. Two inks, fluorescent pink and blue, overprint on paper; headlines are printed
+     twice, a little out of register. One accent pair, one radius scale (10px sheets, square buttons). */
   @font-face {
-    font-family: "Recursive";
-    src: url("/fonts/recursive-latin.woff2") format("woff2");
-    font-weight: 300 1000;
+    font-family: "Bagel Fat One";
+    src: url("/fonts/bagel-fat-one-latin.woff2") format("woff2");
     font-display: swap;
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  @font-face {
+    font-family: "Hanken Grotesk";
+    src: url("/fonts/hanken-grotesk-latin.woff2") format("woff2");
+    font-weight: 400 800;
+    font-display: swap;
   }
 
   :root {
-    --lichen: #edf0e6;
-    --bark: #26211b;
-    --fur: #665f53;
-    --moss: #477a2c;
-    --rule: #d2d6c6;
-    --on-moss: #f6f4ec;
-    --term-bg: #2b241c;
-    --term-fg: #efe7d8;
-    --term-dim: #a99d88;
-    --term-moss: #b9d39a;
-    --font: "Recursive", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
-    --font-mono: "Recursive", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    --step-0: 1.0625rem;
-    --step-1: 1.25rem;
-    --step-2: 1.6rem;
-    --step-3: clamp(2.2rem, 1.4rem + 3.4vw, 3.6rem);
-    --section-gap: clamp(3rem, 7vw, 5.5rem);
+    --paper: #fbfbf9;
+    --blue: #0078bf;
+    --blue-text: #005d94;
+    --pink: #ff48b0;
+    --on-ink: #ffffff;
+    --soft: #4f6f88;
+    --rule: #cfe1ee;
+    --blend: multiply;
+    --print-layer: 1;
+    --dot: rgba(255, 255, 255, 0.32);
+    --display: "Bagel Fat One", "Arial Rounded MT Bold", system-ui, sans-serif;
+    --text: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --lichen: #1a1612;
-      --bark: #ede6d8;
-      --fur: #a89f90;
-      --moss: #9cc77a;
-      --rule: #3a332a;
-      --on-moss: #1a1612;
-      --term-bg: #110e0b;
-      --term-fg: #efe7d8;
-      --term-dim: #968b78;
-      --term-moss: #b9d39a;
+      --paper: #0f141c;
+      --blue: #4fb2ff;
+      --blue-text: #b9dcff;
+      --pink: #ff5cbe;
+      --on-ink: #0b1220;
+      --soft: #8fb0cc;
+      --rule: #22324a;
+      --blend: screen;
+      --print-layer: -1;
+      --dot: rgba(15, 20, 28, 0.35);
       color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
-    --lichen: #1a1612;
-    --bark: #ede6d8;
-    --fur: #a89f90;
-    --moss: #9cc77a;
-    --rule: #3a332a;
-    --on-moss: #1a1612;
-    --term-bg: #110e0b;
-    --term-fg: #efe7d8;
-    --term-dim: #968b78;
-    --term-moss: #b9d39a;
+    --paper: #0f141c;
+    --blue: #4fb2ff;
+    --blue-text: #b9dcff;
+    --pink: #ff5cbe;
+    --on-ink: #0b1220;
+    --soft: #8fb0cc;
+    --rule: #22324a;
+    --blend: screen;
+    --print-layer: -1;
+    --dot: rgba(15, 20, 28, 0.35);
     color-scheme: dark;
   }
 
   *, *::before, *::after { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0;
-    background: var(--lichen);
-    color: var(--bark);
-    font-family: var(--font);
-    font-variation-settings: "CASL" 0, "MONO" 0;
-    font-size: var(--step-0);
-    line-height: 1.6;
-  }
-  .page {
-    max-width: 70rem;
-    margin: 0 auto;
-    padding-inline: clamp(1rem, 4vw, 2.5rem);
-    padding-block: max(1.25rem, env(safe-area-inset-top)) max(3rem, env(safe-area-inset-bottom));
-    display: grid;
-    gap: var(--section-gap);
-  }
-  main { display: grid; gap: var(--section-gap); min-width: 0; }
-  a { color: var(--moss); text-underline-offset: 0.18em; }
-  code { font-family: var(--font-mono); font-variation-settings: "MONO" 1, "CASL" 0; font-size: 0.9em; }
-  a:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; border-radius: 4px; }
+  body { margin: 0; background: var(--paper); color: var(--blue-text); font-family: var(--text); font-size: 1.0625rem; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  ::selection { background: var(--pink); color: #fff; }
+  a { color: inherit; }
+  a:focus-visible, button:focus-visible { outline: 3px solid var(--pink); outline-offset: 3px; }
+  .defs { position: absolute; }
 
-  header.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.75rem 1.5rem; }
-  .wordmark {
-    font-variation-settings: "CASL" 1, "MONO" 0;
-    font-weight: 820;
-    font-size: var(--step-1);
-    color: var(--bark);
-    text-decoration: none;
-  }
-  header.top nav, footer nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; font-size: 0.95rem; }
+  .page { max-width: 76rem; margin: 0 auto; padding-inline: clamp(1rem, 4vw, 2.75rem); padding-block: max(1rem, env(safe-area-inset-top)) max(2rem, env(safe-area-inset-bottom)); }
+  main { display: grid; gap: clamp(5rem, 11vw, 9rem); }
 
-  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(2rem, 5vw, 4rem); align-items: center; }
-  .pitch { min-width: 0; }
-  .hero h1 {
-    font-variation-settings: "CASL" 1, "MONO" 0;
-    font-weight: 880;
-    font-size: var(--step-3);
-    line-height: 1.04;
-    letter-spacing: -0.012em;
-    margin: 0 0 1.25rem;
-    text-wrap: balance;
-  }
-  .hero p { margin: 0 0 1.75rem; max-width: 34rem; color: var(--fur); font-size: var(--step-1); line-height: 1.5; text-wrap: pretty; }
-  .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-  .button {
-    display: inline-block;
-    padding: 0.7rem 1.2rem;
-    border-radius: 999px;
-    font-weight: 650;
-    text-decoration: none;
-    border: 2px solid var(--moss);
-    transition: transform 160ms var(--ease-out), background-color 200ms ease, color 200ms ease;
-  }
-  .button:active { transform: scale(0.97); }
-  .button:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; }
-  .button.primary { background: var(--moss); color: var(--on-moss); }
-  .button.secondary { color: var(--moss); }
-  @media (hover: hover) and (pointer: fine) {
-    .button.secondary:hover { background: color-mix(in oklab, var(--moss) 12%, transparent); }
-    .button.primary:hover { background: color-mix(in oklab, var(--moss) 88%, var(--bark)); }
-  }
+  /* Printed headlines: blue and pink, a few pixels out of register. On paper the inks multiply where
+     they overlap; on dark stock the pink is printed first, under the blue. */
+  .print { position: relative; isolation: isolate; margin: 0; font-family: var(--display); font-weight: 400; color: var(--blue); line-height: 0.95; text-wrap: balance; }
+  .print::before { content: attr(data-text); position: absolute; inset: 0; z-index: var(--print-layer); color: var(--pink); transform: translate(0.06em, 0.05em); mix-blend-mode: var(--blend); pointer-events: none; }
+  :root:not([data-theme="light"]) .print::before { mix-blend-mode: normal; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .print::before { mix-blend-mode: var(--blend); } }
+  :root[data-theme="light"] .print::before { mix-blend-mode: var(--blend); }
+  h2.print { font-size: clamp(2.4rem, 1.5rem + 3.6vw, 4.4rem); margin-bottom: clamp(1.75rem, 4vw, 2.75rem); }
+  h3 { margin: 0; font-size: 1.2rem; font-weight: 800; color: var(--blue); }
 
-  .terminal {
-    margin: 0;
-    min-width: 0;
-    background: var(--term-bg);
-    color: var(--term-fg);
-    border-radius: 16px;
-    padding: 1.25rem 1.35rem 1.4rem;
-    overflow-x: auto;
-  }
-  .session {
-    font-family: var(--font-mono);
-    font-variation-settings: "MONO" 1, "CASL" 0;
-    font-size: 0.86rem;
-    line-height: 1.7;
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; height: 4.5rem; }
+  .brand { display: inline-flex; align-items: center; gap: 0.6rem; text-decoration: none; font-family: var(--display); font-size: 1.45rem; color: var(--blue); }
+  .brand svg { width: 2.1rem; height: 2.1rem; }
+  .top nav { display: flex; align-items: center; gap: 1.4rem; }
+  .quiet { text-decoration: none; font-weight: 600; }
+  .quiet:hover { text-decoration: underline; text-underline-offset: 0.2em; }
 
+  .button { display: inline-flex; align-items: center; justify-content: center; height: 3.1rem; padding: 0 1.45rem; border: 0; background: var(--blue); color: var(--on-ink); font: 700 1.05rem var(--text); text-decoration: none; cursor: pointer; white-space: nowrap; box-shadow: 5px 4px 0 var(--pink); transition: transform 140ms var(--ease-out), box-shadow 140ms var(--ease-out); }
+  .button:active { transform: translate(3px, 2px); box-shadow: 2px 2px 0 var(--pink); }
+  .button.small { height: 2.5rem; padding: 0 1rem; font-size: 0.95rem; box-shadow: 4px 3px 0 var(--pink); }
+  .button.outline { background: transparent; color: var(--blue); box-shadow: inset 0 0 0 2px var(--blue); }
+  .button.outline:active { transform: translate(1px, 1px); box-shadow: inset 0 0 0 2px var(--blue); }
+  .actions { display: flex; flex-wrap: wrap; gap: 1rem; }
+
+  /* Hero */
+  .hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: clamp(2rem, 5vw, 4rem); align-items: center; min-height: calc(100dvh - 7rem); }
+  .pitch { position: relative; display: grid; gap: 1.6rem; justify-items: start; }
+  .hero h1 { font-size: clamp(3rem, 1.6rem + 5.2vw, 6.2rem); max-width: 9.5ch; }
+  .lede { margin: 0; font-size: clamp(1.12rem, 1rem + 0.4vw, 1.3rem); font-weight: 500; max-width: 27rem; }
+  .stamp { position: absolute; top: -1.4rem; right: clamp(0rem, 4vw, 3rem); margin: 0; padding: 0.55rem 0.9rem; transform: rotate(-7deg); border: 3px solid var(--pink); color: var(--pink); font-family: var(--display); font-size: 1.05rem; line-height: 1; background: color-mix(in srgb, var(--paper) 85%, transparent); }
+
+  .pile-wrap { display: grid; gap: 1rem; justify-items: center; }
+  .pile { position: relative; width: 100%; height: min(64vh, 31rem); }
+  .sheet { position: absolute; left: var(--x); top: var(--y); width: 34%; aspect-ratio: 4 / 3; border-radius: 10px; transform: rotate(var(--r)); mix-blend-mode: var(--blend); padding: 0.7rem 0.8rem; display: grid; align-content: space-between; animation: print 420ms var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 70ms); }
+  .sheet.b { background-color: var(--blue); background-image: radial-gradient(circle, var(--dot) 1.2px, transparent 1.6px); background-size: 6px 6px; }
+  .sheet.p { background-color: var(--pink); background-image: radial-gradient(circle, var(--dot) 1.2px, transparent 1.6px); background-size: 7px 7px; }
+  .sheet .dots { display: flex; gap: 0.3rem; }
+  .sheet .dots i { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--paper); opacity: 0.9; }
+  .sheet b { font-family: var(--display); font-weight: 400; font-size: clamp(0.85rem, 0.7rem + 0.4vw, 1.05rem); color: var(--paper); line-height: 1.1; }
+  .sheet.fresh { animation-delay: 0ms; }
+  @keyframes print { from { opacity: 0; transform: rotate(var(--r)) scale(1.1); } }
+  .another { border: 0; background: none; padding: 0.4rem 0.2rem; font: 700 1rem var(--text); color: var(--blue); cursor: pointer; text-decoration: underline; text-decoration-color: var(--pink); text-decoration-thickness: 3px; text-underline-offset: 0.3em; }
+  .another:active { transform: scale(0.97); }
+
+  /* The problem: what today looks like, struck out in pink marker, and what replaces it. */
+  .versus { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(1.5rem, 4vw, 4rem); }
+  .versus ul { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: 0.9rem; font-size: clamp(1.1rem, 1rem + 0.4vw, 1.35rem); font-weight: 600; }
+  .struck li { color: var(--soft); }
+  .struck span { background-image: linear-gradient(var(--pink), var(--pink)); background-size: 100% 0.18em; background-position: 0 58%; background-repeat: no-repeat; }
+
+  /* Where they run: a full-width blue print, the page's one color block. */
+  .places { margin-inline: calc(-1 * clamp(1rem, 4vw, 2.75rem)); background-color: var(--blue); background-image: radial-gradient(circle, var(--dot) 1.2px, transparent 1.6px); background-size: 7px 7px; color: var(--on-ink); }
+  .places-in { padding: clamp(3rem, 7vw, 5rem) clamp(1rem, 4vw, 2.75rem); }
+  .print.on-blue { color: var(--on-ink); }
+  .three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(1.5rem, 3vw, 2.5rem); }
+  .three > div { border-top: 3px solid var(--on-ink); padding-top: 1rem; }
+  .places h3 { color: var(--on-ink); font-size: 1.3rem; }
+  .places p { margin: 0.4rem 0 0; font-size: 1.08rem; font-weight: 500; }
+
+  /* Built to be trusted: four cells, each its own print. */
+  .bento { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto auto; gap: 1rem; }
+  .cell { padding: clamp(1.25rem, 2.5vw, 1.75rem); border-radius: 10px; display: grid; gap: 0.5rem; align-content: start; min-height: 11rem; }
+  .cell p { margin: 0; font-weight: 500; }
+  .c0 { grid-column: span 2; background-color: var(--pink); background-image: radial-gradient(circle, var(--dot) 1.2px, transparent 1.6px); background-size: 7px 7px; color: var(--on-ink); }
+  .c0 h3, .c3 h3 { color: var(--on-ink); font-family: var(--display); font-weight: 400; font-size: clamp(1.6rem, 1.2rem + 1.4vw, 2.3rem); }
+  .c1, .c2 { box-shadow: inset 0 0 0 2px var(--blue); }
+  .c3 { grid-column: span 2; background: var(--blue); color: var(--on-ink); }
+  .c2 { grid-row: 2; grid-column: 1; }
+
+  .close { display: grid; justify-items: center; text-align: center; padding-block: 1rem 2rem; }
+  .close .print { font-size: clamp(2.6rem, 1.6rem + 4vw, 5rem); }
+
+  .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; margin-top: 3rem; padding-top: 1.25rem; border-top: 2px solid var(--rule); color: var(--soft); font-size: 0.95rem; }
+  .foot nav { display: flex; gap: 1.2rem; }
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: minmax(0, 1fr); min-height: 0; padding-top: 2.5rem; }
+    .stamp { position: static; justify-self: start; margin-bottom: -0.4rem; transform: rotate(-4deg); }
+    .pile { height: 20rem; }
+    .versus, .three { grid-template-columns: minmax(0, 1fr); }
+    .bento { grid-template-columns: minmax(0, 1fr); }
+    .c0, .c3, .c2 { grid-column: auto; grid-row: auto; }
   }
-  /* Long lines wrap as a terminal wraps them, continuing under the text rather than the prompt. */
-  .session .line {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    padding-left: 2ch;
-    text-indent: -2ch;
-    transition: opacity 240ms var(--ease-out), transform 240ms var(--ease-out);
-  }
-  .session .line.waiting { opacity: 0; transform: translateY(4px); }
-  .session .prompt, .session .you { color: var(--term-moss); }
-  .session .dim { color: var(--term-dim); }
-  .cursor {
-    display: inline-block;
-    width: 0.55em;
-    height: 1.1em;
-    vertical-align: -0.2em;
-    background: var(--term-moss);
-    animation: blink 2.4s steps(1) infinite;
-  }
-  @keyframes blink { 50% { opacity: 0; } }
+  @media (max-width: 480px) { .top .quiet { display: none; } }
   @media (prefers-reduced-motion: reduce) {
-    .cursor { animation: none; }
-    .button { transition: none; }
-  }
-
-  h2 {
-    font-variation-settings: "CASL" 1, "MONO" 0;
-    font-weight: 800;
-    font-size: var(--step-2);
-    line-height: 1.15;
-    margin: 0 0 0.5rem;
-    text-wrap: balance;
-  }
-  section > .lead { margin: 0 0 1.75rem; color: var(--fur); max-width: 40rem; }
-  h3 { margin: 0; font-size: var(--step-1); font-weight: 720; line-height: 1.3; }
-
-  .places { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.75rem 2.25rem; }
-  .places li { border-top: 3px solid var(--bark); padding-top: 1rem; display: grid; gap: 0.5rem; align-content: start; }
-  .places p, .facts p { margin: 0; color: var(--fur); text-wrap: pretty; }
-
-  .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 3rem; }
-  .facts > div { border-top: 1px solid var(--rule); padding-block: 1.1rem; display: grid; gap: 0.35rem; align-content: start; }
-
-  .accounts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.5rem 3rem; align-items: start; }
-  .accounts p { margin: 0; color: var(--fur); max-width: 34rem; }
-  .accounts ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.6rem; }
-  .accounts li { border-left: 3px solid var(--moss); padding-left: 0.9rem; }
-
-  footer { border-top: 1px solid var(--rule); padding-top: 1.5rem; display: flex; flex-wrap: wrap; gap: 0.75rem 2rem; justify-content: space-between; color: var(--fur); font-size: 0.95rem; }
-  footer p { margin: 0; max-width: 36rem; }
-
-  @media (max-width: 860px) {
-    .hero, .accounts { grid-template-columns: minmax(0, 1fr); }
-    .places, .facts { grid-template-columns: minmax(0, 1fr); }
+    .sheet { animation: none; }
+    .button, .button:active { transition: none; }
   }
 </style>
