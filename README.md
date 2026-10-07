@@ -6,7 +6,7 @@ On-demand, disposable cloud development environments for AI coding agents.
 
 Run `curl -fsSL https://aisloth.dev/install.sh | sh`, which installs sloth in `~/.local/bin`, or
 updates the sloth on your PATH, from the
-[latest release](https://github.com/bagatka/ai-sloth-dotnet/releases/latest): Linux x64 or arm64, or
+[latest release](https://github.com/bagatka/ai-sloth/releases/latest): Linux x64 or arm64, or
 macOS on Apple silicon; on Windows, run it in WSL. It keeps the download only when its SHA-256 is the
 one GitHub has for it. `sloth update` installs newer releases too, which sloth mentions once they're
 out.

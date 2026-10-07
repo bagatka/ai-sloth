@@ -13,7 +13,7 @@
     <Description>A .NET client for Azure Container Apps Sandboxes: create, stop, resume, and delete sandboxes, commit them to disk images, and turn container images into disk images. Built on Azure.Core, with OpenTelemetry traces and metrics.</Description>
     <PackageTags>azure;container-apps;sandboxes;microvm;agents</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <RepositoryUrl>https://github.com/bagatka/ai-sloth-dotnet</RepositoryUrl>
+    <RepositoryUrl>https://github.com/bagatka/ai-sloth</RepositoryUrl>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols>true</IncludeSymbols>

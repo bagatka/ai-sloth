@@ -6,7 +6,7 @@
 # and moved there whole. Its place is the sloth already on the PATH, or else ~/.local/bin.
 set -eu
 
-repository=bagatka/ai-sloth-dotnet
+repository=bagatka/ai-sloth
 
 fail() {
   printf 'sloth: %s\n' "$1" >&2
