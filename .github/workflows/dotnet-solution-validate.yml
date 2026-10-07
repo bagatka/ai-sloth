@@ -59,7 +59,7 @@ jobs:
       # The Docker provider runs nooks under Sysbox, so their own Docker works without privileges.
       # Sysbox 0.7.1's sysbox-fs can deadlock as it starts: it forks itself to probe the kernel without
       # exec'ing, and the child can wait forever on a lock another thread held. Systemd kills it after
-      # its 10-second start timeout, and the drop-in restarts it (README.md, "Development"). Its
+      # its 10-second start timeout, and the drop-in restarts it (CONTRIBUTING.md, "Development"). Its
       # services start in the background; nooks fail until its socket, readable by root only, is up.
       # When it doesn't come up, the step ends with what they logged.
       - name: Install Sysbox

@@ -2,7 +2,7 @@ name: Nook images / Publish
 run-name: Nook images / Publish / ${{ github.ref_name }}
 
 # Main's nook images, public on GHCR as ghcr.io/<owner>/aisloth-nook[-<harness>]:<commit>, each
-# with a signed build provenance attestation. Deployments pull them by commit (README.md, "Deploying").
+# with a signed build provenance attestation. Deployments pull them by commit (docs/self-hosting.md).
 on:
   push:
     branches: [main]

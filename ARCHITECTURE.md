@@ -108,7 +108,8 @@ Directory.Build.props              shared build settings for every project
 Directory.Packages.props           the single version of every package
 BannedSymbols.txt                  APIs nobody may call
 LoggerParameterTypes.txt           log placeholder names and their types
-docs/templates/                    templates (module README)
+CONTRIBUTING.md                    developing, releasing, agent environments
+docs/                              self-hosting, the README's images, templates (module README)
 site/                              the landing page (Astro) and install.sh
 analyzers/
   Bagatka.Analyzers/               our own code-shape rules, run on every project (PATTERNS.md, entry 27)
@@ -323,7 +324,7 @@ vendor-shaped, product-agnostic, and used from module internals. Rules are in `s
 ### Aspire
 
 - **`Bagatka.AiSloth.AppHost`** runs the control plane and its dependencies on a developer
-  machine and in end-to-end tests, and deploys them to Azure (README.md, "Deploying"): the WebApi
+  machine and in end-to-end tests, and deploys them to Azure (docs/self-hosting.md): the WebApi
   in Container Apps, nooks in a sandbox group, checkpoints in Blob Storage. The Aspire CLI is pinned in
   `dotnet-tools.json`, and `dotnet aspire update` upgrades both together.
 - **`Bagatka.ServiceDefaults`** gives every service host the same OpenTelemetry, health checks,

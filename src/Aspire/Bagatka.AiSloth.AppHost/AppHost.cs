@@ -41,7 +41,7 @@ string? chatGptApi = builder.Configuration["Parameters:chatgpt-api"];
 // Encrypt agent accounts' secrets, people's GitHub tokens, and secrets' values at rest. Losing one
 // makes what it encrypted unreadable. Run here, each is generated once and kept in this project's user
 // secrets. Deploying never generates one: a deployment without its keys stops instead of encrypting
-// with new ones (README.md, "Deploying").
+// with new ones (docs/self-hosting.md).
 IResourceBuilder<ParameterResource> agentAccountsKey = EncryptionKey("agent-accounts-key");
 IResourceBuilder<ParameterResource> sourcesKey = EncryptionKey("sources-key");
 IResourceBuilder<ParameterResource> secretsKey = EncryptionKey("secrets-key");
@@ -76,7 +76,7 @@ IResourceBuilder<ParameterResource> sandboxScope = builder.AddParameter("sandbox
 string? imageRepository = builder.Configuration["Parameters:nook-image-repository"];
 
 // The images' tag: dev for images built here, or the commit whose images main published
-// (README.md, "Deploying").
+// (docs/self-hosting.md).
 string imageTag = builder.Configuration["Parameters:nook-image-tag"] ?? "dev";
 string nookImage = "aisloth-nook:" + imageTag;
 
@@ -93,7 +93,7 @@ ReferenceExpression daemonUrl;
 ReferenceExpression modelsUrl;
 if (builder.ExecutionContext.IsPublishMode)
 {
-    // Deployed with `dotnet aspire deploy` (README.md, "Deploying"): the WebApi runs in Azure
+    // Deployed with `dotnet aspire deploy` (docs/self-hosting.md): the WebApi runs in Azure
     // Container Apps, nooks in a sandbox group beside it, and checkpoints are kept in Blob Storage, all
     // in one resource group. Nooks start from images in a public repository.
     if (imageRepository is null)
