@@ -96,7 +96,7 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 | Object storage | `Bagatka.ObjectStorage` (+ `.<Backend>` for cloud backends) | Store and read objects by key: checkpoints and harness state, folder versions later | Contract; a folder of this computer and Azure Blob Storage as backends |
 | Sdk | `Bagatka.Sdk.<Vendor>`, `Bagatka.Azure.Sandboxes` | Clients for vendor APIs without an official .NET SDK | Docker Engine, Sign in with ChatGPT, GitHub, Azure Container Apps Sandboxes |
 | Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration and the Azure deployment; defaults every service host shares | Built |
-| Site | `site/` (Astro, not .NET) | The landing page at aisloth.dev, published to GitHub Pages from main | Built |
+| Site | `site/` (Astro, not .NET) | The landing page at aisloth.dev and `install.sh`, which installs or updates sloth, published to GitHub Pages from main | Built |
 
 The web and mobile apps are not in this repository. They use the same public HTTP API as the CLI.
 
@@ -109,7 +109,7 @@ Directory.Packages.props           the single version of every package
 BannedSymbols.txt                  APIs nobody may call
 LoggerParameterTypes.txt           log placeholder names and their types
 docs/templates/                    templates (module README)
-site/                              the landing page (Astro)
+site/                              the landing page (Astro) and install.sh
 analyzers/
   Bagatka.Analyzers/               our own code-shape rules, run on every project (PATTERNS.md, entry 27)
 src/
