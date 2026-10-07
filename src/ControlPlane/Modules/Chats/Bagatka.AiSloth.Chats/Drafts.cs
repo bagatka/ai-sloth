@@ -87,6 +87,8 @@ internal sealed class Drafts(
     // Deletes the draft, its chat, and its nook, unless someone wrote in it meanwhile: a first message
     // removes the draft in the same save, so only one of the two happens. The chat's runner retires
     // when it finds the chat gone.
+    // Not handled: the host stopping between the commit and the nook's delete leaves the nook in
+    // place; handling it would take a durable record of the nooks still to delete.
     private async Task DropAsync(Draft draft, CancellationToken ct)
     {
         await using (ChatsDbContext db = await databases.CreateDbContextAsync(ct))

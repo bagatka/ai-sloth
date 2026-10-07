@@ -95,16 +95,17 @@ public sealed class DraftsJourney(ControlPlane app, SleepyControlPlane sleepy) :
         TestWorkspace workspace = await TestWorkspace.CreateAsync(sleepyApp, frank);
         ChatSummary draft = await workspace.StartChatAsync();
 
+        // The chat goes first, and its nook in the same pass a moment later.
         long started = TimeProvider.System.GetTimestamp();
         HttpStatusCode status = HttpStatusCode.OK;
-        while (status != HttpStatusCode.NotFound && TimeProvider.System.GetElapsedTime(started) < SleepyControlPlane.Eviction)
+        bool nookGoes = false;
+        while (!(status == HttpStatusCode.NotFound && nookGoes) && TimeProvider.System.GetElapsedTime(started) < SleepyControlPlane.Eviction)
         {
             await Task.Delay(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
             using HttpResponseMessage response = await frank.SendGetAsync(Paths.Chat(draft));
             status = response.StatusCode;
+            nookGoes = await Api.GoneOrDeletingAsync(frank, draft.NookId);
         }
-
-        bool nookGoes = await Api.GoneOrDeletingAsync(frank, draft.NookId);
 
         Assert.Equal(HttpStatusCode.NotFound, status);
         Assert.True(nookGoes);
