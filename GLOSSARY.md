@@ -105,6 +105,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Machine | A computer a workspace adds to run its nooks on, such as a VPS or a Mac mini; its nooks still run isolated, in containers or virtual machines. To nooks, a place within the `machine` provider. | Machines | runner, worker, node, host |
 | Machine mode | `sloth machine run`: the CLI keeping a machine connected and running the control plane's provider calls on its Docker Engine | `src/Cli` | agent, runner, daemon |
 | Registration code | The one-time code an owner gets when adding a machine, traded for the machine's token by `sloth machine connect` | Machines | invite, pairing code |
+| Cloud | The host's own place to run nooks, as people see it, whatever runs it underneath: `sloth chat --on cloud`. A host running several providers of its own, as in development, shows each by its name instead | Nooks | azure, docker (to people), hosted |
 | Provider ID | Where a nook runs, as callers name it: a provider, then the place within it for a provider with several, such as `docker` or `machine:<machine ID>` | Nooks | provider name (for the whole ID), backend |
 | Location | The place within a sandbox provider where a sandbox runs, such as a region or a machine | `Bagatka.Sandboxing` | zone, target |
 | Sandbox | A provider's isolated machine: the technical term beneath a nook, used only in `src/Sandboxing` | `Bagatka.Sandboxing` | nook (in provider code) |

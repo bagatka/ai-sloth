@@ -59,7 +59,8 @@ CreateNook copy = new CreateNook(workspaceId, "docker", "claude-code", [], CopyO
 
 A provider ID names where a nook runs: a provider the deployment runs for every workspace, such as
 `docker`, or one of the workspace's machines, `machine:<machine ID>`. Callers take IDs from
-`ListProvidersAsync` and never parse them.
+`ListProvidersAsync` and never parse them. People see the deployment's own provider as `cloud`,
+whatever runs it, and a machine by its name.
 
 ## Asks
 

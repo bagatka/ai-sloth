@@ -89,11 +89,15 @@ public sealed class MachinesJourney(ControlPlane app) : IDisposable
             IReadOnlyList<ProviderSummary> providers = await ProvidersAsync(acme.Path);
             return providers.SingleOrDefault(found => string.Equals(found.Name, "laptop", StringComparison.Ordinal) && found.Available);
         });
+        IReadOnlyList<ProviderSummary> places = await ProvidersAsync(acme.Path);
+        ProviderSummary[] own = [.. places.Where(found => !string.Equals(found.Id, provider.Id, StringComparison.Ordinal))];
+        string[] ownNames = own.Length == 1 ? ["cloud"] : [.. own.Select(found => found.Id)];
         NookSummary nook = await Api.ReadAsync<NookSummary>(_alice.SendPostAsync(acme.Path + "/nooks", new { provider = provider.Id }), HttpStatusCode.Created);
         int? exitCode = await acme.RunAsync(nook.Id, "exit 7");
         MachineSummary machine = await Api.ReadAsync<MachineSummary>(_alice.SendGetAsync(PathOf(added.Machine)), HttpStatusCode.OK);
 
         Assert.Equal(ProviderId(added), provider.Id);
+        Assert.Equal(ownNames, own.Select(found => found.Name), StringComparer.Ordinal);
         Assert.Equal(provider.Id, nook.Provider);
         Assert.Equal(7, exitCode);
         Assert.Equal(MachineStatus.Online, machine.Status);

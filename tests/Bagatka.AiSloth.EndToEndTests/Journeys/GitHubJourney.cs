@@ -73,7 +73,7 @@ public sealed class GitHubJourney(ControlPlane app) : IDisposable
 
         Assert.Equal((0, 0, 0, 0, 0), (connected, added, chatted, pushed, downloaded));
         Assert.Contains("Connected GitHub as " + _login + ".", connectedOutput, StringComparison.Ordinal);
-        Assert.Matches("^Chat [0-9a-f]{6} · Claude Code · Fake · docker · api\n", chatOutput);
+        Assert.Matches("^Chat [0-9a-f]{6} · Claude Code · Fake · cloud · api\n", chatOutput);
         Assert.Equal((0, 0), (copied, guided));
         Assert.Matches("^api: 1 commits on " + branch + "  http://127.0.0.1:[0-9]+/" + _owner + "/api/pull/1\n", pushedOutput);
         Assert.True(archived > 0);

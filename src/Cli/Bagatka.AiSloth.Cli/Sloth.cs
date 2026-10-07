@@ -66,7 +66,7 @@ internal sealed partial class Sloth(
           sloth git branch-prefix <prefix>
 
         Chats
-          sloth chat ["<message>"] [--harness <id>] [--account <name>] [--on <provider>]
+          sloth chat ["<message>"] [--harness <id>] [--account <name>] [--on cloud|<machine>]
                      [--repo <name>[@<branch>]]... [--from <chat>[@<checkpoint>]]
                                      Start a chat in a nook of its own, and follow it: with the
                                      workspace's repositories, or a copy of a chat's files, as
