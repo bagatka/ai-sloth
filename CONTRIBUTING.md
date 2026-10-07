@@ -1,65 +1,164 @@
-# Contributing
+# Contribute to AiSloth
 
-AiSloth is open source under the [MIT license](LICENSE), and contributions are welcome. The
-[system map](ARCHITECTURE.md) shows how the code fits together, and [AGENTS.md](AGENTS.md) is how
-we build it, for people and agents alike.
+AiSloth is open source under the [MIT license](LICENSE), and we welcome your changes.
+[ARCHITECTURE.md](ARCHITECTURE.md) shows how the parts fit together. [AGENTS.md](AGENTS.md) tells
+how we build, for people and agents alike.
 
-## Development
+## What you need
 
-Install [Nix](https://nixos.org/download/), then run `./dev` to enter Nushell with
-.NET 11 RC1, the Docker CLI, Git, clang for Native AOT, and the Azure CLI. Run `dotnet tool restore` once for the
-pinned Aspire CLI, then `dotnet aspire run` starts the app locally: PostgreSQL, the migrations, the
-nook image (the first build takes a few minutes), and the WebApi. While nobody has signed up, the
-WebApi prints a setup code in its console output; sign in with it as the host's first person:
-`dotnet run --project src/Cli/Bagatka.AiSloth.Cli -- host add <url> --code <code>`, then
-`... -- help` for what `sloth` does. To sign people in with an OpenID Connect provider as well, such
-as a WorkOS staging environment, give the AppHost `Parameters:sign-in-provider-issuer`,
-`-client-id`, `-client-secret`, and `-name` with
-`dotnet user-secrets set <name> <value> --project src/Aspire/Bagatka.AiSloth.AppHost`. For chats
-to start with your GitHub repositories, make the host's GitHub App once with
-`... -- github create-app`, turn on its device flow at GitHub as it says, and give the AppHost
-`Parameters:github-app-client-id`, `-client-secret`, and `-slug` the same way. Anything that runs nooks,
-including the tests, needs a Docker engine with [Sysbox](https://github.com/nestybox/sysbox), which
-Nix can't provide: nooks run Docker of their own, and Sysbox lets them do it without privileges on
-the host. On Linux, install Docker and Sysbox's package; on Windows, run a `dockerd` with Sysbox
-inside WSL, beside Docker Desktop, whose engine can't have it; on a Mac, the engine has to run in a
-Linux VM of your own (not tried yet). Point `DOCKER_HOST` at that engine when it isn't the default
-one: the AppHost, the tests, and `sloth machine run` use it, as the `docker` command does. Sysbox
-0.7.1's `sysbox-fs` now and then hangs as it starts, and systemd stops it after 10 seconds; have
-systemd start it again, before installing the package or followed by `sudo systemctl daemon-reload`:
-`sudo mkdir -p /etc/systemd/system/sysbox-fs.service.d && printf '[Service]\nRestart=on-failure\nRestartSec=1\n' | sudo tee /etc/systemd/system/sysbox-fs.service.d/restart.conf`.
+- A computer with Linux, or Windows with WSL.
+- [Nix](https://nixos.org/download/), which gives you every other tool.
+- A Docker Engine with [Sysbox](https://github.com/nestybox/sysbox). Nooks run their own Docker, and
+  Sysbox lets them do that without special rights on your computer. Nix cannot install Sysbox, so
+  step 2 tells you how.
 
-Personal coding tools (Claude Code, Codex, etc.) are not managed by the flake.
-Install and update them using their own installers. `./dev` includes
-`$HOME/.local/bin` in PATH and retains the inherited PATH, so user-installed tools
-remain available across shell sessions and WSL restarts without Nix updates.
-For access outside `./dev`, include `$HOME/.local/bin` in your shell's startup PATH
-as well.
+## 1. Get the code and the tools
 
-## Releasing
+1. Get the code:
 
-The `CLI / Release` workflow releases sloth from main, run with its version in Actions or with
-`gh workflow run cli-release.yml -f version=<version>`.
+   ```sh
+   git clone https://github.com/bagatka/ai-sloth.git
+   cd ai-sloth
+   ```
 
-The landing page at aisloth.dev is an Astro site in `site/`: run `npm ci` and `npm run dev` there to
-work on it. The `Site / Publish` workflow publishes it to GitHub Pages whenever a push to main
-changes it; the custom domain is a setting of the repository's Pages.
+2. Open the AiSloth shell:
+
+   ```sh
+   ./dev
+   ```
+
+   This opens Nushell with .NET 11 RC1, the Docker CLI, Git, clang for Native AOT, and the Azure
+   CLI. The first time, it downloads them, which can take some minutes. Do all the next steps in
+   this shell.
+
+3. Install Aspire, which runs AiSloth on your computer:
+
+   ```sh
+   dotnet tool restore
+   ```
+
+## 2. Get Docker with Sysbox
+
+- **Linux:** install Docker Engine and the Sysbox package.
+- **Windows:** the engine of Docker Desktop cannot use Sysbox. In WSL, run a second Docker Engine
+  (`dockerd`) with Sysbox, beside Docker Desktop.
+- **Mac:** the engine must run in a Linux virtual machine. Nobody has tried this yet.
+
+Sysbox 0.7.1 sometimes stops as it starts, because `sysbox-fs` hangs and systemd stops it after
+10 seconds. Tell systemd to start it again. Run this before you install the Sysbox package:
+
+```sh
+sudo mkdir -p /etc/systemd/system/sysbox-fs.service.d && printf '[Service]\nRestart=on-failure\nRestartSec=1\n' | sudo tee /etc/systemd/system/sysbox-fs.service.d/restart.conf
+```
+
+If you installed the package already, run `sudo systemctl daemon-reload` after it.
+
+If your engine with Sysbox is not the default one, point `DOCKER_HOST` at it. The AppHost, the tests,
+and `sloth machine run` use it, as the `docker` command does. In Nushell:
+
+```sh
+$env.DOCKER_HOST = "unix:///run/<your engine>.sock"
+```
+
+## 3. Run AiSloth on your computer
+
+1. Start everything: PostgreSQL, the database migrations, the nook image, and the host.
+
+   ```sh
+   dotnet aspire run
+   ```
+
+   The first build of the nook image takes some minutes.
+
+2. Open the dashboard link that the command shows. Go to the console logs of `webapi`, and find the
+   line that starts with `First sign-in:`.
+3. Sign in with the code from that line. Use the command line from the source code, in place of
+   `sloth`:
+
+   ```sh
+   dotnet run --project src/Cli/Bagatka.AiSloth.Cli -- host add <address> --code <setup code>
+   ```
+
+4. See what you can do:
+
+   ```sh
+   dotnet run --project src/Cli/Bagatka.AiSloth.Cli -- help
+   ```
+
+### Optional: work in GitHub repositories
+
+1. Make a GitHub App for your host:
+
+   ```sh
+   dotnet run --project src/Cli/Bagatka.AiSloth.Cli -- github create-app
+   ```
+
+2. On GitHub, open the settings of the new app. Select **Enable Device Flow**, and save.
+3. Give the three values that the command showed to the AppHost:
+
+   ```sh
+   dotnet user-secrets set Parameters:github-app-client-id <client ID> --project src/Aspire/Bagatka.AiSloth.AppHost
+   dotnet user-secrets set Parameters:github-app-client-secret <client secret> --project src/Aspire/Bagatka.AiSloth.AppHost
+   dotnet user-secrets set Parameters:github-app-slug <slug> --project src/Aspire/Bagatka.AiSloth.AppHost
+   ```
+
+### Optional: sign in with an OpenID Connect provider
+
+People always sign in with codes. You can also sign them in with a provider, such as a WorkOS
+staging environment. Give the AppHost these settings with `dotnet user-secrets set`, as above:
+`Parameters:sign-in-provider-issuer`, `-client-id`, `-client-secret`, and `-name`.
+
+## 4. Check your change
+
+| What | Command |
+|---|---|
+| Build | `dotnet build AiSloth.slnx` |
+| The journey closest to your change | `dotnet test --project tests/Bagatka.AiSloth.EndToEndTests --filter-class "*.ChatJourney"` |
+| All tests | `dotnet test --solution AiSloth.slnx` |
+| Format | `dotnet format AiSloth.slnx --verify-no-changes` |
+
+On each push to `main`, CI runs all the journeys. Pushes that change only the landing page or the
+docs skip them.
+
+## Your own coding tools
+
+The flake does not manage personal coding tools, such as Claude Code or Codex. Install and update
+them with their own installers. `./dev` adds `$HOME/.local/bin` to your PATH and keeps the PATH you
+had, so these tools stay available. To use them outside `./dev` too, add `$HOME/.local/bin` to the
+PATH in the startup file of your shell.
+
+## The landing page
+
+The landing page at [aisloth.dev](https://aisloth.dev) is an Astro site in `site/`. To work on it:
+
+```sh
+cd site
+npm ci
+npm run dev
+```
+
+When a push to `main` changes it, the `Site / Publish` workflow publishes it to GitHub Pages. The
+custom domain is a setting of the repository's Pages.
+
+## Release
+
+- **sloth:** run the `CLI / Release` workflow in Actions with the new version, or run
+  `gh workflow run cli-release.yml -f version=<version>`.
+- **The host:** `main` deploys itself after each push. See
+  [docs/self-hosting.md](docs/self-hosting.md#optional-deploy-from-github-on-each-push).
 
 ## Agent environments
 
 ### Amp orbs
 
-`.agents/setup` installs single-user Nix, materializes the existing locked flake,
-and restores locked NuGet packages. Amp snapshots the installed tools and caches
-for reuse by fresh orbs; stale snapshots rerun the idempotent setup. Setup changes
-must reach the project's default branch before future orbs use them.
-
-The setup adds a repository-scoped login-shell hook so agents and supervised
-services receive the full Nix development environment without running `./dev`.
-After setup, commands such as `dotnet build AiSloth.slnx --no-restore` work directly
-in new login shells within the repository. Local development is unchanged.
-
-No resume script is needed: there is no authentication or service state to repair.
-The flake supplies the Docker client, not a Docker daemon; container workloads
-would need a separately configured engine. Setup does not launch application
-servers.
+- `.agents/setup` installs Nix for one user, prepares the locked flake, and restores the locked NuGet
+  packages.
+- Amp saves the installed tools and caches, and new orbs use them again. When the saved copy is old,
+  the setup runs again. It is safe to run more than one time.
+- A change to the setup has an effect on new orbs only after it is on the default branch.
+- The setup adds a login-shell hook for this repository. Agents and their services get the full Nix
+  environment without `./dev`. For example, `dotnet build AiSloth.slnx --no-restore` works in a new
+  login shell. Local development does not change.
+- No resume script is necessary, because there is no sign-in or service state to repair.
+- The flake gives the Docker client, not a Docker daemon. Work with containers needs an engine that
+  you configure separately. The setup does not start application servers.
