@@ -5,15 +5,21 @@ run-name: >-
 
 on:
   push:
-    # The landing page alone changes nothing here; Site / Publish publishes it.
+    # The landing page and the docs alone change nothing here; Site / Publish publishes the page.
     paths-ignore:
       - site/**
       - .github/workflows/site-publish.yml
+      - docs/**
+      - '**/*.md'
+      - LICENSE
   pull_request:
-    # The landing page alone changes nothing here; Site / Publish publishes it.
+    # The landing page and the docs alone change nothing here; Site / Publish publishes the page.
     paths-ignore:
       - site/**
       - .github/workflows/site-publish.yml
+      - docs/**
+      - '**/*.md'
+      - LICENSE
   workflow_dispatch:
 
 permissions:

@@ -2,16 +2,20 @@ name: Control plane / Deploy
 run-name: Control plane / Deploy / production
 
 # Deploys main to Azure with `dotnet aspire deploy` (docs/self-hosting.md) after every push to it
-# that changes more than the landing page, once its journeys pass, with the nook images main published
-# for the same commit; run by hand, it deploys main again. The production environment holds the deployment's secrets and settings, and
-# only main deploys to it; GitHub's OIDC token signs in to Azure, so no Azure secret is stored.
+# that changes more than the landing page and the docs, once its journeys pass, with the nook images
+# main published for the same commit; run by hand, it deploys main again. The production environment
+# holds the deployment's secrets and settings, and only main deploys to it; GitHub's OIDC token signs
+# in to Azure, so no Azure secret is stored.
 on:
   push:
     branches: [main]
-    # The landing page alone changes nothing here; Site / Publish publishes it.
+    # The landing page and the docs alone change nothing here; Site / Publish publishes the page.
     paths-ignore:
       - site/**
       - .github/workflows/site-publish.yml
+      - docs/**
+      - '**/*.md'
+      - LICENSE
   workflow_dispatch:
 
 permissions:
@@ -48,7 +52,7 @@ jobs:
                 break
               fi
               if [ "$attempt" = 40 ]; then
-                echo "::error::$REPOSITORY/$image:$GITHUB_SHA isn't published; run Nook images / Publish for this commit (a commit that changed only the landing page publishes none)."
+                echo "::error::$REPOSITORY/$image:$GITHUB_SHA isn't published; run Nook images / Publish for this commit (a commit that changed only the landing page or the docs publishes none)."
                 exit 1
               fi
               sleep 30
@@ -71,7 +75,7 @@ jobs:
             fi
             sleep 30
           done
-          echo "::error::.NET solution / Validate didn't finish for $GITHUB_SHA within 30 minutes; a commit that changed only the landing page runs none, so run it on main first."
+          echo "::error::.NET solution / Validate didn't finish for $GITHUB_SHA within 30 minutes; a commit that changed only the landing page or the docs runs none, so run it on main first."
           exit 1
 
   # A deploy that started always finishes; the next one waits for it.
