@@ -5,6 +5,10 @@
 const repository = "https://github.com/bagatka/ai-sloth";
 const install = "curl -fsSL https://aisloth.dev/install.sh | sh";
 
+// The GitHub and X marks, from Simple Icons (CC0).
+const githubMark = "M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12";
+const xMark = "M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z";
+
 type Line =
   | { kind: "command" | "output" | "left"; text: string }
   | { kind: "pushed"; text: string; url: string };
@@ -72,7 +76,10 @@ function tiles(): string {
           <a class="name" href="/" aria-label="AiSloth">
             <span aria-hidden="true">Ai<span class="slop">Slop<svg viewBox="0 0 48 10" preserveAspectRatio="none"><path d="M1 6.5C10 3.5 18 8 26 5.2S40 3.6 47 3.8" pathLength="1" /></svg></span><span class="sloth">Sloth</span></span>
           </a>
-          <a href={repository}>GitHub</a>
+          <nav aria-label="AiSloth elsewhere">
+            <a href={repository} aria-label="AiSloth on GitHub" title="GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={githubMark} /></svg></a>
+            <a href="https://x.com/AiSlothDev" aria-label="AiSloth on X, @AiSlothDev" title="@AiSlothDev"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={xMark} /></svg></a>
+          </nav>
         </header>
         <main>
           <h1>Every coding agent gets <em>its own computer.</em></h1>
@@ -87,7 +94,13 @@ function tiles(): string {
           </div>
           <p class="beta"><span class="dot" aria-hidden="true"></span>Early beta, starting today. For Linux and Macs with Apple silicon; on Windows, in WSL.</p>
         </main>
-        <footer>Open source, built by <a href="https://github.com/bagatka">Aleksandr Bagatka</a>.</footer>
+        <footer>
+          <span>Open source, built by Aleksandr Bagatka</span>
+          <nav aria-label="Aleksandr Bagatka elsewhere">
+            <a href="https://github.com/bagatka" aria-label="Aleksandr Bagatka on GitHub" title="bagatka"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={githubMark} /></svg></a>
+            <a href="https://x.com/alex_bagatka" aria-label="Aleksandr Bagatka on X, @alex_bagatka" title="@alex_bagatka"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={xMark} /></svg></a>
+          </nav>
+        </footer>
       </div>
       <aside class="algae">
         <div class="pattern" aria-hidden="true" set:html={tiles()} />
@@ -237,9 +250,15 @@ function tiles(): string {
     gap: 3rem;
     padding: 2.25rem clamp(1rem, 4vw, 3.25rem);
   }
-  header { display: flex; justify-content: space-between; align-items: baseline; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
   header a { text-decoration: none; color: var(--soft); }
   header a:hover { color: var(--ink); }
+  /* Where else AiSloth and its author are: logos only, the same in the header and the footer. */
+  header nav, footer nav { display: flex; align-items: center; gap: 1rem; }
+  header nav a, footer nav a { display: inline-flex; padding: 0.25rem; margin: -0.25rem; color: var(--soft); }
+  header nav a:hover, footer nav a:hover { color: var(--ink); }
+  header nav svg { width: 1.25rem; height: 1.25rem; fill: currentColor; }
+  footer nav svg { width: 1.05rem; height: 1.05rem; fill: currentColor; }
   header .name { color: var(--ink); font-weight: 700; font-size: 1.25rem; letter-spacing: -0.02em; }
 
   /* The name strikes itself out: AiSlop becomes AiSloth. On load the line draws through "Slop" and
@@ -302,7 +321,7 @@ function tiles(): string {
   .beta { display: flex; align-items: baseline; gap: 0.6rem; margin: 0; color: var(--soft); font-size: 0.95rem; }
   .dot { width: 0.5rem; height: 0.5rem; flex: none; border-radius: 50%; background: var(--algae); transform: translateY(-0.05em); }
 
-  footer { color: var(--soft); font-size: 0.95rem; }
+  footer { display: flex; flex-wrap: wrap; align-items: center; column-gap: 0.9rem; row-gap: 0.3rem; color: var(--soft); font-size: 0.95rem; }
 
   .algae {
     position: sticky;
