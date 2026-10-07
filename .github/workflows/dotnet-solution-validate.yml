@@ -5,7 +5,15 @@ run-name: >-
 
 on:
   push:
+    # The landing page alone changes nothing here; Site / Publish publishes it.
+    paths-ignore:
+      - site/**
+      - .github/workflows/site-publish.yml
   pull_request:
+    # The landing page alone changes nothing here; Site / Publish publishes it.
+    paths-ignore:
+      - site/**
+      - .github/workflows/site-publish.yml
   workflow_dispatch:
 
 permissions:

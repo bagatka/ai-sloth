@@ -6,6 +6,10 @@ run-name: Nook images / Publish / ${{ github.ref_name }}
 on:
   push:
     branches: [main]
+    # The landing page alone changes nothing here; Site / Publish publishes it.
+    paths-ignore:
+      - site/**
+      - .github/workflows/site-publish.yml
   workflow_dispatch:
 
 permissions:
