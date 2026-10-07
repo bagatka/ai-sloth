@@ -102,7 +102,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
+        # GitHub refuses this workflow's token a tag on a commit whose workflow files differ from main's,
+        # as when main moved during the release, and says only "Resource not accessible by integration".
         run: |
+          tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$tip" != "$GITHUB_SHA" ]; then
+            echo "::warning::main moved to $tip while releasing $GITHUB_SHA; if GitHub refuses the tag, release again from main."
+          fi
           gh release create "sloth-v$VERSION" "$RUNNER_TEMP"/release/sloth-* \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "sloth $VERSION" \
             --notes "Download the build for your computer, \`sloth-linux-x64\`, \`sloth-linux-arm64\`, or \`sloth-osx-arm64\` for a Mac with Apple silicon, make it executable, and put it on your PATH as \`sloth\`. On Windows, use the Linux build in WSL. Once it's installed, \`sloth update\` installs the newest release."
