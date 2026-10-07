@@ -56,8 +56,9 @@ jobs:
     permissions:
       pages: write
       id-token: write
+    # Named for what it serves; GitHub's default name for a Pages environment is github-pages.
     environment:
-      name: github-pages
+      name: website
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Publish
