@@ -18,11 +18,13 @@ namespace Bagatka.AiSloth.Nooks.Reactions;
 // Nooks on a removed machine can't run anywhere any more: they fail for good, and their daemons, which
 // run on that computer until its machine mode removes them, are cut off and refused, so nothing of the
 // workspace, such as its secrets, reaches it again. Nooks being deleted only lose their record.
-internal sealed class OnMachineRemoved(NooksDbContext db, DaemonConnections daemons, ILogger<OnMachineRemoved> logger) : IReaction<MachineRemoved>
+internal sealed class OnMachineRemoved(IDbContextFactory<NooksDbContext> databases, DaemonConnections daemons, ILogger<OnMachineRemoved> logger) : IReaction<MachineRemoved>
 {
     public async Task<Result> HandleAsync(MachineRemoved integrationEvent, CancellationToken ct)
     {
         string location = MachineProvider.LocationOf(integrationEvent.MachineId);
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
         List<Nook> stranded = await db.Nooks
             .Where(nook => nook.Provider == MachineProvider.Name && nook.Location == location && nook.Status != NookStatus.Deleting)
             .ToListAsync(ct);

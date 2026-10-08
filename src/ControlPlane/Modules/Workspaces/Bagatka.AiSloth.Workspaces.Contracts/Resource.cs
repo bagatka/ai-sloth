@@ -4,7 +4,7 @@ namespace Bagatka.AiSloth.Workspaces.Contracts;
 
 /// <summary>
 /// Something people are given access to: a workspace or a nook. Access to a resource reaches what is
-/// in it, so a workspace's editor writes in all its nooks (<see cref="IWorkspacesApi.AddResourceAsync"/>).
+/// in it, so a workspace's editor writes in all its nooks.
 /// </summary>
 /// <param name="Kind">What it is.</param>
 /// <param name="Id">Its ID, in the module that owns it.</param>

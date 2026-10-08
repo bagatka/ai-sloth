@@ -74,8 +74,8 @@ internal sealed partial class Sloth(
                                      the nook starts while you type it
           sloth chat list
           sloth chat open <id>       Follow a chat; type to write to the agent, /stop to stop it
-          sloth chat send <id> "<message>" [--anyway]
-                                     Send a message; --anyway sends it while the nook's disk is nearly full
+          sloth chat send <id> "<message>"
+                                     Send a message
           sloth chat stop <id>
           sloth chat push <id> [--pr] [--branch <name>] [--source <name>]... [--message <text>]
                                      Push the chat's changes to GitHub, with a pull request each
@@ -83,9 +83,8 @@ internal sealed partial class Sloth(
                                      The chat's files saved after each turn, newest first
           sloth chat setup <id>      What the setup of the chat's files printed when it last ran,
                                      following it while it runs
-          sloth chat prepare <id> [--anyway]
-                                     Have the agent write a setup for the chat's files, so new nooks
-                                     start with everything installed, and test it in a fresh nook
+          sloth chat prepare <id>    Have the agent write a setup for the chat's files, so new nooks
+                                     start with everything installed
           sloth chat download <id> [--source <name>] [--checkpoint <n>] [--out <file>]
                                      Save the chat's files as a .tar.gz, now or at a checkpoint
           sloth instructions         What every agent of your chats is told, whatever its harness
@@ -93,9 +92,10 @@ internal sealed partial class Sloth(
                                      Yours, or the workspace's for everyone's chats; - reads them
                                      from standard input
           sloth instructions clear [--workspace]
-          sloth harness state        What your agents keep for later in this workspace, such as
-                                     Claude Code's memory
-          sloth harness state forget <harness>
+          sloth harness state        What agents keep for later in this workspace, such as Claude
+                                     Code's memory: yours, from chats on your own accounts, and the
+                                     workspace's, from chats on its accounts
+          sloth harness state forget <harness> [--shared]
           Ctrl+C only leaves a chat: the agent keeps working.
 
         Machines
@@ -134,7 +134,6 @@ internal sealed partial class Sloth(
             string hint = exception.Data[HostApi.ProblemCode] switch
             {
                 "sources.github_not_connected" => " Connect it: sloth github connect",
-                "chats.disk_nearly_full" => " Send it anyway: sloth chat send <id> \"<message>\" --anyway",
                 _ => string.Empty,
             };
             await terminal.FailAsync(exception.Message + hint);
@@ -170,19 +169,18 @@ internal sealed partial class Sloth(
             ["secret", "remove", string name] => RemoveSecretAsync(name, ct),
             ["chat", "list"] => ListChatsAsync(ct),
             ["chat", "open", string id] => OpenChatAsync(id, ct),
-            ["chat", "send", string id, string text] => SendToChatAsync(id, text, anyway: false, ct),
-            ["chat", "send", string id, string text, "--anyway"] => SendToChatAsync(id, text, anyway: true, ct),
+            ["chat", "send", string id, string text] => SendToChatAsync(id, text, ct),
             ["chat", "stop", string id] => StopChatAsync(id, ct),
             ["chat", "push", string id, .. string[] rest] => PushChatAsync(id, rest, ct),
             ["chat", "download", string id, .. string[] rest] => DownloadChatAsync(id, rest, ct),
             ["chat", "checkpoints", string id] => ListCheckpointsAsync(id, ct),
             ["chat", "setup", string id] => ShowSetupAsync(id, ct),
-            ["chat", "prepare", string id] => PrepareChatAsync(id, anyway: false, ct),
-            ["chat", "prepare", string id, "--anyway"] => PrepareChatAsync(id, anyway: true, ct),
+            ["chat", "prepare", string id] => PrepareChatAsync(id, ct),
             ["chat", "list" or "open" or "send" or "stop" or "push" or "download" or "checkpoints" or "setup" or "prepare", ..] => UsageAsync(),
             ["chat", .. string[] rest] => StartChatAsync(rest, ct),
             ["harness", "state"] => ListHarnessStatesAsync(ct),
-            ["harness", "state", "forget", string harness] => ForgetHarnessStateAsync(harness, ct),
+            ["harness", "state", "forget", string harness] => ForgetHarnessStateAsync(harness, shared: false, ct),
+            ["harness", "state", "forget", string harness, "--shared"] => ForgetHarnessStateAsync(harness, shared: true, ct),
             ["instructions"] => ShowInstructionsAsync(ct),
             ["instructions", "set", .. string[] rest] => SetInstructionsAsync(rest, ct),
             ["instructions", "clear", .. string[] rest] => ClearInstructionsAsync(rest, ct),

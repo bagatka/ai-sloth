@@ -35,11 +35,10 @@ internal sealed class ProcessTable(DaemonSettings settings, NookDisk disk, ILogg
     /// <summary>Starts the instructed process. A repeated instruction for the same process ID is ignored.</summary>
     public async Task StartAsync(StartProcess instruction)
     {
+        // Unspecified means Recent, as the protocol says.
         OutputRetention retention = instruction.Retention switch
         {
             OutputRetention.Complete => OutputRetention.Complete,
-
-            // Unspecified is what an older control plane sends: the protocol's default retention.
             OutputRetention.Recent or OutputRetention.Unspecified => OutputRetention.Recent,
         };
 
@@ -87,18 +86,6 @@ internal sealed class ProcessTable(DaemonSettings settings, NookDisk disk, ILogg
         lock (_gate)
         {
             return _processes.Find(process => string.Equals(process.Id, processId, StringComparison.Ordinal));
-        }
-    }
-
-    /// <summary>Processes still running, for the hello on a new connection.</summary>
-    public IReadOnlyList<RunningProcess> Running()
-    {
-        lock (_gate)
-        {
-            return _processes
-                .Where(process => !process.Exited.IsCompleted)
-                .Select(process => new RunningProcess { ProcessId = process.Id, OutputLength = process.Output.Length })
-                .ToList();
         }
     }
 

@@ -106,6 +106,9 @@ jobs:
       - name: Verify C# formatting and code style
         run: dotnet format AiSloth.slnx --verify-no-changes --no-restore
 
+      - name: Check the scripts the control plane runs in nooks and their routers
+        run: shellcheck src/ControlPlane/Modules/Nooks/Bagatka.AiSloth.Nooks/Scripts/*.sh src/Sandboxing/Bagatka.Sandboxing.Docker/router.sh
+
       - name: Run the tests other than the journeys
         run: |
           for project in tests/*/*.csproj; do
@@ -116,7 +119,7 @@ jobs:
 
       # The journeys run the real app with real nooks, so they run on main, which deploys only once
       # they pass, and on any branch when this workflow is run by hand; day to day, run the journey
-      # closest to a change locally (PATTERNS.md, entry 26).
+      # closest to a change locally (PATTERNS.md, entry 25).
       - name: Run the journeys
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: dotnet test --project tests/Bagatka.AiSloth.EndToEndTests --configuration Release --no-build

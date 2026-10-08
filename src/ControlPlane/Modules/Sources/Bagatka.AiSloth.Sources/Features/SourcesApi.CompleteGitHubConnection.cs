@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Sources.Data;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,12 +15,14 @@ internal sealed partial class SourcesApi
 {
     public async Task<Result<GitHubConnectionProgress>> CompleteGitHubConnectionAsync(Actor actor, GitHubConnectionAttemptId id, CancellationToken ct)
     {
+        await using SourcesDbContext db = await databases.CreateDbContextAsync(ct);
+
         if (actor is not UserActor user)
         {
             return new Result<GitHubConnectionProgress>(Error.Unauthorized);
         }
 
-        Result<SourcesGitHubApp> app = App();
+        Result<GitHubAppSettings> app = App();
         if (app.Failed)
         {
             return new Result<GitHubConnectionProgress>(app.Error);
@@ -41,7 +44,7 @@ internal sealed partial class SourcesApi
         GitHubDevicePoll poll = await github.PollDeviceAsync(app.Output.ClientId, attempt.DeviceCode(box), ct);
         if (poll.Tokens is null)
         {
-            return await NotYetAsync(attempt, poll, now, ct);
+            return await NotYetAsync(db, attempt, poll, now, ct);
         }
 
         GitHubUser account = await github.GetAuthenticatedUserAsync(poll.Tokens.AccessToken, ct);
@@ -67,7 +70,7 @@ internal sealed partial class SourcesApi
     }
 
     // Waiting for the person, or over: expired, refused, or anything else GitHub says.
-    private async Task<Result<GitHubConnectionProgress>> NotYetAsync(GitHubConnectionAttempt attempt, GitHubDevicePoll poll, DateTimeOffset now, CancellationToken ct)
+    private static async Task<Result<GitHubConnectionProgress>> NotYetAsync(SourcesDbContext db, GitHubConnectionAttempt attempt, GitHubDevicePoll poll, DateTimeOffset now, CancellationToken ct)
     {
         bool waiting = poll.Error is "authorization_pending" or "slow_down";
         if (waiting)

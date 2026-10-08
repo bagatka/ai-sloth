@@ -13,8 +13,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// <summary>
 /// Journey: apps start a chat as someone starts writing its first message, so its agent is ready when
 /// they send it. <c>sloth chat</c> without a message takes the one typed next and keeps nothing when
-/// nothing is typed; a draft is listed from its first message, a person keeps at most two, and one
-/// nobody writes in goes with its nook after the draft lifetime.
+/// nothing is typed; a draft is listed from its first message, and one nobody writes in goes with its
+/// nook after the draft lifetime.
 /// </summary>
 public sealed class DraftsJourney(ControlPlane app, SleepyControlPlane sleepy) : IDisposable
 {
@@ -35,7 +35,6 @@ public sealed class DraftsJourney(ControlPlane app, SleepyControlPlane sleepy) :
         await SlothTakesTheMessageTypedNextAndKeepsNothingWhenNothingIsTypedAsync(sloth);
         TestWorkspace acme = await TestWorkspace.CreateAsync(app, Erin);
         await ADraftsAgentStartsAtOnceAndTheDraftIsListedFromItsFirstMessageAsync(acme);
-        await AThirdDraftDropsTheOldestWithItsNookAsync(acme);
         await lifetime;
     }
 
@@ -72,20 +71,6 @@ public sealed class DraftsJourney(ControlPlane app, SleepyControlPlane sleepy) :
         Assert.Null(agent.ExitCode);
         Assert.DoesNotContain(before.Items, listed => listed.Id == draft.Id);
         Assert.Contains(after.Items, listed => listed.Id == draft.Id);
-    }
-
-    private async Task AThirdDraftDropsTheOldestWithItsNookAsync(TestWorkspace acme)
-    {
-        ChatSummary oldest = await acme.StartChatAsync();
-        ChatSummary second = await acme.StartChatAsync();
-
-        ChatSummary third = await acme.StartChatAsync();
-        bool nookGoes = await Api.GoneOrDeletingAsync(Erin, oldest.NookId);
-
-        await Api.ExpectAsync(Erin.SendGetAsync(Paths.Chat(oldest)), HttpStatusCode.NotFound);
-        await Api.ExpectAsync(Erin.SendGetAsync(Paths.Chat(second)), HttpStatusCode.OK);
-        await Api.ExpectAsync(Erin.SendGetAsync(Paths.Chat(third)), HttpStatusCode.OK);
-        Assert.True(nookGoes);
     }
 
     private async Task ADraftNobodyWritesInGoesWithItsNookAsync()

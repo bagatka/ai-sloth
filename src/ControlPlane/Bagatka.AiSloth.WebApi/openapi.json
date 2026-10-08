@@ -1,0 +1,4533 @@
+{
+  "openapi": "3.2.0",
+  "info": {
+    "title": "Bagatka.AiSloth.WebApi | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/.well-known/aisloth": {
+      "get": {
+        "tags": [
+          "Sign-in"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostDiscovery"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invites/accept": {
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resource"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/providers": {
+      "get": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-account-kinds": {
+      "get": {
+        "tags": [
+          "Agent accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AgentAccountKindSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repositories/{id}": {
+      "delete": {
+        "tags": [
+          "Sources"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/git-settings": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Sources"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitSettings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/harnesses": {
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HarnessSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/instructions": {
+      "put": {
+        "tags": [
+          "Chats"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstructionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/sign-in/code": {
+      "post": {
+        "tags": [
+          "Sign-in"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeSignInRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedIn"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sign-in/token": {
+      "post": {
+        "tags": [
+          "Sign-in"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedIn"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me/link-codes": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkCode"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me/sessions": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me/sessions/{id}": {
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/workspaces": {
+      "post": {
+        "tags": [
+          "Workspaces"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkspaceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceSummary"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfWorkspaceSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{id}": {
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/invites": {
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invite"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/access": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GrantSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/access/{userId}": {
+      "delete": {
+        "tags": [
+          "Access"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/nooks/{nookId}/invites": {
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "parameters": [
+          {
+            "name": "nookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invite"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nooks/{nookId}/access": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "parameters": [
+          {
+            "name": "nookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GrantSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nooks/{nookId}/access/{userId}": {
+      "delete": {
+        "tags": [
+          "Access"
+        ],
+        "parameters": [
+          {
+            "name": "nookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/machines": {
+      "post": {
+        "tags": [
+          "Machines"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMachineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineRegistration"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Machines"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MachineSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/machines/{id}": {
+      "get": {
+        "tags": [
+          "Machines"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineSummary"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Machines"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/nooks": {
+      "post": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNookRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NookSummary"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfNookSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nooks/{id}": {
+      "get": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NookSummary"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/nooks/{id}/download": {
+      "get": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "checkpoint",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/nooks/{nookId}/checkpoints": {
+      "get": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "nookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfCheckpointSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nooks/{nookId}/setup": {
+      "get": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "nookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NookSetup"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nooks/{id}/wake": {
+      "post": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/nooks/{nookId}/processes": {
+      "post": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "nookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartProcessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessSummary"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "nookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfProcessSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nooks/{nookId}/processes/{processId}/output": {
+      "get": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "nookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "processId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fromOffset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ProcessEvent"
+                    },
+                    "event": {
+                      "enum": [
+                        "ProcessOutput",
+                        "ProcessExited"
+                      ],
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nooks/{nookId}/processes/{processId}/input": {
+      "post": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "nookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "processId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendInputRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/nooks/{nookId}/processes/{processId}/stop": {
+      "post": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "nookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "processId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/agent-accounts": {
+      "post": {
+        "tags": [
+          "Agent accounts"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddAgentAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAccountSummary"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Agent accounts"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AgentAccountSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-accounts": {
+      "post": {
+        "tags": [
+          "Agent accounts"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddAgentAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAccountSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-accounts/{id}": {
+      "delete": {
+        "tags": [
+          "Agent accounts"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/agent-accounts/sign-ins": {
+      "post": {
+        "tags": [
+          "Agent accounts"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSignInRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInStarted"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-accounts/sign-ins/{id}/complete": {
+      "post": {
+        "tags": [
+          "Agent accounts"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteSignInRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAccountSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/secrets": {
+      "get": {
+        "tags": [
+          "Secrets"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SecretSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/secrets/{name}": {
+      "put": {
+        "tags": [
+          "Secrets"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSecretRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretSummary"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Secrets"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/github/connections": {
+      "post": {
+        "tags": [
+          "Sources"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubConnectionStarted"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/github/connections/{id}/complete": {
+      "post": {
+        "tags": [
+          "Sources"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubConnectionProgress"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/github/account": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubAccount"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sources"
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/github/repositories": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailableRepositories"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/repositories": {
+      "post": {
+        "tags": [
+          "Sources"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddRepositoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositorySummary"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RepositorySummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/chats": {
+      "post": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSummary"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfChatSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/{id}": {
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/{id}/messages": {
+      "post": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/{id}/stop": {
+      "post": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/chats/{id}/events": {
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ChatEventData"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/{id}/push": {
+      "post": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PushedSource"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/harness-state": {
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HarnessStateSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/harness-state/{harness}": {
+      "delete": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "harness",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "shared",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/instructions": {
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Instructions"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstructionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AcceptInviteRequest": {
+        "required": [
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "AccessLevel": {
+        "enum": [
+          "Read",
+          "Write",
+          "Manage"
+        ],
+        "description": "How much a person may do with a resource. Each level includes the ones below it, so compare\nlevels: \u0060access \u0026gt;= AccessLevel.Write\u0060. What a level allows for its own data, each module\ndecides."
+      },
+      "AddAgentAccountRequest": {
+        "required": [
+          "kind",
+          "name",
+          "secret"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/AgentAccountKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri"
+          }
+        }
+      },
+      "AddMachineRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "AddRepositoryRequest": {
+        "required": [
+          "fullName"
+        ],
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentAccountId": {
+        "description": "Identifies an agent account."
+      },
+      "AgentAccountKind": {
+        "enum": [
+          "AnthropicApiKey",
+          "CopilotPlan",
+          "ClaudePlan",
+          "OpenAIApiKey",
+          "ChatGptPlan"
+        ],
+        "description": "What an agent account is at its vendor, and so which harnesses can use it."
+      },
+      "AgentAccountKindSummary": {
+        "required": [
+          "kind",
+          "addedBySignIn",
+          "personalOnly",
+          "allowed"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "description": "The kind.",
+            "$ref": "#/components/schemas/AgentAccountKind"
+          },
+          "addedBySignIn": {
+            "type": "boolean",
+            "description": "Whether it is added by signing in at its vendor rather than with its secret."
+          },
+          "personalOnly": {
+            "type": "boolean",
+            "description": "Whether it can only be someone\u0027s own, as plans are."
+          },
+          "allowed": {
+            "type": "boolean",
+            "description": "Whether this host allows adding it."
+          }
+        },
+        "description": "A kind of account as this host offers it."
+      },
+      "AgentAccountSummary": {
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "workspaceId",
+          "ownerId",
+          "addedAt",
+          "endpoint",
+          "needsSignIn"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The account.",
+            "$ref": "#/components/schemas/AgentAccountId"
+          },
+          "kind": {
+            "description": "What it is at its vendor.",
+            "$ref": "#/components/schemas/AgentAccountKind"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name for people, such as \u0060Team key\u0060."
+          },
+          "workspaceId": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The workspace whose people with Write use it, for a workspace\u0027s account.",
+                "$ref": "#/components/schemas/WorkspaceId"
+              }
+            ]
+          },
+          "ownerId": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The person it belongs to, for a personal account.",
+                "$ref": "#/components/schemas/UserId"
+              }
+            ]
+          },
+          "addedAt": {
+            "type": "string",
+            "description": "When it was added.",
+            "format": "date-time"
+          },
+          "endpoint": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The API\u0027s base URL for an API key at another endpoint than the vendor\u0027s; otherwise \u0060null\u0060.",
+            "format": "uri"
+          },
+          "needsSignIn": {
+            "type": "boolean",
+            "description": "Whether the account\u0027s sign-in ended, such as a ChatGPT plan whose owner disconnected the app in\nChatGPT: it runs no agents until it is removed and added again."
+          }
+        },
+        "description": "An agent account as people see it; its secret is never shown. A workspace\u0027s account has a\nWorkspaceId; a person\u0027s own has an OwnerId."
+      },
+      "AgentRestarted": {
+        "required": [
+          "remembers"
+        ],
+        "type": "object",
+        "properties": {
+          "remembers": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AgentUpdate": {
+        "required": [
+          "update"
+        ],
+        "type": "object",
+        "properties": {
+          "update": {
+            "$ref": "#/components/schemas/JsonElement"
+          }
+        }
+      },
+      "AvailableRepositories": {
+        "required": [
+          "repositories",
+          "installUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "repositories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AvailableRepository"
+            },
+            "description": "Their names, such as \u0060acme/api\u0060, and whether each is private."
+          },
+          "installUrl": {
+            "type": "string",
+            "description": "Where the person installs the app on more accounts or repositories.",
+            "format": "uri"
+          }
+        },
+        "description": "The repositories a person\u0027s GitHub connection reaches: those of the accounts and organizations the\nhost\u0027s GitHub App is installed on that the person may see."
+      },
+      "AvailableRepository": {
+        "required": [
+          "fullName",
+          "private"
+        ],
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "Its name, such as \u0060acme/api\u0060."
+          },
+          "private": {
+            "type": "boolean",
+            "description": "Whether only people given access see it."
+          }
+        },
+        "description": "A repository a person\u0027s GitHub connection reaches."
+      },
+      "ChatEventBody": {
+        "type": "object",
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/MessageSent"
+          },
+          {
+            "$ref": "#/components/schemas/MessageProposed"
+          },
+          {
+            "$ref": "#/components/schemas/TurnStarted"
+          },
+          {
+            "$ref": "#/components/schemas/MessageSteered"
+          },
+          {
+            "$ref": "#/components/schemas/MessageCancelled"
+          },
+          {
+            "$ref": "#/components/schemas/AgentUpdate"
+          },
+          {
+            "$ref": "#/components/schemas/TurnEnded"
+          },
+          {
+            "$ref": "#/components/schemas/CheckpointSaved"
+          },
+          {
+            "$ref": "#/components/schemas/CheckpointFailed"
+          },
+          {
+            "$ref": "#/components/schemas/AgentRestarted"
+          },
+          {
+            "$ref": "#/components/schemas/SetupStarted"
+          },
+          {
+            "$ref": "#/components/schemas/SetupEnded"
+          },
+          {
+            "$ref": "#/components/schemas/DiskNearlyFull"
+          }
+        ],
+        "description": "What happened in a chat. A message is sent, then either starts a turn, goes into the running\nturn (steered), or is cancelled. A turn shows the agent\u0027s updates and ends with a stop reason,\nthen a checkpoint of the nook\u0027s files. A proposal stays with the people in the chat until the\naccount\u0027s owner sends it on. An agent that had to be started again says whether it remembers.\nThe nook\u0027s setup, when its files have one, starts and ends before its agent starts; a setup the\nagent wrote is tested in a fresh nook after its turn."
+      },
+      "ChatEventData": {
+        "required": [
+          "sequence",
+          "at",
+          "event"
+        ],
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "event": {
+            "$ref": "#/components/schemas/ChatEventBody"
+          }
+        }
+      },
+      "ChatId": {
+        "description": "Identifies a chat."
+      },
+      "ChatMessage": {
+        "required": [
+          "id",
+          "chatId",
+          "sentBy",
+          "text",
+          "sentAt",
+          "isProposal"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The message.",
+            "$ref": "#/components/schemas/MessageId"
+          },
+          "chatId": {
+            "description": "Its chat.",
+            "$ref": "#/components/schemas/ChatId"
+          },
+          "sentBy": {
+            "description": "Who sent it.",
+            "$ref": "#/components/schemas/UserId"
+          },
+          "text": {
+            "type": "string",
+            "description": "What it says."
+          },
+          "sentAt": {
+            "type": "string",
+            "description": "When it was sent.",
+            "format": "date-time"
+          },
+          "isProposal": {
+            "type": "boolean",
+            "description": "Whether it is a proposal: it never reaches the agent, and the account\u0027s owner may send it on."
+          }
+        },
+        "description": "A message someone sent to a chat."
+      },
+      "ChatSummary": {
+        "required": [
+          "id",
+          "nookId",
+          "workspaceId",
+          "startedBy",
+          "startedAt",
+          "working",
+          "harness",
+          "account",
+          "accountOwner"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The chat.",
+            "$ref": "#/components/schemas/ChatId"
+          },
+          "nookId": {
+            "description": "The nook its agent works in.",
+            "$ref": "#/components/schemas/NookId"
+          },
+          "workspaceId": {
+            "description": "The nook\u0027s workspace.",
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "startedBy": {
+            "description": "Who started it.",
+            "$ref": "#/components/schemas/UserId"
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "When it started.",
+            "format": "date-time"
+          },
+          "working": {
+            "type": "boolean",
+            "description": "Whether the agent is working on a turn, or messages wait for it."
+          },
+          "harness": {
+            "type": "string",
+            "description": "The harness that runs its agent."
+          },
+          "account": {
+            "description": "The agent account that pays for its work.",
+            "$ref": "#/components/schemas/AgentAccountId"
+          },
+          "accountOwner": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The owner of the personal account it runs on, whose messages alone reach the agent: everyone\nelse\u0027s are proposals. \u0060null\u0060 on the workspace\u0027s account, which people with Write\non the workspace use.",
+                "$ref": "#/components/schemas/UserId"
+              }
+            ]
+          }
+        },
+        "description": "A chat as the people with access to its nook see it."
+      },
+      "CheckpointFailed": {
+        "required": [
+          "failure"
+        ],
+        "type": "object",
+        "properties": {
+          "failure": {
+            "type": "string"
+          }
+        }
+      },
+      "CheckpointSaved": {
+        "required": [
+          "number"
+        ],
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "CheckpointSummary": {
+        "required": [
+          "nookId",
+          "number",
+          "createdAt",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "nookId": {
+            "description": "The nook.",
+            "$ref": "#/components/schemas/NookId"
+          },
+          "number": {
+            "type": "integer",
+            "description": "Its number in the nook, counting from 1.",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was taken.",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string",
+            "description": "What it follows, in words for people."
+          }
+        },
+        "description": "A nook\u0027s files as they were at one moment, kept while the nook exists."
+      },
+      "CodeSignInRequest": {
+        "required": [
+          "code",
+          "device"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CommitIdentity": {
+        "required": [
+          "author",
+          "committer",
+          "coAuthor"
+        ],
+        "type": "object",
+        "properties": {
+          "author": {
+            "description": "Who wrote the change.",
+            "$ref": "#/components/schemas/GitIdentity"
+          },
+          "committer": {
+            "description": "Who committed it.",
+            "$ref": "#/components/schemas/GitIdentity"
+          },
+          "coAuthor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The trailer that credits AiSloth, such as \u0060Co-authored-by: AiSloth \u0026lt;\u2026\u0026gt;\u0060, or \u0060null\u0060."
+          }
+        },
+        "description": "Who commits in a person\u0027s nooks name: the author and the committer, and the co-author line added to\nevery message, if any."
+      },
+      "CompleteSignInRequest": {
+        "required": [
+          "returnedTo"
+        ],
+        "type": "object",
+        "properties": {
+          "returnedTo": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "CreateInviteRequest": {
+        "required": [
+          "access"
+        ],
+        "type": "object",
+        "properties": {
+          "access": {
+            "$ref": "#/components/schemas/AccessLevel"
+          }
+        }
+      },
+      "CreateNookRequest": {
+        "required": [
+          "provider"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "repositories": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/NookRepository"
+            }
+          },
+          "copyOf": {},
+          "checkpoint": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CreateWorkspaceRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "DiskNearlyFull": {
+        "required": [
+          "usedBytes",
+          "totalBytes"
+        ],
+        "type": "object",
+        "properties": {
+          "usedBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalBytes": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "GitHubAccount": {
+        "required": [
+          "login"
+        ],
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "string",
+            "description": "Its login, such as \u0060octocat\u0060."
+          }
+        },
+        "description": "A person\u0027s GitHub account, connected to AiSloth."
+      },
+      "GitHubConnectionAttemptId": {
+        "description": "Identifies a person\u0027s attempt to connect their GitHub account."
+      },
+      "GitHubConnectionProgress": {
+        "required": [
+          "account",
+          "retryAfter"
+        ],
+        "type": "object",
+        "properties": {
+          "account": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The connected account; \u0060null\u0060 while the person hasn\u0027t approved yet.",
+                "$ref": "#/components/schemas/GitHubAccount"
+              }
+            ]
+          },
+          "retryAfter": {
+            "pattern": "^-?(\\d\u002B\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": "string",
+            "description": "How long to wait before completing again, while waiting."
+          }
+        },
+        "description": "Where a GitHub connection stands: connected, or still waiting for the person."
+      },
+      "GitHubConnectionStarted": {
+        "required": [
+          "id",
+          "userCode",
+          "verificationUri",
+          "expiresAt",
+          "interval"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The attempt.",
+            "$ref": "#/components/schemas/GitHubConnectionAttemptId"
+          },
+          "userCode": {
+            "type": "string",
+            "description": "What the person enters at GitHub, such as \u0060WDJB-MJHT\u0060."
+          },
+          "verificationUri": {
+            "type": "string",
+            "description": "Where they enter it.",
+            "format": "uri"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "When the code stops working.",
+            "format": "date-time"
+          },
+          "interval": {
+            "pattern": "^-?(\\d\u002B\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": "string",
+            "description": "How long to wait between completions."
+          }
+        },
+        "description": "A GitHub connection waiting for the person: they open VerificationUri, enter\nUserCode, and approve; meanwhile the caller completes it every\nInterval until it is connected or expires."
+      },
+      "GitIdentity": {
+        "required": [
+          "name",
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name: 1 to 100 characters, without \u0060\u0026lt;\u0060, \u0060\u0026gt;\u0060, or line breaks."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address, such as GitHub\u0027s no-reply address for the account."
+          }
+        },
+        "description": "Who a commit names, as git writes it: \u0060Name \u0026lt;email\u0026gt;\u0060."
+      },
+      "GitSettings": {
+        "required": [
+          "author",
+          "committer",
+          "aiSlothCoAuthor",
+          "branchPrefix",
+          "effective"
+        ],
+        "type": "object",
+        "properties": {
+          "author": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Who commits name as their author; \u0060null\u0060 for the person\u0027s GitHub account.",
+                "$ref": "#/components/schemas/GitIdentity"
+              }
+            ]
+          },
+          "committer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Who commits name as their committer; \u0060null\u0060 for the author.",
+                "$ref": "#/components/schemas/GitIdentity"
+              }
+            ]
+          },
+          "aiSlothCoAuthor": {
+            "type": "boolean",
+            "description": "Whether every commit credits AiSloth as its co-author."
+          },
+          "branchPrefix": {
+            "type": "string",
+            "description": "What branches AiSloth names start with, such as \u0060aisloth/\u0060; a push can name any branch instead."
+          },
+          "effective": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "What commits get, with the defaults filled in; \u0060null\u0060 while the author comes from a\nGitHub account the person hasn\u0027t connected.",
+                "$ref": "#/components/schemas/CommitIdentity"
+              }
+            ]
+          }
+        },
+        "description": "How a person\u0027s commits and branches look. Their choices, and what those amount to."
+      },
+      "GitSettingsRequest": {
+        "required": [
+          "author",
+          "committer",
+          "aiSlothCoAuthor",
+          "branchPrefix"
+        ],
+        "type": "object",
+        "properties": {
+          "author": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GitIdentity"
+              }
+            ]
+          },
+          "committer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GitIdentity"
+              }
+            ]
+          },
+          "aiSlothCoAuthor": {
+            "type": "boolean"
+          },
+          "branchPrefix": {
+            "type": "string"
+          }
+        }
+      },
+      "GrantSummary": {
+        "required": [
+          "userId",
+          "access"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "description": "Who.",
+            "$ref": "#/components/schemas/UserId"
+          },
+          "access": {
+            "description": "How much they may do.",
+            "$ref": "#/components/schemas/AccessLevel"
+          }
+        },
+        "description": "Someone given access to a resource directly, not through what it is in."
+      },
+      "HarnessStateSummary": {
+        "required": [
+          "harness",
+          "shared",
+          "savedAt",
+          "bytes",
+          "savedFrom"
+        ],
+        "type": "object",
+        "properties": {
+          "harness": {
+            "type": "string",
+            "description": "The harness, such as \u0060claude-code\u0060."
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Whether it is the workspace\u0027s, kept from the chats on the workspace\u0027s accounts and given to all of\nthem, rather than the actor\u0027s own, kept from the chats on their own accounts."
+          },
+          "savedAt": {
+            "type": "string",
+            "description": "When a chat last saved it.",
+            "format": "date-time"
+          },
+          "bytes": {
+            "type": "integer",
+            "description": "The size of its history.",
+            "format": "int64"
+          },
+          "savedFrom": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The chat that saved it last, unless that chat is gone.",
+                "$ref": "#/components/schemas/ChatId"
+              }
+            ]
+          }
+        },
+        "description": "Harness state for one harness, as the list of a workspace\u0027s harness state shows it."
+      },
+      "HarnessSummary": {
+        "required": [
+          "id",
+          "name",
+          "accepts"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "What a nook takes as its harness, such as \u0060claude-code\u0060."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name for people."
+          },
+          "accepts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentAccountKind"
+            },
+            "description": "The kinds of agent account it can run on."
+          }
+        },
+        "description": "A harness chats can run, and the agent accounts it takes."
+      },
+      "HostDiscovery": {
+        "required": [
+          "name",
+          "apiVersion",
+          "signIn"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "apiVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "signIn": {
+            "$ref": "#/components/schemas/SignInMethods"
+          }
+        }
+      },
+      "Instructions": {
+        "required": [
+          "workspace",
+          "personal"
+        ],
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "The workspace\u0027s, for everyone\u0027s chats there."
+          },
+          "personal": {
+            "type": "string",
+            "description": "The person\u0027s own, for the chats they start."
+          }
+        },
+        "description": "What every agent of a person\u0027s chats in a workspace is told to follow, besides each repository\u0027s\nown instructions: the workspace\u0027s first, then the person\u0027s own. Empty for none."
+      },
+      "InstructionsRequest": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "Invite": {
+        "required": [
+          "code",
+          "resource",
+          "access",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The one-time code to pass on."
+          },
+          "resource": {
+            "description": "What it gives access to.",
+            "$ref": "#/components/schemas/Resource"
+          },
+          "access": {
+            "description": "How much.",
+            "$ref": "#/components/schemas/AccessLevel"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "When it stops working.",
+            "format": "date-time"
+          }
+        },
+        "description": "A new invite: whoever accepts Code first gets the access, once, until it expires.\nThe code is shown only here."
+      },
+      "JsonElement": {},
+      "LinkCode": {
+        "required": [
+          "code",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The code."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "When it stops working.",
+            "format": "date-time"
+          }
+        },
+        "description": "A code that signs its creator in on another device, once, until it expires. Shown only here."
+      },
+      "MachineId": {
+        "description": "Identifies a machine."
+      },
+      "MachineRegistration": {
+        "required": [
+          "machine",
+          "code",
+          "codeExpiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "machine": {
+            "description": "The machine, awaiting registration.",
+            "$ref": "#/components/schemas/MachineSummary"
+          },
+          "code": {
+            "type": "string",
+            "description": "Registers the machine once; never shown again."
+          },
+          "codeExpiresAt": {
+            "type": "string",
+            "description": "When the code stops working.",
+            "format": "date-time"
+          }
+        },
+        "description": "A machine just added, with the one-time code that registers it:\n\u0060sloth machine connect \u0026lt;control plane\u0026gt; \u0026lt;code\u0026gt;\u0060 on the machine."
+      },
+      "MachineStatus": {
+        "enum": [
+          "AwaitingRegistration",
+          "Offline",
+          "Online"
+        ],
+        "description": "Whether a machine can run nooks right now."
+      },
+      "MachineSummary": {
+        "required": [
+          "id",
+          "workspaceId",
+          "name",
+          "status",
+          "addedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The machine.",
+            "$ref": "#/components/schemas/MachineId"
+          },
+          "workspaceId": {
+            "description": "The workspace whose nooks it runs.",
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its display name, such as \u0060hetzner-1\u0060."
+          },
+          "status": {
+            "description": "Whether it can run nooks right now.",
+            "$ref": "#/components/schemas/MachineStatus"
+          },
+          "addedAt": {
+            "type": "string",
+            "description": "When a manager added it.",
+            "format": "date-time"
+          }
+        },
+        "description": "A machine as the people with access to its workspace see it."
+      },
+      "MessageCancelled": {
+        "required": [
+          "messageId"
+        ],
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "$ref": "#/components/schemas/MessageId"
+          }
+        }
+      },
+      "MessageId": {
+        "description": "Identifies a message in a chat."
+      },
+      "MessageProposed": {
+        "required": [
+          "messageId",
+          "proposedBy",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "$ref": "#/components/schemas/MessageId"
+          },
+          "proposedBy": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "MessageSent": {
+        "required": [
+          "messageId",
+          "sentBy",
+          "text",
+          "proposal"
+        ],
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "$ref": "#/components/schemas/MessageId"
+          },
+          "sentBy": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "text": {
+            "type": "string"
+          },
+          "proposal": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MessageId"
+              }
+            ]
+          }
+        }
+      },
+      "MessageSteered": {
+        "required": [
+          "messageId"
+        ],
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "$ref": "#/components/schemas/MessageId"
+          }
+        }
+      },
+      "NookId": {
+        "description": "Identifies a nook."
+      },
+      "NookRepository": {
+        "required": [
+          "repository"
+        ],
+        "type": "object",
+        "properties": {
+          "repository": {
+            "description": "One of the workspace\u0027s repositories (\u0060ISourcesApi\u0060).",
+            "$ref": "#/components/schemas/RepositoryId"
+          },
+          "branch": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The branch to start from, or \u0060null\u0060 for its default branch."
+          }
+        },
+        "description": "A repository a new nook starts with."
+      },
+      "NookSetup": {
+        "required": [
+          "scripts",
+          "run",
+          "readyCopyMadeAt"
+        ],
+        "type": "object",
+        "properties": {
+          "scripts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The scripts, as paths in the nook\u0027s files, in the order they run; empty when there are none."
+          },
+          "run": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Their latest run, or \u0060null\u0060 when there are no scripts.",
+                "$ref": "#/components/schemas/SetupRun"
+              }
+            ]
+          },
+          "readyCopyMadeAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the ready copy the latest run set the nook up from was made: a copy of a nook with the same\nfiles right after a setup that took a while, which leaves this setup little to do. \u0060null\u0060\nwhen the run set it up from scratch, or only resumed it.",
+            "format": "date-time"
+          }
+        },
+        "description": "A nook\u0027s setup: scripts that come with its files and prepare it, which run whenever the nook gets\nits files, as a new nook, a copy, or one brought back after its sandbox was lost. Every\n\u0060.agents/setup\u0060 runs first, installing what the code needs, then every \u0060.agents/resume\u0060,\nstarting its services; those at the top of the files before each folder\u0027s directly in it, by\nname, each in its own folder, with the workspace\u0027s secrets. A setup may take 30 minutes and\na resume 5. Their output is also written to \u0060/var/log/aisloth/setup.log\u0060 in the nook."
+      },
+      "NookSource": {
+        "required": [
+          "name",
+          "repository",
+          "branch",
+          "commit"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Its name, which is its folder in \u0060/work\u0060."
+          },
+          "repository": {
+            "description": "The workspace\u0027s repository it is a copy of.",
+            "$ref": "#/components/schemas/RepositoryId"
+          },
+          "branch": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The branch it started from; \u0060null\u0060 for the default branch until it\u0027s copied in."
+          },
+          "commit": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The commit it started from, the base of its changes; \u0060null\u0060 until it\u0027s copied in."
+          }
+        },
+        "description": "A repository in a nook, at \u0060/work/\u0026lt;name\u0026gt;\u0060."
+      },
+      "NookStatus": {
+        "enum": [
+          "Starting",
+          "Ready",
+          "Asleep",
+          "Offline",
+          "Failed",
+          "Deleting"
+        ],
+        "description": "Where a nook is in its lifecycle, as people see it. Callers never have to act on it: any operation\nwakes an asleep nook and waits for a starting one, so callers only notice latency."
+      },
+      "NookSummary": {
+        "required": [
+          "id",
+          "workspaceId",
+          "provider",
+          "status",
+          "createdAt",
+          "usage",
+          "diskNearlyFull",
+          "image",
+          "reservedFor",
+          "sources"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The nook.",
+            "$ref": "#/components/schemas/NookId"
+          },
+          "workspaceId": {
+            "description": "The workspace that owns it.",
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "provider": {
+            "type": "string",
+            "description": "The ID of the provider it runs on, as in string ProviderSummary.Id."
+          },
+          "status": {
+            "description": "Where it is in its lifecycle.",
+            "$ref": "#/components/schemas/NookStatus"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was recorded.",
+            "format": "date-time"
+          },
+          "usage": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "What it uses of its disk, memory, and CPU while it runs; \u0060null\u0060 while it doesn\u0027t.",
+                "$ref": "#/components/schemas/NookUsage"
+              }
+            ]
+          },
+          "diskNearlyFull": {
+            "type": "boolean",
+            "description": "Whether its disk is so full that its work, and keeping its files as checkpoints, may soon fail:\npeople should free space, or move to a nook with a bigger disk."
+          },
+          "image": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The image it started from, such as one with a chat\u0027s harness, or \u0060null\u0060 for the base image."
+          },
+          "reservedFor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The one person who may change what runs in it or its files, such as the owner of the personal\naccount its chat\u0027s agent works on; \u0060null\u0060 for everyone with Write on its workspace.",
+                "$ref": "#/components/schemas/UserId"
+              }
+            ]
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NookSource"
+            },
+            "description": "Its sources, each a repository at \u0060/work/\u0026lt;name\u0026gt;\u0060, by name."
+          }
+        },
+        "description": "A nook as the people with access to it see it."
+      },
+      "NookUsage": {
+        "required": [
+          "diskUsedBytes",
+          "diskTotalBytes",
+          "memoryUsedBytes",
+          "memoryTotalBytes",
+          "cpuUsedMillicores",
+          "cpuTotalMillicores"
+        ],
+        "type": "object",
+        "properties": {
+          "diskUsedBytes": {
+            "type": "integer",
+            "description": "The disk space the nook\u0027s files use.",
+            "format": "int64"
+          },
+          "diskTotalBytes": {
+            "type": "integer",
+            "description": "The disk\u0027s size.",
+            "format": "int64"
+          },
+          "memoryUsedBytes": {
+            "type": "integer",
+            "description": "The memory its processes use.",
+            "format": "int64"
+          },
+          "memoryTotalBytes": {
+            "type": "integer",
+            "description": "The memory it may use.",
+            "format": "int64"
+          },
+          "cpuUsedMillicores": {
+            "type": "integer",
+            "description": "The CPU its processes used since the last measurement, in thousandths of a core.",
+            "format": "int32"
+          },
+          "cpuTotalMillicores": {
+            "type": "integer",
+            "description": "The CPU it may use, in thousandths of a core.",
+            "format": "int32"
+          }
+        },
+        "description": "How much of its disk, memory, and CPU a nook uses, as its daemon last measured it, every 30\nseconds while it runs. A figure its daemon can\u0027t measure is 0. On the Docker provider the disk is\nthe host\u0027s, because Docker can\u0027t cap a container\u0027s disk on most setups."
+      },
+      "OutputChannel": {
+        "enum": [
+          "StandardOutput",
+          "StandardError"
+        ]
+      },
+      "OutputRetention": {
+        "enum": [
+          "Recent",
+          "Complete",
+          null
+        ]
+      },
+      "PageOfChatSummary": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatSummary"
+            },
+            "description": "The items, in the list\u0027s stable order."
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Pass it in the next PageRequest; \u0060null\u0060 on the last page."
+          }
+        },
+        "description": "One page of a keyset-paginated list."
+      },
+      "PageOfCheckpointSummary": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckpointSummary"
+            },
+            "description": "The items, in the list\u0027s stable order."
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Pass it in the next PageRequest; \u0060null\u0060 on the last page."
+          }
+        },
+        "description": "One page of a keyset-paginated list."
+      },
+      "PageOfNookSummary": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NookSummary"
+            },
+            "description": "The items, in the list\u0027s stable order."
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Pass it in the next PageRequest; \u0060null\u0060 on the last page."
+          }
+        },
+        "description": "One page of a keyset-paginated list."
+      },
+      "PageOfProcessSummary": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessSummary"
+            },
+            "description": "The items, in the list\u0027s stable order."
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Pass it in the next PageRequest; \u0060null\u0060 on the last page."
+          }
+        },
+        "description": "One page of a keyset-paginated list."
+      },
+      "PageOfWorkspaceSummary": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceSummary"
+            },
+            "description": "The items, in the list\u0027s stable order."
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Pass it in the next PageRequest; \u0060null\u0060 on the last page."
+          }
+        },
+        "description": "One page of a keyset-paginated list."
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ProcessEvent": {
+        "type": "object",
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ProcessOutput"
+          },
+          {
+            "$ref": "#/components/schemas/ProcessExited"
+          }
+        ],
+        "description": "Something a running process did: wrote output, or exited. A process\u0027s events arrive in order,\nand ProcessExited is always its last."
+      },
+      "ProcessExited": {
+        "required": [
+          "processId",
+          "exitCode"
+        ],
+        "type": "object",
+        "properties": {
+          "processId": {
+            "$ref": "#/components/schemas/ProcessId"
+          },
+          "exitCode": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ProcessId": {
+        "description": "Identifies a process in a nook. The control plane creates it before the daemon starts the process."
+      },
+      "ProcessOutput": {
+        "required": [
+          "processId",
+          "offset",
+          "channel",
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "processId": {
+            "$ref": "#/components/schemas/ProcessId"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/OutputChannel"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReadOnlyMemoryOfbyte"
+          }
+        }
+      },
+      "ProcessSummary": {
+        "required": [
+          "id",
+          "nookId",
+          "command",
+          "arguments",
+          "startedAt",
+          "exitCode"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The process.",
+            "$ref": "#/components/schemas/ProcessId"
+          },
+          "nookId": {
+            "description": "The nook it runs in.",
+            "$ref": "#/components/schemas/NookId"
+          },
+          "command": {
+            "type": "string",
+            "description": "The program."
+          },
+          "arguments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Its arguments."
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "When the control plane asked the daemon to start it.",
+            "format": "date-time"
+          },
+          "exitCode": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Its exit code, or \u0060null\u0060 while it runs.",
+            "format": "int32"
+          }
+        },
+        "description": "A process in a nook."
+      },
+      "ProviderSummary": {
+        "required": [
+          "id",
+          "name",
+          "available"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "What string CreateNook.Provider takes; callers don\u0027t parse it."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its display name: \u0060cloud\u0060 for the deployment\u0027s own provider, whatever runs it, or each one\u0027s\nown name, such as \u0060docker\u0060, when a deployment runs several, as in development; a machine\u0027s name\nfor a machine."
+          },
+          "available": {
+            "type": "boolean",
+            "description": "Whether it can create nooks right now; a machine that is offline can\u0027t."
+          }
+        },
+        "description": "A provider a workspace\u0027s nooks can run on: one the deployment runs for every workspace, such as a\nDocker Engine or a cloud, or one of the workspace\u0027s own machines."
+      },
+      "PushedSource": {
+        "required": [
+          "source",
+          "branch",
+          "commits",
+          "branchUrl",
+          "pullRequestUrl",
+          "problem"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "branch": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "commits": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "branchUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri"
+          },
+          "pullRequestUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri"
+          },
+          "problem": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PushRequest": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "branch": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pullRequest": {
+            "type": "boolean",
+            "default": false
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ReadOnlyMemoryOfbyte": {
+        "type": "string"
+      },
+      "RepositoryId": {
+        "description": "Identifies a repository a workspace connected."
+      },
+      "RepositorySummary": {
+        "required": [
+          "id",
+          "workspaceId",
+          "name",
+          "fullName",
+          "defaultBranch",
+          "url",
+          "addedBy",
+          "addedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The repository.",
+            "$ref": "#/components/schemas/RepositoryId"
+          },
+          "workspaceId": {
+            "description": "The workspace that connected it.",
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its folder in a nook, the repository\u0027s own name, such as \u0060api\u0060."
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Its name on GitHub, such as \u0060acme/api\u0060."
+          },
+          "defaultBranch": {
+            "type": "string",
+            "description": "The branch nooks start from unless told otherwise, which AiSloth never pushes to."
+          },
+          "url": {
+            "type": "string",
+            "description": "Its page on GitHub.",
+            "format": "uri"
+          },
+          "addedBy": {
+            "description": "Who connected it.",
+            "$ref": "#/components/schemas/UserId"
+          },
+          "addedAt": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          }
+        },
+        "description": "A repository a workspace connected, which its nooks can start with at \u0060/work/\u0026lt;name\u0026gt;\u0060."
+      },
+      "Resource": {
+        "required": [
+          "kind",
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "description": "What it is.",
+            "$ref": "#/components/schemas/ResourceKind"
+          },
+          "id": {
+            "type": "string",
+            "description": "Its ID, in the module that owns it.",
+            "format": "uuid"
+          }
+        },
+        "description": "Something people are given access to: a workspace or a nook. Access to a resource reaches what is\nin it, so a workspace\u0027s editor writes in all its nooks."
+      },
+      "ResourceKind": {
+        "enum": [
+          "Workspace",
+          "Nook"
+        ],
+        "description": "The kinds of Resource people can be given access to."
+      },
+      "SecretId": {
+        "description": "Identifies a secret."
+      },
+      "SecretSummary": {
+        "required": [
+          "id",
+          "workspaceId",
+          "name",
+          "setBy",
+          "setAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The secret; replacing its value keeps it.",
+            "$ref": "#/components/schemas/SecretId"
+          },
+          "workspaceId": {
+            "description": "The workspace whose nooks get it.",
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "name": {
+            "type": "string",
+            "description": "The environment variable\u0027s name."
+          },
+          "setBy": {
+            "description": "Who set its value last.",
+            "$ref": "#/components/schemas/UserId"
+          },
+          "setAt": {
+            "type": "string",
+            "description": "When its value was set last.",
+            "format": "date-time"
+          }
+        },
+        "description": "A secret as people see it: never its value."
+      },
+      "SendInputRequest": {
+        "required": [
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string",
+            "format": "byte"
+          }
+        }
+      },
+      "SendMessageRequest": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "proposal": {}
+        }
+      },
+      "SessionId": {
+        "description": "Identifies a session: one signed-in device."
+      },
+      "SessionSummary": {
+        "required": [
+          "id",
+          "device",
+          "startedAt",
+          "lastUsedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The session.",
+            "$ref": "#/components/schemas/SessionId"
+          },
+          "device": {
+            "type": "string",
+            "description": "What the device is, such as \u0060sloth on alex-laptop\u0060."
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "When it signed in.",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "description": "When it was last used, to the day.",
+            "format": "date-time"
+          }
+        },
+        "description": "A signed-in device, without its token."
+      },
+      "SetSecretRequest": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "SetupEnded": {
+        "required": [
+          "exitCode",
+          "took",
+          "output"
+        ],
+        "type": "object",
+        "properties": {
+          "exitCode": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "took": {
+            "pattern": "^-?(\\d\u002B\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": "string"
+          },
+          "output": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SetupRun": {
+        "required": [
+          "process",
+          "startedAt",
+          "endedAt",
+          "exitCode"
+        ],
+        "type": "object",
+        "properties": {
+          "process": {
+            "description": "The process, to watch its output.",
+            "$ref": "#/components/schemas/ProcessId"
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "When it started.",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it ended, or \u0060null\u0060 while it runs.",
+            "format": "date-time"
+          },
+          "exitCode": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "How it ended, or \u0060null\u0060 while it runs: 0 when every script succeeded.",
+            "format": "int32"
+          }
+        },
+        "description": "A run of a nook\u0027s setup scripts: one process, whose output says what each script did. It fails\nwith the first failing script\u0027s exit code, 124 for one that ran out of time, after the others ran."
+      },
+      "SetupStarted": {
+        "required": [
+          "scripts",
+          "fromReadyCopy"
+        ],
+        "type": "object",
+        "properties": {
+          "scripts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fromReadyCopy": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SignedIn": {
+        "required": [
+          "token",
+          "session",
+          "user",
+          "workspace"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionId"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "workspace": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkspaceId"
+              }
+            ]
+          }
+        }
+      },
+      "SignInId": {
+        "description": "Identifies a sign-in in progress."
+      },
+      "SignInMethods": {
+        "required": [
+          "provider",
+          "inviteSignUp"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "inviteSignUp": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SignInStarted": {
+        "required": [
+          "id",
+          "url",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The sign-in.",
+            "$ref": "#/components/schemas/SignInId"
+          },
+          "url": {
+            "type": "string",
+            "description": "The vendor\u0027s sign-in page.",
+            "format": "uri"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "When the sign-in can no longer complete.",
+            "format": "date-time"
+          }
+        },
+        "description": "A sign-in in progress: open Url in the person\u0027s browser, then pass the address the\nbrowser returns to on to complete the sign-in before ExpiresAt."
+      },
+      "StartChatRequest": {
+        "required": [
+          "provider",
+          "harness",
+          "account"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "harness": {
+            "type": "string"
+          },
+          "account": {
+            "$ref": "#/components/schemas/AgentAccountId"
+          },
+          "repositories": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/NookRepository"
+            }
+          },
+          "copyOf": {},
+          "checkpoint": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "StartProcessRequest": {
+        "required": [
+          "command"
+        ],
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "arguments": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "workingDirectory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "retention": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OutputRetention"
+              }
+            ]
+          },
+          "environment": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "StartSignInRequest": {
+        "required": [
+          "kind",
+          "name",
+          "callback"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/AgentAccountKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "callback": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "TokenRequest": {
+        "required": [
+          "code",
+          "codeVerifier",
+          "redirectUri"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "codeVerifier": {
+            "type": "string"
+          },
+          "redirectUri": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "TurnEnded": {
+        "required": [
+          "stopReason",
+          "failure"
+        ],
+        "type": "object",
+        "properties": {
+          "stopReason": {
+            "type": "string"
+          },
+          "failure": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "TurnStarted": {
+        "required": [
+          "messageId"
+        ],
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "$ref": "#/components/schemas/MessageId"
+          }
+        }
+      },
+      "UserId": {
+        "description": "Identifies a user. It lives in Foundation, not in a module, because Actor needs it."
+      },
+      "UserProfile": {
+        "required": [
+          "id",
+          "name",
+          "signedUpAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The user.",
+            "$ref": "#/components/schemas/UserId"
+          },
+          "name": {
+            "type": "string",
+            "description": "Their name."
+          },
+          "signedUpAt": {
+            "type": "string",
+            "description": "When they first signed in.",
+            "format": "date-time"
+          }
+        },
+        "description": "A user as they see themselves."
+      },
+      "UserSummary": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The user.",
+            "$ref": "#/components/schemas/UserId"
+          },
+          "name": {
+            "type": "string",
+            "description": "Their name."
+          }
+        },
+        "description": "A user as others see them."
+      },
+      "WorkspaceId": {},
+      "WorkspaceSummary": {
+        "required": [
+          "id",
+          "name",
+          "access"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The workspace.",
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its display name."
+          },
+          "access": {
+            "description": "How much the caller may do in it.",
+            "$ref": "#/components/schemas/AccessLevel"
+          }
+        },
+        "description": "A workspace as one person with access sees it."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Access"
+    },
+    {
+      "name": "Agent accounts"
+    },
+    {
+      "name": "Chats"
+    },
+    {
+      "name": "Machines"
+    },
+    {
+      "name": "Nooks"
+    },
+    {
+      "name": "Secrets"
+    },
+    {
+      "name": "Sign-in"
+    },
+    {
+      "name": "Sources"
+    },
+    {
+      "name": "Users"
+    },
+    {
+      "name": "Workspaces"
+    }
+  ]
+}

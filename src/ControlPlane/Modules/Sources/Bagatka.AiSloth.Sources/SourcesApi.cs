@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Sources.Contracts;
 using Bagatka.AiSloth.Sources.Data;
+using Bagatka.AiSloth.Sources.Git;
 using Bagatka.AiSloth.Sources.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
@@ -21,23 +22,24 @@ namespace Bagatka.AiSloth.Sources;
 // person's working GitHub token, and finding a repository the actor may use. Each feature is a file
 // in Features/.
 internal sealed partial class SourcesApi(
-    SourcesDbContext db,
+    IDbContextFactory<SourcesDbContext> databases,
     IWorkspacesApi workspaces,
     GitHubClient github,
     CoAuthorLine coAuthorLine,
+    GitScratch scratches,
     [FromKeyedServices(SourcesDbContext.Schema)] SecretBox box,
     SourcesSettings settings,
     TimeProvider time,
     ILogger<SourcesApi> logger) : ISourcesApi
 {
     // The host's GitHub App, if it has one.
-    private Result<SourcesGitHubApp> App()
+    private Result<GitHubAppSettings> App()
     {
-        return settings.GitHubApp is null ? new Result<SourcesGitHubApp>(SourcesErrors.GitHubNotConfigured) : new Result<SourcesGitHubApp>(settings.GitHubApp);
+        return settings.GitHubApp is null ? new Result<GitHubAppSettings>(SourcesErrors.GitHubNotConfigured) : new Result<GitHubAppSettings>(settings.GitHubApp);
     }
 
     // The actor's GitHub connection with a token that works for a while yet, renewed first when due.
-    private async Task<Result<Connected>> ConnectedAsync(Actor actor, CancellationToken ct)
+    private async Task<Result<Connected>> ConnectedAsync(SourcesDbContext db, Actor actor, CancellationToken ct)
     {
         if (actor is not UserActor user)
         {
@@ -52,7 +54,7 @@ internal sealed partial class SourcesApi(
 
         if (connection.RenewalDue(time.GetUtcNow()))
         {
-            Result<GitHubConnection> renewed = await RenewAsync(user.UserId);
+            Result<GitHubConnection> renewed = await RenewAsync(db, user.UserId);
             if (renewed.Failed)
             {
                 return new Result<Connected>(renewed.Error);
@@ -68,9 +70,9 @@ internal sealed partial class SourcesApi(
     // renewal and refuses one used twice, so the row stays locked while GitHub answers, and whoever
     // waited finds it renewed. The caller's cancellation doesn't apply: a renewal GitHub completed but
     // this side dropped would end the connection.
-    private async Task<Result<GitHubConnection>> RenewAsync(UserId userId)
+    private async Task<Result<GitHubConnection>> RenewAsync(SourcesDbContext db, UserId userId)
     {
-        Result<SourcesGitHubApp> app = App();
+        Result<GitHubAppSettings> app = App();
         if (app.Failed)
         {
             return new Result<GitHubConnection>(app.Error);
@@ -120,7 +122,7 @@ internal sealed partial class SourcesApi(
 
     // The repository, if the actor may do at least `needed` in its workspace; the control plane's own
     // processes may do anything. Not found when they may not see it.
-    private async Task<Result<Repository>> FindRepositoryAsync(Actor actor, RepositoryId id, AccessLevel needed, CancellationToken ct)
+    private async Task<Result<Repository>> FindRepositoryAsync(SourcesDbContext db, Actor actor, RepositoryId id, AccessLevel needed, CancellationToken ct)
     {
         Repository? repository = await db.Repositories.SingleOrDefaultAsync(found => found.Id == id, ct);
         if (repository is null || actor is AnonymousActor)

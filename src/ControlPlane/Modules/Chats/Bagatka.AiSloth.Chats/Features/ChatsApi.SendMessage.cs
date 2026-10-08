@@ -1,8 +1,8 @@
+using Bagatka.AiSloth.Chats.Data;
 using System.Threading.Tasks;
 using System.Threading;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Chats.Model;
-using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation.Modules;
 using Bagatka.Foundation;
@@ -14,7 +14,9 @@ internal sealed partial class ChatsApi
 {
     public async Task<Result<ChatMessage>> SendAsync(Actor actor, SendMessage command, CancellationToken ct)
     {
-        Result<Chat> found = await FindChatAsync(actor, command.ChatId, AccessLevel.Write, ct);
+        await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Chat> found = await FindChatAsync(db, actor, command.ChatId, AccessLevel.Write, ct);
         if (found.Failed)
         {
             return new Result<ChatMessage>(found.Error);
@@ -45,18 +47,7 @@ internal sealed partial class ChatsApi
             }
         }
 
-        bool unconfirmed = false;
-        if (!isProposal)
-        {
-            unconfirmed = await NeedsDiskConfirmationAsync(chat, command.ConfirmNearlyFullDisk, ct);
-        }
-
-        if (unconfirmed)
-        {
-            return new Result<ChatMessage>(ChatsErrors.DiskNearlyFull);
-        }
-
-        Result<Message> sent = Message.Send(command.ChatId, user.UserId, command.Text, isProposal, command.Proposal, setupTest: null, time);
+        Result<Message> sent = Message.Send(command.ChatId, user.UserId, command.Text, isProposal, command.Proposal, time);
         if (sent.Failed)
         {
             return new Result<ChatMessage>(sent.Error);
@@ -64,7 +55,7 @@ internal sealed partial class ChatsApi
 
         // Recorded only; the chat's runner announces and delivers it.
         Message message = sent.Output;
-        await AddMessageAsync(message, ct);
+        await AddMessageAsync(db, message, ct);
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)
         {
@@ -73,20 +64,5 @@ internal sealed partial class ChatsApi
 
         runners.Wake(command.ChatId);
         return new Result<ChatMessage>(message.ToContract());
-    }
-
-    // A nearly full disk is the sender's to confirm, because the agent's work and checkpoints may
-    // fail: a message for the agent, unconfirmed, while the nook's disk was nearly full at its
-    // daemon's last report, needs it. Proposals don't run the agent, so they never ask.
-    private async Task<bool> NeedsDiskConfirmationAsync(Chat chat, bool confirmed, CancellationToken ct)
-    {
-        if (confirmed)
-        {
-            return false;
-        }
-
-        Result<NookSummary> nook = await nooks.GetAsync(SystemActors.Harness, chat.NookId, ct);
-        return !nook.Failed && nook.Output.Disk is DiskUsage disk && disk.TotalBytes > 0
-            && 1 - ((double)disk.AvailableBytes / disk.TotalBytes) >= settings.NearlyFullDisk;
     }
 }

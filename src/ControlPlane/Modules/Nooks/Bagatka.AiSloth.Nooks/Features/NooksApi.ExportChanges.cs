@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Nooks.Data;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,35 +18,23 @@ internal sealed partial class NooksApi
     // The exit code that says there is nothing beyond the base to send.
     private const int NoChanges = 3;
 
-    // Commits what isn't committed, as the pusher, then sends the commits since the base as a bundle.
-    private const string ExportScript = """
-        set -eu
-        cd "/work/$1"
-        git add -A
-        if ! git diff --cached --quiet; then git commit --quiet -m "$2"; fi
-        if [ "$(git rev-parse HEAD)" = "$3" ]; then exit 3; fi
-        git bundle create - "$3..HEAD"
-        """;
-
     public async Task<Result<ExportedChanges>> ExportChangesAsync(Actor actor, ExportChanges command, Stream destination, CancellationToken ct)
     {
-        Result<Nook> nook = await FindNookAsync(actor, command.NookId, AccessLevel.Write, ct);
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Nook> nook = await FindNookAsync(db, actor, command.NookId, AccessLevel.Write, ct);
         if (nook.Failed)
         {
             return new Result<ExportedChanges>(nook.Error);
         }
 
-        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
-        if (connection is null)
+        Result<DaemonConnection> ready = await ReadyAsync(db, actor, nook.Output, changes: false, ct);
+        if (ready.Failed)
         {
-            return new Result<ExportedChanges>(NooksErrors.NotReady);
+            return new Result<ExportedChanges>(ready.Error);
         }
 
-        Result prepared = await PrepareSourcesAsync(nook.Output, connection, ct);
-        if (prepared.Failed)
-        {
-            return new Result<ExportedChanges>(prepared.Error);
-        }
+        DaemonConnection connection = ready.Output;
 
         SourceCopy? copy = await db.SourceCopies.AsNoTracking().SingleOrDefaultAsync(found => found.NookId == command.NookId && found.Name == command.Source, ct);
         if (copy is not { Branch: string branch, Commit: string commit })
@@ -64,7 +53,7 @@ internal sealed partial class NooksApi
             ["GIT_CONFIG_KEY_0"] = "aisloth.coauthor",
             ["GIT_CONFIG_VALUE_0"] = command.Identity.CoAuthor ?? string.Empty,
         };
-        ProcessRun exported = await RunAsync(connection, ExportScript, [copy.Name, command.Message, commit], environment, input: null, destination, ct);
+        ProcessRun exported = await processes.RunAsync(connection, Scripts.Export, [copy.Name, command.Message, commit], environment, input: null, ScriptOutput.To(destination), ct);
         if (exported.ExitCode == NoChanges)
         {
             return new Result<ExportedChanges>(new ExportedChanges(copy.RepositoryId, branch, commit, HasChanges: false));

@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using Azure.Identity;
@@ -27,6 +28,7 @@ using Bagatka.AiSloth.Users.Contracts;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -67,13 +69,11 @@ DockerSandboxSettings? docker = builder.Configuration.GetSection("Sandboxing:Doc
 AzureSandboxSettings? azure = builder.Configuration.GetSection("Sandboxing:Azure").Exists()
     ? builder.Configuration.GetRequired<AzureSandboxSettings>("Sandboxing:Azure")
     : null;
-UsersSettings users = builder.Configuration.GetRequired<UsersSettings>("Modules:Users");
-WorkspacesSettings workspaces = builder.Configuration.GetRequired<WorkspacesSettings>("Modules:Workspaces");
-MachinesSettings machines = builder.Configuration.GetRequired<MachinesSettings>("Modules:Machines");
+DatabaseSettings database = builder.Configuration.GetRequired<DatabaseSettings>("Database");
+EncryptionSettings encryption = builder.Configuration.GetRequired<EncryptionSettings>("Encryption");
 NooksSettings nooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
 AgentAccountsSettings agentAccounts = builder.Configuration.GetRequired<AgentAccountsSettings>("Modules:AgentAccounts");
-SecretsSettings secrets = builder.Configuration.GetRequired<SecretsSettings>("Modules:Secrets");
-SourcesSettings sources = builder.Configuration.GetRequired<SourcesSettings>("Modules:Sources");
+SourcesSettings sources = builder.Configuration.GetSection("Modules:Sources").Exists() ? builder.Configuration.GetRequired<SourcesSettings>("Modules:Sources") : new SourcesSettings();
 GitHubSettings gitHub = builder.Configuration.GetSection("GitHub").Exists() ? builder.Configuration.GetRequired<GitHubSettings>("GitHub") : GitHubSettings.Public;
 ChatsSettings chats = builder.Configuration.GetRequired<ChatsSettings>("Modules:Chats");
 FileSystemObjectStorageSettings? folderStorage = builder.Configuration.GetSection("ObjectStorage:FileSystem").Exists()
@@ -98,13 +98,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 // once, then lets requests in flight finish, agents' model calls among them, for up to this long;
 // the deployment waits a little longer before it kills the instance (the AppHost's grace period).
 builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(570));
-string? sharedDatabase = builder.Configuration["ActiveInstance:ConnectionString"];
-if (sharedDatabase is null)
-{
-    throw new InvalidOperationException("Configure 'ActiveInstance:ConnectionString', the database the instances share.");
-}
-
-builder.Services.AddActiveInstance(sharedDatabase);
+builder.Services.AddModuleDatabase(database);
+builder.Services.AddActiveInstance();
 builder.Services.ConfigureHttpJsonOptions(json => FoundationJson.Configure(json.SerializerOptions));
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
@@ -138,6 +133,7 @@ if (signInProvider is not null)
 // Every endpoint requires a signed-in user unless it says AllowAnonymous().
 builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddRateLimits(host);
 
 // Sources copies repositories in and pushes them out with people's GitHub connections, through the
 // host's GitHub App, running git on this computer.
@@ -161,19 +157,25 @@ if (azure is not null)
 }
 
 // Nooks run on a Docker Engine too when the host has one, such as in development or on one server.
+// They reach the control plane through the Docker host when its addresses for them name it, and
+// nothing else there.
 if (docker is not null)
 {
-    builder.Services.AddDockerSandboxProvider(docker);
+    Uri[] nookFacing = [nooks.DaemonUrl, chats.ModelGatewayUrl];
+    builder.Services.AddDockerSandboxProvider(docker with
+    {
+        HostPorts = [.. nookFacing.Where(url => string.Equals(url.Host, "host.docker.internal", StringComparison.Ordinal)).Select(url => url.Port)],
+    });
 }
 
 builder.Services
-    .AddUsersModule(users)
-    .AddWorkspacesModule(workspaces)
-    .AddMachinesModule(machines)
-    .AddSecretsModule(secrets)
-    .AddSourcesModule(sources)
+    .AddUsersModule()
+    .AddWorkspacesModule()
+    .AddMachinesModule()
+    .AddSecretsModule(encryption)
+    .AddSourcesModule(sources, encryption)
     .AddNooksModule(nooks)
-    .AddAgentAccountsModule(agentAccounts)
+    .AddAgentAccountsModule(agentAccounts, encryption)
     .AddChatsModule(chats);
 
 await using WebApplication app = builder.Build();
@@ -186,10 +188,20 @@ if (args is ["migrate"])
     return;
 }
 
+// Behind a proxy, the caller's address is the one it adds last; one a caller wrote is never trusted.
+if (host.BehindProxy)
+{
+    ForwardedHeadersOptions forwarded = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor, ForwardLimit = 1 };
+    forwarded.KnownIPNetworks.Clear();
+    forwarded.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwarded);
+}
+
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 // While nobody has signed up, the host's first person signs in with a setup code. It goes to
 // standard output only, never through logging, so no telemetry carries it.

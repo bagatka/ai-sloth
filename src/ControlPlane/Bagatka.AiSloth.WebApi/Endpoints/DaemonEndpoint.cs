@@ -29,11 +29,8 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
             throw new RpcException(new Status(StatusCode.InvalidArgument, "The first event must be Hello."));
         }
 
-        ConnectDaemon command = new ConnectDaemon(
-            NookId.From(GrpcCalls.ParseId(hello.NookId)),
-            GrpcCalls.BearerToken(context),
-            hello.DaemonVersion,
-            hello.RunningProcesses.Select(running => new RunningProcess(ProcessId.From(GrpcCalls.ParseId(running.ProcessId)), running.OutputLength)).ToList());
+        // Not handled: daemon versions; any daemon is accepted, and its version is read once one isn't.
+        ConnectDaemon command = new ConnectDaemon(NookId.From(GrpcCalls.ParseId(hello.NookId)), GrpcCalls.BearerToken(context));
         Result<IAsyncEnumerable<DaemonInstruction>> connected = await nooks.ConnectAsync(Actor.Anonymous, command, ReportsAsync(requestStream, ct), ct);
         if (connected.Failed)
         {
@@ -117,8 +114,15 @@ internal sealed class DaemonEndpoint(INookDaemonsApi nooks) : Wire.ControlPlane.
                     Wire.ProcessExited exited = events.Current.ProcessExited;
                     yield return new DaemonReport(new ProcessExited(ProcessId.From(GrpcCalls.ParseId(exited.ProcessId)), exited.ExitCode));
                     break;
-                case Wire.DaemonEvent.EventOneofCase.DiskUsage:
-                    yield return new DaemonReport(new DiskUsage(events.Current.DiskUsage.TotalBytes, events.Current.DiskUsage.AvailableBytes));
+                case Wire.DaemonEvent.EventOneofCase.Usage:
+                    Wire.Usage usage = events.Current.Usage;
+                    yield return new DaemonReport(new NookUsage(
+                        usage.DiskTotalBytes - usage.DiskAvailableBytes,
+                        usage.DiskTotalBytes,
+                        usage.MemoryUsedBytes,
+                        usage.MemoryTotalBytes,
+                        usage.CpuUsedMillicores,
+                        usage.CpuTotalMillicores));
                     break;
                 case Wire.DaemonEvent.EventOneofCase.Hello or Wire.DaemonEvent.EventOneofCase.None:
                     // A repeated hello, or an event from a newer daemon: nothing to report.

@@ -14,12 +14,13 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// access a nook is not found; with too little, forbidden.
 /// </summary>
 /// <remarks>
-/// A nook nobody uses falls asleep after a while (<see cref="NookStatus"/>), which is invisible to
-/// callers: any operation wakes it first, so callers only notice latency. Processes keep running
+/// A nook nobody uses falls asleep after a while (<see cref="NookStatus.Asleep"/>), which is invisible
+/// to callers: any operation wakes it first, so callers only notice latency. Processes keep running
 /// through a sleep where its provider keeps memory, and otherwise end with exit code -1. A nook's
-/// files survive until it is deleted, except when its machine is lost or it sleeps long enough to
-/// be evicted: then it starts again from its latest checkpoint, and processes that ran there end
-/// with exit code -1.
+/// files survive until it is deleted, except when its machine is lost or it sleeps for long: then it
+/// starts again from its latest checkpoint, and processes that ran there end with exit code -1.
+/// Every operation on a nook's files, and starting a process, puts its files in place first: its
+/// repositories copied in, or a checkpoint's files put back, the first time; which can take a while.
 /// </remarks>
 public interface INooksApi
 {
@@ -29,12 +30,12 @@ public interface INooksApi
     /// </summary>
     /// <remarks>
     /// A nook may be created on a provider that isn't available, such as a machine that is offline;
-    /// it stays <see cref="NookStatus.Creating"/> until the provider is back.
+    /// it stays <see cref="NookStatus.Starting"/> until the provider is back.
     /// </remarks>
     /// <returns>
-    /// The nook in <see cref="NookStatus.Creating"/>; not found when the actor has no access to the
+    /// The nook in <see cref="NookStatus.Starting"/>; not found when the actor has no access to the
     /// workspace, or forbidden without Write; or a validation error for a provider the workspace
-    /// doesn't have, a harness this deployment doesn't offer, repositories or a nook to copy it can't
+    /// doesn't have, an image this deployment doesn't offer, repositories or a nook to copy it can't
     /// start with, or kept paths it can't keep.
     /// </returns>
     public Task<Result<NookSummary>> CreateAsync(Actor actor, CreateNook command, CancellationToken ct);
@@ -87,10 +88,10 @@ public interface INooksApi
     public Task<Result<NookSetup>> RunSetupAsync(Actor actor, NookId id, CancellationToken ct);
 
     /// <summary>
-    /// Wakes the nook when it sleeps, without waiting for it, and keeps it awake for a while: the sleep
-    /// period, as after any use, for someone about to use it, such as a person opening its chat; or as
-    /// long as asked, renewed by whatever keeps it busy, such as Chats while its agent works. People
-    /// with Write may.
+    /// Wakes the nook when it sleeps, without waiting for it, and counts as a use: it falls asleep only
+    /// once its sleep period has passed since. Whatever keeps it busy, such as Chats while its agent
+    /// works, says for how long and renews it; a person about to use it, such as by opening its chat,
+    /// says nothing. People with Write may.
     /// </summary>
     /// <returns>Success; <see cref="NooksErrors.NotReady"/> when its provider can't be asked; a validation error for longer than an hour; or not found or forbidden.</returns>
     public Task<Result> WakeAsync(Actor actor, WakeNook command, CancellationToken ct);
@@ -178,4 +179,23 @@ public interface INooksApi
     /// repositories; <see cref="NooksErrors.NotReady"/>; or not found or forbidden.
     /// </returns>
     public Task<Result<ExportedChanges>> ExportChangesAsync(Actor actor, ExportChanges command, Stream destination, CancellationToken ct);
+
+    /// <summary>
+    /// Syncs a folder of the nook with a folder AiSloth keeps outside every nook, so the nooks that sync
+    /// the same one share its files, such as an agent's memory across a person's chats: what changed on
+    /// either side since the nook last synced comes together. A text file both sides changed keeps the
+    /// lines of both, so nothing either wrote is lost; any other file both changed keeps the nook's.
+    /// The kept folder starts with the first sync. Only the control plane's own processes may.
+    /// </summary>
+    /// <returns>Success; a validation error for a path that isn't absolute or a name it can't keep; <see cref="NooksErrors.NotReady"/>; or not found or forbidden.</returns>
+    public Task<Result> SyncFolderAsync(Actor actor, SyncFolder command, CancellationToken ct);
+
+    /// <summary>The folders AiSloth keeps whose names start with <paramref name="prefix"/>. Only the control plane's own processes may.</summary>
+    public Task<Result<IReadOnlyList<KeptFolderSummary>>> ListFoldersAsync(Actor actor, string prefix, CancellationToken ct);
+
+    /// <summary>
+    /// Deletes the folders AiSloth keeps whose names start with <paramref name="prefix"/>, with their
+    /// history; nooks keep their own copies of the files. Only the control plane's own processes may.
+    /// </summary>
+    public Task<Result> DeleteFoldersAsync(Actor actor, string prefix, CancellationToken ct);
 }

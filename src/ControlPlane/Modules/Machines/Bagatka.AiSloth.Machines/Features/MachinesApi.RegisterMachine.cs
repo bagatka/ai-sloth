@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Machines.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Machines.Contracts;
@@ -12,6 +13,8 @@ internal sealed partial class MachinesApi
 {
     public async Task<Result<MachineCredential>> RegisterAsync(Actor actor, RegisterMachine command, CancellationToken ct)
     {
+        await using MachinesDbContext db = await databases.CreateDbContextAsync(ct);
+
         // The code is the credential; the actor is always anonymous.
         byte[] codeHash = OneTimeCode.Hash(command.Code);
         Machine? machine = await db.Machines.SingleOrDefaultAsync(found => found.CodeHash == codeHash, ct);

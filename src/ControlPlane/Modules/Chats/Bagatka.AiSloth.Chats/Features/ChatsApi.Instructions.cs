@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Chats.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,6 +16,8 @@ internal sealed partial class ChatsApi
 {
     public async Task<Result<Instructions>> GetInstructionsAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct)
     {
+        await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
+
         Result<UserId> person = await PersonInAsync(actor, workspaceId, AccessLevel.Read, ct);
         if (person.Failed)
         {
@@ -28,6 +31,8 @@ internal sealed partial class ChatsApi
 
     public async Task<Result> SetWorkspaceInstructionsAsync(Actor actor, WorkspaceId workspaceId, string text, CancellationToken ct)
     {
+        await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
+
         Result<UserId> person = await PersonInAsync(actor, workspaceId, AccessLevel.Write, ct);
         if (person.Failed)
         {
@@ -55,6 +60,8 @@ internal sealed partial class ChatsApi
 
     public async Task<Result> SetPersonalInstructionsAsync(Actor actor, string text, CancellationToken ct)
     {
+        await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
+
         if (actor is not UserActor user)
         {
             return new Result(Error.Forbidden);

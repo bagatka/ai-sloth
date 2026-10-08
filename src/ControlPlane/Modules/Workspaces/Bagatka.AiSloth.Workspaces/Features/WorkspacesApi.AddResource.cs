@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Workspaces.Data;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,6 +16,8 @@ internal sealed partial class WorkspacesApi
 
     public async Task<Result> AddResourceAsync(Actor actor, AddResource command, CancellationToken ct)
     {
+        await using WorkspacesDbContext db = await databases.CreateDbContextAsync(ct);
+
         ArgumentNullException.ThrowIfNull(command);
 
         // Today a nook is in its workspace; projects will add more ways to nest.

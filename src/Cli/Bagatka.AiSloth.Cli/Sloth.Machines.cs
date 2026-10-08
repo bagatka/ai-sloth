@@ -96,6 +96,8 @@ internal sealed partial class Sloth
             return 1;
         }
 
+        // Not handled: a control plane on this computer too, which its nooks can't reach (no HostPorts).
+        await terminal.WriteLineAsync("Nooks here reach the internet, but not this computer, its network, or each other.");
         using ILoggerFactory loggers = LoggerFactory.Create(logging => logging.AddSimpleConsole(console =>
         {
             console.SingleLine = true;

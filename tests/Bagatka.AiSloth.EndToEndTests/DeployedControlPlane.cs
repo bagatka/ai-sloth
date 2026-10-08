@@ -12,7 +12,7 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// </summary>
 public sealed class DeployedControlPlane : IAsyncDisposable
 {
-    private readonly ControlPlane _app = new ControlPlane([]);
+    private readonly ControlPlane _app = new ControlPlane([], []);
     private readonly Lazy<Task> _started;
 
     public DeployedControlPlane()

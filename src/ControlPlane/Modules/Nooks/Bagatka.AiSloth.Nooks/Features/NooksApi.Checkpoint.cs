@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Nooks.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Nooks.Contracts;
@@ -12,7 +13,9 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<CheckpointSummary>> CheckpointAsync(Actor actor, CheckpointNook command, CancellationToken ct)
     {
-        Result<Nook> nook = await FindNookAsync(actor, command.NookId, AccessLevel.Write, ct);
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Nook> nook = await FindNookAsync(db, actor, command.NookId, AccessLevel.Write, ct);
         if (nook.Failed)
         {
             return new Result<CheckpointSummary>(nook.Error);
@@ -23,19 +26,15 @@ internal sealed partial class NooksApi
             return new Result<CheckpointSummary>(Error.Validation("note", "At most 200 characters."));
         }
 
-        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
-        if (connection is null)
+        Result<DaemonConnection> ready = await ReadyAsync(db, actor, nook.Output, changes: false, ct);
+        if (ready.Failed)
         {
-            return new Result<CheckpointSummary>(NooksErrors.NotReady);
+            return new Result<CheckpointSummary>(ready.Error);
         }
 
-        Result prepared = await PrepareSourcesAsync(nook.Output, connection, ct);
-        if (prepared.Failed)
-        {
-            return new Result<CheckpointSummary>(prepared.Error);
-        }
+        DaemonConnection connection = ready.Output;
 
-        Result<Checkpoint> saved = await SaveCheckpointAsync(nook.Output, connection, command.Note, onlyIfChanged: false, ct);
+        Result<Checkpoint> saved = await checkpoints.SaveAsync(db, nook.Output, connection, command.Note, onlyIfChanged: false, ct);
         return saved.Failed ? new Result<CheckpointSummary>(saved.Error) : new Result<CheckpointSummary>(saved.Output.ToSummary());
     }
 }

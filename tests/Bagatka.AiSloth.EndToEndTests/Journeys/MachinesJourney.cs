@@ -151,18 +151,18 @@ public sealed class MachinesJourney(ControlPlane app) : IDisposable
     {
         await app.LoseSandboxAsync(nook.Id.Value);
 
-        NookStatus away = await acme.StatusAsync(nook.Id, status => status is NookStatus.Unreachable, TimeSpan.FromSeconds(60));
+        NookStatus away = await acme.StatusAsync(nook.Id, status => status is NookStatus.Offline, TimeSpan.FromSeconds(60));
 
-        Assert.Equal(NookStatus.Unreachable, away);
+        Assert.Equal(NookStatus.Offline, away);
     }
 
     private async Task TheNookComesBackWithItsMachineAndIsDeletedThereAsync(TestWorkspace acme, NookSummary nook)
     {
-        NookStatus back = await acme.StatusAsync(nook.Id, status => status is NookStatus.Running, TimeSpan.FromSeconds(60));
+        NookStatus back = await acme.StatusAsync(nook.Id, status => status is NookStatus.Ready, TimeSpan.FromSeconds(60));
         await Api.ExpectAsync(_alice.DeleteAsync(new Uri(Paths.Nook(nook.Id), UriKind.Relative), Ct), HttpStatusCode.NoContent);
         bool gone = await Api.GoneOrDeletingAsync(_alice, nook.Id);
 
-        Assert.Equal(NookStatus.Running, back);
+        Assert.Equal(NookStatus.Ready, back);
         Assert.True(gone);
     }
 

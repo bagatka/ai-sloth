@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Sources.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +13,8 @@ internal sealed partial class SourcesApi
     // credentials; until they revoke it there, the app stays in their authorized apps, unused.
     public async Task<Result> DisconnectGitHubAsync(Actor actor, CancellationToken ct)
     {
+        await using SourcesDbContext db = await databases.CreateDbContextAsync(ct);
+
         if (actor is not UserActor user)
         {
             return new Result(Error.Unauthorized);

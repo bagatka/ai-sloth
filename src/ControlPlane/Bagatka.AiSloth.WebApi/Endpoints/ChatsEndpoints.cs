@@ -28,28 +28,27 @@ internal static class ChatsEndpoints
 
     internal sealed record PushRequest(IReadOnlyList<string>? Sources = null, string? Branch = null, bool PullRequest = false, string? Message = null);
 
-    internal sealed record SendMessageRequest(string Text, MessageId? Proposal = null, bool ConfirmNearlyFullDisk = false);
+    internal sealed record SendMessageRequest(string Text, MessageId? Proposal = null);
 
-    internal sealed record PrepareRequest(bool ConfirmNearlyFullDisk = false);
 
     internal sealed record InstructionsRequest(string Text);
 
 
-    // A chat event in a server-sent event: its type is the event's kind, its ID the sequence number.
-    internal sealed record ChatEventData(long Sequence, DateTimeOffset At, object Event);
+    // A chat event in a server-sent event: its type is the event's kind, which names the case of Event,
+    // and its ID the sequence number.
+    internal sealed record ChatEventData(long Sequence, DateTimeOffset At, ChatEventBody Event);
 
     public static RouteGroupBuilder MapChatsEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/harnesses", ListHarnesses).WithTags("Chats");
 
         RouteGroupBuilder workspaceChats = app.MapGroup("/workspaces/{workspaceId:guid}/chats").WithTags("Chats");
-        workspaceChats.MapPost("/", Start);
+        workspaceChats.MapPost("/", Start).RequireRateLimiting(RateLimits.Starts).ProducesProblem(StatusCodes.Status429TooManyRequests);
         workspaceChats.MapGet("/", List);
 
         RouteGroupBuilder chats = app.MapGroup("/chats").WithTags("Chats");
         chats.MapGet("/{id:guid}", Get);
         chats.MapPost("/{id:guid}/messages", Send);
-        chats.MapPost("/{id:guid}/prepare", Prepare);
         chats.MapPost("/{id:guid}/stop", Stop);
         chats.MapGet("/{id:guid}/events", Watch);
         chats.MapPost("/{id:guid}/push", Push);
@@ -119,8 +118,7 @@ internal static class ChatsEndpoints
     /// Sends a message. It reaches the agent when the chat runs on the workspace's account or the
     /// sender's own, and is otherwise a proposal the account's owner may send on, by passing its ID as
     /// <c>proposal</c>. It is never refused because the agent is working: it joins the running turn when
-    /// the agent supports that, and otherwise starts the next turn. While the nook's disk is nearly
-    /// full, it is sent only with <c>confirmNearlyFullDisk</c>.
+    /// the agent supports that, and otherwise starts the next turn.
     /// </summary>
     private static async Task<Results<Ok<ChatMessage>, ProblemHttpResult>> Send(
         [FromRoute] Guid id,
@@ -129,27 +127,10 @@ internal static class ChatsEndpoints
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        Result<ChatMessage> result = await api.SendAsync(principal.ToActor(), new SendMessage(ChatId.From(id), request.Text, request.Proposal, request.ConfirmNearlyFullDisk), ct);
+        Result<ChatMessage> result = await api.SendAsync(principal.ToActor(), new SendMessage(ChatId.From(id), request.Text, request.Proposal), ct);
         return result.ToOk();
     }
 
-    /// <summary>
-    /// Asks the agent to prepare the chat for fast starts: to write a setup for its files, its
-    /// <c>.agents/setup</c> and <c>.agents/resume</c> scripts, run them, and commit them. After that turn, they are tested in a
-    /// fresh nook with only the chat's files, and a failure goes back to the agent, for at most three
-    /// tests; the chat's events tell how each went. Only someone who may use the chat's account may.
-    /// While the nook's disk is nearly full, it is sent only with <c>confirmNearlyFullDisk</c>.
-    /// </summary>
-    private static async Task<Results<Ok<ChatMessage>, ProblemHttpResult>> Prepare(
-        [FromRoute] Guid id,
-        [FromBody] PrepareRequest? request,
-        ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
-        CancellationToken ct)
-    {
-        Result<ChatMessage> result = await api.PrepareAsync(principal.ToActor(), new PrepareChat(ChatId.From(id), request?.ConfirmNearlyFullDisk ?? false), ct);
-        return result.ToOk();
-    }
 
     /// <summary>
     /// Your harness state in the workspace, for each harness that keeps any: what its agents write
@@ -166,15 +147,19 @@ internal static class ChatsEndpoints
         return result.ToOk();
     }
 
-    /// <summary>Forgets your state for the harness in the workspace: agents of your chats there start without it.</summary>
+    /// <summary>
+    /// Forgets your state for the harness in the workspace, or with <c>shared</c> the workspace's: the
+    /// next agents of the chats that would get it start without it.
+    /// </summary>
     private static async Task<Results<NoContent, ProblemHttpResult>> ForgetHarnessState(
         [FromRoute] Guid workspaceId,
         [FromRoute] string harness,
+        [FromQuery] bool? shared,
         ClaimsPrincipal principal,
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        Result result = await api.ForgetHarnessStateAsync(principal.ToActor(), WorkspaceId.From(workspaceId), harness, ct);
+        Result result = await api.ForgetHarnessStateAsync(principal.ToActor(), new ForgetHarnessState(WorkspaceId.From(workspaceId), harness, shared ?? false), ct);
         return result.ToNoContent();
     }
 
@@ -285,24 +270,7 @@ internal static class ChatsEndpoints
         await response.Body.FlushAsync(ct);
         await foreach (ChatEvent chatEvent in events.WithCancellation(ct))
         {
-            (string type, object body) = chatEvent.Body switch
-            {
-                MessageSent sent => ("message-sent", (object)sent),
-                MessageProposed proposed => ("message-proposed", proposed),
-                TurnStarted started => ("turn-started", started),
-                MessageSteered steered => ("message-steered", steered),
-                MessageCancelled cancelled => ("message-cancelled", cancelled),
-                AgentUpdate update => ("agent-update", update),
-                TurnEnded ended => ("turn-ended", ended),
-                CheckpointSaved saved => ("checkpoint-saved", saved),
-                CheckpointFailed failed => ("checkpoint-failed", failed),
-                AgentRestarted restarted => ("agent-restarted", restarted),
-                SetupStarted started => ("setup-started", started),
-                SetupEnded ended => ("setup-ended", ended),
-                SetupTestStarted testing => ("setup-test-started", testing),
-                SetupTested tested => ("setup-tested", tested),
-            };
-            yield return new SseItem<ChatEventData>(new ChatEventData(chatEvent.Sequence, chatEvent.At, body), type)
+            yield return new SseItem<ChatEventData>(new ChatEventData(chatEvent.Sequence, chatEvent.At, chatEvent.Body), chatEvent.Kind)
             {
                 EventId = chatEvent.Sequence.ToString(CultureInfo.InvariantCulture),
             };

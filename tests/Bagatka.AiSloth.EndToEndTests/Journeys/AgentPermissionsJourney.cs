@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -17,7 +18,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 
 /// <summary>
 /// Journey: only people who may use an account make its agent work. Alice's messages reach the agent
-/// on her own account; Bob's become proposals she sends on; a chat needs a harness that takes its
+/// on her own account; Bob's become proposals she sends on; only Alice changes what runs in that
+/// chat's nook, as whoever does can use what its agent can; a chat needs a harness that takes its
 /// account; a refused token, or a removed account, ends the turn with the reason; and the model gateway
 /// answers only calls carrying a chat's token.
 /// </summary>
@@ -38,6 +40,7 @@ public sealed class AgentPermissionsJourney(ControlPlane app) : IDisposable
         await using ChatWatch watch = await ChatWatch.OpenAsync(_alice, chat);
         await TheOwnersMessagesReachTheAgentAsync(acme, chat, watch);
         await SomeoneElsesMessageIsAProposalTheOwnerSendsOnAsync(acme, chat, watch);
+        await OnlyTheAccountsOwnerChangesWhatRunsInItsChatsNookAsync(acme, chat);
         await AChatNeedsAHarnessThatTakesItsAccountAsync(acme);
         await ARefusedTokenEndsTheTurnWithTheReasonAsync(acme);
         await ARemovedAccountRunsNoMoreAgentsAsync(acme, chat, watch, own);
@@ -85,6 +88,26 @@ public sealed class AgentPermissionsJourney(ControlPlane app) : IDisposable
             watch.SeenOfChat.Skip(seenBefore).Select(seen => seen.Type).SkipWhile(type => type is not "message-proposed").Take(3),
             StringComparer.Ordinal);
         Assert.Equal("end_turn", ended.GetProperty("stopReason").GetString());
+    }
+
+    // Bob writes in the workspace, yet in the nook of a chat on Alice's own account he may neither run
+    // anything, such as a command printing the agent's token, nor stop what runs; in the workspace's
+    // other nooks he may.
+    private async Task OnlyTheAccountsOwnerChangesWhatRunsInItsChatsNookAsync(TestWorkspace acme, ChatSummary chat)
+    {
+        NookSummary nook = await acme.NookAsync(chat.NookId);
+        Problem run = await Api.ProblemAsync(_bob.SendPostAsync(Paths.Nook(chat.NookId) + "/processes", new { command = "env" }), HttpStatusCode.Forbidden);
+        ProcessSummary alices = await NookProcesses.StartAsync(_alice, chat.NookId, "sleep", "60");
+        string stop = Paths.Nook(chat.NookId) + "/processes/" + alices.Id.Value.ToString("D", CultureInfo.InvariantCulture) + "/stop";
+        Problem stopped = await Api.ProblemAsync(_bob.SendPostAsync(stop, new { }), HttpStatusCode.Forbidden);
+        await Api.ExpectAsync(_alice.SendPostAsync(stop, new { }), HttpStatusCode.NoContent);
+        NookSummary workspaces = await Api.ReadAsync<NookSummary>(_alice.SendPostAsync(acme.Path + "/nooks", new { provider = "docker" }), HttpStatusCode.Created);
+        int? ran = await NookProcesses.ExitCodeAsync(_bob, workspaces.Id, "true");
+
+        Assert.Equal(chat.AccountOwner, nook.ReservedFor);
+        Assert.Equal((NooksErrors.Reserved.Code, NooksErrors.Reserved.Code), (run.Code, stopped.Code));
+        Assert.Null(workspaces.ReservedFor);
+        Assert.Equal(0, ran);
     }
 
     private async Task AChatNeedsAHarnessThatTakesItsAccountAsync(TestWorkspace acme)

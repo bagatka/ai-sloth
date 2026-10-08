@@ -62,8 +62,8 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
   can read anything inside a nook, including the daemon's token. Shared credentials never enter a
   nook: agent accounts reach models through the model gateway, and the control plane moves code in
   and out itself, as git bundles, with each person's GitHub connection. Secrets are the exception
-  people choose: they exist for
-  the agent's tools, and everyone who may write in a nook can use the secrets in it.
+  people choose: they exist for the agent's tools, and everyone who may write in a nook can use the
+  secrets in it.
 - **Starting is nearly instant.** The setup that comes with a chat's files prepares its nook, and a
   nook whose setup took a while leaves a ready copy that the next nooks start from and catch up. A
   chat starts as its first message is typed, and its agent with it. The time from Send to the
@@ -75,7 +75,7 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
   checkpoint of the nook's files and the agent's session in object storage. A nook whose machine is
   lost comes back from its latest checkpoint, and a new agent continues the conversation with the
   turn in progress, so a loss costs at most that turn's work. Risks we can see coming, such as a
-  nearly full disk, pause new work until a person confirms, with the risk explained.
+  nearly full disk, are told before they cost work.
 - **Small units, optional groups.** A chat and its nook work on their own; a project groups them
   without anything else knowing about projects. Every capability is general-purpose: removing a
   grouping leaves the units working.
@@ -93,7 +93,7 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |
 | CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API: hosts, sign-in, agent accounts, secrets, and chats; its machine mode runs nooks on people's own computers (`src/Cli/README.md`) | Built |
 | Foundation | `Bagatka.Foundation` (+ `.Modules`, `.Web`) | Plumbing: results, errors, actors, typed IDs | Built |
-| Object storage | `Bagatka.ObjectStorage` (+ `.<Backend>` for cloud backends) | Store and read objects by key: checkpoints and harness state, folder versions later | Contract; a folder of this computer and Azure Blob Storage as backends |
+| Object storage | `Bagatka.ObjectStorage` (+ `.<Backend>` for cloud backends) | Store and read objects by key: checkpoints and kept folders | Contract; a folder of this computer and Azure Blob Storage as backends |
 | Sdk | `Bagatka.Sdk.<Vendor>`, `Bagatka.Azure.Sandboxes` | Clients for vendor APIs without an official .NET SDK | Docker Engine, Sign in with ChatGPT, GitHub, Azure Container Apps Sandboxes |
 | Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration and the Azure deployment; defaults every service host shares | Built |
 | Site | `site/` (Astro, not .NET) | The landing page at aisloth.dev and `install.sh`, which installs or updates sloth, published to GitHub Pages from main | Built |
@@ -112,7 +112,7 @@ CONTRIBUTING.md                    developing, releasing, agent environments
 docs/                              self-hosting, the README's images, templates (module README)
 site/                              the landing page (Astro) and install.sh
 analyzers/
-  Bagatka.Analyzers/               our own code-shape rules, run on every project (PATTERNS.md, entry 27)
+  Bagatka.Analyzers/               our own code-shape rules, run on every project (PATTERNS.md, entry 26)
 src/
   Aspire/
     Bagatka.AiSloth.AppHost/       local orchestration and the Azure deployment
@@ -193,6 +193,9 @@ The HTTP host of the control plane and its composition root. It has four jobs:
   is that provider's client, so no client knows the provider, and only configuration differs.
   `/.well-known/aisloth` tells any client the host's name and how to sign in.
 - **Translate:** map HTTP to contract calls, and `Result`s back to HTTP.
+- **Bound callers:** sign-ins per address and starts of chats and nooks per person, answering 429
+  beyond them (`RateLimits.cs`). Behind a proxy that adds the caller's address, as Container Apps'
+  ingress does, the deployment says so (`Host:BehindProxy`); otherwise the header is never trusted.
 - **Curate:** decide which contract methods are public.
 - **Compose:** assemble responses that need several modules.
 
@@ -202,48 +205,12 @@ It also hosts an HTTP/2-only gRPC endpoint that every nook's daemon and every ma
 model gateway agents in nooks call their model through (on its own plain HTTP endpoint, forwarding
 each call to the chat's agent account's endpoint with the headers that pay for it, so no nook holds a
 key or a plan's token; endpoints are people's choice, so it reaches only public ones unless the
-deployment allows private networks, PATTERNS.md entry 30), and will host the MCP endpoint, which exposes the same public operations as HTTP. Run with the single argument
-`migrate`, it applies every module's migrations and exits. Canonical example:
-`src/ControlPlane/Bagatka.AiSloth.WebApi/Program.cs`.
+deployment allows private networks, PATTERNS.md entry 29), and will host the MCP endpoint, which
+exposes the same public operations as HTTP. Run with the single argument
+`migrate`, it applies every module's migrations and exits. `Program.cs` is the composition root:
+the only code that reads configuration, one visible registration per module, provider, and endpoint
+group.
 
-```csharp
-CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
-CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
-
-WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-builder.AddServiceDefaults();
-
-// The only place that reads configuration (PATTERNS.md, entry 20).
-DockerSandboxSettings docker = builder.Configuration.GetRequired<DockerSandboxSettings>("Sandboxing:Docker");
-UsersSettings users = builder.Configuration.GetRequired<UsersSettings>("Modules:Users");
-WorkspacesSettings workspaces = builder.Configuration.GetRequired<WorkspacesSettings>("Modules:Workspaces");
-NooksSettings nooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
-
-builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddGrpc();
-builder.Services
-    .AddDockerSandboxProvider(docker)
-    .AddUsersModule(users)
-    .AddWorkspacesModule(workspaces)
-    .AddNooksModule(nooks);
-
-await using WebApplication app = builder.Build();
-if (args is ["migrate"])
-{
-    await ModuleDatabases.MigrateAsync(app.Services, CancellationToken.None);
-    return;
-}
-
-app.UseExceptionHandler();
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapDefaultEndpoints();
-app.MapUsersEndpoints();
-app.MapWorkspacesEndpoints();
-app.MapNooksEndpoints();
-app.MapGrpcService<DaemonEndpoint>().AllowAnonymous();
-await app.RunAsync();
-```
 
 ### Module: `Bagatka.AiSloth.<Module>` + `.Contracts`
 
@@ -259,10 +226,11 @@ A capability with one contract, `I<Module>Api`.
 
 ### Nooks, providers, and the daemon
 
-Built: the Docker and Azure providers, the daemon and its image, the Nooks module from creating a nook to
-deleting it, setups, checkpoints and coming back from them, and machines, a workspace's
-own computers as a provider, nooks that sleep when nobody uses them, and ready copies. The maps are `src/ControlPlane/Modules/Nooks/README.md`,
-`src/ControlPlane/Modules/Machines/README.md`, `src/Sandboxing/README.md`, and `src/Daemon/README.md`.
+Built: the Docker and Azure providers, the daemon and its image, the Nooks module from creating a
+nook to deleting it, setups, checkpoints and coming back from them, machines (a workspace's own
+computers as a provider), sleep, ready copies, and kept folders. The maps are
+`src/ControlPlane/Modules/Nooks/README.md`, `src/ControlPlane/Modules/Machines/README.md`,
+`src/Sandboxing/README.md`, and `src/Daemon/README.md`.
 These decisions are fixed:
 
 - **Lifecycle.** A nook nobody uses falls asleep after two minutes: Paused (memory and files kept:
@@ -270,6 +238,8 @@ These decisions are fixed:
   (files kept: it resumes in seconds and processes start again). After a day asleep its sandbox is
   evicted, and it comes back from its latest checkpoint. Files survive until deletion; any operation
   wakes a sleeping nook first, so callers only notice latency, and people see it only as asleep.
+  A nook whose daemon is away and whose provider can't be asked, such as a machine that is off, is
+  Offline until its daemon dials in again.
 - **Providers do lifecycle only.** Every operation is safe to repeat, and every provider passes the
   same conformance suite. `Bagatka.Sandboxing.Docker` serves local development, CI, single-machine
   deployments, and machines; `Bagatka.Sandboxing.Azure` runs the official host's nooks on Azure
@@ -282,10 +252,11 @@ These decisions are fixed:
   are the machines. `sloth machine run` dials out and runs the provider calls it receives on the
   computer's Docker Engine, so a machine needs no inbound networking either.
 - **Record first, then reconcile.** The Nooks module records a nook before asking a provider to
-  create it, so every sandbox at a provider has a record. A reconciler retries what a failed call
-  left undone and deletes what shouldn't exist.
+  create it, so every sandbox at a provider has a record. One lifecycle job makes each sandbox
+  match its record, finishing what a failed call left undone.
 - **Processes are detached.** The daemon runs them until they exit or are stopped, keeps their
-  output so anyone can watch it from any offset, and reports them again after it reconnects.
+  output so anyone can watch it from any offset, and reports exits that happened while it was
+  away once it reconnects.
 - **Checkpoints are git, kept outside the nook.** A checkpoint saves `/work`, its repositories with
   their history and branches, and paths the nook's creator names, such as an agent's sessions, as
   git bundles in object storage: each holds only what changed since the last one. A running nook
@@ -308,8 +279,8 @@ These decisions are fixed:
 
 | Project | Used by | Holds |
 |---|---|---|
-| `Bagatka.Foundation` | everyone, including Contracts and Sdk clients | `Result`, `Result<T>`, `Success`, `Error`, `ErrorKind`, `Actor`, `UserId`, `ITypedId<T>`, `TypedIdJsonConverter<T>`, `OneTimeCode`; later `Page<T>`, `PageRequest`, `FoundationJson`, `Money` |
-| `Bagatka.Foundation.Modules` | module projects | `AddModuleDbContext`, `ModuleDatabases.MigrateAsync`, `TypedIdConverter<T>`, `SaveAsync`, keyset pagination, `ActiveInstance`; `IOutbox`, the outbox dispatcher, and `IReaction<T>` (`Events/`) |
+| `Bagatka.Foundation` | everyone, including Contracts and Sdk clients | `Result`, `Result<T>`, `Success`, `Error`, `ErrorKind`, `Actor`, `UserId`, `ITypedId<T>`, `TypedIdJsonConverter<T>`, `OneTimeCode`, `Page<T>`, `PageRequest`, `FoundationJson` |
+| `Bagatka.Foundation.Modules` | module projects | `AddModuleDatabase` (the one database every module shares), `AddModuleDbContext`, `ModuleDatabases.MigrateAsync`, `TypedIdConverter<T>`, `SaveAsync`, keyset pagination, `SecretBox` (under the deployment's `EncryptionSettings`), `ActiveInstance`; `IOutbox`, the outbox dispatcher, and `IReaction<T>` (`Events/`) |
 | `Bagatka.Foundation.Web` | WebApi hosts | `Result` → HTTP mapping as problem details, `ClaimsPrincipal` → `Actor`; unhandled exceptions use ASP.NET Core's built-in problem details |
 
 Foundation is plumbing only. A business concept never goes into Foundation. If two modules need
@@ -325,8 +296,8 @@ vendor-shaped, product-agnostic, and used from module internals. Rules are in `s
 
 - **`Bagatka.AiSloth.AppHost`** runs the control plane and its dependencies on a developer
   machine and in end-to-end tests, and deploys them to Azure (docs/self-hosting.md): the WebApi
-  in Container Apps, nooks in a sandbox group, checkpoints in Blob Storage. The Aspire CLI is pinned in
-  `dotnet-tools.json`, and `dotnet aspire update` upgrades both together.
+  in Container Apps, nooks in a sandbox group, checkpoints and kept folders in Blob Storage. The
+  Aspire CLI is pinned in `dotnet-tools.json`, and `dotnet aspire update` upgrades both together.
 - **`Bagatka.ServiceDefaults`** gives every service host the same OpenTelemetry, health checks,
   and service discovery: the WebApi today, and each service extracted from it later. It is
   general-purpose.
@@ -358,7 +329,9 @@ the `machine` provider. Copying them into contract records would give one wire f
 
 ## Data
 
-- Each module owns a schema in the shared PostgreSQL database, named after the module.
+- Each module owns a schema in the shared PostgreSQL database, named after the module. The host
+  registers that database once, so every module and the instance lease share one pool of
+  connections, bounded by its connection string's `Maximum Pool Size`.
 - That schema is accessed only through the module's own `DbContext` and changed only through
   its own migrations.
 - No module reads another module's tables.
@@ -418,23 +391,19 @@ The compiler does most of the work:
 - Switches over unions and enums are exhaustive (`PATTERNS.md`, entry 4).
 
 Architecture tests in `tests/Bagatka.AiSloth.ArchitectureTests` read project files and types,
-and a test fails if a source project isn't checked by them. Today they verify that:
+and a test fails if a source project isn't checked by them. They verify that:
 
-- general-purpose projects never reference product projects;
-- `Bagatka.Foundation` depends only on the base class library;
-- no type declares an implicit conversion operator;
-- no class derives from another class in this solution;
+- general-purpose projects never reference product projects, and `Bagatka.Foundation` depends only
+  on the base class library;
+- modules and Contracts reference only what the dependency rules table allows, and never ASP.NET
+  Core;
+- a module project exposes only `<Module>Module` and its settings;
+- Contracts hold plain data: interfaces, records, unions, enums, typed IDs, and static error classes;
+- no two modules ask each other, even through others;
+- `<Module>Api` holds nothing beyond its constructor's dependencies;
+- no module class takes the service container: each names its dependencies;
+- no type declares an implicit conversion, and no class derives from another class in this solution;
 - tests run under `tr-TR`.
-
-With the first module, they will also verify that:
-
-- the dependency rules table holds;
-- each module project exposes only `<Module>Module` and `<Module>Settings`;
-- module and Contracts projects do not reference ASP.NET Core;
-- Contracts contain only interfaces, records, unions, enums, typed IDs, and error definitions,
-  and reference only Foundation and the Contracts of modules their module asks;
-- the asks graph (`I<Module>Api` usage between modules) is acyclic;
-- `<Module>Api` declares no instance state of its own.
 
 ## Deliberate decisions
 
@@ -485,8 +454,9 @@ this table in the same change.
 
 | Module | Owns | Asks | Reacts to | Schema |
 |---|---|---|---|---|
-| Workspaces (contract only) | Workspaces, and who may do what with them and their nooks: access levels, invites | — | — | `workspaces` |
-| Nooks | Nooks, where each runs, their lifecycle and recovery, processes, their copies of sources, running setups, checkpoints, ready copies, daemon connections | Workspaces, Sources, Machines, Secrets | Machines | `nooks` |
+| Users | People, their sessions on each device, sign-in codes | — | — | `users` |
+| Workspaces | Workspaces, and who may do what with them and their nooks: access levels, invites | — | — | `workspaces` |
+| Nooks | Nooks, where each runs, their lifecycle and recovery, processes, their copies of sources, running setups, checkpoints, ready copies, kept folders, daemon connections | Workspaces, Sources, Machines, Secrets | Machines | `nooks` |
 | Secrets | Workspaces' environment variables for every process in their nooks, their sealed values | Workspaces | — | `secrets` |
 | Sources | GitHub repositories a workspace connected, people's GitHub connections and git settings, copying in and pushing out, push policy; folders (planned) | Workspaces | — | `sources` |
 | AgentAccounts | Accounts at agent vendors that pay for agents: a workspace's and people's own, their sealed secrets | Workspaces | — | `agent_accounts` |

@@ -11,7 +11,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 
 /// <summary>
 /// Journey: nooks on Azure, when asked for (<see cref="AzureControlPlane"/>). A nook runs its agent and
-/// Docker, sleeps with its memory, and wakes with its agent still running; one asleep for long is
+/// Docker, gets no Azure token from its sandbox, sleeps with its memory, and wakes with its agent still
+/// running; one asleep for long is
 /// evicted and comes back from its latest checkpoint; and the next chat with a repository sets up from
 /// the ready copy its slow setup left. The parts wait on Azure, so they run at the same time.
 /// </summary>
@@ -36,15 +37,19 @@ public sealed class AzureJourney(AzureControlPlane azure)
         ChatSummary chat = await acme.StartChatAsync(provider: "azure");
         await using ChatWatch watch = await ChatWatch.OpenAsync(alice, chat);
         await acme.SendAsync(chat, "Please write hello.txt for me");
-        await watch.NextAsync("checkpoint-saved", AzureControlPlane.FirstTurn);
+        await watch.NextAsync("turn-ended", AzureControlPlane.FirstTurn);
         int? docker = await acme.RunAsync(chat.NookId, "docker run --rm busybox true");
 
-        NookStatus asleep = await acme.StatusAsync(chat.NookId, status => status is NookStatus.Paused, AzureControlPlane.Sleep);
+        // Azure offers every sandbox an identity endpoint; the group has no identity, so it gives nothing.
+        int? tokenRefused = await acme.RunAsync(chat.NookId, "test \"$(curl -s -m 10 -o /dev/null -w '%{http_code}' \"$IDENTITY_ENDPOINT?api-version=2019-08-01&resource=https://management.azure.com/\" -H \"X-IDENTITY-HEADER: $IDENTITY_HEADER\")\" != 200");
+
+        NookStatus asleep = await acme.StatusAsync(chat.NookId, status => status is NookStatus.Asleep, AzureControlPlane.Sleep);
         await acme.SendAsync(chat, "What was my first message?");
         await watch.NextAsync("turn-ended", AzureControlPlane.Sleep);
 
         Assert.Equal(0, docker);
-        Assert.Equal(NookStatus.Paused, asleep);
+        Assert.Equal(0, tokenRefused);
+        Assert.Equal(NookStatus.Asleep, asleep);
         Assert.DoesNotContain(watch.Seen, seen => string.Equals(seen.Type, "agent-restarted", StringComparison.Ordinal));
         Assert.Contains(watch.Seen, seen => string.Equals(seen.Type, "agent-update", StringComparison.Ordinal)
             && seen.Event.GetProperty("update").ToString().Contains("You first said: Please write hello.txt for me", StringComparison.Ordinal));
@@ -57,16 +62,16 @@ public sealed class AzureJourney(AzureControlPlane azure)
         ChatSummary chat = await acme.StartChatAsync(provider: "azure");
         await using ChatWatch watch = await ChatWatch.OpenAsync(bob, chat);
         await acme.SendAsync(chat, "Please write hello.txt for me");
-        await watch.NextAsync("checkpoint-saved", AzureControlPlane.FirstTurn);
+        await watch.NextAsync("turn-ended", AzureControlPlane.FirstTurn);
         await acme.ChangeAsync(chat.NookId, "touch /tmp/outside-the-checkpoint");
 
-        NookStatus evicted = await acme.StatusAsync(chat.NookId, status => status is NookStatus.Evicted, AzureControlPlane.Eviction);
+        bool evicted = await AzureControlPlane.SandboxGoneAsync(app, chat.NookId.Value, AzureControlPlane.Eviction);
         await acme.SendAsync(chat, "What was my first message?");
         JsonElement restarted = await watch.NextAsync("agent-restarted", AzureControlPlane.FirstTurn);
         await watch.NextAsync("turn-ended");
         int? restored = await acme.RunAsync(chat.NookId, "grep -q 'hi from the fake model' /work/hello.txt && test ! -e /tmp/outside-the-checkpoint");
 
-        Assert.Equal(NookStatus.Evicted, evicted);
+        Assert.True(evicted);
         Assert.True(restarted.GetProperty("remembers").GetBoolean());
         Assert.Equal(0, restored);
     }
@@ -78,7 +83,7 @@ public sealed class AzureJourney(AzureControlPlane azure)
         ChatSummary first = await repository.StartChatAsync("azure");
         await using ChatWatch firstWatch = await ChatWatch.OpenAsync(dev, first);
         await repository.Workspace.SendAsync(first, "Please write hello.txt for me");
-        await firstWatch.NextAsync("checkpoint-saved", AzureControlPlane.FirstTurn);
+        await firstWatch.NextAsync("turn-ended", AzureControlPlane.FirstTurn);
 
         ChatSummary second = await repository.StartChatAsync("azure");
         await using ChatWatch watch = await ChatWatch.OpenAsync(dev, second);

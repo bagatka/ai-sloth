@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Workspaces.Data;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +13,8 @@ internal sealed partial class WorkspacesApi
 {
     public async Task<Result<Resource>> CheckInviteAsync(Actor actor, AcceptInvite command, CancellationToken ct)
     {
+        await using WorkspacesDbContext db = await databases.CreateDbContextAsync(ct);
+
         ArgumentNullException.ThrowIfNull(command);
         byte[] codeHash = OneTimeCode.Hash(command.Code ?? string.Empty);
         StoredInvite? invite = await db.Invites.AsNoTracking().SingleOrDefaultAsync(found => found.CodeHash == codeHash, ct);

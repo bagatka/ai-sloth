@@ -13,7 +13,6 @@ using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Harnesses;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Bagatka.AiSloth.Chats.Harness;
 
@@ -22,7 +21,7 @@ namespace Bagatka.AiSloth.Chats.Harness;
 // its chat. They are written, before the agent starts, to the file its harness reads its user's own
 // instructions from (HarnessProfile.InstructionsPath), outside /work, so they never meet a
 // repository's files and every session of the harness reads them.
-internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databases, IServiceScopeFactory scopes)
+internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databases, INooksApi nooks)
 {
     // Each text's limit: instructions go into every model call the agent makes.
     public const int MaxLength = 10_000;
@@ -43,20 +42,37 @@ internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databa
             personal = await db.PersonalInstructions.Where(found => found.PersonId == chat.StartedBy).Select(found => found.Text).SingleOrDefaultAsync(ct);
         }
 
-        string text = Compose(Nook(chat.SetupExitCode), workspace ?? string.Empty, personal ?? string.Empty);
+        Result<NookSummary> nook = await nooks.GetAsync(SystemActors.Harness, chat.NookId, ct);
+        if (nook.Failed)
+        {
+            return new Result(nook.Error);
+        }
+
+        string text = Compose(Nook(chat.SetupExitCode, nook.Output.Sources), workspace ?? string.Empty, personal ?? string.Empty);
         using MemoryStream archive = await ArchiveAsync(harness.InstructionsPath, text, ct);
-        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<INooksApi>().CopyFilesInAsync(SystemActors.Harness, new CopyFilesIn(chat.NookId, Replacing: []), archive, ct);
+        return await nooks.CopyFilesInAsync(SystemActors.Harness, new CopyFilesIn(chat.NookId, Replacing: []), archive, ct);
     }
 
-    // What every agent knows about its nook: what it has, how setups work, and how the nook's setup
-    // ended when it failed.
-    private static string Nook(int? setupExitCode)
+    // What every agent knows about its nook: what it has, where its repositories are, how setups
+    // work, and how the nook's setup ended when it failed.
+    private static string Nook(int? setupExitCode, IReadOnlyList<NookSource> sources)
     {
-        string nook = "## Your nook\n\nYou work in a nook: a Linux machine of your own, with Docker. The code you work on is in /work. "
-            + "Its setup, `.agents/setup` scripts at the top of /work or of a repository in it, installs what it needs, and its `.agents/resume` "
-            + "scripts start its services; AiSloth runs them whenever a nook gets these files, before its agent starts. "
-            + "When you add a tool, a dependency, or a service the code needs, update them, and keep them safe to run again.";
+        string nook = "## Your nook\n\nYou work in a nook: a Linux machine of your own, with Docker. The code you work on is in /work.\n\n"
+            + "Its setup makes new nooks start with everything installed: `.agents/setup` and `.agents/resume` scripts, executable, at the top "
+            + "of /work or of a repository in it. AiSloth runs them as root in their folder, with the workspace's secrets, whenever a nook gets "
+            + "these files, before its agent starts: every setup (30 minutes each), then every resume (5 minutes each). `.agents/setup` installs "
+            + "what the code needs to build, test, and run, at the versions it pins; `.agents/resume` starts its services, such as "
+            + "`docker compose up -d`, and returns once they are up. Both must be safe and fast to run again. A fresh nook is Ubuntu with "
+            + "Docker, git, and curl, so never rely on what was installed by hand. Never print or store secrets. When asked to prepare the "
+            + "code, write them, run them twice, and commit them; when you add a tool, a dependency, or a service, update them.";
+        if (sources.Count > 0)
+        {
+            nook += "\n\nEach of these folders in /work is its own git repository, copied from GitHub: "
+                + string.Join(", ", sources.Select(source => "`" + source.Name + "/`" + (source.Branch is null ? string.Empty : " from its branch " + source.Branch)))
+                + ". Before working in one, read its own AGENTS.md or CLAUDE.md, if it has one, and follow it there. Commit in the repository "
+                + "you changed. AiSloth pushes the commits to GitHub when asked, so don't push: this nook has no credentials for GitHub.";
+        }
+
         if (setupExitCode is not int exitCode || exitCode == 0)
         {
             return nook;

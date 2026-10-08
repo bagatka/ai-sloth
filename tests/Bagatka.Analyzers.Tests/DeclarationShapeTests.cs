@@ -7,7 +7,7 @@ namespace Bagatka.Analyzers.Tests;
 public sealed class DeclarationShapeTests
 {
     [Fact]
-    public async Task Our_methods_declare_no_out_parameters_unless_their_signature_is_given()
+    public async Task Our_methods_declare_no_out_or_ref_parameters_unless_their_signature_is_given()
     {
         const string sample = """
             using System.Collections;
@@ -22,6 +22,11 @@ public sealed class DeclarationShapeTests
                 {
                     first = left;
                     return true;
+                }
+
+                public void Advance(ref int position) // BAG0003
+                {
+                    position += left;
                 }
 
                 public void Deconstruct(out int first, out int second)

@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Sources.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Sources.Contracts;
@@ -11,6 +12,8 @@ internal sealed partial class SourcesApi
 {
     public async Task<Result<GitHubAccount>> GetGitHubAccountAsync(Actor actor, CancellationToken ct)
     {
+        await using SourcesDbContext db = await databases.CreateDbContextAsync(ct);
+
         if (actor is not UserActor user)
         {
             return new Result<GitHubAccount>(Error.Unauthorized);

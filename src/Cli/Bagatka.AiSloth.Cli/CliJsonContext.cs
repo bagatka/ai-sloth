@@ -42,7 +42,6 @@ namespace Bagatka.AiSloth.Cli;
 [JsonSerializable(typeof(Wire.SentMessage))]
 [JsonSerializable(typeof(Wire.ChatEvent))]
 [JsonSerializable(typeof(Wire.NookSetup))]
-[JsonSerializable(typeof(Wire.Prepare))]
 [JsonSerializable(typeof(Wire.ProcessOutput))]
 [JsonSerializable(typeof(Wire.ProcessExit))]
 [JsonSerializable(typeof(IReadOnlyList<Wire.Person>))]

@@ -31,46 +31,30 @@ string? inviteSignUp = builder.Configuration["Parameters:invite-sign-up"];
 IResourceBuilder<ParameterResource> modelPrivateNetworks = builder.AddParameter(
     "model-private-networks", builder.Configuration["Parameters:model-private-networks"] ?? "false");
 
-// Running AiSloth for yourself is the self-hosted use OpenAI allows ChatGPT plans for. Tests point
-// Sign in with ChatGPT and the plans' API at fakes.
+// Running AiSloth for yourself is the self-hosted use OpenAI allows ChatGPT plans for.
 IResourceBuilder<ParameterResource> allowChatGptPlans = builder.AddParameter(
     "allow-chatgpt-plans", builder.Configuration["Parameters:allow-chatgpt-plans"] is { Length: > 0 } allowed ? allowed : "true");
-string? chatGptAuthority = builder.Configuration["Parameters:chatgpt-authority"];
-string? chatGptApi = builder.Configuration["Parameters:chatgpt-api"];
 
-// Encrypt agent accounts' secrets, people's GitHub tokens, and secrets' values at rest. Losing one
-// makes what it encrypted unreadable. Run here, each is generated once and kept in this project's user
-// secrets. Deploying never generates one: a deployment without its keys stops instead of encrypting
-// with new ones (docs/self-hosting.md).
-IResourceBuilder<ParameterResource> agentAccountsKey = EncryptionKey("agent-accounts-key");
-IResourceBuilder<ParameterResource> sourcesKey = EncryptionKey("sources-key");
-IResourceBuilder<ParameterResource> secretsKey = EncryptionKey("secrets-key");
+// Encrypts agent accounts' secrets, people's GitHub tokens, and secrets' values at rest; losing it
+// makes them unreadable. Run here, it is generated once and kept in this project's user secrets.
+// Deploying never generates it: a deployment without its key stops instead of encrypting with a new
+// one (docs/self-hosting.md).
+IResourceBuilder<ParameterResource> encryptionKey = builder.ExecutionContext.IsPublishMode
+    ? builder.AddParameter("encryption-key", secret: true)
+    : builder.AddParameter("encryption-key", new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
 
 // People connect GitHub through the host's GitHub App, which `sloth github create-app` makes: give
-// github-app-client-id, -client-secret, and -slug as user secrets of this project. Tests point
-// github-api and github-web at a fake GitHub.
+// github-app-client-id, -client-secret, and -slug as user secrets of this project.
 string? gitHubAppClientId = builder.Configuration["Parameters:github-app-client-id"];
-string? gitHubApi = builder.Configuration["Parameters:github-api"];
 
-// How full a nook's disk is when a message for its agent needs confirming. Docker nooks share this
-// computer's disk, so tests ask only for a full one.
-IResourceBuilder<ParameterResource> nearlyFullDisk = builder.AddParameter(
-    "nearly-full-disk", builder.Configuration["Parameters:nearly-full-disk"] ?? "0.9");
-
-// How long a nook nobody uses stays awake, and how long it sleeps before its sandbox is deleted and
-// it would come back from its latest checkpoint. Tests give short ones.
-IResourceBuilder<ParameterResource> nookSleepAfter = builder.AddParameter(
-    "nook-sleep-after", builder.Configuration["Parameters:nook-sleep-after"] ?? "00:02:00");
-IResourceBuilder<ParameterResource> nookEvictAfter = builder.AddParameter(
-    "nook-evict-after", builder.Configuration["Parameters:nook-evict-after"] ?? "1.00:00:00");
-
-// How long a chat nobody wrote in yet keeps its nook before both go. Tests give a short one.
-IResourceBuilder<ParameterResource> chatDraftLifetime = builder.AddParameter(
-    "chat-draft-lifetime", builder.Configuration["Parameters:chat-draft-lifetime"] ?? "00:15:00");
-
-// The scope nooks run in, so test runs never touch a developer's nooks. A parameter given a value
-// can't be overridden, so the default is applied here.
-IResourceBuilder<ParameterResource> sandboxScope = builder.AddParameter("sandbox-scope", builder.Configuration["Parameters:sandbox-scope"] ?? "dev");
+// The scope nooks run in, which the control plane owns: it deletes sandboxes there that no nook
+// records. Run here, each clone gets its own, generated once and kept in its user secrets, so
+// developers sharing a sandbox group and test runs never touch each other's nooks. A parameter given
+// a value can't be overridden, so the configured one is applied here.
+string? configuredScope = builder.Configuration["Parameters:sandbox-scope"];
+IResourceBuilder<ParameterResource> sandboxScope = configuredScope is not null || builder.ExecutionContext.IsPublishMode
+    ? builder.AddParameter("sandbox-scope", configuredScope ?? "dev")
+    : builder.AddParameter("sandbox-scope", new GenerateParameterDefault { MinLength = 12, Upper = false, Special = false }, persist: true);
 
 // The repository nook images are pushed to, which nooks outside this computer pull them from.
 string? imageRepository = builder.Configuration["Parameters:nook-image-repository"];
@@ -138,6 +122,7 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithAzureUserAssignedIdentity(identity)
         .WithRoleAssignments(storage, StorageBuiltInRole.StorageBlobDataContributor)
         .WithEnvironment("ObjectStorage__AzureBlob__ContainerUrl", ReferenceExpression.Create($"{storage.Resource.BlobEndpoint}checkpoints"))
+        .WithEnvironment("Host__BehindProxy", "true")
         .WithEnvironment("Sandboxing__Azure__SandboxGroup", NookSandboxGroup.Name)
         .WithEnvironment("Sandboxing__Azure__Scope", sandboxScope)
         .PublishAsAzureContainerApp((infrastructure, app) =>
@@ -152,6 +137,11 @@ if (builder.ExecutionContext.IsPublishMode)
 
             // The sandbox group is in the deployment's own subscription, resource group, and location.
             ContainerAppContainer container = app.Template.Containers.Single().Value!;
+
+            // Checkpoints, downloads, and copies of repositories pass through this replica's disk, which
+            // Container Apps sizes with it: 2 vCPU and 4 GiB come with 8 GiB of disk, room for the two
+            // large outputs and two copies of repositories it holds at once.
+            container.Resources = new AppContainerResources { Cpu = 2, Memory = "4Gi" };
             container.Env.Add(new ContainerAppEnvironmentVariable { Name = "Sandboxing__Azure__SubscriptionId", Value = BicepFunction.GetSubscription().SubscriptionId });
             container.Env.Add(new ContainerAppEnvironmentVariable { Name = "Sandboxing__Azure__ResourceGroup", Value = BicepFunction.GetResourceGroup().Name });
             container.Env.Add(new ContainerAppEnvironmentVariable { Name = "Sandboxing__Azure__Region", Value = BicepFunction.GetResourceGroup().Location });
@@ -272,22 +262,10 @@ else
 foreach (IResourceBuilder<IResourceWithEnvironment> mode in modes)
 {
     mode.WithEnvironment("Host__PublicUrl", publicUrl)
-        .WithEnvironment("ActiveInstance__ConnectionString", database)
-        .WithEnvironment("Modules__Users__ConnectionString", database)
-        .WithEnvironment("Modules__Workspaces__ConnectionString", database)
-        .WithEnvironment("Modules__Machines__ConnectionString", database)
-        .WithEnvironment("Modules__Nooks__ConnectionString", database)
-        .WithEnvironment("Modules__Chats__ConnectionString", database)
+        .WithEnvironment("Database__ConnectionString", database)
         .WithEnvironment("Modules__Chats__ModelGatewayUrl", modelsUrl)
-        .WithEnvironment("Modules__Chats__NearlyFullDisk", nearlyFullDisk)
-        .WithEnvironment("Modules__Chats__DraftLifetime", chatDraftLifetime)
-        .WithEnvironment("Modules__AgentAccounts__ConnectionString", database)
-        .WithEnvironment("Modules__AgentAccounts__EncryptionKey", agentAccountsKey)
+        .WithEnvironment("Encryption__Key", encryptionKey)
         .WithEnvironment("Modules__AgentAccounts__AllowChatGptPlans", allowChatGptPlans)
-        .WithEnvironment("Modules__Secrets__ConnectionString", database)
-        .WithEnvironment("Modules__Secrets__EncryptionKey", secretsKey)
-        .WithEnvironment("Modules__Sources__ConnectionString", database)
-        .WithEnvironment("Modules__Sources__EncryptionKey", sourcesKey)
         .WithEnvironment("ModelGateway__AllowPrivateNetworks", modelPrivateNetworks)
         .WithEnvironment("Modules__Nooks__DaemonUrl", daemonUrl)
         .WithEnvironment("Modules__Nooks__Image", Published(nookImage))
@@ -295,7 +273,7 @@ foreach (IResourceBuilder<IResourceWithEnvironment> mode in modes)
         {
             foreach (string harness in harnesses)
             {
-                environment.EnvironmentVariables["Modules__Nooks__HarnessImages__" + harness] = Published(HarnessImage(harness));
+                environment.EnvironmentVariables["Modules__Nooks__Images__" + harness] = Published(HarnessImage(harness));
             }
 
             if (providerIssuer is not null)
@@ -317,38 +295,11 @@ foreach (IResourceBuilder<IResourceWithEnvironment> mode in modes)
                 environment.EnvironmentVariables["Modules__Sources__GitHubApp__ClientSecret"] = builder.Configuration["Parameters:github-app-client-secret"] ?? string.Empty;
                 environment.EnvironmentVariables["Modules__Sources__GitHubApp__Slug"] = builder.Configuration["Parameters:github-app-slug"] ?? string.Empty;
             }
-
-            if (gitHubApi is not null)
-            {
-                environment.EnvironmentVariables["GitHub__ApiUrl"] = gitHubApi;
-                environment.EnvironmentVariables["GitHub__WebUrl"] = builder.Configuration["Parameters:github-web"] ?? string.Empty;
-            }
-
-            if (chatGptAuthority is not null)
-            {
-                environment.EnvironmentVariables["Modules__AgentAccounts__ChatGptAuthority"] = chatGptAuthority;
-            }
-
-            if (chatGptApi is not null)
-            {
-                environment.EnvironmentVariables["Modules__AgentAccounts__ChatGptApi"] = chatGptApi;
-            }
-        })
-        .WithEnvironment("Modules__Nooks__CpuMillicores", "2000")
-        .WithEnvironment("Modules__Nooks__MemoryMebibytes", "4096")
-        .WithEnvironment("Modules__Nooks__SleepAfter", nookSleepAfter)
-        .WithEnvironment("Modules__Nooks__EvictAfter", nookEvictAfter);
+        });
 }
 
 using DistributedApplication app = builder.Build();
 app.Run();
-
-IResourceBuilder<ParameterResource> EncryptionKey(string name)
-{
-    return builder.ExecutionContext.IsPublishMode
-        ? builder.AddParameter(name, secret: true)
-        : builder.AddParameter(name, new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
-}
 
 string HarnessImage(string harness)
 {

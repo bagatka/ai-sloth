@@ -59,10 +59,3 @@ switch (read?.Value)
 - **Adding a harness** is a profile here, a start script in `start/`, and an install line in the
   host's image; a harness must speak ACP on standard input and output.
 - **Secrets never reach a log.** Environments built here hold them.
-
-## Not built yet
-
-- **State for Codex, pi, and Copilot.** None of them writes a memory of its own that we know of, so
-  their profiles keep none. Copilot's instructions file is confirmed by `copilot instruction list`,
-  not by a test, since no fake serves Copilot.
-- **Forking a session** (`session/fork`), for continuing a conversation from an earlier turn.

@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Chats.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,6 +19,8 @@ internal sealed partial class ChatsApi
 {
     public async Task<Result<ChatSummary>> StartAsync(Actor actor, StartChat command, CancellationToken ct)
     {
+        await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
+
         // Only people start chats, and only where they may write.
         AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(command.WorkspaceId), ct);
         if (access is null)
@@ -49,13 +52,12 @@ internal sealed partial class ChatsApi
             return new Result<ChatSummary>(Error.Validation("copyOf", "Must be another chat of the workspace."));
         }
 
-        // The chat is a draft until someone writes in it, and the person keeps at most two.
-        await drafts.MakeRoomAsync(user.UserId, command.WorkspaceId, ct);
-
         // Every chat gets a nook of its own, so its agent never works on another agent's files. The nook
         // stands on its own: should saving the chat fail, it stays until someone deletes it. Its
-        // checkpoints keep the agent's sessions, so a new agent can continue the conversation.
-        CreateNook nook = new CreateNook(command.WorkspaceId, command.Provider, harness.Id, command.Repositories, copyOf, command.Checkpoint, harness.SessionPaths, FromScratch: false);
+        // checkpoints keep the agent's sessions, so a new agent can continue the conversation. Whoever
+        // operates the nook can use what its agent can, so on a personal account it is reserved for
+        // the account's owner.
+        CreateNook nook = new CreateNook(command.WorkspaceId, command.Provider, harness.Id, command.Repositories, copyOf, command.Checkpoint, harness.SessionPaths, FromScratch: false, ReservedFor: account.Output.OwnerId);
         Result<NookSummary> created = await nooks.CreateAsync(actor, nook, ct);
         if (created.Failed)
         {

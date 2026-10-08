@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Machines.Data;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -16,6 +17,8 @@ internal sealed partial class MachinesApi
 {
     public async Task<Result<IAsyncEnumerable<Wire.SandboxCall>>> ConnectAsync(Actor actor, ConnectMachine command, IAsyncEnumerable<Wire.SandboxCallResult> results, CancellationToken ct)
     {
+        await using MachinesDbContext db = await databases.CreateDbContextAsync(ct);
+
         // A machine proves itself with its token; the actor is always anonymous.
         Machine? machine = await db.Machines.AsNoTracking().SingleOrDefaultAsync(found => found.Id == command.MachineId, ct);
         if (machine is null || !machine.AcceptsToken(command.Token))

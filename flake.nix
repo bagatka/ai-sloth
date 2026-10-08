@@ -41,6 +41,9 @@
 
               # The landing page (site/) builds with Astro.
               pkgs.nodejs_24
+
+              # The scripts the control plane runs in nooks are checked like code.
+              pkgs.shellcheck
             ];
 
             # Native AOT links against zlib.

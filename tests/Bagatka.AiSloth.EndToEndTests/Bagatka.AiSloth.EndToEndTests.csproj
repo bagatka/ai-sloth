@@ -13,6 +13,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- HostJourney compares the host's API description with the committed one. -->
+    <None Include="..\..\src\ControlPlane\Bagatka.AiSloth.WebApi\openapi.json" Link="openapi.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Testing" />
     <!-- The Azure tests clean up as the person running them (az login). -->
     <PackageReference Include="Azure.Identity" />

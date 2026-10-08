@@ -9,7 +9,7 @@ internal sealed class InstanceLeaseDbContextFactory : IDesignTimeDbContextFactor
     public InstanceLeaseDbContext CreateDbContext(string[] args)
     {
         DbContextOptionsBuilder<InstanceLeaseDbContext> options = new DbContextOptionsBuilder<InstanceLeaseDbContext>();
-        options.UseModuleDatabase("Host=localhost", InstanceLeaseDbContext.Schema);
+        options.UseModuleDatabase(database: null, InstanceLeaseDbContext.Schema);
         return new InstanceLeaseDbContext(options.Options);
     }
 }

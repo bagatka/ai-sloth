@@ -5,19 +5,21 @@ using System.Text;
 namespace Bagatka.Foundation.Modules;
 
 /// <summary>
-/// Encrypts secrets a module keeps at rest with AES-256-GCM under a key from its settings (PATTERNS.md,
-/// "Secrets at rest"). The ID of the row that holds a secret is authenticated with it, so a secret
-/// copied onto another row doesn't open. Thread-safe.
+/// Encrypts secrets a module keeps at rest with AES-256-GCM under a key derived from the deployment's
+/// for one purpose, such as the module's schema, so a box never opens another purpose's secrets
+/// (PATTERNS.md, "Secrets at rest"). The ID of the row that holds a secret is authenticated with it,
+/// so a secret copied onto another row doesn't open. Thread-safe.
 /// </summary>
 /// <remarks>Not handled: rotating the key; a new key makes every stored secret unreadable.</remarks>
-/// <param name="encryptionKey">The module's encryption key, at least 32 random characters.</param>
-public sealed class SecretBox(string encryptionKey)
+/// <param name="encryption">The deployment's encryption key.</param>
+/// <param name="purpose">What the box is for, such as the module's schema.</param>
+public sealed class SecretBox(EncryptionSettings encryption, string purpose)
 {
     private const byte Format = 1;
     private const int NonceSize = 12;
     private const int TagSize = 16;
 
-    private readonly byte[] _key = SHA256.HashData(Encoding.UTF8.GetBytes(encryptionKey));
+    private readonly byte[] _key = HKDF.DeriveKey(HashAlgorithmName.SHA256, Encoding.UTF8.GetBytes(encryption.Key), 32, salt: [], info: Encoding.UTF8.GetBytes(purpose));
 
     /// <summary>Seals <paramref name="secret"/> for the row with ID <paramref name="row"/>: a format byte, the nonce, the tag, then the ciphertext.</summary>
     public byte[] Seal(string secret, Guid row)

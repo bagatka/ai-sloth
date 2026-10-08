@@ -12,13 +12,13 @@ namespace Bagatka.AiSloth.AgentAccounts;
 public static class AgentAccountsModule
 {
     /// <summary>Registers the module. The host also registers a <see cref="System.TimeProvider"/> and the Workspaces module.</summary>
-    public static IServiceCollection AddAgentAccountsModule(this IServiceCollection services, AgentAccountsSettings settings)
+    public static IServiceCollection AddAgentAccountsModule(this IServiceCollection services, AgentAccountsSettings settings, EncryptionSettings encryption)
     {
         services.AddSingleton(settings);
-        services.AddKeyedSingleton(AgentAccountsDbContext.Schema, new SecretBox(settings.EncryptionKey));
+        services.AddKeyedSingleton(AgentAccountsDbContext.Schema, new SecretBox(encryption, AgentAccountsDbContext.Schema));
         services.AddChatGptSignInClient(settings.ChatGptSignIn);
-        services.AddModuleDbContext<AgentAccountsDbContext>(settings.ConnectionString, AgentAccountsDbContext.Schema);
-        services.AddScoped<IAgentAccountsApi, AgentAccountsApi>();
+        services.AddModuleDbContext<AgentAccountsDbContext>(AgentAccountsDbContext.Schema);
+        services.AddSingleton<IAgentAccountsApi, AgentAccountsApi>();
         return services;
     }
 }

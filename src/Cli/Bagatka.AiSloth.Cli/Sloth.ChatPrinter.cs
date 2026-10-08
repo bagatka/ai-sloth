@@ -72,7 +72,12 @@ internal sealed partial class Sloth
                 case "checkpoint-failed":
                     await LineAsync("  (saving the files failed: " + StringOf(body, "failure") + ")");
                     break;
-                case "setup-started" or "setup-ended" or "setup-test-started" or "setup-tested":
+                case "disk-nearly-full":
+                    long used = body.GetProperty("usedBytes").GetInt64();
+                    long total = body.GetProperty("totalBytes").GetInt64();
+                    await LineAsync(string.Create(CultureInfo.InvariantCulture, $"  (the nook's disk is {used * 100 / Math.Max(total, 1)}% full: free space, or the agent's work and saving its files may fail)"));
+                    break;
+                case "setup-started" or "setup-ended":
                     await PrintSetupAsync(type, body);
                     break;
                 case "agent-restarted":
@@ -85,7 +90,7 @@ internal sealed partial class Sloth
             }
         }
 
-        // The nook's setup: when it starts and ends, and the tests of one the agent wrote.
+        // The nook's setup: when it starts and ends.
         private async Task PrintSetupAsync(string type, JsonElement body)
         {
             switch (type)
@@ -96,15 +101,8 @@ internal sealed partial class Sloth
                     await LineAsync((fromCopy ? "Setting up from a ready copy: " : "Setting up: ") + string.Join(", ", scripts));
                     _setUp = true;
                     break;
-                case "setup-ended":
-                    await PrintSetupEndAsync(body);
-                    break;
-                case "setup-test-started":
-                    int test = body.GetProperty("test").GetInt32();
-                    await LineAsync(test == 1 ? "Testing the setup in a fresh nook…" : string.Create(CultureInfo.InvariantCulture, $"Testing the setup in a fresh nook again (test {test} of 3)…"));
-                    break;
                 default:
-                    await PrintSetupTestAsync(body);
+                    await PrintSetupEndAsync(body);
                     break;
             }
         }
@@ -127,37 +125,6 @@ internal sealed partial class Sloth
             }
 
             await LineAsync("The agent knows and can fix it. Full output: sloth chat setup " + ShortId(chat));
-        }
-
-        // Both runs' times when the test passed; otherwise what went wrong, and whether the agent fixes it.
-        private async Task PrintSetupTestAsync(JsonElement tested)
-        {
-            int exitCode = tested.GetProperty("exitCode").GetInt32();
-            TimeSpan fromScratch = TimeSpan.Parse(StringOf(tested, "fromScratch") ?? "0", CultureInfo.InvariantCulture);
-            string? again = StringOf(tested, "again");
-            if (exitCode == 0)
-            {
-                string second = again is null ? string.Empty : "; run again: " + Duration(TimeSpan.Parse(again, CultureInfo.InvariantCulture));
-                await LineAsync("Setup works from scratch: " + Duration(fromScratch) + second + ".");
-                return;
-            }
-
-            string after = fromScratch > TimeSpan.Zero ? " after " + Duration(fromScratch) : string.Empty;
-            string code = exitCode > 0 ? string.Create(CultureInfo.InvariantCulture, $" (exit {exitCode})") : string.Empty;
-            await LineAsync("Setup failed in a fresh nook" + after + code + ":");
-            foreach (string line in (StringOf(tested, "output") ?? string.Empty).Split('\n'))
-            {
-                await LineAsync("  " + line);
-            }
-
-            if (tested.GetProperty("agentFixes").GetBoolean())
-            {
-                await LineAsync("Sent to the agent to fix; it's tested again after its turn.");
-            }
-            else if (exitCode > 0)
-            {
-                await LineAsync("It still fails after 3 tests. Tell the agent what you know, then prepare again: sloth chat prepare " + ShortId(chat));
-            }
         }
 
         // Once, after a turn, for a chat whose files have no setup.

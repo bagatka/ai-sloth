@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Machines.Contracts;
@@ -9,45 +8,38 @@ using Bagatka.AiSloth.Nooks.Daemons;
 using Bagatka.AiSloth.Nooks.Data;
 using Bagatka.AiSloth.Nooks.Jobs;
 using Bagatka.AiSloth.Nooks.Model;
-using Bagatka.AiSloth.Secrets.Contracts;
 using Bagatka.AiSloth.Sources.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
-using Bagatka.ObjectStorage;
 using Bagatka.Sandboxing;
 using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Nooks;
 
 // The front door for both contracts: dependencies and the helpers several features share. Each
-// feature is a file in Features/. Streams that outlive a call use `databases`, never `db`.
+// feature is a file in Features/.
 internal sealed partial class NooksApi(
-    NooksDbContext db,
     IDbContextFactory<NooksDbContext> databases,
     IWorkspacesApi workspaces,
     IMachinesApi machines,
-    ISecretsApi secrets,
     ISourcesApi sources,
     IEnumerable<ISandboxProvider> providers,
     DaemonConnections daemons,
     InputFeeds feeds,
-    FileLocks fileLocks,
-    IObjectStorage storage,
-    NookReconciler reconciler,
-    NookSleeper sleeper,
+    NookProcesses processes,
+    NookFiles files,
+    Checkpoints checkpoints,
+    KeptFolders folders,
+    NookLifecycle lifecycle,
     NookActivity activity,
-    ReadyCopies readyCopies,
     NooksSettings settings,
     TimeProvider time) : INooksApi, INookDaemonsApi
 {
-    // How long a call waits for a nook's daemon, such as a new nook's first connection.
-    private static readonly TimeSpan ReadyTimeout = TimeSpan.FromSeconds(60);
-
     // The nook, if the actor may do at least `needed` with it: a person as their access to it allows,
     // through its workspace or given to them directly, and the control plane's own processes, such as
     // Chats running a harness, anything. Not found when they may not see it, so nobody learns that it
     // exists; forbidden when they may see it but not do this.
-    private async Task<Result<Nook>> FindNookAsync(Actor actor, NookId id, AccessLevel needed, CancellationToken ct)
+    private async Task<Result<Nook>> FindNookAsync(NooksDbContext db, Actor actor, NookId id, AccessLevel needed, CancellationToken ct)
     {
         Nook? nook = await db.Nooks.SingleOrDefaultAsync(found => found.Id == id, ct);
         if (nook is null)
@@ -79,10 +71,35 @@ internal sealed partial class NooksApi(
         throw new InvalidOperationException("The actor has no kind.");
     }
 
-    // The process, if the actor may do at least `needed` with its nook.
-    private async Task<Result<Process>> FindProcessAsync(Actor actor, NookId nookId, ProcessId processId, AccessLevel needed, CancellationToken ct)
+    // The nook, if the actor may operate it: change what runs in it or its files. The person it is
+    // reserved for alone, when it is; otherwise anyone with Write on its workspace, not people invited
+    // to the nook alone, as whoever operates a nook can use what its agent can.
+    private async Task<Result<Nook>> FindNookToOperateAsync(NooksDbContext db, Actor actor, NookId id, CancellationToken ct)
     {
-        Result<Nook> nook = await FindNookAsync(actor, nookId, needed, ct);
+        Result<Nook> nook = await FindNookAsync(db, actor, id, AccessLevel.Write, ct);
+        if (nook.Failed || actor is not UserActor user)
+        {
+            return nook;
+        }
+
+        if (nook.Output.ReservedFor is UserId only)
+        {
+            return only == user.UserId ? nook : new Result<Nook>(NooksErrors.Reserved);
+        }
+
+        bool member = await WritesInWorkspaceAsync(actor, nook.Output, ct);
+        return member ? nook : new Result<Nook>(Error.Forbidden);
+    }
+
+    private async Task<bool> WritesInWorkspaceAsync(Actor actor, Nook nook, CancellationToken ct)
+    {
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(nook.WorkspaceId), ct);
+        return access >= AccessLevel.Write;
+    }
+
+    private async Task<Result<Process>> FindProcessToOperateAsync(NooksDbContext db, Actor actor, NookId nookId, ProcessId processId, CancellationToken ct)
+    {
+        Result<Nook> nook = await FindNookToOperateAsync(db, actor, nookId, ct);
         if (nook.Failed)
         {
             return new Result<Process>(nook.Error);
@@ -92,34 +109,49 @@ internal sealed partial class NooksApi(
         return process is null ? new Result<Process>(NooksErrors.ProcessNotFound) : new Result<Process>(process);
     }
 
-    // The nook's daemon connection, waking the nook first when it sleeps and waiting for its daemon to
-    // dial in; null when the nook can't run processes, or can't be woken. A person reaching it uses it,
-    // which keeps it awake for the sleep period; the use counts before the status is read, so a nook
-    // about to fall asleep either sees it and stays awake, or is seen asleep and woken.
-    // Not handled: an operation in the instant between a nook's last idle check and its going to
-    // sleep reaches a daemon about to stop, and may need repeating.
-    private async Task<DaemonConnection?> ConnectionAsync(Actor actor, NookId nookId, CancellationToken ct)
+    // The process, if the actor may do at least `needed` with its nook.
+    private async Task<Result<Process>> FindProcessAsync(NooksDbContext db, Actor actor, NookId nookId, ProcessId processId, AccessLevel needed, CancellationToken ct)
     {
-        if (actor is UserActor)
+        Result<Nook> nook = await FindNookAsync(db, actor, nookId, needed, ct);
+        if (nook.Failed)
         {
-            activity.Used(nookId);
+            return new Result<Process>(nook.Error);
         }
 
-        NookStatus status = await db.Nooks.Where(nook => nook.Id == nookId).Select(nook => nook.Status).SingleAsync(ct);
-        if (status is NookStatus.Failed or NookStatus.Deleting)
+        Process? process = await db.Processes.SingleOrDefaultAsync(found => found.Id == processId && found.NookId == nookId, ct);
+        return process is null ? new Result<Process>(NooksErrors.ProcessNotFound) : new Result<Process>(process);
+    }
+
+    // The nook's daemon connection once its files can be worked with: woken when it sleeps, its files
+    // put in place and its setup started the first time, its resume scripts started after it woke.
+    // An operation that `changes` the nook takes its ready copy first, when its setup earned one.
+    private async Task<Result<DaemonConnection>> ReadyAsync(NooksDbContext db, Actor actor, Nook nook, bool changes, CancellationToken ct)
+    {
+        Result<DaemonConnection> connected = await lifecycle.ConnectAsync(db, actor, nook.Id, ct);
+        if (connected.Failed)
         {
-            return null;
+            return new Result<DaemonConnection>(connected.Error);
         }
 
-        if (status is NookStatus.Sleeping or NookStatus.Paused or NookStatus.Stopped or NookStatus.Evicted)
+        DaemonConnection connection = connected.Output;
+
+        Result prepared = await files.PrepareAsync(db, nook, connection, ct);
+        if (prepared.Failed)
         {
-            bool woke = await sleeper.WakeAsync(nookId, actor, ct);
-            if (!woke)
-            {
-                return null;
-            }
+            return new Result<DaemonConnection>(prepared.Error);
         }
 
-        return await daemons.WaitAsync(nookId, ReadyTimeout, ct);
+        if (changes)
+        {
+            await files.KeepReadyCopyAsync(db, nook, ct);
+        }
+
+        return new Result<DaemonConnection>(connection);
+    }
+
+    // The nook as people see it, with what it uses while it runs.
+    private NookSummary SummaryOf(Nook nook, IReadOnlyList<NookSource> copies)
+    {
+        return nook.ToSummary(copies, daemons.UsageOf(nook.Id), settings.NearlyFull);
     }
 }

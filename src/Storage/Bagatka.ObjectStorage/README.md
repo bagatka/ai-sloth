@@ -13,7 +13,3 @@ people's harness state. General-purpose: it knows nothing about AiSloth.
   is protected like the database.
 - **Tests:** `tests/Bagatka.ObjectStorage.Tests` runs every backend through the same guarantees,
   Azure Blob against its emulator, Azurite, in Docker.
-
-## Not built yet
-
-- An S3-compatible backend, and listing keys.

@@ -15,6 +15,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.Testing;
 using Aspire.Hosting.ApplicationModel;
 using Bagatka.AiSloth.Cli;
+using Bagatka.Foundation;
 using Bagatka.Sandboxing;
 using Bagatka.Sandboxing.Docker;
 using Microsoft.Extensions.DependencyInjection;
@@ -146,19 +147,12 @@ public sealed partial class ControlPlane : IAsyncLifetime
                 "Parameters:invite-sign-up=true",
                 "Parameters:sandbox-scope=" + Scope,
                 "Parameters:object-storage=" + ObjectStorage,
-                "Parameters:nearly-full-disk=1",
                 "Parameters:model-private-networks=true",
                 "Parameters:allow-chatgpt-plans=true",
-                "Parameters:chatgpt-authority=" + _chatGpt.Url,
-                "Parameters:chatgpt-api=" + _model.OpenAIUrl,
                 "Parameters:github-app-client-id=" + FakeGitHub.ClientId,
                 "Parameters:github-app-client-secret=" + FakeGitHub.ClientSecret,
                 "Parameters:github-app-slug=" + FakeGitHub.AppSlug,
-                "Parameters:github-api=" + _gitHub.ApiUrl,
-                "Parameters:github-web=" + _gitHub.Url,
-                "Parameters:sources-key=" + RandomNumberGenerator.GetHexString(64),
-                "Parameters:agent-accounts-key=" + RandomNumberGenerator.GetHexString(64),
-                "Parameters:secrets-key=" + RandomNumberGenerator.GetHexString(64),
+                "Parameters:encryption-key=" + RandomNumberGenerator.GetHexString(64),
                 "DaemonPort=" + _daemonPort.ToString(CultureInfo.InvariantCulture),
                 "ModelsPort=" + _modelsPort.ToString(CultureInfo.InvariantCulture),
                 "DOCKER_HOST=" + DockerEndpoint,
@@ -171,9 +165,8 @@ public sealed partial class ControlPlane : IAsyncLifetime
         _logs = logs;
         appHost.Services.AddLogging(logs.Route);
 
-        // No dashboard runs in tests to send telemetry to; flushing it would hold every stop of the
-        // WebApi for seconds.
-        appHost.CreateResourceBuilder<ProjectResource>("webapi").WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", string.Empty);
+        ConfigureWebApi(appHost.CreateResourceBuilder<ProjectResource>("webapi"));
+
         _app = await appHost.BuildAsync(ct);
 
         await _app.StartAsync(ct);
@@ -187,24 +180,47 @@ public sealed partial class ControlPlane : IAsyncLifetime
             anonymous.SendPostAsync("/sign-in/code", new { code = SetupCode, name = "Owner", device = "e2e" }), HttpStatusCode.OK);
     }
 
+    // The paid and external services are fakes in this process; no dashboard runs to send telemetry
+    // to, and flushing it would hold every stop of the WebApi for seconds; every journey signs people
+    // in from this computer's one address; and the rest of the settings are the test's own, such as
+    // short sleep periods.
+    private void ConfigureWebApi(IResourceBuilder<ProjectResource> webApi)
+    {
+        webApi.WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", string.Empty)
+            .WithEnvironment("Host__SignInsPerMinute", "100000")
+            .WithEnvironment("Modules__AgentAccounts__ChatGptAuthority", ChatGpt.Url.AbsoluteUri)
+            .WithEnvironment("Modules__AgentAccounts__ChatGptApi", Model.OpenAIUrl.AbsoluteUri)
+            .WithEnvironment("GitHub__ApiUrl", GitHub.ApiUrl.AbsoluteUri)
+            .WithEnvironment("GitHub__WebUrl", GitHub.Url.AbsoluteUri);
+        foreach ((string name, string value) in _environment)
+        {
+            webApi.WithEnvironment(name, value);
+        }
+    }
+
     private readonly IReadOnlyList<string> _settings;
+    private readonly IReadOnlyList<(string Name, string Value)> _environment;
 
     /// <summary>The app as it runs for most tests.</summary>
     public ControlPlane()
-        : this([])
+        : this([], [])
     {
     }
 
-    /// <summary>The app with settings of its own, as AppHost arguments, for tests that need them.</summary>
-    internal ControlPlane(IReadOnlyList<string> settings)
-        : this(settings, FreePort(), FreePort())
+    /// <summary>
+    /// The app with settings of its own, for tests that need them: AppHost arguments, and the WebApi's
+    /// environment, such as <c>Modules__Nooks__SleepAfter</c>.
+    /// </summary>
+    internal ControlPlane(IReadOnlyList<string> settings, IReadOnlyList<(string Name, string Value)> environment)
+        : this(settings, environment, FreePort(), FreePort())
     {
     }
 
     /// <summary>The app with settings of its own, its nook-facing endpoints on given ports, such as ports a tunnel forwards to.</summary>
-    internal ControlPlane(IReadOnlyList<string> settings, int daemonPort, int modelsPort)
+    internal ControlPlane(IReadOnlyList<string> settings, IReadOnlyList<(string Name, string Value)> environment, int daemonPort, int modelsPort)
     {
         _settings = settings;
+        _environment = environment;
         _daemonPort = daemonPort;
         _modelsPort = modelsPort;
     }
@@ -253,6 +269,36 @@ public sealed partial class ControlPlane : IAsyncLifetime
         }
     }
 
+    /// <summary>
+    /// Leaves a sandbox in the app's scope that no nook records, as a database reset would; returns
+    /// its key.
+    /// </summary>
+    internal async Task<Guid> LeaveOrphanSandboxAsync()
+    {
+        Guid key = Guid.CreateVersion7();
+        ServiceCollection services = new ServiceCollection();
+        services.AddDockerSandboxProvider(new DockerSandboxSettings(DockerEndpoint, Scope));
+        await using ServiceProvider provider = services.BuildServiceProvider();
+        SandboxSpec spec = new SandboxSpec(SandboxKey.From(key), new SandboxSource(new SandboxImage("aisloth-nook:dev")), new SandboxResources(500, 256), new Dictionary<string, string>(StringComparer.Ordinal), Location: null);
+        Result<SandboxObservation> created = await provider.GetRequiredService<ISandboxProvider>().CreateAsync(spec, TestContext.Current.CancellationToken);
+        Assert.False(created.Failed, created.Failed ? created.Error.Message : null);
+        return key;
+    }
+
+    /// <summary>Waits until a nook's container is gone, on the docker provider or a machine, such as after a long sleep; false when it stays.</summary>
+    internal async Task<bool> SandboxGoneAsync(Guid nookId, TimeSpan patience)
+    {
+        long started = TimeProvider.System.GetTimestamp();
+        bool exists = await SandboxExistsAsync(nookId);
+        while (exists && TimeProvider.System.GetElapsedTime(started) < patience)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
+            exists = await SandboxExistsAsync(nookId);
+        }
+
+        return !exists;
+    }
+
     /// <summary>Whether a nook's container exists, on the docker provider or a machine.</summary>
     internal async Task<bool> SandboxExistsAsync(Guid nookId)
     {
@@ -292,7 +338,8 @@ public sealed partial class ControlPlane : IAsyncLifetime
     /// <summary>Runs machine mode in this process, as <c>sloth machine run</c> would.</summary>
     internal RunningMachine StartMachine(MachineCredential credential)
     {
-        return new RunningMachine(credential, new DockerSandboxSettings(DockerEndpoint, MachineScope));
+        DockerSandboxSettings docker = new DockerSandboxSettings(DockerEndpoint, MachineScope) { HostPorts = [_daemonPort, _modelsPort] };
+        return new RunningMachine(credential, docker);
     }
 
     public async ValueTask DisposeAsync()

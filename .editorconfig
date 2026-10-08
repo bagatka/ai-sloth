@@ -74,7 +74,7 @@ generated_code = true
 
 [analyzers/**.cs]
 # Release tracking is for analyzers shipped as packages; this one runs only on this repository, and
-# PATTERNS.md (entry 27) lists its rules.
+# PATTERNS.md (entry 26) lists its rules.
 dotnet_diagnostic.RS2008.severity = none
 
 [tests/**.cs]

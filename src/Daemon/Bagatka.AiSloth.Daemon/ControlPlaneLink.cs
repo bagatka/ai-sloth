@@ -20,14 +20,14 @@ namespace Bagatka.AiSloth.Daemon;
 /// out instructions, and serves each watch on an upload stream of its own. Processes never depend on
 /// the connection; losing it only means reconnecting.
 /// </summary>
-internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable processes, NookDisk disk, TimeProvider time, ILogger<ControlPlaneLink> logger) : IDisposable
+internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable processes, NookDisk disk, NookMeter meter, TimeProvider time, ILogger<ControlPlaneLink> logger) : IDisposable
 {
     private const int MaxConcurrentUploads = 64;
 
     // The exit an upload reports for a process this daemon doesn't know (daemon.proto, ProcessExited).
     private const int UnknownExitCode = -1;
     private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan DiskReportInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan UsageReportInterval = TimeSpan.FromSeconds(30);
 
     // A connection that lasted this long resets the backoff.
     private static readonly TimeSpan StableConnection = TimeSpan.FromSeconds(10);
@@ -147,8 +147,8 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
         }
     }
 
-    // Sends exits as they happen, and the disk's usage on connecting, every 30 seconds, and as soon as
-    // it fills. One loop, because a call's request stream takes one write at a time.
+    // Sends exits as they happen, and what the nook uses on connecting, every 30 seconds, and as soon
+    // as its disk fills. One loop, because a call's request stream takes one write at a time.
     private async Task SendEventsAsync(IClientStreamWriter<DaemonEvent> stream, CancellationToken ct)
     {
         try
@@ -160,8 +160,8 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
                 if (diskDue.IsCompleted)
                 {
                     disk.Reserve();
-                    await stream.WriteAsync(new DaemonEvent { DiskUsage = disk.Measure() }, ct);
-                    diskDue = Task.WhenAny(Task.Delay(DiskReportInterval, time, ct), disk.Full);
+                    await stream.WriteAsync(new DaemonEvent { Usage = Measure() }, ct);
+                    diskDue = Task.WhenAny(Task.Delay(UsageReportInterval, time, ct), disk.Full);
                 }
 
                 if (exits.IsCompleted)
@@ -194,6 +194,8 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
         _uploadSlots.Dispose();
     }
 
+    // Not handled: compressing output, a few lines of gzip once nooks and the control plane run in
+    // different clouds and egress costs money.
     private async Task UploadAsync(ControlPlane.ControlPlaneClient client, WatchOutput watch, CancellationToken ct)
     {
         try
@@ -288,13 +290,28 @@ internal sealed class ControlPlaneLink(DaemonSettings settings, ProcessTable pro
 
     private Hello Hello()
     {
-        Hello hello = new Hello
+        return new Hello
         {
             NookId = settings.NookId.ToString("D", CultureInfo.InvariantCulture),
             DaemonVersion = Version,
         };
-        hello.RunningProcesses.AddRange(processes.Running());
-        return hello;
+    }
+
+    // What the nook uses now: its disk, and its processes' memory and CPU.
+    private Usage Measure()
+    {
+        DriveUsage drive = disk.Measure();
+        (long memoryUsed, long memoryTotal) = NookMeter.Memory();
+        (int cpuUsed, int cpuTotal) = meter.Cpu();
+        return new Usage
+        {
+            DiskTotalBytes = drive.TotalBytes,
+            DiskAvailableBytes = drive.AvailableBytes,
+            MemoryUsedBytes = memoryUsed,
+            MemoryTotalBytes = memoryTotal,
+            CpuUsedMillicores = cpuUsed,
+            CpuTotalMillicores = cpuTotal,
+        };
     }
 
     private Metadata Authorization()

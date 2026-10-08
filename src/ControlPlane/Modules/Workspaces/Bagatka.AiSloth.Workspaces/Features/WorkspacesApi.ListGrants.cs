@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Workspaces.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,6 +15,8 @@ internal sealed partial class WorkspacesApi
 {
     public async Task<Result<IReadOnlyList<GrantSummary>>> ListGrantsAsync(Actor actor, Resource resource, CancellationToken ct)
     {
+        await using WorkspacesDbContext db = await databases.CreateDbContextAsync(ct);
+
         ArgumentNullException.ThrowIfNull(resource);
         Error? refused = await RefusalAsync(actor, resource, AccessLevel.Read, ct);
         if (refused is not null)

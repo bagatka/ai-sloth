@@ -11,12 +11,11 @@ namespace Bagatka.AiSloth.Secrets;
 public static class SecretsModule
 {
     /// <summary>Registers the module. The host also registers a <see cref="System.TimeProvider"/> and the Workspaces module.</summary>
-    public static IServiceCollection AddSecretsModule(this IServiceCollection services, SecretsSettings settings)
+    public static IServiceCollection AddSecretsModule(this IServiceCollection services, EncryptionSettings encryption)
     {
-        services.AddSingleton(settings);
-        services.AddKeyedSingleton(SecretsDbContext.Schema, new SecretBox(settings.EncryptionKey));
-        services.AddModuleDbContext<SecretsDbContext>(settings.ConnectionString, SecretsDbContext.Schema);
-        services.AddScoped<ISecretsApi, SecretsApi>();
+        services.AddKeyedSingleton(SecretsDbContext.Schema, new SecretBox(encryption, SecretsDbContext.Schema));
+        services.AddModuleDbContext<SecretsDbContext>(SecretsDbContext.Schema);
+        services.AddSingleton<ISecretsApi, SecretsApi>();
         return services;
     }
 }

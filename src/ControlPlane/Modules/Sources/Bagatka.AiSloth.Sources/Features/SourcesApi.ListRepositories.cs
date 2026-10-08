@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Sources.Data;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,6 +15,8 @@ internal sealed partial class SourcesApi
 {
     public async Task<Result<IReadOnlyList<RepositorySummary>>> ListRepositoriesAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct)
     {
+        await using SourcesDbContext db = await databases.CreateDbContextAsync(ct);
+
         AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(workspaceId), ct);
         if (access is null)
         {

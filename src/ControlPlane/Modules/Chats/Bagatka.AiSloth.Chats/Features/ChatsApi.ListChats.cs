@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Chats.Data;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -15,6 +16,8 @@ internal sealed partial class ChatsApi
 {
     public async Task<Result<Page<ChatSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, PageRequest page, CancellationToken ct)
     {
+        await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
+
         // A nook's guest doesn't see the workspace's other chats.
         AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(workspaceId), ct);
         if (access is null)

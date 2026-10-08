@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.AgentAccounts.Data;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,8 @@ internal sealed partial class AgentAccountsApi
 {
     public async Task<Result<AgentAccountSummary>> CompleteSignInAsync(Actor actor, CompleteSignIn command, CancellationToken ct)
     {
+        await using AgentAccountsDbContext db = await databases.CreateDbContextAsync(ct);
+
         if (actor is not UserActor user)
         {
             return new Result<AgentAccountSummary>(AgentAccountsErrors.SignInNotFound);

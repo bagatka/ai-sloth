@@ -16,7 +16,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261006101500_Drafts";
+    public override string LastMigrationId => "20261008091529_Initial";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -42,10 +42,6 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("uuid")
                     .HasColumnName("agent_account_id");
 
-                b.Property<Guid?>("CheckpointAfter")
-                    .HasColumnType("uuid")
-                    .HasColumnName("checkpoint_after");
-
                 b.Property<string>("Harness")
                     .IsRequired()
                     .HasMaxLength(32)
@@ -55,11 +51,6 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.Property<Guid?>("HarnessProcessId")
                     .HasColumnType("uuid")
                     .HasColumnName("harness_process_id");
-
-                b.Property<string>("HarnessStateFiles")
-                    .HasMaxLength(366000)
-                    .HasColumnType("character varying(366000)")
-                    .HasColumnName("harness_state_files");
 
                 b.Property<byte[]>("HarnessTokenHash")
                     .HasColumnType("bytea")
@@ -98,10 +89,6 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.Property<Guid?>("SetupRunId")
                     .HasColumnType("uuid")
                     .HasColumnName("setup_run_id");
-
-                b.Property<Guid?>("SetupTestAfter")
-                    .HasColumnType("uuid")
-                    .HasColumnName("setup_test_after");
 
                 b.Property<DateTimeOffset>("StartedAt")
                     .HasColumnType("timestamp with time zone")
@@ -178,54 +165,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.HasIndex("StartedAt")
                     .HasDatabaseName("ix_drafts_started_at");
 
-                b.HasIndex("StartedBy", "WorkspaceId", "StartedAt")
-                    .HasDatabaseName("ix_drafts_started_by_workspace_id_started_at");
-
                 b.ToTable("drafts", "chats");
-            });
-
-        modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.HarnessState", b =>
-            {
-                b.Property<Guid>("PersonId")
-                    .HasColumnType("uuid")
-                    .HasColumnName("person_id");
-
-                b.Property<Guid>("WorkspaceId")
-                    .HasColumnType("uuid")
-                    .HasColumnName("workspace_id");
-
-                b.Property<string>("Harness")
-                    .HasMaxLength(32)
-                    .HasColumnType("character varying(32)")
-                    .HasColumnName("harness");
-
-                b.Property<long>("Bytes")
-                    .HasColumnType("bigint")
-                    .HasColumnName("bytes");
-
-                b.Property<DateTimeOffset>("SavedAt")
-                    .HasColumnType("timestamp with time zone")
-                    .HasColumnName("saved_at");
-
-                b.Property<Guid>("SavedFrom")
-                    .HasColumnType("uuid")
-                    .HasColumnName("saved_from");
-
-                b.Property<byte[]>("Sha256")
-                    .IsRequired()
-                    .HasColumnType("bytea")
-                    .HasColumnName("sha256");
-
-                b.Property<uint>("Version")
-                    .IsConcurrencyToken()
-                    .ValueGeneratedOnAddOrUpdate()
-                    .HasColumnType("xid")
-                    .HasColumnName("xmin");
-
-                b.HasKey("PersonId", "WorkspaceId", "Harness")
-                    .HasName("pk_harness_states");
-
-                b.ToTable("harness_states", "chats");
             });
 
         modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.Message", b =>
@@ -253,10 +193,6 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.Property<Guid>("SentBy")
                     .HasColumnType("uuid")
                     .HasColumnName("sent_by");
-
-                b.Property<int?>("SetupTest")
-                    .HasColumnType("integer")
-                    .HasColumnName("setup_test");
 
                 b.Property<string>("State")
                     .IsRequired()

@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.AgentAccounts.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
@@ -62,15 +63,15 @@ internal sealed partial class AgentAccountsApi
             return new Result<AgentAccountSummary>(added.Error);
         }
 
-        AgentAccount account = added.Output;
-        db.Accounts.Add(account);
+        await using AgentAccountsDbContext db = await databases.CreateDbContextAsync(ct);
+        db.Accounts.Add(added.Output);
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)
         {
             return new Result<AgentAccountSummary>(saved.Error);
         }
 
-        return new Result<AgentAccountSummary>(account.ToSummary());
+        return new Result<AgentAccountSummary>(added.Output.ToSummary());
     }
 
     // Plans are for one person, some need the deployment's permission, and some are added by signing in.

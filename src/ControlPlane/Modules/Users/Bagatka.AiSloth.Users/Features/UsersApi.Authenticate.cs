@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Users.Data;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +13,13 @@ internal sealed partial class UsersApi
 {
     public async Task<UserId?> AuthenticateAsync(string token, CancellationToken ct)
     {
+        if (!token.StartsWith(Session.TokenPrefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        await using UsersDbContext db = await databases.CreateDbContextAsync(ct);
+
         byte[] hash = Session.HashToken(token);
         Session? session = await db.Sessions.SingleOrDefaultAsync(found => found.TokenHash == hash, ct);
         DateTimeOffset now = time.GetUtcNow();

@@ -58,6 +58,12 @@ public sealed class Error
         return new Error(ErrorKind.NotFound, code, message, []);
     }
 
+    /// <summary>The actor may not perform the operation, for a reason worth telling them.</summary>
+    public static Error NotAllowed(string code, string message)
+    {
+        return new Error(ErrorKind.Forbidden, code, message, []);
+    }
+
     /// <summary>The operation conflicts with the current state.</summary>
     public static Error Conflict(string code, string message)
     {

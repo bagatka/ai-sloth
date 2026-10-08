@@ -20,7 +20,7 @@ internal sealed class MachineEndpoint(IMachineConnectionsApi machines) : Wire.Ma
 {
     public override async Task<Wire.RegisterResponse> Register(Wire.RegisterRequest request, ServerCallContext context)
     {
-        Result<MachineCredential> registered = await machines.RegisterAsync(Actor.Anonymous, new RegisterMachine(request.Code, request.SlothVersion), context.CancellationToken);
+        Result<MachineCredential> registered = await machines.RegisterAsync(Actor.Anonymous, new RegisterMachine(request.Code), context.CancellationToken);
         if (registered.Failed)
         {
             throw GrpcCalls.Rejection(registered.Error);
@@ -40,7 +40,8 @@ internal sealed class MachineEndpoint(IMachineConnectionsApi machines) : Wire.Ma
             throw new RpcException(new Status(StatusCode.InvalidArgument, "The first message must be Hello."));
         }
 
-        ConnectMachine command = new ConnectMachine(MachineId.From(GrpcCalls.ParseId(hello.MachineId)), GrpcCalls.BearerToken(context), hello.SlothVersion);
+        // Not handled: sloth versions; any is accepted, and its version is read once one isn't.
+        ConnectMachine command = new ConnectMachine(MachineId.From(GrpcCalls.ParseId(hello.MachineId)), GrpcCalls.BearerToken(context));
         Result<IAsyncEnumerable<Calls.SandboxCall>> connected = await machines.ConnectAsync(Actor.Anonymous, command, ResultsAsync(requestStream, ct), ct);
         if (connected.Failed)
         {

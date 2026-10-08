@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Sources.Data;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,8 @@ internal sealed partial class SourcesApi
 {
     public async Task<Result<RepositorySummary>> AddRepositoryAsync(Actor actor, AddRepository command, CancellationToken ct)
     {
+        await using SourcesDbContext db = await databases.CreateDbContextAsync(ct);
+
         AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(command.WorkspaceId), ct);
         if (access is null)
         {
@@ -31,7 +34,7 @@ internal sealed partial class SourcesApi
             return new Result<RepositorySummary>(Error.Validation("fullName", "Must be owner/name, such as acme/api."));
         }
 
-        Result<Connected> connected = await ConnectedAsync(actor, ct);
+        Result<Connected> connected = await ConnectedAsync(db, actor, ct);
         if (connected.Failed)
         {
             return new Result<RepositorySummary>(connected.Error);

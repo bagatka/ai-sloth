@@ -14,7 +14,7 @@ One problem, one solution. This file lists the established way to solve each rec
 
 Examples use `Users` and `Workspaces` modules. Snippets omit `using` lines and put several types
 together for brevity; real files list their usings (implicit usings are off) and hold one
-top-level type each (entry 28).
+top-level type each (entry 27).
 
 ---
 
@@ -119,7 +119,7 @@ string forRecipient = invoice.Total.ToString("N2", recipientCulture);
     comparison arguments mandatory; MA0075 and MA0076 do the same for concatenation and
     interpolation. All are build errors.
   - Reading `CultureInfo.CurrentCulture`, `CurrentUICulture`, or `Thread.CurrentCulture` is banned.
-  - Tests run under `tr-TR`, which has comma decimals and the dotless `ı` (entry 26). They are the
+  - Tests run under `tr-TR`, which has comma decimals and the dotless `ı` (entry 25). They are the
     backstop for culture-dependent behavior inside libraries the analyzers can't see.
 
 ### Files and environment
@@ -218,8 +218,8 @@ public static class UsersModule
     public static IServiceCollection AddUsersModule(this IServiceCollection services, UsersSettings settings)
     {
         services.AddSingleton(settings);
-        services.AddModuleDbContext<UsersDbContext>(settings.ConnectionString, schema: "users");
-        services.AddScoped<IUsersApi, UsersApi>();
+        services.AddModuleDbContext<UsersDbContext>(UsersDbContext.Schema);
+        services.AddSingleton<IUsersApi, UsersApi>();
         services.AddReaction<WorkspaceDeleted, OnWorkspaceDeleted>();
         return services;
     }
@@ -232,6 +232,10 @@ Canonical example: `src/ControlPlane/Modules/Workspaces/Bagatka.AiSloth.Workspac
   record lives next to it and is public too, because the host constructs it (entry 20).
 - **The table of contents.** Every registration is a visible line here, so this file shows
   everything the module wires up.
+- **Callable from anywhere.** `I<Module>Api` is registered once, as a singleton, so a request, a
+  job, a reaction, or another module's background work injects it alike, as it would a client of a
+  module in another process. Nothing in a module asks the container for a service
+  (`GetRequiredService`, scopes): its dependencies are its constructor's.
 
 ## 7. Features
 
@@ -240,7 +244,7 @@ to the module's partial `<Module>Api` class.
 
 ```csharp
 // UsersApi.cs: the front door. Dependencies only; no logic, no state.
-internal sealed partial class UsersApi(UsersDbContext db, TimeProvider time, ILogger<UsersApi> logger) : IUsersApi
+internal sealed partial class UsersApi(IDbContextFactory<UsersDbContext> databases, TimeProvider time, ILogger<UsersApi> logger) : IUsersApi
 {
 }
 ```
@@ -264,7 +268,8 @@ internal sealed partial class UsersApi
             return new Result(name.Error);
         }
 
-        // 3. Load
+        // 3. Load, in a context of this call's own
+        await using UsersDbContext db = await databases.CreateDbContextAsync(ct);
         User? user = await db.Users.SingleOrDefaultAsync(u => u.Id == command.UserId, ct);
         if (user is null)
         {
@@ -540,11 +545,12 @@ UserProfile profile = found.Output;
   `HttpRequestException` carrying the host's own words, which `Sloth.RunAsync` prints; a failure
   sloth decides itself is written with `Terminal.FailAsync` where it is decided. Canonical example:
   `src/Cli/Bagatka.AiSloth.Cli/HostApi.cs`.
-- **Rare cases.** A case too rare to earn its own handling (AGENTS.md, "Proportional handling")
-  throws `InvalidOperationException` with a message saying what is off, under a
-  `// Not handled: <case>; <what handling it would take>.` comment, and reaches the general handler
-  like any bug. Example: `InspectRequiredAsync` in
-  `src/Sandboxing/Bagatka.Sandboxing.Docker/DockerSandboxProvider.cs`.
+- **Known gaps.** Every case the code doesn't handle, too rare to earn handling or not built yet,
+  is marked once, where it would be handled: `// Not handled: <case>; <what happens today or what
+  handling it would take>.` Nothing else lists them, so the change that handles one removes its
+  comment. A rare case (AGENTS.md, "Proportional handling") throws `InvalidOperationException` with
+  a message saying what is off, and reaches the general handler like any bug. Example:
+  `InspectRequiredAsync` in `src/Sandboxing/Bagatka.Sandboxing.Docker/DockerSandboxProvider.cs`.
 
 ## 12. Actor and authorization
 
@@ -619,13 +625,13 @@ Canonical examples: `Data/WorkspacesDbContext.cs` in the Workspaces module, and
 `Data/MachinesDbContext.cs` in the Machines module for one with an outbox.
 
 - **One DbContext per module.** Each module has one `internal` `<Module>DbContext`, with its own
-  schema and its migrations history table in that schema. `AddModuleDbContext` registers it and an
-  `IDbContextFactory<T>`; work that outlives a request, such as a stream or a job, creates short-lived
-  contexts from the factory instead of using the scoped one.
+  schema and its migrations history table in that schema, on the one database the host registers
+  (`AddModuleDatabase`). `AddModuleDbContext` registers a pooled `IDbContextFactory<T>`.
 - **Names.** Tables and columns are snake_case (EFCore.NamingConventions, applied by
   `UseModuleDatabase`), so hand-written SQL needs no quotes.
-- **One scope, one operation.** A tracked entity isn't refreshed when a later query in the same
-  scope loads it again, so each operation gets its own scope, as each request does.
+- **One operation, one context.** Every operation creates its context from the factory and
+  disposes it: a feature, a job's work on one item, a reaction, a stream's every read. A helper
+  that needs it takes it as a parameter.
 - **Everything is listed.** Every entity configuration and every type conversion is a visible
   line in the DbContext. No scanning.
 - **Writes.**
@@ -665,12 +671,13 @@ Canonical examples: `Data/WorkspacesDbContext.cs` in the Workspaces module, and
 - **Raw SQL.** Only through EF's parameterized APIs (`FromSql`, `SqlQuery`), and only for a
   measured need. Never concatenate SQL.
 - **Secrets at rest.** A secret a module must keep, such as an agent account's key, is stored
-  sealed with AES-256-GCM under a key from the module's settings, bound to its row's ID so it can't
-  be moved to another row. It is decrypted only to hand to whoever uses it, in a record whose text
+  sealed with AES-256-GCM under the module's own key, derived from the deployment's
+  (`EncryptionSettings`, section `Encryption`), bound to its row's ID so it can't be moved to
+  another row. It is decrypted only to hand to whoever uses it, in a record whose text
   form leaves it out, and never logged. A secret the module only checks, such as a daemon's or a
   machine's token, is stored as its SHA-256 hash instead. `SecretBox` (`Bagatka.Foundation.Modules`)
   seals and opens; each module registers its own, keyed by its schema, so no module ever opens with
-  another's key: `services.AddKeyedSingleton(SecretsDbContext.Schema, new SecretBox(settings.EncryptionKey))`
+  another's key: `services.AddKeyedSingleton(SecretsDbContext.Schema, new SecretBox(encryption, SecretsDbContext.Schema))`
   and `[FromKeyedServices(SecretsDbContext.Schema)] SecretBox box`. Canonical example: the Secrets
   module (`src/ControlPlane/Modules/Secrets`).
   Codes people pass on once, such as a machine's registration code or an invite, come from
@@ -682,7 +689,7 @@ Canonical examples: `Data/WorkspacesDbContext.cs` in the Workspaces module, and
   refers to them. The object is written before the row that refers to it, and the row deleted before
   the object, so an object may be left over but a row never points at nothing. Objects aren't
   encrypted here: the storage is protected like the database. Canonical example: checkpoints
-  (`src/ControlPlane/Modules/Nooks/Bagatka.AiSloth.Nooks/NooksApi.Checkpoints.cs`).
+  (`src/ControlPlane/Modules/Nooks/Bagatka.AiSloth.Nooks/Checkpoints.cs`).
 
 ## 14. Migrations
 
@@ -745,8 +752,8 @@ and `Reactions/OnMachineRemoved.cs` in the Nooks module. Delivery is in
 - **Who emits.** Only entities add events, through the `IOutbox` they receive as a parameter.
   The rows commit with the change.
 - **Delivery and idempotency.** After commit, Foundation's dispatcher, on the active instance,
-  delivers events at least once: it looks every second, oldest first, and runs each reaction in a
-  scope of its own. Every reaction is idempotent, preferably check-then-act on a key protected by a
+  delivers events at least once: it looks every second, oldest first, and runs each reaction in turn.
+  Every reaction is idempotent, preferably check-then-act on a key protected by a
   unique index.
 - **Failures.** A reaction that fails, by its result or an exception, has the event delivered again
   with growing waits, its other reactions too, up to ten minutes apart. After ten failures the event
@@ -853,6 +860,9 @@ Canonical example: `src/ControlPlane/Bagatka.AiSloth.WebApi/Endpoints/Workspaces
   methods, explicit binding attributes, and written return types.
 - **Endpoints translate only.** Build the actor, map the request to a command, call the
   contract, and map the `Result` to HTTP. No logic, no DbContext, no direct Sdk calls.
+- **Rate limits.** An endpoint that does expensive work for anyone, or for one person many times,
+  names one of the policies in `RateLimits.cs`: `.RequireRateLimiting(RateLimits.Starts)` and
+  `.ProducesProblem(StatusCodes.Status429TooManyRequests)`. Limits are host settings with defaults.
 - **Request records** live in the endpoints file and use the same field names as the command
   they map to.
 - **Responses.** Return contract DTOs directly. Add a WebApi response record only when the
@@ -880,7 +890,8 @@ Canonical example: `src/ControlPlane/Bagatka.AiSloth.WebApi/Endpoints/Workspaces
   webhooks verify their signature with the Sdk client, then call the owning module with a
   system actor.
 - **OpenAPI.** The document is generated by ASP.NET Core's built-in OpenAPI support from the
-  typed results.
+  typed results, and committed as `src/ControlPlane/Bagatka.AiSloth.WebApi/openapi.json`;
+  `HostJourney` fails when the host's differs, so every change to the API shows in review.
 
 ## 18. Pagination
 
@@ -940,7 +951,7 @@ NooksSettings nooks = builder.Configuration.GetRequired<NooksSettings>("Modules:
 
 builder.Services
     .AddDockerSandboxProvider(docker)
-    .AddNooksModule(nooks, limits => limits.BindConfiguration("Modules:Nooks:Limits"));
+    .AddNooksModule(nooks);
 ```
 
 - **Hosts read configuration; owners receive values.** Sdk clients, sandbox providers, and
@@ -1005,6 +1016,9 @@ UserId;System.Guid
 - **What never goes in logs.** Log IDs only: never personal data, secrets, or tokens.
 - **What to log.** Log what operators need. Expected errors aren't logged as errors, and
   unhandled exceptions are logged once.
+- **Levels.** Information records routine events, such as a nook falling asleep, for local runs
+  and tests. Deployed hosts keep Warning and above (`appsettings.json`), so every line there is
+  worth an operator's look; to investigate, raise a category with `Logging__LogLevel__<category>`.
 - **Traces and metrics.**
   - OpenTelemetry is configured by `Bagatka.ServiceDefaults` in every host.
   - A module adds an `ActivitySource` or `Meter` named `Bagatka.AiSloth.<Module>` only when it
@@ -1026,15 +1040,15 @@ UserId;System.Guid
 - **Shape.**
   - Implement it as a `BackgroundService` driven by a `PeriodicTimer`. A job that features need
     to run sooner exposes `Wake()` and waits for that or its interval instead
-    (`Jobs/NookReconciler.cs` in the Nooks module).
-  - Create one DI scope or context per item, and pass `stoppingToken` everywhere.
+    (`Jobs/NookLifecycle.cs` in the Nooks module).
+  - Create one context per item, and pass `stoppingToken` everywhere.
 - **One failure never stops a job.** Catch per item and per pass, log, and let the next pass retry.
 - **Bounded batches.** Each iteration processes a limited batch.
 - **The active instance runs it.** A job's `ExecuteAsync` returns
   `active.RunAsync(WorkAsync, stoppingToken)` (`ActiveInstance`, `Bagatka.Foundation.Modules`): its
   work starts when the instance takes the lease and stops when it hands over, so no two instances
   run it at once. Work is still idempotent, since an instance may stop at any point and the next one
-  starts from what was saved. Canonical example: `Jobs/NookReconciler.cs` in the Nooks module.
+  starts from what was saved. Canonical example: `Jobs/NookLifecycle.cs` in the Nooks module.
 - **Long-lived connections move with the work.** A stream that lasts, such as a watch or a daemon's
   or machine's connection, ends on `ActiveInstance.Leaving`, and its other end resumes on the active
   instance from where it was: after the last event, from the next offset, or by dialing again.
@@ -1051,17 +1065,7 @@ UserId;System.Guid
   `string.Create(CultureInfo.InvariantCulture, ...)`.
 - **Permission-dependent results** are never cached under a key that doesn't include the actor.
 
-## 25. Money
-
-- **One type.** A single `Money` value type in `Bagatka.Foundation`: a `decimal` amount plus an
-  ISO 4217 currency. Never `double` or `float`.
-- **Rules live on `Money`.** Arithmetic across currencies fails, and rounding rules are defined
-  on the type.
-- **Storage.** Money is stored as two columns: amount and currency.
-- **Formatting for humans uses an explicit culture.** Symbol placement and separators are
-  culture data, never code.
-
-## 26. Testing
+## 25. Testing
 
 Test what people and agents rely on, through the surface they use: the public API.
 
@@ -1109,7 +1113,7 @@ Test what people and agents rely on, through the surface they use: the public AP
 - **Test names state behavior,** for example `Rename_fails_for_deactivated_user`. Underscores are
   allowed in test projects only.
 
-## 27. Build, analyzers, banned APIs
+## 26. Build, analyzers, banned APIs
 
 The build files are the specification; this entry says what each one owns.
 
@@ -1132,7 +1136,7 @@ The build files are the specification; this entry says what each one owns.
 - **Repeated mistakes become bans.** When a mistake repeats, ban the API, raise an analyzer rule,
   or add a `BAG` rule with its test, rather than adding another paragraph here.
 
-## 28. Files and naming
+## 27. Files and naming
 
 - **One top-level type per file,** and the file is named after it: `UserId.cs`. Generic types use
   braces: `Result{T}.cs`. Partial types add a suffix: `UsersApi.RenameUser.cs`. MA0048 enforces
@@ -1145,7 +1149,7 @@ The build files are the specification; this entry says what each one owns.
 - **Nested types stay nested** only when they belong to their parent alone, such as an endpoint's
   request record.
 
-## 29. Recipes
+## 28. Recipes
 
 ### Add a feature
 
@@ -1182,7 +1186,7 @@ The build files are the specification; this entry says what each one owns.
 
 Follow `src/Sdk/README.md`.
 
-## 30. Addresses people supply
+## 29. Addresses people supply
 
 The control plane calls URLs people choose: an agent account's endpoint today, git remotes and
 webhooks later. Unguarded, anyone could make it reach this host, its private network, or a cloud's

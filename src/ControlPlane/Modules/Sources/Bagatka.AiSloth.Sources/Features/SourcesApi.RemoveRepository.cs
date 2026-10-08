@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Sources.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Sources.Contracts;
@@ -12,7 +13,9 @@ internal sealed partial class SourcesApi
 {
     public async Task<Result> RemoveRepositoryAsync(Actor actor, RepositoryId id, CancellationToken ct)
     {
-        Result<Repository> repository = await FindRepositoryAsync(actor, id, AccessLevel.Manage, ct);
+        await using SourcesDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Repository> repository = await FindRepositoryAsync(db, actor, id, AccessLevel.Manage, ct);
         if (repository.Failed)
         {
             return new Result(repository.Error);

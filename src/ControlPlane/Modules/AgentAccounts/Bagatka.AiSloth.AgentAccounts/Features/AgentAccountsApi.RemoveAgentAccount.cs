@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.AgentAccounts.Data;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,8 @@ internal sealed partial class AgentAccountsApi
 {
     public async Task<Result> RemoveAsync(Actor actor, AgentAccountId id, CancellationToken ct)
     {
+        await using AgentAccountsDbContext db = await databases.CreateDbContextAsync(ct);
+
         AgentAccount? account = await db.Accounts.SingleOrDefaultAsync(found => found.Id == id, ct);
         if (account is null || actor is not UserActor user)
         {

@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Machines.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,8 @@ internal sealed partial class MachinesApi
 {
     public async Task<Result> RemoveAsync(Actor actor, MachineId id, CancellationToken ct)
     {
+        await using MachinesDbContext db = await databases.CreateDbContextAsync(ct);
+
         Machine? machine = await db.Machines.SingleOrDefaultAsync(found => found.Id == id, ct);
         if (machine is null)
         {

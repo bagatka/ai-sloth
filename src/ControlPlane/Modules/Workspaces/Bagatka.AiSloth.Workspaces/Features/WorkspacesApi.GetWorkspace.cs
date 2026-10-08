@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Workspaces.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +13,8 @@ internal sealed partial class WorkspacesApi
 {
     public async Task<Result<WorkspaceSummary>> GetAsync(Actor actor, WorkspaceId id, CancellationToken ct)
     {
+        await using WorkspacesDbContext db = await databases.CreateDbContextAsync(ct);
+
         // Only people with access see a workspace; everyone else learns nothing about it.
         AccessLevel? access = await GetAccessAsync(actor, Resource.Workspace(id), ct);
         if (access is null)

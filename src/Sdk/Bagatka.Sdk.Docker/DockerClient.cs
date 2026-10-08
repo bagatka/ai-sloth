@@ -17,13 +17,13 @@ using Bagatka.Foundation;
 namespace Bagatka.Sdk.Docker;
 
 /// <summary>
-/// A minimal client for the Docker Engine API (version 1.47) over its Unix socket, covering only the
+/// A minimal client for the Docker Engine API (version 1.48, Docker 28 and later) over its Unix socket, covering only the
 /// endpoints AiSloth uses. Expected outcomes are results or <see langword="null"/>; anything else the
 /// engine rejects throws <see cref="HttpRequestException"/>. Thread-safe.
 /// </summary>
 public sealed class DockerClient : IDisposable
 {
-    private const string ApiVersion = "v1.47";
+    private const string ApiVersion = "v1.48";
 
     private readonly HttpClient _http;
 
@@ -81,11 +81,25 @@ public sealed class DockerClient : IDisposable
     public async Task<Result<string>> CreateContainerAsync(string name, ContainerConfiguration configuration, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+
+        // A lower gateway priority keeps a network from carrying the default route.
+        Dictionary<string, DockerWire.EndpointSettings> endpoints = configuration.ExtraNetworks
+            .ToDictionary(network => network, _ => new DockerWire.EndpointSettings(GwPriority: -1), StringComparer.Ordinal);
+        endpoints[configuration.Network] = new DockerWire.EndpointSettings(GwPriority: 0);
         DockerWire.ContainerCreate body = new DockerWire.ContainerCreate(
             configuration.Image,
             configuration.Environment,
             configuration.Labels,
-            new DockerWire.HostConfig(configuration.NanoCpus, configuration.MemoryBytes, configuration.ExtraHosts, configuration.Runtime));
+            configuration.Command.Count > 0 ? configuration.Command : null,
+            new DockerWire.HostConfig(
+                configuration.NanoCpus,
+                configuration.MemoryBytes,
+                configuration.ExtraHosts,
+                configuration.Runtime,
+                configuration.Network,
+                configuration.Capabilities,
+                configuration.Sysctls),
+            new DockerWire.NetworkingConfig(endpoints));
 
         using JsonContent content = JsonContent.Create(body, DockerJsonContext.Default.ContainerCreate);
         using HttpResponseMessage response = await _http.PostAsync(Path("containers/create?name=", name, string.Empty), content, ct).ConfigureAwait(false);
@@ -103,6 +117,55 @@ public sealed class DockerClient : IDisposable
 
         DockerWire.IdResponse created = await ReadAsync(response, DockerJsonContext.Default.IdResponse, ct).ConfigureAwait(false);
         return new Result<string>(created.Id);
+    }
+
+    /// <summary>
+    /// Creates a bridge network on an IPv4 subnet, such as <c>198.18.0.8/29</c>, whose first address
+    /// Docker reserves as the gateway, with the driver's options, such as one whose containers can't
+    /// reach each other.
+    /// </summary>
+    /// <returns>
+    /// A conflict: <c>docker.network_exists</c> when a network by that name exists already, or
+    /// <c>docker.subnet_in_use</c> when another network's subnet overlaps this one.
+    /// </returns>
+    public async Task<Result> CreateNetworkAsync(
+        string name,
+        string subnet,
+        IReadOnlyDictionary<string, string> options,
+        IReadOnlyDictionary<string, string> labels,
+        CancellationToken ct)
+    {
+        DockerWire.NetworkCreate body = new DockerWire.NetworkCreate(name, "bridge", options, labels, new DockerWire.Ipam([new DockerWire.IpamConfig(subnet)]));
+        using JsonContent content = JsonContent.Create(body, DockerJsonContext.Default.NetworkCreate);
+        using HttpResponseMessage response = await _http.PostAsync(new Uri("networks/create", UriKind.Relative), content, ct).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            string message = await MessageAsync(response, ct).ConfigureAwait(false);
+            return new Result(Error.Conflict("docker.network_exists", message));
+        }
+
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+        {
+            string message = await MessageAsync(response, ct).ConfigureAwait(false);
+            return new Result(Error.Conflict("docker.subnet_in_use", message));
+        }
+
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        return new Result(new Success());
+    }
+
+    /// <summary>Removes a network.</summary>
+    /// <returns><see langword="false"/> when it doesn't exist, or containers are still on it.</returns>
+    public async Task<bool> RemoveNetworkAsync(string name, CancellationToken ct)
+    {
+        using HttpResponseMessage response = await _http.DeleteAsync(Path("networks/", name, string.Empty), ct).ConfigureAwait(false);
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Conflict or HttpStatusCode.Forbidden)
+        {
+            return false;
+        }
+
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        return true;
     }
 
     /// <summary>Starts a container. Starting a running container does nothing.</summary>
@@ -129,11 +192,12 @@ public sealed class DockerClient : IDisposable
         }
     }
 
-    /// <summary>Freezes a running container's processes, keeping their memory.</summary>
-    public async Task PauseContainerAsync(string nameOrId, CancellationToken ct)
+    /// <summary>Waits until a container's entry point exits, returning its exit code.</summary>
+    public async Task<int> WaitContainerAsync(string nameOrId, CancellationToken ct)
     {
-        using HttpResponseMessage response = await _http.PostAsync(Path("containers/", nameOrId, "/pause"), content: null, ct).ConfigureAwait(false);
-        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        using HttpResponseMessage response = await _http.PostAsync(Path("containers/", nameOrId, "/wait"), content: null, ct).ConfigureAwait(false);
+        DockerWire.WaitResponse exited = await ReadAsync(response, DockerJsonContext.Default.WaitResponse, ct).ConfigureAwait(false);
+        return exited.StatusCode;
     }
 
     /// <summary>Lets a paused container's processes continue.</summary>

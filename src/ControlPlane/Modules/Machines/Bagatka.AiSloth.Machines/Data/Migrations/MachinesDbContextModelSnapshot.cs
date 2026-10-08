@@ -16,7 +16,7 @@ partial class MachinesDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261006211203_Outbox";
+    public override string LastMigrationId => "20261008091523_Initial";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {

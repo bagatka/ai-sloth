@@ -1,6 +1,9 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Users.Contracts;
@@ -13,7 +16,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// <summary>
 /// Journey: a host's first person signs in with its setup code; anyone can learn how to sign in, and
 /// only the host's own sessions sign calls in; someone signs in with <c>sloth</c> in the browser, then
-/// on a phone with a link code, and signs the phone out again.
+/// on a phone with a link code, and signs the phone out again. The host describes its API as the
+/// committed <c>openapi.json</c> does, so every change to it shows in review.
 /// </summary>
 public sealed partial class HostJourney(ControlPlane app)
 {
@@ -26,6 +30,8 @@ public sealed partial class HostJourney(ControlPlane app)
         await TheFirstPersonTookTheSetupCodeWhichWorksOnceAsync();
         await OnlySessionsSignCallsInAsync();
         await SomeoneSignsInOnALaptopThenAPhoneAndSignsThePhoneOutAsync();
+        await TheHostDescribesItsApiAsCommittedAsync();
+        await SomeoneStartingNooksFasterThanTheHostAllowsIsAskedToWaitAsync();
     }
 
     private async Task AnyoneLearnsHowToSignInAsync()
@@ -98,6 +104,46 @@ public sealed partial class HostJourney(ControlPlane app)
         Assert.Equal(1, reused);
         Assert.Equal(0, signedOut);
         Assert.Equal(0, laptopStill);
+    }
+
+    // Starts are bounded per person: past a burst of 20, the host answers 429 with when to try again.
+    // Starts it refuses still count, so these name a provider the workspace doesn't have.
+    private async Task SomeoneStartingNooksFasterThanTheHostAllowsIsAskedToWaitAsync()
+    {
+        using HttpClient hasty = app.ClientFor("hasty-" + Guid.CreateVersion7());
+        TestWorkspace acme = await TestWorkspace.CreateAsync(app, hasty);
+        for (int start = 0; start < 20; start++)
+        {
+            await Api.ExpectAsync(hasty.SendPostAsync(acme.Path + "/nooks", new { provider = "nowhere" }), HttpStatusCode.BadRequest);
+        }
+
+        using HttpResponseMessage refused = await hasty.SendPostAsync(acme.Path + "/nooks", new { provider = "nowhere" });
+        Problem problem = await Api.ProblemAsync(Task.FromResult(refused), HttpStatusCode.TooManyRequests);
+
+        Assert.Equal("host.too_many_requests", problem.Code);
+        Assert.NotNull(refused.Headers.RetryAfter);
+    }
+
+    // Without its servers, which name this run's port. A changed API leaves its description beside
+    // the test's output, to review and commit.
+    private async Task TheHostDescribesItsApiAsCommittedAsync()
+    {
+        using HttpClient anonymous = app.ClientWithToken(token: null);
+        using HttpResponseMessage response = await anonymous.SendGetAsync("/openapi/v1.json");
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        JsonObject document = JsonNode.Parse(body)!.AsObject();
+        document.Remove("servers");
+        string described = document.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
+        string committed = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "openapi.json"), TestContext.Current.CancellationToken);
+        string changed = Path.Combine(AppContext.BaseDirectory, "TestResults", "openapi.json");
+        if (!string.Equals(described, committed, StringComparison.Ordinal))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(changed)!);
+            await File.WriteAllTextAsync(changed, described, TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(string.Equals(described, committed, StringComparison.Ordinal), "The host's API changed; review " + changed + " and copy it to src/ControlPlane/Bagatka.AiSloth.WebApi/openapi.json.");
     }
 
     [GeneratedRegex("--code (?<code>[A-Z0-9]{16})", RegexOptions.None, matchTimeoutMilliseconds: 1000)]

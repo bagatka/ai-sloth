@@ -118,6 +118,8 @@ internal sealed class AgentAccount
 
     // What running an agent on the account takes. Model APIs are reached through the model gateway,
     // which adds these headers; plan tokens tied to one harness go to it.
+    // Not handled: Claude plans through the gateway; moving their token there needs a test against
+    // Anthropic.
     public AgentAccountCredential ToCredential(SecretBox box, Uri chatGptApi)
     {
         AgentAccountAccess access = Kind switch

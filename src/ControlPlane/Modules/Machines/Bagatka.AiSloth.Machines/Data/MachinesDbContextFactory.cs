@@ -10,7 +10,7 @@ internal sealed class MachinesDbContextFactory : IDesignTimeDbContextFactory<Mac
     public MachinesDbContext CreateDbContext(string[] args)
     {
         DbContextOptionsBuilder<MachinesDbContext> options = new DbContextOptionsBuilder<MachinesDbContext>();
-        options.UseModuleDatabase("Host=localhost", MachinesDbContext.Schema);
+        options.UseModuleDatabase(database: null, MachinesDbContext.Schema);
         return new MachinesDbContext(options.Options);
     }
 }

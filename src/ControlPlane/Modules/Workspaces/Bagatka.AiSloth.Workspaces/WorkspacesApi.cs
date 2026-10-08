@@ -12,14 +12,14 @@ using Microsoft.EntityFrameworkCore;
 namespace Bagatka.AiSloth.Workspaces;
 
 // The front door: dependencies and the access rule every feature shares. Each feature is a file in Features/.
-internal sealed partial class WorkspacesApi(WorkspacesDbContext db, TimeProvider time) : IWorkspacesApi
+internal sealed partial class WorkspacesApi(IDbContextFactory<WorkspacesDbContext> databases, TimeProvider time) : IWorkspacesApi
 {
     // How deep resources nest: a nook in a project in a workspace, with room to spare.
     private const int MaxDepth = 4;
 
     // The highest level given to the user on the resource or on anything it is in. Workspaces are in
     // nothing, so a nook takes one query for its workspace and one for the grants.
-    private async Task<AccessLevel?> AccessOfAsync(UserId userId, Resource resource, CancellationToken ct)
+    private static async Task<AccessLevel?> AccessOfAsync(WorkspacesDbContext db, UserId userId, Resource resource, CancellationToken ct)
     {
         List<Guid> reach = [resource.Id];
         List<Guid> unexplored = resource.Kind == ResourceKind.Workspace ? [] : [resource.Id];

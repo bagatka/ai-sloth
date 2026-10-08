@@ -10,7 +10,7 @@ internal sealed class ChatsDbContextFactory : IDesignTimeDbContextFactory<ChatsD
     public ChatsDbContext CreateDbContext(string[] args)
     {
         DbContextOptionsBuilder<ChatsDbContext> options = new DbContextOptionsBuilder<ChatsDbContext>();
-        options.UseModuleDatabase("Host=localhost", ChatsDbContext.Schema);
+        options.UseModuleDatabase(database: null, ChatsDbContext.Schema);
         return new ChatsDbContext(options.Options);
     }
 }

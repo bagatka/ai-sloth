@@ -8,4 +8,4 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// The nook's setup, when its files have one, starts and ends before its agent starts; a setup the
 /// agent wrote is tested in a fresh nook after its turn.
 /// </summary>
-public union ChatEventBody(MessageSent, MessageProposed, TurnStarted, MessageSteered, MessageCancelled, AgentUpdate, TurnEnded, CheckpointSaved, CheckpointFailed, AgentRestarted, SetupStarted, SetupEnded, SetupTestStarted, SetupTested);
+public union ChatEventBody(MessageSent, MessageProposed, TurnStarted, MessageSteered, MessageCancelled, AgentUpdate, TurnEnded, CheckpointSaved, CheckpointFailed, AgentRestarted, SetupStarted, SetupEnded, DiskNearlyFull);

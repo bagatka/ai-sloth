@@ -10,7 +10,7 @@ internal sealed class NooksDbContextFactory : IDesignTimeDbContextFactory<NooksD
     public NooksDbContext CreateDbContext(string[] args)
     {
         DbContextOptionsBuilder<NooksDbContext> options = new DbContextOptionsBuilder<NooksDbContext>();
-        options.UseModuleDatabase("Host=localhost", NooksDbContext.Schema);
+        options.UseModuleDatabase(database: null, NooksDbContext.Schema);
         return new NooksDbContext(options.Options);
     }
 }

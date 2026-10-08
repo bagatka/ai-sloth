@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Users.Data;
 using System;
 using System.Linq;
 using System.Threading;
@@ -14,6 +15,8 @@ internal sealed partial class UsersApi
 {
     public async Task<Result<StartedSession>> SignInAsync(Actor actor, SignIn command, CancellationToken ct)
     {
+        await using UsersDbContext db = await databases.CreateDbContextAsync(ct);
+
         // Only system code, the host's sign-in, starts sessions: it validated a provider's token or
         // checked that a newcomer may join. A code proves itself.
         if (actor is not SystemActor)
@@ -27,13 +30,7 @@ internal sealed partial class UsersApi
             return new Result<StartedSession>(device.Error);
         }
 
-        Task<Result<SignedInPerson>> finding = command.Proof switch
-        {
-            VerifiedIdentity identity => PersonWithIdentityAsync(identity, ct),
-            SignInCode code => PersonWithCodeAsync(code, ct),
-            Newcomer newcomer => Task.FromResult(AddNewcomer(newcomer)),
-        };
-        Result<SignedInPerson> person = await finding;
+        Result<SignedInPerson> person = await PersonAsync(db, command.Proof, ct);
         if (person.Failed)
         {
             return new Result<StartedSession>(person.Error);
@@ -55,7 +52,7 @@ internal sealed partial class UsersApi
     // The person a provider vouches for, recorded with the name it gave on their first sign-in. A new
     // person is saved at once, so two first sign-ins at the same moment, such as a web app's parallel
     // requests, end with the same person: the unique index lets one win, and the other reads it.
-    private async Task<Result<SignedInPerson>> PersonWithIdentityAsync(VerifiedIdentity identity, CancellationToken ct)
+    private async Task<Result<SignedInPerson>> PersonWithIdentityAsync(UsersDbContext db, VerifiedIdentity identity, CancellationToken ct)
     {
         Result<User> recorded = User.FromProvider(identity, time);
         if (recorded.Failed)
@@ -63,7 +60,7 @@ internal sealed partial class UsersApi
             return new Result<SignedInPerson>(recorded.Error);
         }
 
-        User? existing = await FindByIdentityAsync(identity, ct);
+        User? existing = await FindByIdentityAsync(db, identity, ct);
         if (existing is not null)
         {
             return new Result<SignedInPerson>(new SignedInPerson(existing, IsNew: false));
@@ -79,7 +76,7 @@ internal sealed partial class UsersApi
             {
                 // The failed insert stays tracked; forget it, or saving the session would repeat it.
                 db.ChangeTracker.Clear();
-                winner = await FindByIdentityAsync(identity, ct);
+                winner = await FindByIdentityAsync(db, identity, ct);
             }
 
             return winner is null ? new Result<SignedInPerson>(saved.Error) : new Result<SignedInPerson>(new SignedInPerson(winner, IsNew: false));
@@ -88,14 +85,14 @@ internal sealed partial class UsersApi
         return new Result<SignedInPerson>(new SignedInPerson(recorded.Output, IsNew: true));
     }
 
-    private async Task<User?> FindByIdentityAsync(VerifiedIdentity identity, CancellationToken ct)
+    private static async Task<User?> FindByIdentityAsync(UsersDbContext db, VerifiedIdentity identity, CancellationToken ct)
     {
         return await db.Users.AsNoTracking().SingleOrDefaultAsync(user => user.Issuer == identity.Issuer && user.Subject == identity.Subject, ct);
     }
 
     // The setup code makes its user the host's first person, while nobody has signed up; a link code
     // signs in its creator. The code is removed with the session, so it works once.
-    private async Task<Result<SignedInPerson>> PersonWithCodeAsync(SignInCode proof, CancellationToken ct)
+    private async Task<Result<SignedInPerson>> PersonWithCodeAsync(UsersDbContext db, SignInCode proof, CancellationToken ct)
     {
         byte[] hash = OneTimeCode.Hash(proof.Code ?? string.Empty);
         IssuedCode? code = await db.IssuedCodes.SingleOrDefaultAsync(found => found.CodeHash == hash, ct);
@@ -129,7 +126,18 @@ internal sealed partial class UsersApi
         return new Result<SignedInPerson>(new SignedInPerson(first, IsNew: true));
     }
 
-    private Result<SignedInPerson> AddNewcomer(Newcomer newcomer)
+    // The person the proof vouches for.
+    private Task<Result<SignedInPerson>> PersonAsync(UsersDbContext db, SignInProof proof, CancellationToken ct)
+    {
+        return proof switch
+        {
+            VerifiedIdentity identity => PersonWithIdentityAsync(db, identity, ct),
+            SignInCode code => PersonWithCodeAsync(db, code, ct),
+            Newcomer newcomer => Task.FromResult(AddNewcomer(db, newcomer)),
+        };
+    }
+
+    private Result<SignedInPerson> AddNewcomer(UsersDbContext db, Newcomer newcomer)
     {
         Result<BoundedName> name = BoundedName.Parse(newcomer.Name, "name");
         if (name.Failed)

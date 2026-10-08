@@ -5,13 +5,14 @@ using Bagatka.AiSloth.Machines.Data;
 using Bagatka.AiSloth.Machines.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Machines;
 
 // The front door for both contracts: dependencies and the helpers several features share. Each
 // feature is a file in Features/.
 internal sealed partial class MachinesApi(
-    MachinesDbContext db,
+    IDbContextFactory<MachinesDbContext> databases,
     IWorkspacesApi workspaces,
     MachineConnections connections,
     TimeProvider time,

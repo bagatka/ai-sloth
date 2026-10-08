@@ -13,9 +13,35 @@ internal static class DockerWire
         string Image,
         IReadOnlyList<string> Env,
         IReadOnlyDictionary<string, string> Labels,
-        HostConfig HostConfig);
+        IReadOnlyList<string>? Cmd,
+        HostConfig HostConfig,
+        NetworkingConfig NetworkingConfig);
 
-    internal sealed record HostConfig(long NanoCpus, long Memory, IReadOnlyList<string> ExtraHosts, string Runtime);
+    internal sealed record HostConfig(
+        long NanoCpus,
+        long Memory,
+        IReadOnlyList<string> ExtraHosts,
+        string Runtime,
+        string NetworkMode,
+        IReadOnlyList<string> CapAdd,
+        IReadOnlyDictionary<string, string> Sysctls);
+
+    internal sealed record NetworkingConfig(IReadOnlyDictionary<string, EndpointSettings> EndpointsConfig);
+
+    internal sealed record EndpointSettings(int GwPriority);
+
+    internal sealed record NetworkCreate(
+        string Name,
+        string Driver,
+        IReadOnlyDictionary<string, string> Options,
+        IReadOnlyDictionary<string, string> Labels,
+        [property: JsonPropertyName("IPAM")] Ipam Ipam);
+
+    internal sealed record Ipam(IReadOnlyList<IpamConfig> Config);
+
+    internal sealed record IpamConfig(string Subnet);
+
+    internal sealed record WaitResponse(int StatusCode);
 
     internal sealed record SystemInfo(IReadOnlyDictionary<string, JsonElement>? Runtimes);
 

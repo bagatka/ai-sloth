@@ -14,6 +14,10 @@ namespace Bagatka.AiSloth.Nooks.Daemons;
 // at once would need each nook's calls routed to the instance its daemon dialed.
 internal sealed class DaemonConnections : IDisposable
 {
+    // How long a call waits for a nook's daemon to dial in, such as a new nook's first connection or
+    // one dialing again after a deploy.
+    public static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
+
     private readonly TimeProvider _time;
     private readonly Lock _gate = new Lock();
     private readonly Dictionary<NookId, DaemonConnection> _connections = [];
@@ -133,6 +137,15 @@ internal sealed class DaemonConnections : IDisposable
         lock (_gate)
         {
             return _connections.ContainsKey(nookId);
+        }
+    }
+
+    // What the nook used at its daemon's latest report; none while its daemon isn't connected here.
+    public NookUsage? UsageOf(NookId nookId)
+    {
+        lock (_gate)
+        {
+            return _connections.GetValueOrDefault(nookId)?.Usage;
         }
     }
 

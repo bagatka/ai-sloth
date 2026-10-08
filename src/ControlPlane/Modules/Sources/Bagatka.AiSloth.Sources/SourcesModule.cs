@@ -1,5 +1,6 @@
 using Bagatka.AiSloth.Sources.Contracts;
 using Bagatka.AiSloth.Sources.Data;
+using Bagatka.AiSloth.Sources.Git;
 using Bagatka.Foundation.Modules;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,13 +16,14 @@ public static class SourcesModule
     /// Workspaces module, and a <c>GitHubClient</c> (<c>AddGitHubClient</c>). Copying and pushing run
     /// the <c>git</c> command line, which the host's computer has.
     /// </summary>
-    public static IServiceCollection AddSourcesModule(this IServiceCollection services, SourcesSettings settings)
+    public static IServiceCollection AddSourcesModule(this IServiceCollection services, SourcesSettings settings, EncryptionSettings encryption)
     {
         services.AddSingleton(settings);
         services.AddSingleton<CoAuthorLine>();
-        services.AddKeyedSingleton(SourcesDbContext.Schema, new SecretBox(settings.EncryptionKey));
-        services.AddModuleDbContext<SourcesDbContext>(settings.ConnectionString, SourcesDbContext.Schema);
-        services.AddScoped<ISourcesApi, SourcesApi>();
+        services.AddSingleton<GitScratch>();
+        services.AddKeyedSingleton(SourcesDbContext.Schema, new SecretBox(encryption, SourcesDbContext.Schema));
+        services.AddModuleDbContext<SourcesDbContext>(SourcesDbContext.Schema);
+        services.AddSingleton<ISourcesApi, SourcesApi>();
         return services;
     }
 }

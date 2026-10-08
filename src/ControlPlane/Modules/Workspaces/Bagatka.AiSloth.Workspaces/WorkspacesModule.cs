@@ -11,10 +11,10 @@ namespace Bagatka.AiSloth.Workspaces;
 public static class WorkspacesModule
 {
     /// <summary>Registers the module. The host must also register a <see cref="System.TimeProvider"/>.</summary>
-    public static IServiceCollection AddWorkspacesModule(this IServiceCollection services, WorkspacesSettings settings)
+    public static IServiceCollection AddWorkspacesModule(this IServiceCollection services)
     {
-        services.AddModuleDbContext<WorkspacesDbContext>(settings.ConnectionString, WorkspacesDbContext.Schema);
-        services.AddScoped<IWorkspacesApi, WorkspacesApi>();
+        services.AddModuleDbContext<WorkspacesDbContext>(WorkspacesDbContext.Schema);
+        services.AddSingleton<IWorkspacesApi, WorkspacesApi>();
         return services;
     }
 }

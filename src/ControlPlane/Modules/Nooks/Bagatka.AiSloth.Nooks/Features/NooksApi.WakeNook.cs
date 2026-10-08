@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Nooks.Data;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,8 +15,10 @@ internal sealed partial class NooksApi
 
     public async Task<Result> WakeAsync(Actor actor, WakeNook command, CancellationToken ct)
     {
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
         NookId id = command.NookId;
-        Result<Nook> nook = await FindNookAsync(actor, id, AccessLevel.Write, ct);
+        Result<Nook> nook = await FindNookAsync(db, actor, id, AccessLevel.Write, ct);
         if (nook.Failed)
         {
             return new Result(nook.Error);
@@ -28,7 +31,7 @@ internal sealed partial class NooksApi
                 return new Result(Error.Validation("keepAwakeFor", "Must be more than zero and at most an hour."));
             }
 
-            activity.KeepAwake(id, span);
+            activity.KeepBusy(id, span);
         }
         else
         {
@@ -39,7 +42,6 @@ internal sealed partial class NooksApi
             return new Result(new Success());
         }
 
-        bool woke = await sleeper.WakeAsync(id, actor, ct);
-        return woke ? new Result(new Success()) : new Result(NooksErrors.NotReady);
+        return await lifecycle.WakeAsync(id, actor, ct);
     }
 }

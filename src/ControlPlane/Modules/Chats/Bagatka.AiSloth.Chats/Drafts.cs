@@ -6,11 +6,9 @@ using System.Threading.Tasks;
 using Bagatka.AiSloth.Chats.Data;
 using Bagatka.AiSloth.Chats.Model;
 using Bagatka.AiSloth.Nooks.Contracts;
-using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -18,38 +16,17 @@ namespace Bagatka.AiSloth.Chats;
 
 // Drafts (README, "Drafts"): chats nobody wrote in yet. Apps start a chat as someone starts writing
 // its first message, so its nook and agent are ready when it is sent. A draft nobody writes in goes
-// with its nook after the draft lifetime, and a person keeps at most two in a workspace.
+// with its nook after the draft lifetime.
 internal sealed class Drafts(
     IDbContextFactory<ChatsDbContext> databases,
-    IServiceScopeFactory scopes,
+    INooksApi nooks,
     ChatsSettings settings,
     ActiveInstance active,
     TimeProvider time,
     ILogger<Drafts> logger) : BackgroundService
 {
-    public const int MaxPerPerson = 2;
     private const int BatchSize = 20;
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
-
-    // Before a person starts a chat: their oldest drafts in the workspace go, so that with the new one
-    // they keep at most two.
-    public async Task MakeRoomAsync(UserId person, WorkspaceId workspace, CancellationToken ct)
-    {
-        List<Draft> older;
-        await using (ChatsDbContext db = await databases.CreateDbContextAsync(ct))
-        {
-            older = await db.Drafts.AsNoTracking()
-                .Where(draft => draft.StartedBy == person && draft.WorkspaceId == workspace)
-                .OrderByDescending(draft => draft.StartedAt)
-                .Skip(MaxPerPerson - 1)
-                .ToListAsync(ct);
-        }
-
-        foreach (Draft draft in older)
-        {
-            await DropAsync(draft, ct);
-        }
-    }
 
     // Only the active instance runs it (PATTERNS.md, entry 23).
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -105,8 +82,7 @@ internal sealed class Drafts(
             await transaction.CommitAsync(ct);
         }
 
-        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-        Result deleted = await scope.ServiceProvider.GetRequiredService<INooksApi>().DeleteAsync(SystemActors.Harness, draft.NookId, ct);
+        Result deleted = await nooks.DeleteAsync(SystemActors.Harness, draft.NookId, ct);
         if (deleted.Failed)
         {
             Log.DraftNookKept(logger, draft.NookId.Value, deleted.Error.Message);

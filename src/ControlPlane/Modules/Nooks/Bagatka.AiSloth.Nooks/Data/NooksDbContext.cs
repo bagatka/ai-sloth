@@ -24,6 +24,8 @@ internal sealed class NooksDbContext(DbContextOptions<NooksDbContext> options) :
 
     public DbSet<ReadyCopy> ReadyCopies => Set<ReadyCopy>();
 
+    public DbSet<KeptFolder> KeptFolders => Set<KeptFolder>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -33,6 +35,7 @@ internal sealed class NooksDbContext(DbContextOptions<NooksDbContext> options) :
         modelBuilder.ApplyConfiguration(new CheckpointConfiguration());
         modelBuilder.ApplyConfiguration(new CheckpointPartConfiguration());
         modelBuilder.ApplyConfiguration(new ReadyCopyConfiguration());
+        modelBuilder.ApplyConfiguration(new KeptFolderConfiguration());
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

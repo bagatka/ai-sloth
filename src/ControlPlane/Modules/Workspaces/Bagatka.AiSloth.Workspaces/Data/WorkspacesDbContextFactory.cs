@@ -10,7 +10,7 @@ internal sealed class WorkspacesDbContextFactory : IDesignTimeDbContextFactory<W
     public WorkspacesDbContext CreateDbContext(string[] args)
     {
         DbContextOptionsBuilder<WorkspacesDbContext> options = new DbContextOptionsBuilder<WorkspacesDbContext>();
-        options.UseModuleDatabase("Host=localhost", WorkspacesDbContext.Schema);
+        options.UseModuleDatabase(database: null, WorkspacesDbContext.Schema);
         return new WorkspacesDbContext(options.Options);
     }
 }

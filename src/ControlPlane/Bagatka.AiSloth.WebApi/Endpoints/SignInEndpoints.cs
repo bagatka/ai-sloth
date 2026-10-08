@@ -56,7 +56,7 @@ internal static class SignInEndpoints
     public static void MapSignInEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/.well-known/aisloth", Discover).AllowAnonymous().WithTags("Sign-in");
-        RouteGroupBuilder signIn = app.MapGroup("/sign-in").WithTags("Sign-in").AllowAnonymous();
+        RouteGroupBuilder signIn = app.MapGroup("/sign-in").WithTags("Sign-in").AllowAnonymous().RequireRateLimiting(RateLimits.SignIn).ProducesProblem(StatusCodes.Status429TooManyRequests);
         signIn.MapPost("/code", SignInWithCode);
         signIn.MapGet("/", StartInBrowser).ExcludeFromDescription();
         signIn.MapGet("/callback", ReturnFromProvider).ExcludeFromDescription();

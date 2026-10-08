@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Workspaces.Data;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,6 +14,8 @@ internal sealed partial class WorkspacesApi
 {
     public async Task<Result> RevokeAsync(Actor actor, RevokeAccess command, CancellationToken ct)
     {
+        await using WorkspacesDbContext db = await databases.CreateDbContextAsync(ct);
+
         ArgumentNullException.ThrowIfNull(command);
         Error? refused = await RefusalAsync(actor, command.Resource, AccessLevel.Manage, ct);
         if (refused is not null)

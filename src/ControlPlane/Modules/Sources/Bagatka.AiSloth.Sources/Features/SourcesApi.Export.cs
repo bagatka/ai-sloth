@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Sources.Data;
 using System;
 using System.IO;
 using System.Net.Http;
@@ -16,13 +17,15 @@ internal sealed partial class SourcesApi
 {
     public async Task<Result<ExportedRepository>> ExportAsync(Actor actor, ExportRepository command, Stream destination, CancellationToken ct)
     {
-        Result<Repository> repository = await FindRepositoryAsync(actor, command.Repository, AccessLevel.Read, ct);
+        await using SourcesDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Repository> repository = await FindRepositoryAsync(db, actor, command.Repository, AccessLevel.Read, ct);
         if (repository.Failed)
         {
             return new Result<ExportedRepository>(repository.Error);
         }
 
-        Result<Reached> reached = await ReachAsync(actor, repository.Output, ct);
+        Result<Reached> reached = await ReachAsync(db, actor, repository.Output, ct);
         if (reached.Failed)
         {
             return new Result<ExportedRepository>(reached.Error);
@@ -35,39 +38,32 @@ internal sealed partial class SourcesApi
         }
 
         // A bare copy of the one branch, with its history, sent on as a bundle the nook clones.
-        DirectoryInfo scratch = Directory.CreateTempSubdirectory("aisloth-export-");
-        try
+        using GitScratch.Lease scratch = await scratches.TakeAsync("export", ct);
+        string[] clone = ["clone", "--quiet", "--bare", "--single-branch", "--no-tags", "--branch", branch, "--", reached.Output.Repository.CloneUrl.AbsoluteUri, "repository.git"];
+        GitRun cloned = await GitCommand.RunAsync(scratch.Path, clone, reached.Output.Token, input: null, output: null, ct);
+        if (!cloned.Succeeded)
         {
-            string[] clone = ["clone", "--quiet", "--bare", "--single-branch", "--no-tags", "--branch", branch, "--", reached.Output.Repository.CloneUrl.AbsoluteUri, "repository.git"];
-            GitRun cloned = await GitCommand.RunAsync(scratch.FullName, clone, reached.Output.Token, input: null, output: null, ct);
-            if (!cloned.Succeeded)
-            {
-                bool noBranch = cloned.Errors.Contains("not found in upstream", StringComparison.Ordinal);
-                return new Result<ExportedRepository>(noBranch
-                    ? Error.Validation("branch", repository.Output.Name + " has no branch " + branch + ".")
-                    : Error.Conflict("sources.git_failed", "Copying " + reached.Output.Repository.FullName + " failed: " + cloned.Errors));
-            }
-
-            string copy = Path.Combine(scratch.FullName, "repository.git");
-            GitRun head = await GitCommand.RunAsync(copy, ["rev-parse", "refs/heads/" + branch], token: null, input: null, output: null, ct);
-            GitRun bundled = await GitCommand.RunAsync(copy, ["bundle", "create", "-", "refs/heads/" + branch], token: null, input: null, destination, ct);
-            if (!head.Succeeded || !bundled.Succeeded)
-            {
-                throw new InvalidOperationException("Bundling a fresh copy of " + reached.Output.Repository.FullName + " failed: " + head.Errors + bundled.Errors);
-            }
-
-            return new Result<ExportedRepository>(new ExportedRepository(repository.Output.Name, branch, head.Output, reached.Output.Repository.CloneUrl));
+            bool noBranch = cloned.Errors.Contains("not found in upstream", StringComparison.Ordinal);
+            return new Result<ExportedRepository>(noBranch
+                ? Error.Validation("branch", repository.Output.Name + " has no branch " + branch + ".")
+                : Error.Conflict("sources.git_failed", "Copying " + reached.Output.Repository.FullName + " failed: " + cloned.Errors));
         }
-        finally
+
+        string copy = Path.Combine(scratch.Path, "repository.git");
+        GitRun head = await GitCommand.RunAsync(copy, ["rev-parse", "refs/heads/" + branch], token: null, input: null, output: null, ct);
+        GitRun bundled = await GitCommand.RunAsync(copy, ["bundle", "create", "-", "refs/heads/" + branch], token: null, input: null, destination, ct);
+        if (!head.Succeeded || !bundled.Succeeded)
         {
-            scratch.Delete(recursive: true);
+            throw new InvalidOperationException("Bundling a fresh copy of " + reached.Output.Repository.FullName + " failed: " + head.Errors + bundled.Errors);
         }
+
+        return new Result<ExportedRepository>(new ExportedRepository(repository.Output.Name, branch, head.Output, reached.Output.Repository.CloneUrl));
     }
 
     // The repository at GitHub, as the actor's connection sees it now.
-    private async Task<Result<Reached>> ReachAsync(Actor actor, Repository repository, CancellationToken ct)
+    private async Task<Result<Reached>> ReachAsync(SourcesDbContext db, Actor actor, Repository repository, CancellationToken ct)
     {
-        Result<Connected> connected = await ConnectedAsync(actor, ct);
+        Result<Connected> connected = await ConnectedAsync(db, actor, ct);
         if (connected.Failed)
         {
             return new Result<Reached>(connected.Error);

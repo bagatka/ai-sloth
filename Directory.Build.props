@@ -26,7 +26,7 @@
     <NuGetAuditMode>all</NuGetAuditMode>
   </PropertyGroup>
 
-  <!-- Our own analyzer: the code-shape rules no off-the-shelf analyzer covers (PATTERNS.md, entry 27).
+  <!-- Our own analyzer: the code-shape rules no off-the-shelf analyzer covers (PATTERNS.md, entry 26).
        The Aspire app host would otherwise take the reference for a service to run. -->
   <ItemGroup Condition="'$(MSBuildProjectName)' != 'Bagatka.Analyzers'">
     <ProjectReference Include="$(MSBuildThisFileDirectory)analyzers/Bagatka.Analyzers/Bagatka.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" IsAspireProjectResource="false" />

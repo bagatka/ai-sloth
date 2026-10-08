@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Nooks.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,43 +21,28 @@ internal sealed partial class NooksApi
 
     public async Task<Result<NookSummary>> CreateAsync(Actor actor, CreateNook command, CancellationToken ct)
     {
-        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(command.WorkspaceId), ct);
-        if (access is null)
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<ProviderId> provider = await CheckCreateAsync(actor, command, ct);
+        if (provider.Failed)
         {
-            return new Result<NookSummary>(WorkspacesErrors.NotFound);
+            return new Result<NookSummary>(provider.Error);
         }
 
-        if (access < AccessLevel.Write)
-        {
-            return new Result<NookSummary>(Error.Forbidden);
-        }
-
-        ProviderId? provider = await FindProviderAsync(actor, command.WorkspaceId, command.Provider, ct);
-        if (provider is null)
-        {
-            return new Result<NookSummary>(Error.Validation("provider", "The workspace has no provider with this ID."));
-        }
-
-        bool harnessOffered = command.Harness is null || settings.HarnessImages.ContainsKey(command.Harness);
-        if (!harnessOffered)
-        {
-            return new Result<NookSummary>(Error.Validation("harness", "This deployment offers no harness with this ID."));
-        }
-
-        bool keepable = command.KeptPaths.Count <= MaxPaths && command.KeptPaths.All(path => IsAbsolute(path) && path is not "/work" && !path.StartsWith("/work/", StringComparison.Ordinal));
-        if (!keepable)
-        {
-            return new Result<NookSummary>(Error.Validation("keptPaths", "At most 10 absolute paths outside /work, without . or .. parts."));
-        }
-
-        Result<IReadOnlyList<PlannedRepository>> planned = await PlanSourcesAsync(actor, command, ct);
+        Result<IReadOnlyList<PlannedRepository>> planned = await PlanSourcesAsync(db, actor, command, ct);
         if (planned.Failed)
         {
             return new Result<NookSummary>(planned.Error);
         }
 
+        Result room = await lifecycle.MakeRoomAsync(db, command.WorkspaceId, ct);
+        if (room.Failed)
+        {
+            return new Result<NookSummary>(room.Error);
+        }
+
         UserId? createdBy = actor is UserActor user ? user.UserId : null;
-        Nook nook = Nook.Create(command.WorkspaceId, provider.Value, command.Harness, createdBy, command.CopyOf, command.Checkpoint, [.. command.KeptPaths], command.FromScratch, time);
+        Nook nook = Nook.Create(command.WorkspaceId, provider.Output, command.Image, createdBy, command.ReservedFor, command.CopyOf, command.Checkpoint, [.. command.KeptPaths], command.FromScratch, time);
         List<SourceCopy> copies = [.. planned.Output.Select(repository => SourceCopy.Planned(nook.Id, repository.Name, repository.Repository, repository.Branch))];
 
         // Recorded before the nook is saved: a record for a nook that never got saved stands alone harmlessly.
@@ -75,17 +61,49 @@ internal sealed partial class NooksApi
             return new Result<NookSummary>(saved.Error);
         }
 
-        reconciler.Wake();
-        return new Result<NookSummary>(nook.ToSummary([.. copies.Select(copy => copy.ToContract())]));
+        lifecycle.Wake();
+        return new Result<NookSummary>(SummaryOf(nook, [.. copies.Select(copy => copy.ToContract())]));
+    }
+
+    // Whether the actor may create this nook here, and where it runs: the workspace's provider by its ID.
+    private async Task<Result<ProviderId>> CheckCreateAsync(Actor actor, CreateNook command, CancellationToken ct)
+    {
+        AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(command.WorkspaceId), ct);
+        if (access is null)
+        {
+            return new Result<ProviderId>(WorkspacesErrors.NotFound);
+        }
+
+        if (access < AccessLevel.Write)
+        {
+            return new Result<ProviderId>(Error.Forbidden);
+        }
+
+        ProviderId? provider = await FindProviderAsync(actor, command.WorkspaceId, command.Provider, ct);
+        if (provider is null)
+        {
+            return new Result<ProviderId>(Error.Validation("provider", "The workspace has no provider with this ID."));
+        }
+
+        bool imageOffered = command.Image is null || settings.Images.ContainsKey(command.Image);
+        if (!imageOffered)
+        {
+            return new Result<ProviderId>(Error.Validation("image", "This deployment offers no image by this name."));
+        }
+
+        bool keepable = command.KeptPaths.Count <= MaxPaths && command.KeptPaths.All(path => IsAbsolute(path) && path is not "/work" && !path.StartsWith("/work/", StringComparison.Ordinal));
+        return keepable
+            ? new Result<ProviderId>(provider.Value)
+            : new Result<ProviderId>(Error.Validation("keptPaths", "At most 10 absolute paths outside /work, without . or .. parts."));
     }
 
     // The repositories the nook starts with, by copy name: the workspace's, each once. A copy of
     // another nook is of one the actor may see, in the same workspace, instead.
-    private async Task<Result<IReadOnlyList<PlannedRepository>>> PlanSourcesAsync(Actor actor, CreateNook command, CancellationToken ct)
+    private async Task<Result<IReadOnlyList<PlannedRepository>>> PlanSourcesAsync(NooksDbContext db, Actor actor, CreateNook command, CancellationToken ct)
     {
         if (command.CopyOf is NookId copyOf)
         {
-            Result<Nook> source = await FindNookAsync(actor, copyOf, AccessLevel.Read, ct);
+            Result<Nook> source = await FindNookAsync(db, actor, copyOf, AccessLevel.Read, ct);
             bool copyable = !source.Failed && source.Output.WorkspaceId == command.WorkspaceId && command.Repositories.Count == 0;
             if (!copyable)
             {

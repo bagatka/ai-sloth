@@ -11,14 +11,13 @@ namespace Bagatka.Foundation.Modules.Events;
 public static class Reactions
 {
     /// <summary>
-    /// Registers a reaction to another module's event, in the reacting module's registration. Each
-    /// delivery resolves it in a scope of its own.
+    /// Registers a reaction to another module's event, in the reacting module's registration.
     /// </summary>
     public static IServiceCollection AddReaction<TEvent, TReaction>(this IServiceCollection services)
         where TEvent : class
         where TReaction : class, IReaction<TEvent>
     {
-        services.AddScoped<TReaction>();
+        services.AddSingleton<TReaction>();
         services.AddSingleton(new Reaction(TypeOf<TEvent>(), typeof(TReaction).Name, DeliverAsync<TEvent, TReaction>));
         return services;
     }

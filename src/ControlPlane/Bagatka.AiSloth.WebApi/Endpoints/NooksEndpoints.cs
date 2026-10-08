@@ -30,12 +30,12 @@ internal static class NooksEndpoints
         OutputRetention? Retention = null,
         IReadOnlyDictionary<string, string>? Environment = null);
 
-    internal sealed record SendInputRequest(ReadOnlyMemory<byte> Data);
+    internal sealed record SendInputRequest(byte[] Data);
 
     public static RouteGroupBuilder MapNooksEndpoints(this IEndpointRouteBuilder app)
     {
         RouteGroupBuilder workspaceNooks = app.MapGroup("/workspaces/{workspaceId:guid}/nooks").WithTags("Nooks");
-        workspaceNooks.MapPost("/", Create);
+        workspaceNooks.MapPost("/", Create).RequireRateLimiting(RateLimits.Starts).ProducesProblem(StatusCodes.Status429TooManyRequests);
         workspaceNooks.MapGet("/", List);
         app.MapGet("/workspaces/{workspaceId:guid}/providers", ListProviders).WithTags("Nooks");
 
@@ -66,7 +66,7 @@ internal static class NooksEndpoints
         [FromServices] INooksApi api,
         CancellationToken ct)
     {
-        Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider, Harness: null, request.Repositories ?? [], request.CopyOf, request.Checkpoint, KeptPaths: [], FromScratch: false), ct);
+        Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider, Image: null, request.Repositories ?? [], request.CopyOf, request.Checkpoint, KeptPaths: [], FromScratch: false, ReservedFor: null), ct);
         return result.ToCreated(nook => string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Id.Value}"));
     }
 
@@ -80,12 +80,18 @@ internal static class NooksEndpoints
         [FromQuery] string? source,
         [FromQuery] int? checkpoint,
         ClaimsPrincipal principal,
+        HttpContext context,
         [FromServices] INooksApi api,
         CancellationToken ct)
     {
         // The archive is complete before it is sent, so a failure midway is a problem, not a broken
-        // file. Sending it deletes it.
+        // file. It lives on this instance's disk until the request ends, however it ends.
         string path = Path.GetTempFileName();
+        context.Response.OnCompleted(() =>
+        {
+            File.Delete(path);
+            return Task.CompletedTask;
+        });
         Result downloaded;
         await using (FileStream archive = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 81920, FileOptions.Asynchronous))
         {
@@ -94,7 +100,6 @@ internal static class NooksEndpoints
 
         if (downloaded.Failed)
         {
-            File.Delete(path);
             return downloaded.Error.ToProblem();
         }
 
@@ -103,7 +108,7 @@ internal static class NooksEndpoints
         return TypedResults.Stream(
             async body =>
             {
-                await using FileStream archive = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None, bufferSize: 81920, FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+                await using FileStream archive = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None, bufferSize: 81920, FileOptions.Asynchronous);
                 await archive.CopyToAsync(body);
             },
             "application/gzip",
@@ -234,11 +239,12 @@ internal static class NooksEndpoints
     }
 
     /// <summary>
-    /// Streams a process's output from <c>fromOffset</c> (0 by default) as server-sent events:
-    /// <c>output</c> events carry the offset, channel, and base64 data, and a final <c>exit</c> event
-    /// carries the exit code. Disconnecting ends the watch, never the process.
+    /// Streams a process's output from <c>fromOffset</c> (0 by default) as server-sent events named
+    /// after what they carry: <c>ProcessOutput</c> events carry the offset, channel, and base64 data,
+    /// and a final <c>ProcessExited</c> event the exit code. Disconnecting ends the watch, never the
+    /// process.
     /// </summary>
-    private static async Task<Results<ServerSentEventsResult<object>, ProblemHttpResult>> WatchProcess(
+    private static async Task<Results<ServerSentEventsResult<ProcessEvent>, ProblemHttpResult>> WatchProcess(
         [FromRoute] Guid nookId,
         [FromRoute] Guid processId,
         [FromQuery] long? fromOffset,
@@ -266,7 +272,7 @@ internal static class NooksEndpoints
         [FromServices] INooksApi api,
         CancellationToken ct)
     {
-        Result result = await api.SendInputAsync(principal.ToActor(), new SendInput(NookId.From(nookId), ProcessId.From(processId), request.Data), ct);
+        Result result = await api.SendInputAsync(principal.ToActor(), new SendInput(NookId.From(nookId), ProcessId.From(processId), request.Data.AsMemory()), ct);
         return result.ToNoContent();
     }
 
@@ -282,17 +288,18 @@ internal static class NooksEndpoints
         return result.ToNoContent();
     }
 
-    private static async IAsyncEnumerable<SseItem<object>> AsServerSentEvents(HttpResponse response, IAsyncEnumerable<ProcessEvent> events, [EnumeratorCancellation] CancellationToken ct)
+    private static async IAsyncEnumerable<SseItem<ProcessEvent>> AsServerSentEvents(HttpResponse response, IAsyncEnumerable<ProcessEvent> events, [EnumeratorCancellation] CancellationToken ct)
     {
         // The headers go out now, not with the first output, so a client watching a quiet process knows it is connected.
         await response.Body.FlushAsync(ct);
         await foreach (ProcessEvent processEvent in events.WithCancellation(ct))
         {
-            yield return processEvent switch
+            string kind = processEvent switch
             {
-                ProcessOutput output => new SseItem<object>(output, "output"),
-                ProcessExited exited => new SseItem<object>(exited, "exit"),
+                ProcessOutput => nameof(ProcessOutput),
+                ProcessExited => nameof(ProcessExited),
             };
+            yield return new SseItem<ProcessEvent>(processEvent, kind);
         }
     }
 }

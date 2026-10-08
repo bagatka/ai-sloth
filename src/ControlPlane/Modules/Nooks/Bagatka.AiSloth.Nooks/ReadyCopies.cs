@@ -38,7 +38,7 @@ internal sealed class ReadyCopies(
         {
             await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
             List<SourceCopy> repositories = await db.SourceCopies.AsNoTracking().Where(copy => copy.NookId == nook.Id).ToListAsync(ct);
-            string? image = settings.ImageOf(nook.Harness);
+            string? image = settings.ImageOf(nook.Image);
             if (repositories.Count == 0 || image is null)
             {
                 return;

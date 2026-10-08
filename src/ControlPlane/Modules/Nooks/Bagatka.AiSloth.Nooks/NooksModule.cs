@@ -24,19 +24,21 @@ public static class NooksModule
     public static IServiceCollection AddNooksModule(this IServiceCollection services, NooksSettings settings)
     {
         services.AddSingleton(settings);
-        services.AddModuleDbContext<NooksDbContext>(settings.ConnectionString, NooksDbContext.Schema);
+        services.AddModuleDbContext<NooksDbContext>(NooksDbContext.Schema);
         services.AddSingleton<DaemonConnections>();
         services.AddSingleton<InputFeeds>();
         services.AddSingleton<FileLocks>();
         services.AddSingleton<ReadyCopies>();
-        services.AddSingleton<NookReconciler>();
-        services.AddHostedService(provider => provider.GetRequiredService<NookReconciler>());
         services.AddSingleton<NookActivity>();
-        services.AddSingleton<NookSleeper>();
-        services.AddHostedService(provider => provider.GetRequiredService<NookSleeper>());
-        services.AddScoped<NooksApi>();
-        services.AddScoped<INooksApi>(provider => provider.GetRequiredService<NooksApi>());
-        services.AddScoped<INookDaemonsApi>(provider => provider.GetRequiredService<NooksApi>());
+        services.AddSingleton<NookProcesses>();
+        services.AddSingleton<Checkpoints>();
+        services.AddSingleton<NookLifecycle>();
+        services.AddHostedService(provider => provider.GetRequiredService<NookLifecycle>());
+        services.AddSingleton<NookFiles>();
+        services.AddSingleton<KeptFolders>();
+        services.AddSingleton<NooksApi>();
+        services.AddSingleton<INooksApi>(provider => provider.GetRequiredService<NooksApi>());
+        services.AddSingleton<INookDaemonsApi>(provider => provider.GetRequiredService<NooksApi>());
         services.AddReaction<MachineRemoved, OnMachineRemoved>();
         return services;
     }

@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using Bagatka.Sdk.Docker;
 
 namespace Bagatka.Sandboxing.Docker;
@@ -45,4 +46,11 @@ public sealed record DockerSandboxSettings
 
     /// <summary>The deployment this provider serves.</summary>
     public string Scope { get; }
+
+    /// <summary>
+    /// The TCP ports on the Docker host that sandboxes reach, at <c>host.docker.internal</c>, such as a
+    /// control plane's that runs there; none by default. Nothing else on the host or its networks is
+    /// in a sandbox's reach.
+    /// </summary>
+    public IReadOnlyList<int> HostPorts { get; init; } = [];
 }

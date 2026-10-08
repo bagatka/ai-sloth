@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Workspaces.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,6 +16,8 @@ internal sealed partial class WorkspacesApi
 {
     public async Task<Result<Page<WorkspaceSummary>>> ListMineAsync(Actor actor, PageRequest page, CancellationToken ct)
     {
+        await using WorkspacesDbContext db = await databases.CreateDbContextAsync(ct);
+
         if (actor is not UserActor user)
         {
             return new Result<Page<WorkspaceSummary>>(Error.Unauthorized);

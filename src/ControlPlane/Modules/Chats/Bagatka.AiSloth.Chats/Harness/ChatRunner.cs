@@ -15,7 +15,6 @@ using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.Harnesses;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Bagatka.AiSloth.Chats.Harness;
@@ -27,7 +26,8 @@ namespace Bagatka.AiSloth.Chats.Harness;
 internal sealed class ChatRunner(
     ChatId chatId,
     IDbContextFactory<ChatsDbContext> databases,
-    IServiceScopeFactory scopes,
+    INooksApi nooks,
+    IAgentAccountsApi accounts,
     AgentProcess agent,
     HarnessStates states,
     AgentInstructions instructions,
@@ -232,21 +232,7 @@ internal sealed class ChatRunner(
         bool stopRequested = Interlocked.Exchange(ref _stopRequested, 0) == 1;
         if (stopRequested)
         {
-            StopTurn(db, chat, waiting, outgoing);
-            await StopSetupTestAsync(db, chat, waits, ct);
-        }
-
-        // The files a turn changed are saved before the next turn changes them again.
-        if (chat.CheckpointAfter is MessageId after && chat.TurnMessageId is null)
-        {
-            await SaveAsync(db, ct);
-            await TakeCheckpointAsync(db, chat, after, ct);
-        }
-
-        // A setup the agent prepared is tested from its turn's checkpoint, before the next turn.
-        if (chat.SetupTestAfter is MessageId preparing && chat.TurnMessageId is null && chat.CheckpointAfter is null)
-        {
-            await TestSetupAsync(db, chat, preparing, waits, ct);
+            await StopTurnAsync(db, chat, waiting, ct);
         }
 
         List<Message> queued = waiting.Where(message => message.State == MessageState.Queued).ToList();
@@ -258,16 +244,15 @@ internal sealed class ChatRunner(
                 await StartHarnessAsync(db, chat, queued.FirstOrDefault(), outgoing, ct);
             }
         }
-        else if (chat.SessionId is not null && chat.SetupTestAfter is null)
+        else if (chat.SessionId is not null)
         {
-            await CatchUpStateAsync(chat, queued, ct);
             await DeliverAsync(db, chat, chat.SessionId, queued, outgoing, ct);
         }
 
         await SaveAsync(db, ct);
         await SendAsync(chat, outgoing, ct);
         bool idle = chat.TurnMessageId is null && !waiting.Any(message => message.Waiting) && !chat.StartsAgent
-            && chat.SetupTestAfter is null && (chat.HarnessProcessId is null || chat.SessionId is not null);
+            && (chat.HarnessProcessId is null || chat.SessionId is not null);
         if (!idle)
         {
             await KeepAwakeAsync(chat, ct);
@@ -286,8 +271,7 @@ internal sealed class ChatRunner(
             return;
         }
 
-        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-        Result kept = await scope.ServiceProvider.GetRequiredService<INooksApi>().WakeAsync(SystemActors.Harness, new WakeNook(chat.NookId, KeepAwakeFor), ct);
+        Result kept = await nooks.WakeAsync(SystemActors.Harness, new WakeNook(chat.NookId, KeepAwakeFor), ct);
         if (!kept.Failed)
         {
             _keptAwakeAt = now;
@@ -311,58 +295,52 @@ internal sealed class ChatRunner(
 
     // The turn ends now; whatever the agent still sends about it is kept, but no longer waited for.
     // Messages it hasn't received are cancelled.
-    private void StopTurn(ChatsDbContext db, Chat chat, List<Message> waiting, List<string> outgoing)
+    private async Task StopTurnAsync(ChatsDbContext db, Chat chat, List<Message> waiting, CancellationToken ct)
     {
-        if (chat.TurnMessageId is not null)
-        {
-            db.Events.Add(chat.Record(new ChatEventBody(new TurnEnded("cancelled", Failure: null)), time));
-            chat.TurnEnded();
-            _agentFinishedTurn = false;
-            if (chat.SessionId is not null)
-            {
-                outgoing.Add(Acp.Cancel(chat.SessionId));
-            }
-        }
-
         foreach (Message message in waiting.Where(message => message.State == MessageState.Queued))
         {
             db.Events.Add(chat.Record(new ChatEventBody(new MessageCancelled(message.Id)), time));
             message.Cancel();
         }
-    }
 
-    // Takes the checkpoint after the message's turn, and syncs the harness state. A failed
-    // checkpoint is told and the chat goes on: the next turn's checkpoint keeps its files too.
-    private async Task TakeCheckpointAsync(ChatsDbContext db, Chat chat, MessageId after, CancellationToken ct)
-    {
-        string text = await db.Messages.Where(message => message.Id == after).Select(message => message.Text).SingleAsync(ct);
-        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-        Result<CheckpointSummary> taken = await scope.ServiceProvider.GetRequiredService<INooksApi>()
-            .CheckpointAsync(SystemActors.Harness, new CheckpointNook(chat.NookId, Note(text)), ct);
-        ChatEventBody told = taken.Failed
-            ? new ChatEventBody(new CheckpointFailed(taken.Error.Message))
-            : new ChatEventBody(new CheckpointSaved(taken.Output.Number));
-        db.Events.Add(chat.Record(told, time));
-        chat.CheckpointTaken();
-        string? state = await states.SyncAsync(chat, ct);
-        chat.HarnessStateSynced(state);
-    }
-
-    // Before a turn starts, its agent's nook gets the harness state its person's other chats saved since.
-    private async Task CatchUpStateAsync(Chat chat, List<Message> queued, CancellationToken ct)
-    {
-        if (chat.TurnMessageId is not null || queued.Count == 0)
+        if (chat.TurnMessageId is not MessageId turn)
         {
             return;
         }
 
-        bool moved = await states.MovedAsync(chat, ct);
-        if (moved)
+        if (chat.SessionId is not null)
         {
-            string? state = await states.SyncAsync(chat, ct);
-            chat.HarnessStateSynced(state);
+            await SendAsync(chat, [Acp.Cancel(chat.SessionId)], ct);
         }
+
+        await EndTurnAsync(db, chat, turn, new TurnEnded("cancelled", Failure: null), ct);
     }
+
+    // A turn ends with a checkpoint of the files it changed, and only then does everyone see that it
+    // ended, so a turn that ended has its files saved. A failed checkpoint is told and the chat goes
+    // on: the next turn's checkpoint keeps the files too. A nearly full disk is told too, since the
+    // next checkpoints may fail. Then the harness state syncs.
+    private async Task EndTurnAsync(ChatsDbContext db, Chat chat, MessageId turn, TurnEnded ended, CancellationToken ct)
+    {
+        await SaveAsync(db, ct);
+        string text = await db.Messages.Where(message => message.Id == turn).Select(message => message.Text).SingleAsync(ct);
+        Result<CheckpointSummary> taken = await nooks.CheckpointAsync(SystemActors.Harness, new CheckpointNook(chat.NookId, Note(text)), ct);
+        ChatEventBody told = taken.Failed
+            ? new ChatEventBody(new CheckpointFailed(taken.Error.Message))
+            : new ChatEventBody(new CheckpointSaved(taken.Output.Number));
+        db.Events.Add(chat.Record(told, time));
+        Result<NookSummary> nook = await nooks.GetAsync(SystemActors.Harness, chat.NookId, ct);
+        if (!nook.Failed && nook.Output is { DiskNearlyFull: true, Usage: NookUsage usage })
+        {
+            db.Events.Add(chat.Record(new ChatEventBody(new DiskNearlyFull(usage.DiskUsedBytes, usage.DiskTotalBytes)), time));
+        }
+
+        db.Events.Add(chat.Record(new ChatEventBody(ended), time));
+        chat.TurnEnded();
+        _agentFinishedTurn = false;
+        await states.SyncAsync(chat, ct);
+    }
+
 
     // A checkpoint's note: the first line of the message, cut to fit.
     private static string Note(string text)
@@ -388,7 +366,7 @@ internal sealed class ChatRunner(
 
             db.Events.Add(chat.Record(new ChatEventBody(new TurnStarted(first.Id)), time));
             first.Deliver();
-            chat.TurnStarted(first.Id, testsSetup: first.SetupTest is not null);
+            chat.TurnStarted(first.Id);
             _firstActionDue = first.SentAt;
             outgoing.Add(Acp.Prompt(first.Id.Value, sessionId, first.Text));
         }
@@ -410,15 +388,13 @@ internal sealed class ChatRunner(
     // or when someone stops it.
     private async Task<bool> AccountServesAsync(ChatsDbContext db, Chat chat, Message first, CancellationToken ct)
     {
-        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-        Result<AgentAccountCredential> used = await scope.ServiceProvider.GetRequiredService<IAgentAccountsApi>()
-            .UseAsync(SystemActors.Harness, chat.AgentAccountId, chat.WorkspaceId, ct);
+        Result<AgentAccountCredential> used = await accounts.UseAsync(SystemActors.Harness, chat.AgentAccountId, chat.WorkspaceId, ct);
         if (!used.Failed)
         {
             return true;
         }
 
-        Fail(db, chat, first, "The agent couldn't start: " + used.Error.Message);
+        await FailAsync(db, chat, first, "The agent couldn't start: " + used.Error.Message, ct);
         await StopHarnessAsync(chat, ct);
         return false;
     }
@@ -432,16 +408,14 @@ internal sealed class ChatRunner(
         HarnessProfile? harness = HarnessProfiles.Find(chat.Harness);
         if (harness is null)
         {
-            Fail(db, chat, first, "The agent couldn't start: its harness is no longer offered.");
+            await FailAsync(db, chat, first, "The agent couldn't start: its harness is no longer offered.", ct);
             return;
         }
 
-        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-        Result<AgentAccountCredential> used = await scope.ServiceProvider.GetRequiredService<IAgentAccountsApi>()
-            .UseAsync(SystemActors.Harness, chat.AgentAccountId, chat.WorkspaceId, ct);
+        Result<AgentAccountCredential> used = await accounts.UseAsync(SystemActors.Harness, chat.AgentAccountId, chat.WorkspaceId, ct);
         if (used.Failed)
         {
-            Fail(db, chat, first, "The agent couldn't start: " + used.Error.Message);
+            await FailAsync(db, chat, first, "The agent couldn't start: " + used.Error.Message, ct);
             return;
         }
 
@@ -467,16 +441,15 @@ internal sealed class ChatRunner(
         Result instructed = await instructions.WriteAsync(chat, harness, ct);
         if (instructed.Failed)
         {
-            Fail(db, chat, first, "The agent couldn't start: writing its instructions failed: " + instructed.Error.Message);
+            await FailAsync(db, chat, first, "The agent couldn't start: writing its instructions failed: " + instructed.Error.Message, ct);
             return;
         }
 
-        string? state = await states.SyncAsync(chat, ct);
-        chat.HarnessStateSynced(state);
+        await states.SyncAsync(chat, ct);
         Result<ProcessId> started = await agent.StartAsync(chat.NookId, environment, ct);
         if (started.Failed)
         {
-            Fail(db, chat, first, "The agent couldn't start: " + started.Error.Message);
+            await FailAsync(db, chat, first, "The agent couldn't start: " + started.Error.Message, ct);
             return;
         }
 
@@ -490,15 +463,11 @@ internal sealed class ChatRunner(
     // fails the start.
     private async Task<bool> SetUpAsync(ChatsDbContext db, Chat chat, Message? first, Waits waits, CancellationToken ct)
     {
-        Result<NookSetup> setup;
-        await using (AsyncServiceScope scope = scopes.CreateAsyncScope())
-        {
-            setup = await scope.ServiceProvider.GetRequiredService<INooksApi>().GetSetupAsync(SystemActors.Harness, chat.NookId, ct);
-        }
+        Result<NookSetup> setup = await nooks.GetSetupAsync(SystemActors.Harness, chat.NookId, ct);
 
         if (setup.Failed)
         {
-            Fail(db, chat, first, "The agent couldn't start: " + setup.Error.Message);
+            await FailAsync(db, chat, first, "The agent couldn't start: " + setup.Error.Message, ct);
             chat.AgentStartTried();
             return false;
         }
@@ -542,61 +511,6 @@ internal sealed class ChatRunner(
         finally
         {
             Wake();
-        }
-    }
-
-    // Tests the setup the agent prepared in a fresh nook, in the background, as the person who asked:
-    // the chat tells when the test starts and how it ended, and a failure goes back to the agent to fix,
-    // until the last test.
-    private async Task TestSetupAsync(ChatsDbContext db, Chat chat, MessageId preparing, Waits waits, CancellationToken ct)
-    {
-        Message asked = await db.Messages.SingleAsync(message => message.Id == preparing, ct);
-        int test = asked.SetupTest ?? 1;
-        if (!waits.SetupTest.Works(preparing))
-        {
-            db.Events.Add(chat.Record(new ChatEventBody(new SetupTestStarted(test)), time));
-        }
-
-        Actor person = Actor.ForUser(asked.SentBy);
-        SetupTestResult? result = await waits.SetupTest.ResultAsync(preparing, token => ThenWakeAsync(setups.TestAsync(person, chat.NookId, chat.Harness, token)), ct);
-        if (result is null)
-        {
-            return;
-        }
-
-        bool fixes = result.ExitCode > 0 && test < NookSetups.MaxTests;
-        db.Events.Add(chat.Record(new ChatEventBody(new SetupTested(test, result.ExitCode, result.FromScratch, result.Again, result.Output, fixes)), time));
-        chat.SetupTestEnded();
-        if (!fixes)
-        {
-            return;
-        }
-
-        Result<Message> fix = Message.Send(chat.Id, asked.SentBy, NookSetups.FixRequest(result.Output ?? string.Empty), isProposal: false, proposalId: null, test + 1, time);
-        if (fix.Failed)
-        {
-            throw new InvalidOperationException("Asking chat " + chatId.Value + "'s agent to fix its setup failed: " + fix.Error.Message);
-        }
-
-        db.Messages.Add(fix.Output);
-        Wake();
-    }
-
-    // Stopping the agent stops testing its setup too, whether the test was due or running.
-    private async Task StopSetupTestAsync(ChatsDbContext db, Chat chat, Waits waits, CancellationToken ct)
-    {
-        if (chat.SetupTestAfter is not MessageId preparing)
-        {
-            return;
-        }
-
-        bool running = waits.SetupTest.Works(preparing);
-        await waits.SetupTest.StopAsync();
-        chat.SetupTestEnded();
-        if (running)
-        {
-            int test = await db.Messages.Where(message => message.Id == preparing).Select(message => message.SetupTest ?? 1).SingleAsync(ct);
-            db.Events.Add(chat.Record(new ChatEventBody(new SetupTested(test, ProcessExited.Lost, TimeSpan.Zero, Again: null, "Stopped.", AgentFixes: false)), time));
         }
     }
 
@@ -646,6 +560,7 @@ internal sealed class ChatRunner(
 
         switch (read.Value)
         {
+            // Not handled: merging streamed text chunks, each of which is a row.
             case AcpUpdate update when !chat.LoadingSession:
                 db.Events.Add(chat.Record(new ChatEventBody(new AgentUpdate(update.Update)), time));
                 MeasureFirstAction(chat, update);
@@ -682,10 +597,10 @@ internal sealed class ChatRunner(
                 await FailStartAsync(db, chat, failed.Error, ct);
                 break;
             case AcpPromptEnded ended:
-                EndTurn(db, chat, MessageId.From(ended.Prompt), new TurnEnded(ended.StopReason, Failure: null));
+                await PromptEndedAsync(db, chat, MessageId.From(ended.Prompt), new TurnEnded(ended.StopReason, Failure: null), ct);
                 break;
             case AcpPromptFailed failed:
-                EndTurn(db, chat, MessageId.From(failed.Prompt), new TurnEnded("failed", failed.Error));
+                await PromptEndedAsync(db, chat, MessageId.From(failed.Prompt), new TurnEnded("failed", failed.Error), ct);
                 break;
             case AcpSteerAnswered answered:
                 await HandleSteerAnswerAsync(db, chat, MessageId.From(answered.Message), answered.Injected, ct);
@@ -710,7 +625,7 @@ internal sealed class ChatRunner(
     private async Task FailStartAsync(ChatsDbContext db, Chat chat, string error, CancellationToken ct)
     {
         Message? first = await db.Messages.Where(message => message.ChatId == chatId && message.State == MessageState.Queued).OrderBy(message => message.Id).FirstOrDefaultAsync(ct);
-        Fail(db, chat, first, "The agent couldn't start: " + error);
+        await FailAsync(db, chat, first, "The agent couldn't start: " + error, ct);
         await StopHarnessAsync(chat, ct);
     }
 
@@ -728,16 +643,12 @@ internal sealed class ChatRunner(
     }
 
     // A stopped turn already ended; its late answer changes nothing.
-    private void EndTurn(ChatsDbContext db, Chat chat, MessageId prompt, TurnEnded ended)
+    private async Task PromptEndedAsync(ChatsDbContext db, Chat chat, MessageId prompt, TurnEnded ended, CancellationToken ct)
     {
-        if (chat.TurnMessageId != prompt)
+        if (chat.TurnMessageId == prompt)
         {
-            return;
+            await EndTurnAsync(db, chat, prompt, ended, ct);
         }
-
-        db.Events.Add(chat.Record(new ChatEventBody(ended), time));
-        chat.TurnEnded();
-        _agentFinishedTurn = false;
     }
 
     private async Task HandleSteerAnswerAsync(ChatsDbContext db, Chat chat, MessageId steered, bool injected, CancellationToken ct)
@@ -765,11 +676,10 @@ internal sealed class ChatRunner(
     private async Task HandleExitAsync(ChatsDbContext db, Chat chat, int exitCode, CancellationToken ct)
     {
         bool lost = exitCode == ProcessExited.Lost;
-        if (chat.TurnMessageId is not null && !lost)
+        if (chat.TurnMessageId is MessageId turn && !lost)
         {
             string failure = string.Create(CultureInfo.InvariantCulture, $"The agent stopped with exit code {exitCode}.");
-            db.Events.Add(chat.Record(new ChatEventBody(new TurnEnded("failed", failure)), time));
-            chat.TurnEnded();
+            await EndTurnAsync(db, chat, turn, new TurnEnded("failed", failure), ct);
         }
 
         List<Message> steering = await db.Messages.Where(message => message.ChatId == chatId && message.State == MessageState.Steering).ToListAsync(ct);
@@ -793,12 +703,11 @@ internal sealed class ChatRunner(
 
     // The turn a lost agent was working on ends as failed; otherwise the message gets a turn that
     // fails at once.
-    private void Fail(ChatsDbContext db, Chat chat, Message? message, string failure)
+    private async Task FailAsync(ChatsDbContext db, Chat chat, Message? message, string failure, CancellationToken ct)
     {
-        if (chat.TurnMessageId is not null)
+        if (chat.TurnMessageId is MessageId turn)
         {
-            db.Events.Add(chat.Record(new ChatEventBody(new TurnEnded("failed", failure)), time));
-            chat.TurnEnded();
+            await EndTurnAsync(db, chat, turn, new TurnEnded("failed", failure), ct);
         }
         else if (message is not null)
         {
@@ -881,8 +790,7 @@ internal sealed class ChatRunner(
     private sealed record Progress(NookId NookId, ProcessId? Harness, long OutputOffset, bool Idle);
 
     // What a runner waits for in the background, stopped when it stops: following the setup run its
-    // agent waits for, testing a setup the agent prepared in a fresh nook, and a regular tick that has
-    // the runner look at its chat again.
+    // agent waits for, and a regular tick that has the runner look at its chat again.
     private sealed class Waits : IAsyncDisposable
     {
         private readonly CancellationTokenSource _stop;
@@ -896,12 +804,9 @@ internal sealed class ChatRunner(
 
         public Background<SetupEnd> SetupRun { get; } = new Background<SetupEnd>();
 
-        public Background<SetupTestResult> SetupTest { get; } = new Background<SetupTestResult>();
-
         public async ValueTask DisposeAsync()
         {
             await SetupRun.StopAsync();
-            await SetupTest.StopAsync();
             await _stop.CancelAsync();
             await _ticking;
             _stop.Dispose();
@@ -932,12 +837,6 @@ internal sealed class ChatRunner(
         private object? _key;
         private CancellationTokenSource? _stop;
         private Task<T>? _done;
-
-        // Whether it works, or worked, on this.
-        public bool Works(object key)
-        {
-            return _done is not null && Equals(_key, key);
-        }
 
         // Its result once it ended; until then null, working on it from now on, instead of anything else.
         public async Task<T?> ResultAsync(object key, Func<CancellationToken, Task<T>> work, CancellationToken ct)

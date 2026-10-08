@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Workspaces.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Workspaces.Contracts;
@@ -11,6 +12,8 @@ internal sealed partial class WorkspacesApi
 {
     public async Task<Result<WorkspaceSummary>> CreateAsync(Actor actor, CreateWorkspace command, CancellationToken ct)
     {
+        await using WorkspacesDbContext db = await databases.CreateDbContextAsync(ct);
+
         // Only a user can manage a workspace.
         if (actor is not UserActor user)
         {

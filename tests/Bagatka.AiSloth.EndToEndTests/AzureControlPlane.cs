@@ -45,6 +45,25 @@ public sealed class AzureControlPlane : IAsyncDisposable
         return _started.Value;
     }
 
+    /// <summary>Waits until a nook's sandbox is gone from Azure, such as after a long sleep; false when it stays.</summary>
+    public static async Task<bool> SandboxGoneAsync(ControlPlane app, Guid nookId, TimeSpan patience)
+    {
+        string[] group = Group!.Split('/');
+        ServiceCollection services = new ServiceCollection();
+        services.AddAzureSandboxProvider(new AzureSandboxSettings(group[0], group[1], group[2], group[3], app.Scope), new AzureCliCredential());
+        await using ServiceProvider provider = services.BuildServiceProvider();
+        ISandboxProvider azure = provider.GetRequiredService<ISandboxProvider>();
+        long started = TimeProvider.System.GetTimestamp();
+        SandboxObservation? sandbox = await azure.ObserveAsync(SandboxKey.From(nookId), CancellationToken.None);
+        while (sandbox is not null && TimeProvider.System.GetElapsedTime(started) < patience)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+            sandbox = await azure.ObserveAsync(SandboxKey.From(nookId), CancellationToken.None);
+        }
+
+        return sandbox is null;
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_app is not null)
@@ -74,13 +93,12 @@ public sealed class AzureControlPlane : IAsyncDisposable
         _app = new ControlPlane(
             [
                 "Parameters:nook-harnesses=claude-code",
-                "Parameters:nook-sleep-after=00:00:08",
-                "Parameters:nook-evict-after=00:00:20",
                 "Parameters:azure-sandbox-group=" + Group,
                 "Parameters:nook-image-repository=" + repository,
                 "Parameters:nook-daemon-url=" + _tunnels.DaemonUrl,
                 "Parameters:nook-models-url=" + _tunnels.ModelsUrl,
             ],
+            [("Modules__Nooks__SleepAfter", "00:00:08"), ("Modules__Nooks__EvictAfter", "00:00:20")],
             daemonPort,
             modelsPort);
         await _app.InitializeAsync();

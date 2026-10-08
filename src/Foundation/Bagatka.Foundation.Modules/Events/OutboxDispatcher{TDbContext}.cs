@@ -4,21 +4,19 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Bagatka.Foundation.Modules.Events;
 
 // Delivers the events in one module's outbox to the reactions registered for them, after they commit
-// (PATTERNS.md, entry 15): oldest first, every second, at least once. Each reaction runs in a scope of
-// its own. A message is deleted once all its reactions succeed; one whose reactions fail is delivered
+// (PATTERNS.md, entry 15): oldest first, every second, at least once. A message is deleted once all its reactions succeed; one whose reactions fail is delivered
 // again with growing waits, its successful reactions too, and after MaxAttempts it is parked and logged
 // for an operator. Messages wait only for their own retries, never for others'. Only the active
 // instance delivers.
 internal sealed class OutboxDispatcher<TDbContext>(
     IDbContextFactory<TDbContext> databases,
-    IServiceScopeFactory scopes,
+    IServiceProvider services,
     IEnumerable<Reaction> reactions,
     ActiveInstance active,
     TimeProvider time,
@@ -92,8 +90,7 @@ internal sealed class OutboxDispatcher<TDbContext>(
         {
             try
             {
-                await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-                Result handled = await reaction.DeliverAsync(scope.ServiceProvider, message.Payload, ct);
+                Result handled = await reaction.DeliverAsync(services, message.Payload, ct);
                 if (handled.Failed)
                 {
                     Log.ReactionFailed(logger, null, reaction.Name, message.Id, handled.Error.Message);

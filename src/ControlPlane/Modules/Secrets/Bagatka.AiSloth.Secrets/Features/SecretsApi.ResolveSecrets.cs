@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Secrets.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,6 +15,8 @@ internal sealed partial class SecretsApi
 {
     public async Task<Result<IReadOnlyDictionary<string, string>>> ResolveAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct)
     {
+        await using SecretsDbContext db = await databases.CreateDbContextAsync(ct);
+
         // The module that starts processes decides who may; values never go to people from here.
         if (actor is not SystemActor)
         {

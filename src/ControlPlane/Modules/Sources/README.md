@@ -65,12 +65,14 @@ the refresh token with each renewal.
 
 ## Configuration
 
-`SourcesSettings`: the connection string, the key that seals tokens, and the host's GitHub App
-(client ID, client secret, slug), without which GitHub can't be connected. The host also registers
+`SourcesSettings`: the host's GitHub App (client ID, client secret, slug), without which GitHub
+can't be connected; and the deployment's `EncryptionSettings`, for sealing tokens. The host also registers
 `GitHubClient` with GitHub's addresses, github.com's unless it says otherwise.
 
 ## Decisions and constraints
 
+- **Copies of repositories pass through the control plane's disk,** for exports into nooks and for
+  pushes: at most two at once (`Git/GitScratch.cs`), each deleted when its work ends, however it ends.
 - **One GitHub App per host, acting as each person.** People connect with GitHub's device flow, so a
   CLI needs no callback and the host no public address. A company installs the app on its
   organization's repositories; each member's pushes and pull requests are theirs, under GitHub's own
@@ -89,13 +91,3 @@ the refresh token with each renewal.
   change the branch prefix (`aisloth/`); a push can name any branch.
 - **Git is a file-history format, not a product concept.** People see repositories, pushes, and
   pull requests; branches only as names.
-
-## Not built yet
-
-- Other git hosts, such as GitLab, with a token per repository; and repositories by URL.
-- Folders AiSloth keeps, with versions, which need object storage (with Checkpoints).
-- Bringing new commits from GitHub into a running nook; a nook keeps the branch it started from.
-- Revoking a person's authorization at GitHub when they disconnect, and a workspace-wide identity
-  policy.
-- Two repositories of one name from different owners in one workspace: the second is refused.
-- GitHub Enterprise Server's no-reply addresses, and `sloth github create-app` against it.

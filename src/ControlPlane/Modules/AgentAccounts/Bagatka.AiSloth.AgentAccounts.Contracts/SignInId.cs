@@ -5,7 +5,7 @@ using Bagatka.Foundation;
 namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 
 /// <summary>
-/// Identifies a sign-in in progress (<see cref="IAgentAccountsApi.StartSignInAsync"/>).
+/// Identifies a sign-in in progress.
 /// </summary>
 [JsonConverter(typeof(TypedIdJsonConverter<SignInId>))]
 public readonly record struct SignInId : ITypedId<SignInId>

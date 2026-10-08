@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Users.Data;
 using System;
 using System.Linq;
 using System.Threading;
@@ -14,6 +15,8 @@ internal sealed partial class UsersApi
 {
     public async Task<Result<LinkCode>> CreateLinkCodeAsync(Actor actor, CancellationToken ct)
     {
+        await using UsersDbContext db = await databases.CreateDbContextAsync(ct);
+
         if (actor is not UserActor user)
         {
             return new Result<LinkCode>(Error.Unauthorized);

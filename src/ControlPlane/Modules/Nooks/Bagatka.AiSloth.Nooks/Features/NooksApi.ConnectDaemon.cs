@@ -16,6 +16,8 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<IAsyncEnumerable<DaemonInstruction>>> ConnectAsync(Actor actor, ConnectDaemon command, IAsyncEnumerable<DaemonReport> reports, CancellationToken ct)
     {
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
         // A daemon proves its nook with the nook's token; the actor is always anonymous.
         Nook? nook = await db.Nooks.SingleOrDefaultAsync(found => found.Id == command.NookId, ct);
         if (nook is null || !nook.AcceptsDaemonToken(command.Token) || !nook.DaemonConnected())
@@ -37,7 +39,7 @@ internal sealed partial class NooksApi
     {
         DaemonConnection connection = daemons.Connect(nookId);
         using CancellationTokenSource ending = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        Task receiving = ReceiveReportsAsync(nookId, reports, ending.Token);
+        Task receiving = ReceiveReportsAsync(connection, reports, ending.Token);
         try
         {
             await foreach (DaemonInstruction instruction in connection.Instructions.ReadAllAsync(ct))
@@ -53,7 +55,10 @@ internal sealed partial class NooksApi
         }
     }
 
-    private async Task ReceiveReportsAsync(NookId nookId, IAsyncEnumerable<DaemonReport> reports, CancellationToken ct)
+    // A process's exit is recorded; what the nook uses is kept with the connection.
+    // Not handled: processes a restarted daemon lost in the same sandbox never report an exit, so the
+    // list shows them running; marking those its hello doesn't name as ended would.
+    private async Task ReceiveReportsAsync(DaemonConnection connection, IAsyncEnumerable<DaemonReport> reports, CancellationToken ct)
     {
         try
         {
@@ -62,18 +67,10 @@ internal sealed partial class NooksApi
                 switch (report)
                 {
                     case ProcessExited exited:
-                        await RecordExitAsync(nookId, exited, ct);
+                        await processes.RecordExitAsync(connection.NookId, exited, ct);
                         break;
-                    case DiskUsage disk:
-                        await using (NooksDbContext current = await databases.CreateDbContextAsync(ct))
-                        {
-                            Nook? nook = await current.Nooks.SingleOrDefaultAsync(found => found.Id == nookId, ct);
-                            nook?.ReportDisk(disk);
-
-                            // A conflict means the nook changed meanwhile; the next report, 30 seconds on, wins.
-                            await current.SaveAsync(ct);
-                        }
-
+                    case NookUsage usage:
+                        connection.Reported(usage);
                         break;
                 }
             }

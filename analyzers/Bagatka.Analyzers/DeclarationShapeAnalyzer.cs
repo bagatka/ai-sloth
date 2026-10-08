@@ -8,8 +8,8 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace Bagatka.Analyzers;
 
 /// <summary>
-/// Declarations that hide steps: methods with out parameters, which callers can only use inside
-/// another expression, and local functions, which hide a helper inside the method that calls it.
+/// Declarations that hide steps: methods with out or ref parameters, whose callers can't see what
+/// changes, and local functions, which hide a helper inside the method that calls it.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class DeclarationShapeAnalyzer : DiagnosticAnalyzer
@@ -30,7 +30,7 @@ public sealed class DeclarationShapeAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeMethod(SymbolAnalysisContext context)
     {
         IMethodSymbol method = (IMethodSymbol)context.Symbol;
-        bool declaresOut = method.Parameters.Any(parameter => parameter.RefKind == RefKind.Out);
+        bool declaresOut = method.Parameters.Any(parameter => parameter.RefKind is RefKind.Out or RefKind.Ref);
 
         // These follow a signature someone else defined.
         bool signatureIsGiven = method.IsImplicitlyDeclared

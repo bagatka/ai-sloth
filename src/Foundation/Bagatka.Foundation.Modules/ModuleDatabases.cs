@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bagatka.Foundation.Modules;
@@ -20,9 +19,7 @@ public static class ModuleDatabases
     {
         foreach (ModuleDatabase database in services.GetServices<ModuleDatabase>())
         {
-            await using AsyncServiceScope scope = services.CreateAsyncScope();
-            DbContext db = (DbContext)scope.ServiceProvider.GetRequiredService(database.ContextType);
-            await db.Database.MigrateAsync(ct);
+            await database.MigrateAsync(services, ct);
         }
     }
 }

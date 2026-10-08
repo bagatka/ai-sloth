@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Sources.Data;
 using System;
 using System.IO;
 using System.Threading;
@@ -15,7 +16,9 @@ internal sealed partial class SourcesApi
 {
     public async Task<Result<PushedChanges>> PushAsync(Actor actor, PushChanges command, Stream bundle, CancellationToken ct)
     {
-        Result<Repository> repository = await FindRepositoryAsync(actor, command.Repository, AccessLevel.Write, ct);
+        await using SourcesDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Repository> repository = await FindRepositoryAsync(db, actor, command.Repository, AccessLevel.Write, ct);
         if (repository.Failed)
         {
             return new Result<PushedChanges>(repository.Error);
@@ -26,7 +29,7 @@ internal sealed partial class SourcesApi
             return new Result<PushedChanges>(Error.Validation("branch", "Must be a branch name: letters, digits, /, -, _, and ."));
         }
 
-        Result<Reached> reached = await ReachAsync(actor, repository.Output, ct);
+        Result<Reached> reached = await ReachAsync(db, actor, repository.Output, ct);
         if (reached.Failed)
         {
             return new Result<PushedChanges>(reached.Error);
@@ -38,34 +41,27 @@ internal sealed partial class SourcesApi
             return new Result<PushedChanges>(Error.Validation("branch", "AiSloth never pushes to " + remote.FullName + "'s default branch, " + remote.DefaultBranch + "; name another."));
         }
 
-        DirectoryInfo scratch = Directory.CreateTempSubdirectory("aisloth-push-");
-        try
+        using GitScratch.Lease scratch = await scratches.TakeAsync("push", ct);
+        Result<Delivered> delivered = await DeliverAsync(scratch.Path, remote, command, reached.Output.Token, bundle, ct);
+        if (delivered.Failed)
         {
-            Result<Delivered> delivered = await DeliverAsync(scratch.FullName, remote, command, reached.Output.Token, bundle, ct);
-            if (delivered.Failed)
+            return new Result<PushedChanges>(delivered.Error);
+        }
+
+        Uri? pullRequest = null;
+        if (command.PullRequest)
+        {
+            Result<GitHubPullRequest> opened = await OpenPullRequestAsync(remote, command, delivered.Output.Title, reached.Output.Token, ct);
+            if (opened.Failed)
             {
-                return new Result<PushedChanges>(delivered.Error);
+                return new Result<PushedChanges>(opened.Error);
             }
 
-            Uri? pullRequest = null;
-            if (command.PullRequest)
-            {
-                Result<GitHubPullRequest> opened = await OpenPullRequestAsync(remote, command, delivered.Output.Title, reached.Output.Token, ct);
-                if (opened.Failed)
-                {
-                    return new Result<PushedChanges>(opened.Error);
-                }
-
-                pullRequest = opened.Output.HtmlUrl;
-            }
-
-            Uri branchUrl = new Uri(remote.HtmlUrl.AbsoluteUri.TrimEnd('/') + "/tree/" + command.Branch);
-            return new Result<PushedChanges>(new PushedChanges(command.Branch, delivered.Output.Commits, branchUrl, pullRequest));
+            pullRequest = opened.Output.HtmlUrl;
         }
-        finally
-        {
-            scratch.Delete(recursive: true);
-        }
+
+        Uri branchUrl = new Uri(remote.HtmlUrl.AbsoluteUri.TrimEnd('/') + "/tree/" + command.Branch);
+        return new Result<PushedChanges>(new PushedChanges(command.Branch, delivered.Output.Commits, branchUrl, pullRequest));
     }
 
     // Puts the bundle's commits on top of the base fetched from GitHub, and pushes them to the branch:

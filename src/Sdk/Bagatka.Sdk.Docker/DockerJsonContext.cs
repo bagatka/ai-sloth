@@ -8,7 +8,9 @@ namespace Bagatka.Sdk.Docker;
 /// </summary>
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(DockerWire.ContainerCreate))]
+[JsonSerializable(typeof(DockerWire.NetworkCreate))]
 [JsonSerializable(typeof(DockerWire.IdResponse))]
+[JsonSerializable(typeof(DockerWire.WaitResponse))]
 [JsonSerializable(typeof(DockerWire.ContainerInspect))]
 [JsonSerializable(typeof(IReadOnlyList<DockerWire.ContainerSummary>))]
 [JsonSerializable(typeof(DockerWire.ImageInspect))]

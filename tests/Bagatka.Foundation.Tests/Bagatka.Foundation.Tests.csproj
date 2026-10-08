@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Foundation\Bagatka.Foundation\Bagatka.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Foundation\Bagatka.Foundation.Modules\Bagatka.Foundation.Modules.csproj" />
     <ProjectReference Include="..\..\src\Foundation\Bagatka.Foundation.Web\Bagatka.Foundation.Web.csproj" />
   </ItemGroup>
 

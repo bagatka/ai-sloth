@@ -8,14 +8,13 @@ using System.Threading.Tasks;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Harnesses;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Bagatka.AiSloth.Chats.Harness;
 
 // An agent's process in its nook, seen as lines of text: starts it, reads its standard output a line at
 // a time from any offset, writes lines to its standard input, and stops it. Knows nothing about ACP or
 // chats; every call goes to Nooks as the harness system actor.
-internal sealed class AgentProcess(IServiceScopeFactory scopes)
+internal sealed class AgentProcess(INooksApi nooks)
 {
     // Where agents work: every nook's sources are mounted under it.
     public const string WorkingDirectory = "/work";
@@ -29,8 +28,7 @@ internal sealed class AgentProcess(IServiceScopeFactory scopes)
     public async Task<Result<ProcessId>> StartAsync(NookId nookId, IReadOnlyDictionary<string, string> environment, CancellationToken ct)
     {
         StartProcess start = new StartProcess(nookId, HarnessProfile.Command, [], WorkingDirectory, OutputRetention.Complete, environment);
-        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-        Result<ProcessSummary> started = await scope.ServiceProvider.GetRequiredService<INooksApi>().StartProcessAsync(SystemActors.Harness, start, ct);
+        Result<ProcessSummary> started = await nooks.StartProcessAsync(SystemActors.Harness, start, ct);
         if (started.Failed)
         {
             return new Result<ProcessId>(started.Error);
@@ -45,9 +43,7 @@ internal sealed class AgentProcess(IServiceScopeFactory scopes)
     // so reading throws and the caller tries again.
     public async IAsyncEnumerable<AgentOutput> ReadAsync(NookId nookId, ProcessId processId, long offset, [EnumeratorCancellation] CancellationToken ct)
     {
-        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-        Result<IAsyncEnumerable<ProcessEvent>> watched = await scope.ServiceProvider.GetRequiredService<INooksApi>()
-            .WatchProcessAsync(SystemActors.Harness, new WatchProcess(nookId, processId, offset), ct);
+        Result<IAsyncEnumerable<ProcessEvent>> watched = await nooks.WatchProcessAsync(SystemActors.Harness, new WatchProcess(nookId, processId, offset), ct);
         if (watched.Failed)
         {
             bool mayComeBack = watched.Error == NooksErrors.NotReady;
@@ -98,8 +94,6 @@ internal sealed class AgentProcess(IServiceScopeFactory scopes)
     // exit then arrives through ReadAsync.
     public async Task<Result> SendAsync(NookId nookId, ProcessId processId, IReadOnlyList<string> lines, CancellationToken ct)
     {
-        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-        INooksApi nooks = scope.ServiceProvider.GetRequiredService<INooksApi>();
         foreach (string line in lines)
         {
             ReadOnlyMemory<byte> bytes = Encoding.UTF8.GetBytes(line + "\n");
@@ -119,7 +113,6 @@ internal sealed class AgentProcess(IServiceScopeFactory scopes)
 
     public async Task<Result> StopAsync(NookId nookId, ProcessId processId, CancellationToken ct)
     {
-        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<INooksApi>().StopProcessAsync(SystemActors.Harness, new StopProcess(nookId, processId), ct);
+        return await nooks.StopProcessAsync(SystemActors.Harness, new StopProcess(nookId, processId), ct);
     }
 }

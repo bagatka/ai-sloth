@@ -49,8 +49,7 @@ None.
 
 ## Configuration
 
-`SecretsSettings`, passed by the host (`PATTERNS.md`, entry 20): the connection string, and the
-encryption key, at least 32 characters (the AppHost generates one and keeps it in its user secrets).
+The deployment's `EncryptionSettings`, passed by the host (`PATTERNS.md`, entry 20).
 
 ## Decisions and constraints
 
@@ -63,16 +62,7 @@ encryption key, at least 32 characters (the AppHost generates one and keeps it i
 - **Every process gets them,** as they are when it starts: the agent and anything people run. A
   process's own variables win over a secret of the same name. Names the system relies on (`PATH`,
   `HOME`, `LD_*`, `SLOTHD_*`) are refused.
-- **Values at rest** are sealed with AES-256-GCM under this module's encryption key, bound to their
+- **Values at rest** are sealed with AES-256-GCM under this module's key, derived from the deployment's, bound to their
   row's ID (`PATTERNS.md`, entry 13). They leave the module only through `ResolveAsync`.
 - **At most 100 per workspace,** of at most 16,384 characters each, which bounds what every process
   start carries.
-
-## Not built yet
-
-- **Secrets as files,** such as an SSH key or a cloud's credentials file.
-- **Choosing secrets per nook;** every nook in a workspace gets all of them.
-- **Personal secrets in private chats.** A private chat's nook would be its starter's alone: no
-  workspace access, no invites. Only there could a person's own secrets go, beside the workspace's.
-  Sharing such a session would mean forking it into a new nook, which leaves the home directory, its
-  sign-ins, and the personal secrets behind.

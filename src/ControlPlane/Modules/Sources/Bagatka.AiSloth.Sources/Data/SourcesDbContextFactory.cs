@@ -10,7 +10,7 @@ internal sealed class SourcesDbContextFactory : IDesignTimeDbContextFactory<Sour
     public SourcesDbContext CreateDbContext(string[] args)
     {
         DbContextOptionsBuilder<SourcesDbContext> options = new DbContextOptionsBuilder<SourcesDbContext>();
-        options.UseModuleDatabase("Host=localhost", SourcesDbContext.Schema);
+        options.UseModuleDatabase(database: null, SourcesDbContext.Schema);
         return new SourcesDbContext(options.Options);
     }
 }

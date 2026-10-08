@@ -19,7 +19,9 @@ internal sealed partial class ChatsApi
 
     public async Task<Result<IAsyncEnumerable<ChatEvent>>> WatchAsync(Actor actor, WatchChat command, CancellationToken ct)
     {
-        Result<Chat> chat = await FindChatAsync(actor, command.ChatId, AccessLevel.Read, ct);
+        await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Chat> chat = await FindChatAsync(db, actor, command.ChatId, AccessLevel.Read, ct);
         if (chat.Failed)
         {
             return new Result<IAsyncEnumerable<ChatEvent>>(chat.Error);

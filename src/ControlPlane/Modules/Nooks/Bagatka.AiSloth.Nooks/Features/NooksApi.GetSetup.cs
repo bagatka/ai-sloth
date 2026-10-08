@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Nooks.Data;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,77 +15,55 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<NookSetup>> GetSetupAsync(Actor actor, NookId id, CancellationToken ct)
     {
-        Result<Nook> nook = await FindNookAsync(actor, id, AccessLevel.Read, ct);
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Nook> nook = await FindNookAsync(db, actor, id, AccessLevel.Read, ct);
         if (nook.Failed)
         {
             return new Result<NookSetup>(nook.Error);
         }
 
-        DaemonConnection? connection = await ConnectionAsync(actor, id, ct);
-        if (connection is null)
+        Result<DaemonConnection> ready = await ReadyAsync(db, actor, nook.Output, changes: false, ct);
+        if (ready.Failed)
         {
-            return new Result<NookSetup>(NooksErrors.NotReady);
+            return new Result<NookSetup>(ready.Error);
         }
 
-        // Putting the files in place starts the setup.
-        Result prepared = await PrepareSourcesAsync(nook.Output, connection, ct);
-        if (prepared.Failed)
-        {
-            return new Result<NookSetup>(prepared.Error);
-        }
+        DaemonConnection connection = ready.Output;
 
-        NookSetup setup = await SetupOfAsync(nook.Output, ct);
+        NookSetup setup = await SetupOfAsync(db, nook.Output, ct);
         return new Result<NookSetup>(setup);
     }
 
     public async Task<Result<NookSetup>> RunSetupAsync(Actor actor, NookId id, CancellationToken ct)
     {
-        Result<Nook> nook = await FindNookAsync(actor, id, AccessLevel.Write, ct);
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Nook> nook = await FindNookToOperateAsync(db, actor, id, ct);
         if (nook.Failed)
         {
             return new Result<NookSetup>(nook.Error);
         }
 
-        DaemonConnection? connection = await ConnectionAsync(actor, id, ct);
-        if (connection is null)
+        Result<DaemonConnection> ready = await ReadyAsync(db, actor, nook.Output, changes: true, ct);
+        if (ready.Failed)
         {
-            return new Result<NookSetup>(NooksErrors.NotReady);
+            return new Result<NookSetup>(ready.Error);
         }
 
-        Result prepared = await PrepareSourcesAsync(nook.Output, connection, ct);
-        if (prepared.Failed)
+        DaemonConnection connection = ready.Output;
+
+        Result again = await files.RunSetupAgainAsync(db, nook.Output, connection, ct);
+        if (again.Failed)
         {
-            return new Result<NookSetup>(prepared.Error);
+            return new Result<NookSetup>(again.Error);
         }
 
-        await KeepReadyCopyAsync(nook.Output, ct);
-
-        // One run at a time: they share the log, and a second would race the first.
-        using IDisposable held = await fileLocks.AcquireAsync(id, ct);
-        await db.Entry(nook.Output).ReloadAsync(ct);
-        NookSetup current = await SetupOfAsync(nook.Output, ct);
-        if (current.Run is { ExitCode: null })
-        {
-            return new Result<NookSetup>(NooksErrors.SetupRunning);
-        }
-
-        Result<SetupStart> started = await StartSetupAsync(nook.Output, connection, resumeOnly: false, ct);
-        if (started.Failed)
-        {
-            return new Result<NookSetup>(started.Error);
-        }
-
-        Result saved = await MarkPreparedAsync(nook.Output, copiedCheckpoint: null, started.Output, ct);
-        if (saved.Failed)
-        {
-            return new Result<NookSetup>(saved.Error);
-        }
-
-        NookSetup again = await SetupOfAsync(nook.Output, ct);
-        return new Result<NookSetup>(again);
+        NookSetup setup = await SetupOfAsync(db, nook.Output, ct);
+        return new Result<NookSetup>(setup);
     }
 
-    private async Task<NookSetup> SetupOfAsync(Nook nook, CancellationToken ct)
+    private static async Task<NookSetup> SetupOfAsync(NooksDbContext db, Nook nook, CancellationToken ct)
     {
         if (nook.SetupProcessId is not ProcessId processId)
         {

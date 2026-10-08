@@ -1,9 +1,9 @@
+using Bagatka.AiSloth.Nooks.Data;
 using System.Threading.Tasks;
 using System.Threading;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Daemons;
 using Bagatka.AiSloth.Nooks.Model;
-using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Nooks;
@@ -12,7 +12,9 @@ internal sealed partial class NooksApi
 {
     public async Task<Result> StopProcessAsync(Actor actor, StopProcess command, CancellationToken ct)
     {
-        Result<Process> found = await FindProcessAsync(actor, command.NookId, command.ProcessId, AccessLevel.Write, ct);
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Process> found = await FindProcessToOperateAsync(db, actor, command.NookId, command.ProcessId, ct);
         if (found.Failed)
         {
             return new Result(found.Error);
@@ -25,11 +27,13 @@ internal sealed partial class NooksApi
             return new Result(new Success());
         }
 
-        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
-        if (connection is null)
+        Result<DaemonConnection> connected = await lifecycle.ConnectAsync(db, actor, command.NookId, ct);
+        if (connected.Failed)
         {
-            return new Result(NooksErrors.NotReady);
+            return new Result(connected.Error);
         }
+
+        DaemonConnection connection = connected.Output;
 
         bool sent = await connection.SendAsync(new DaemonInstruction(new StopProcessInstruction(process.Id)), ct);
         if (!sent)

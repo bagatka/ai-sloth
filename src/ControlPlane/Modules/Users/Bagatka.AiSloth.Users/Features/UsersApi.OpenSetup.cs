@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Users.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +13,8 @@ internal sealed partial class UsersApi
 {
     public async Task<string?> OpenSetupAsync(Actor actor, CancellationToken ct)
     {
+        await using UsersDbContext db = await databases.CreateDbContextAsync(ct);
+
         if (actor is not SystemActor)
         {
             return null;

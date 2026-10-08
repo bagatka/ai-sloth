@@ -42,13 +42,9 @@ internal sealed class Message
     // The proposal this message sends on, if any.
     public MessageId? ProposalId { get; private set; }
 
-    // Which test of the nook's setup its turn's end calls for: 1 for a request to prepare it, the
-    // next one for a fix after a failed test; none for other messages.
-    public int? SetupTest { get; private set; }
-
     public bool Waiting => State is MessageState.New or MessageState.Queued or MessageState.Steering;
 
-    public static Result<Message> Send(ChatId chatId, UserId sentBy, string? text, bool isProposal, MessageId? proposalId, int? setupTest, TimeProvider time)
+    public static Result<Message> Send(ChatId chatId, UserId sentBy, string? text, bool isProposal, MessageId? proposalId, TimeProvider time)
     {
         if (string.IsNullOrWhiteSpace(text) || text.Length > MaxTextLength)
         {
@@ -56,7 +52,7 @@ internal sealed class Message
             return new Result<Message>(Error.Validation("text", message));
         }
 
-        return new Result<Message>(new Message(MessageId.New(), chatId, sentBy, text, time.GetUtcNow(), MessageState.New, isProposal, proposalId) { SetupTest = setupTest });
+        return new Result<Message>(new Message(MessageId.New(), chatId, sentBy, text, time.GetUtcNow(), MessageState.New, isProposal, proposalId));
     }
 
     public void Propose()

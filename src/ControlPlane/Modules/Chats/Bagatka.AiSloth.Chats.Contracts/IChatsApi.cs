@@ -54,30 +54,13 @@ public interface IChatsApi
     /// working: it goes into the running turn when the agent supports that, and otherwise waits and
     /// starts the next turn. <see cref="WatchAsync"/> shows which happened.
     /// </summary>
-    /// <remarks>
-    /// When the nook's disk is nearly full, the agent may fail to write and checkpoints may fail, so a
-    /// message for the agent is sent only once the sender confirms (<see cref="SendMessage.ConfirmNearlyFullDisk"/>).
-    /// </remarks>
     /// <returns>
-    /// The message; <see cref="ChatsErrors.DiskNearlyFull"/>; a validation error for an empty or too long
+    /// The message; a validation error for an empty or too long
     /// text, or a proposal not in the chat; forbidden when sending on a proposal from someone whose
     /// messages don't reach the agent; or not found.
     /// </returns>
     public Task<Result<ChatMessage>> SendAsync(Actor actor, SendMessage command, CancellationToken ct);
 
-    /// <summary>
-    /// Asks the agent to prepare the chat for fast starts: to write a setup for its files, the
-    /// <c>.agents/setup</c> and <c>.agents/resume</c> scripts that new nooks run before their agent
-    /// starts, run them, and commit them. A message from the actor carries AiSloth's instructions.
-    /// After its turn, the setup is tested in a fresh nook with only the chat's files; a failure goes
-    /// back to the agent to fix, for at most three tests (<see cref="SetupTested"/>). Stopping the
-    /// agent stops the test too.
-    /// </summary>
-    /// <returns>
-    /// The message; <see cref="ChatsErrors.DiskNearlyFull"/>; forbidden for anyone who may not use the
-    /// chat's account; or not found.
-    /// </returns>
-    public Task<Result<ChatMessage>> PrepareAsync(Actor actor, PrepareChat command, CancellationToken ct);
 
     /// <summary>
     /// Stops the agent: the running turn ends as <c>cancelled</c>, and messages it hasn't received yet
@@ -87,21 +70,21 @@ public interface IChatsApi
     public Task<Result> StopAsync(Actor actor, ChatId id, CancellationToken ct);
 
     /// <summary>
-    /// The actor's harness state in the workspace, for each harness that keeps any: what its agents
-    /// write for themselves to use later, such as Claude Code's memory, saved from the chats the actor
-    /// starts there after each turn that changed it, and given to the agents of their next chats
-    /// there. It never leaves its workspace. A chat several people write in keeps the state of the
-    /// person who started it.
+    /// The harness state the actor's agents in the workspace get, for each harness that keeps any: what
+    /// its agents write for themselves to use later, such as Claude Code's memory, saved after each
+    /// turn that changed it and given to the next agents. It follows who may direct the agents: the
+    /// chats on the actor's own accounts share theirs, and the chats on the workspace's accounts share
+    /// the workspace's. It never leaves its workspace.
     /// </summary>
     /// <returns>The states; forbidden for anyone but a person; or not found without access to the workspace.</returns>
     public Task<Result<IReadOnlyList<HarnessStateSummary>>> ListHarnessStatesAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct);
 
     /// <summary>
-    /// Forgets the actor's state for the harness in the workspace: agents of their chats there start
-    /// without it. A chat whose agent already has it saves it again when it changes it. Forgetting
-    /// none succeeds.
+    /// Forgets the actor's state for the harness in the workspace, or the workspace's shared one, which
+    /// takes Write on the workspace: the next agents start without it. A chat whose agent already has
+    /// it saves it again when it changes it. Forgetting none succeeds.
     /// </summary>
-    public Task<Result> ForgetHarnessStateAsync(Actor actor, WorkspaceId workspaceId, string harness, CancellationToken ct);
+    public Task<Result> ForgetHarnessStateAsync(Actor actor, ForgetHarnessState command, CancellationToken ct);
 
     /// <summary>
     /// The instructions the actor's agents in the workspace get, whatever their harness: the

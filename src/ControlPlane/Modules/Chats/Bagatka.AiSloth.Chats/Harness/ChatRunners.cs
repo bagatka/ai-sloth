@@ -1,3 +1,5 @@
+using Bagatka.AiSloth.AgentAccounts.Contracts;
+using Bagatka.AiSloth.Nooks.Contracts;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,7 +10,6 @@ using Bagatka.AiSloth.Chats.Data;
 using Bagatka.AiSloth.Chats.Model;
 using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -20,7 +21,8 @@ namespace Bagatka.AiSloth.Chats.Harness;
 // get their runners back, among them those written in meanwhile on this one.
 internal sealed class ChatRunners(
     IDbContextFactory<ChatsDbContext> databases,
-    IServiceScopeFactory scopes,
+    INooksApi nooks,
+    IAgentAccountsApi accounts,
     AgentProcess agent,
     HarnessStates states,
     AgentInstructions instructions,
@@ -71,7 +73,7 @@ internal sealed class ChatRunners(
         await using (ChatsDbContext db = await databases.CreateDbContextAsync(stoppingToken))
         {
             busy = await db.Chats
-                .Where(chat => chat.TurnMessageId != null || chat.CheckpointAfter != null || (chat.HarnessProcessId != null && chat.SessionId == null) || chat.StartsAgent
+                .Where(chat => chat.TurnMessageId != null || (chat.HarnessProcessId != null && chat.SessionId == null) || chat.StartsAgent
                     || db.Messages.Any(message => message.ChatId == chat.Id
                         && (message.State == MessageState.New || message.State == MessageState.Queued || message.State == MessageState.Steering)))
                 .Select(chat => chat.Id)
@@ -123,7 +125,7 @@ internal sealed class ChatRunners(
                 return _runners[chat].Runner;
             }
 
-            ChatRunner runner = new ChatRunner(chat, databases, scopes, agent, states, instructions, setups, meter, settings, signals, time, logger);
+            ChatRunner runner = new ChatRunner(chat, databases, nooks, accounts, agent, states, instructions, setups, meter, settings, signals, time, logger);
             Task running = Task.Run(() => runner.RunAsync(Retire, _stopping.Token), CancellationToken.None);
             _runners[chat] = (runner, running);
             return runner;

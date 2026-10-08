@@ -63,7 +63,7 @@ None. Expired codes are deleted when new ones are made; sessions end when they g
 
 ## Configuration
 
-`UsersSettings`: the connection string.
+None; the host passes the shared database.
 
 ## Decisions and constraints
 
@@ -83,8 +83,3 @@ None. Expired codes are deleted when new ones are made; sessions end when they g
   accounts can be linked.
 - **Two first sign-ins at once** (a web app's parallel requests) both get the same user: the unique
   index lets one insert win, and the other reads what it wrote.
-
-## Not built yet
-
-- Emails, renaming, account linking, and deleting users.
-- Ending every session of a person at once, and sessions that expire regardless of use.

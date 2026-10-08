@@ -37,10 +37,14 @@ internal sealed class Session
 
     public DateTimeOffset LastUsedAt { get; private set; }
 
-    // The token is shown once, to the device, and prefixed so secret scanners can find a leaked one.
+    // Prefixed so secret scanners can find a leaked token, and so other tokens, such as a chat's
+    // for the model gateway, are told apart without a lookup.
+    public const string TokenPrefix = "aisloth_";
+
+    // The token is shown once, to the device.
     public static (Session Session, string Token) Start(UserId userId, BoundedName device, TimeProvider time)
     {
-        string token = "aisloth_" + Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
+        string token = TokenPrefix + Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
         return (new Session(SessionId.New(), userId, device, HashToken(token), time.GetUtcNow()), token);
     }
 

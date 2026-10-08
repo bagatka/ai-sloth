@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Nooks.Data;
 using System;
 using System.IO;
 using System.Linq;
@@ -6,7 +7,6 @@ using System.Threading.Tasks;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Nooks.Daemons;
 using Bagatka.AiSloth.Nooks.Model;
-using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Nooks;
@@ -16,29 +16,11 @@ internal sealed partial class NooksApi
     // The most paths one call names: what a script's arguments hold comfortably.
     private const int MaxPaths = 10;
 
-    // Arguments: the paths. The ones that exist, relative to /, the same bytes for the same files.
-    private const string CopyOutScript = """
-        set -eu
-        exec 3>&1 1>&2
-        named=$#
-        for path; do
-          if [ -e "$path" ]; then set -- "$@" "${path#/}"; fi
-        done
-        shift "$named"
-        if [ $# -eq 0 ]; then set -- --files-from=/dev/null; fi
-        tar -cf - -C / --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner "$@" | gzip -n >&3
-        """;
-
-    // Arguments: the paths to remove first.
-    private const string CopyInScript = """
-        set -eu
-        for path; do rm -rf -- "$path"; done
-        tar -xzf - -C /
-        """;
-
     public async Task<Result> CopyFilesOutAsync(Actor actor, CopyFilesOut command, Stream destination, CancellationToken ct)
     {
-        Result<Nook> nook = await FindNookAsync(actor, command.NookId, AccessLevel.Write, ct);
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Nook> nook = await FindNookToOperateAsync(db, actor, command.NookId, ct);
         if (nook.Failed)
         {
             return new Result(nook.Error);
@@ -49,13 +31,15 @@ internal sealed partial class NooksApi
             return new Result(Error.Validation("paths", "At most 10 absolute paths, without . or .. parts."));
         }
 
-        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
-        if (connection is null)
+        Result<DaemonConnection> connected = await lifecycle.ConnectAsync(db, actor, command.NookId, ct);
+        if (connected.Failed)
         {
-            return new Result(NooksErrors.NotReady);
+            return new Result(connected.Error);
         }
 
-        ProcessRun copied = await RunAsync(connection, CopyOutScript, command.Paths, NoVariables, input: null, destination, ct);
+        DaemonConnection connection = connected.Output;
+
+        ProcessRun copied = await processes.RunAsync(connection, Scripts.CopyOut, command.Paths, NookProcesses.NoVariables, input: null, ScriptOutput.To(destination), ct);
         return copied.Succeeded
             ? new Result(new Success())
             : new Result(Error.Conflict("nooks.copy_failed", "Copying files out of the nook failed: " + copied.Errors));
@@ -63,7 +47,9 @@ internal sealed partial class NooksApi
 
     public async Task<Result> CopyFilesInAsync(Actor actor, CopyFilesIn command, Stream archive, CancellationToken ct)
     {
-        Result<Nook> nook = await FindNookAsync(actor, command.NookId, AccessLevel.Write, ct);
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Nook> nook = await FindNookToOperateAsync(db, actor, command.NookId, ct);
         if (nook.Failed)
         {
             return new Result(nook.Error);
@@ -74,20 +60,14 @@ internal sealed partial class NooksApi
             return new Result(Error.Validation("replacing", "At most 10 absolute paths, without . or .. parts."));
         }
 
-        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
-        if (connection is null)
+        Result<DaemonConnection> ready = await ReadyAsync(db, actor, nook.Output, changes: true, ct);
+        if (ready.Failed)
         {
-            return new Result(NooksErrors.NotReady);
+            return new Result(ready.Error);
         }
 
-        Result prepared = await PrepareSourcesAsync(nook.Output, connection, ct);
-        if (prepared.Failed)
-        {
-            return prepared;
-        }
-
-        await KeepReadyCopyAsync(nook.Output, ct);
-        ProcessRun copied = await RunAsync(connection, CopyInScript, command.Replacing, NoVariables, async (stream, token) => { await archive.CopyToAsync(stream, token); }, output: null, ct);
+        DaemonConnection connection = ready.Output;
+        ProcessRun copied = await processes.RunAsync(connection, Scripts.CopyIn, command.Replacing, NookProcesses.NoVariables, async (stream, token) => { await archive.CopyToAsync(stream, token); }, output: null, ct);
         return copied.Succeeded
             ? new Result(new Success())
             : new Result(Error.Conflict("nooks.copy_failed", "Copying files into the nook failed: " + copied.Errors));

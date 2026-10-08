@@ -63,7 +63,7 @@ None.
 
 ## Configuration
 
-`WorkspacesSettings`: the connection string.
+None; the host passes the shared database.
 
 ## Decisions and constraints
 
@@ -77,13 +77,3 @@ None.
   exists; someone who may see it but not do something gets forbidden.
 - **Invite codes** are one-time codes (`OneTimeCode` in Foundation), kept only as hashes and sent in
   request bodies, never in URLs.
-
-## Not built yet
-
-- **Names for people.** Grants list user IDs; Users stores no names yet.
-- **Inviting by editors.** Only managers invite, also to a single nook.
-- **A list of nooks shared with a guest.** A guest reaches their nook through the invite.
-- **Leaving a workspace,** and transferring management, beyond a manager ending someone's access.
-- **Cleanup when a nook is deleted.** Its grants and link stay behind, harmlessly.
-- **Two managers removing each other at the same moment** can leave a workspace without one.
-- A personal workspace for every new user: waits for Users' `UserRegistered`, which needs the outbox.

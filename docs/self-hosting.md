@@ -61,20 +61,19 @@ compute only while it is awake: it goes to sleep when nobody uses it.
    az bicep install
    ```
 
-## 3. Make your three keys
+## 3. Make your key
 
-The host encrypts saved secrets, such as API keys, with three keys. You make the keys one time.
+The host encrypts saved secrets, such as API keys, with a key. You make the key one time.
 
-1. Run this command three times. Each time, it shows a new key of 64 letters and digits.
+1. Run this command. It shows a new key of 64 letters and digits.
 
    ```sh
    openssl rand -hex 32
    ```
 
-2. Save the three keys in your password manager. Name them "agent accounts key", "sources key", and
-   "secrets key".
+2. Save the key in your password manager. Name it "AiSloth encryption key".
 
-> **Caution:** Do not lose the keys. If you lose a key, the host cannot read the data that the key
+> **Caution:** Do not lose the key. If you lose it, the host cannot read the data that it
 > encrypted, and nobody can get that data back.
 
 ## 4. Find the image tag
@@ -92,10 +91,10 @@ image tag. Copy it.
 ## 5. Deploy
 
 1. Run the deploy command below. First, replace each `<...>` with your values: the image tag from
-   step 4, and the three keys from step 3.
+   step 4, and the key from step 3.
 
    ```sh
-   dotnet aspire deploy -- --Parameters:nook-image-repository=ghcr.io/bagatka --Parameters:nook-image-tag=<image tag> --Parameters:agent-accounts-key=<agent accounts key> --Parameters:sources-key=<sources key> --Parameters:secrets-key=<secrets key>
+   dotnet aspire deploy -- --Parameters:nook-image-repository=ghcr.io/bagatka --Parameters:nook-image-tag=<image tag> --Parameters:encryption-key=<key>
    ```
 
 2. Answer the questions of the command:
@@ -104,12 +103,15 @@ image tag. Copy it.
    - Choose a region near you.
 3. Wait until the command ends. The first deploy creates everything, so it takes the longest.
 
-Save your deploy command in your password manager too, because it contains your keys. You use it
+Save your deploy command in your password manager too, because it contains your key. You use it
 again for each update.
 
 To use a PostgreSQL server that you have already, add
 `--Parameters:postgres-connection-string=<connection string>` to the command. Without it, the deploy
-makes an Azure Database for PostgreSQL server for you.
+makes an Azure Database for PostgreSQL server for you. The host opens up to 100 connections, the
+default of `Maximum Pool Size`, and twice that for a moment during an update, when the new host
+starts beside the old one. If your server allows fewer, add `Maximum Pool Size=<number>` to the
+connection string, or use your server's connection pooler.
 
 ## 6. Sign in
 
@@ -143,6 +145,13 @@ Run `sloth help` to see what you can do next.
 
 2. Find the new image tag, as in step 4.
 3. Run your saved deploy command again, with the new image tag.
+
+## Optional: limit what your host costs
+
+Each nook that is awake is a sandbox you pay for. Your host keeps at most 10 nooks of a workspace
+awake at once, puts nooks nobody uses to sleep after two minutes, and lets each person start at most
+120 chats and nooks an hour. To be told before costs pass an amount you choose, add a budget to your
+resource group in the Azure portal: Cost Management, then Budgets.
 
 ## Optional: connect GitHub
 
@@ -227,7 +236,7 @@ deploy again without a push, run the workflow in Actions, or run
    |---|---|
    | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | The IDs of the Entra app, its tenant, and your subscription |
    | `AZURE_RESOURCE_GROUP`, `AZURE_LOCATION` | Your resource group and its region |
-   | `AGENT_ACCOUNTS_KEY`, `SOURCES_KEY`, `SECRETS_KEY` | Your three keys |
+   | `ENCRYPTION_KEY` | Your key |
    | `POSTGRES_CONNECTION_STRING` | Optional: your own PostgreSQL server |
 
 4. Optional: add these variables to the environment:
@@ -241,7 +250,8 @@ deploy again without a push, run the workflow in Actions, or run
 
 - **"Deploying needs nook-image-repository"**: the command does not have the
   `--Parameters:nook-image-repository` setting. Add it.
-- **The deploy asks for a key or stops because a key is missing**: add the three key settings.
+- **The deploy asks for a key or stops because a key is missing**: add the
+  `--Parameters:encryption-key` setting.
 - **A changed setting has no effect**: Aspire remembers your settings in `~/.aspire/deployments`,
   and a remembered value wins over an environment variable. Give the setting in the deploy
   command, after `--`, or change it in that folder.

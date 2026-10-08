@@ -8,5 +8,6 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// </summary>
 /// <param name="Sequence">Its place in the chat.</param>
 /// <param name="At">When it happened.</param>
+/// <param name="Kind">The name of what happened, such as <c>turn-ended</c>: what clients switch on.</param>
 /// <param name="Body">What happened.</param>
-public sealed record ChatEvent(long Sequence, DateTimeOffset At, ChatEventBody Body);
+public sealed record ChatEvent(long Sequence, DateTimeOffset At, string Kind, ChatEventBody Body);

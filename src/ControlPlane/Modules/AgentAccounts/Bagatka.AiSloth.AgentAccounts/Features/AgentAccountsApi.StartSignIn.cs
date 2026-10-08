@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.AgentAccounts.Data;
 using System;
 using System.Globalization;
 using System.Linq;
@@ -19,6 +20,8 @@ internal sealed partial class AgentAccountsApi
 
     public async Task<Result<SignInStarted>> StartSignInAsync(Actor actor, StartSignIn command, CancellationToken ct)
     {
+        await using AgentAccountsDbContext db = await databases.CreateDbContextAsync(ct);
+
         if (actor is not UserActor user)
         {
             return new Result<SignInStarted>(Error.Forbidden);

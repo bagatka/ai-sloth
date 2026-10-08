@@ -10,7 +10,7 @@ internal sealed class AgentAccountsDbContextFactory : IDesignTimeDbContextFactor
     public AgentAccountsDbContext CreateDbContext(string[] args)
     {
         DbContextOptionsBuilder<AgentAccountsDbContext> options = new DbContextOptionsBuilder<AgentAccountsDbContext>();
-        options.UseModuleDatabase("Host=localhost", AgentAccountsDbContext.Schema);
+        options.UseModuleDatabase(database: null, AgentAccountsDbContext.Schema);
         return new AgentAccountsDbContext(options.Options);
     }
 }

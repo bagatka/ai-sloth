@@ -46,6 +46,8 @@ notice one that fell silent without closing the connection.
 - **Stay in scope.** List and touch only resources tagged with your own scope.
 - **Exact resources.** Run the requested resources or reject the spec; never round silently.
 - **No inbound networking.** The sandbox dials out; never open ports into it.
+- **Sandboxes don't reach each other.** Put a scope's sandboxes where they can't reach one another:
+  a network of their own, or a backend that isolates each sandbox (see Network below).
 - **Containers inside, no privileges outside.** A sandbox can run containers of its own, as
   code's Docker does: give it its own kernel, as a microVM, or a runtime that makes that safe in
   a container, as Docker does with Sysbox. Never a privileged container.
@@ -55,7 +57,7 @@ notice one that fell silent without closing the connection.
 
 | Provider | Status | Suspends to | Notes |
 |---|---|---|---|
-| Docker | Built | `Stopped` (`docker stop`) | Local development, CI, single-machine deployments, and machines. Stopping frees a sandbox's memory, which matters on people's machines; a container whose entry point exited cleanly, as it does when asked to stop, is `Stopped`, and any other end is `Failed`. Runs sandboxes under Sysbox (`sysbox-runc`), which the engine must have; creating fails with `sandboxing.sysbox_missing` otherwise. Snapshots are committed images, with the sandbox's environment values kept out. Sandboxes can reach the host as `host.docker.internal`. |
+| Docker | Built | `Stopped` (`docker stop`) | Local development, CI, single-machine deployments, and machines. Stopping frees a sandbox's memory, which matters on people's machines; a container whose entry point exited cleanly, as it does when asked to stop, is `Stopped`, and any other end is `Failed`. Runs sandboxes under Sysbox (`sysbox-runc`), which the engine must have; creating fails with `sandboxing.sysbox_missing` otherwise. Snapshots are committed images, with the sandbox's environment values kept out. Each sandbox has a network and a router of its own ("Network"). |
 | Azure Container Apps Sandboxes | Built | `Paused` | The official host: microVMs with Docker inside. Images must be public; an image's disk image is shared by the deployments of a sandbox group, made again daily, and deleted after two days unused. Disks get 20 GiB per core. The service suspends a sandbox idle for 30 minutes, in case the control plane is down. Snapshots are committed disk images. Through `Bagatka.Azure.Sandboxes` (`src/Sdk`) |
 | macOS virtual machines | After a spike | To be measured | On people's Macs only, through machines (`src/ControlPlane/Modules/Machines`), for iOS and macOS work; Apple's Virtualization.framework through Tart |
 
@@ -78,6 +80,25 @@ there need the images in a public repository (`nook-image-repository`) and publi
 computer's daemon and model endpoints (`nook-daemon-url`, `nook-models-url`). We test with ngrok and
 ttl.sh, and anyone can: the end-to-end suite's Azure tests run when `BAGATKA_AZURE_SANDBOXES_GROUP`
 is set and `BAGATKA_NGROK_ENV_FILE` names an env file with `NGROK_AUTHTOKEN`.
+
+## Network
+
+What a sandbox can reach, as measured on each backend:
+
+- **Azure Container Apps Sandboxes:** the internet only. Each sandbox is alone on a link-local
+  network of its own, so it reaches no other sandbox, and neither the metadata service nor the
+  WireServer answers. Azure offers every sandbox an identity endpoint (`IDENTITY_ENDPOINT`); it gives
+  no token as long as the sandbox group has no identity, so a group never gets one.
+- **Docker:** the internet, and on the host only the TCP ports in `DockerSandboxSettings.HostPorts`
+  (at `host.docker.internal`), such as a control plane's in development. Each sandbox is a computer
+  of its own: it has a network of its own, a /29 of 198.18.0.0/15, and a router of its own
+  (`router.sh`), a small Alpine container that forwards its traffic to the internet and drops
+  everything bound for private networks, link-local and metadata addresses, the host's own
+  addresses, or other sandboxes. DNS goes through Docker as for any container. The host has no
+  address on a sandbox's network, IPv6 link-local included (the bridge's MTU is below IPv6's
+  minimum), so even a sandbox's root, which can change its own routes and switch IPv6 on, has no way
+  around the router. Routers run Alpine with iptables, an image (`bagatka-router`) each engine
+  builds once, which takes the internet that once. The engine must be Docker 28 or later.
 
 ## Tests
 

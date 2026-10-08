@@ -79,11 +79,9 @@ None. A plan's access token is renewed when it is used and due, never in the bac
 
 ## Configuration
 
-`AgentAccountsSettings`, passed by the host (`PATTERNS.md`, entry 20):
+`AgentAccountsSettings`, passed by the host (`PATTERNS.md`, entry 20), with the deployment's
+`EncryptionSettings`:
 
-- the connection string;
-- the encryption key, at least 32 characters (the AppHost generates one and keeps it in its user
-  secrets);
 - `AllowClaudePlans`, off: Anthropic's terms forbid storing Claude sign-in tokens without
   its written permission, so turn it on only with that permission;
 - `AllowChatGptPlans`, off: OpenAI lets open-source and self-hosted deployments use Sign in with
@@ -119,12 +117,3 @@ None. A plan's access token is renewed when it is used and due, never in the bac
   anyway, with a warning in the log.
 - **Removing an account** stops model-gateway calls at once; an agent holding a token directly, such
   as a Copilot token, keeps it until its process stops.
-
-## Not built yet
-
-- **Key rotation.** A new encryption key makes every stored secret unreadable.
-- **Signing in again** to an account whose sign-in ended, keeping its registration; today it is
-  removed and added again.
-- **Claude plans behind the gateway.** Their token still goes to Claude Code; moving it needs
-  a test against Anthropic.
-- **Per-vendor sharing rules.** Plans are always personal; nobody else ever sends to them.

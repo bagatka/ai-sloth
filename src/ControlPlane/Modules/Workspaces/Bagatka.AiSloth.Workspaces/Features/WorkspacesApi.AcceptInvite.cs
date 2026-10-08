@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Workspaces.Data;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,6 +14,8 @@ internal sealed partial class WorkspacesApi
 {
     public async Task<Result<Resource>> AcceptInviteAsync(Actor actor, AcceptInvite command, CancellationToken ct)
     {
+        await using WorkspacesDbContext db = await databases.CreateDbContextAsync(ct);
+
         ArgumentNullException.ThrowIfNull(command);
         if (actor is not UserActor user)
         {

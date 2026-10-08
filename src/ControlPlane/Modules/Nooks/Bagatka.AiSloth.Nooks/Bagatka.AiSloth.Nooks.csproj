@@ -10,4 +10,9 @@
     <ProjectReference Include="..\..\..\..\Storage\Bagatka.ObjectStorage\Bagatka.ObjectStorage.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The shell scripts the control plane runs in nooks, by file name (Scripts.cs). -->
+    <EmbeddedResource Include="Scripts/*.sh" LogicalName="%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>

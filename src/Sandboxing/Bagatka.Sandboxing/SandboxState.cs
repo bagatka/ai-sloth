@@ -20,12 +20,10 @@ public enum SandboxState
     /// <summary>Compute released with files kept: processes start again on resume.</summary>
     Stopped = 5,
 
-    /// <summary>Being resumed.</summary>
-    Resuming = 6,
 
     /// <summary>The entry point stopped unexpectedly or never started; see <see cref="SandboxObservation.Reason"/>.</summary>
-    Failed = 7,
+    Failed = 6,
 
     /// <summary>Being deleted.</summary>
-    Deleting = 8,
+    Deleting = 7,
 }

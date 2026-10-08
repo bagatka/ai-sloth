@@ -27,7 +27,7 @@ internal sealed class SlothDaemon : IAsyncDisposable
 
         _disk = new NookDisk(settings, loggers.CreateLogger<NookDisk>());
         _processes = new ProcessTable(settings, _disk, loggers.CreateLogger<ProcessTable>());
-        _link = new ControlPlaneLink(settings, _processes, _disk, time, loggers.CreateLogger<ControlPlaneLink>());
+        _link = new ControlPlaneLink(settings, _processes, _disk, new NookMeter(time), time, loggers.CreateLogger<ControlPlaneLink>());
     }
 
     /// <summary>Serves the control plane until <paramref name="ct"/> is cancelled.</summary>

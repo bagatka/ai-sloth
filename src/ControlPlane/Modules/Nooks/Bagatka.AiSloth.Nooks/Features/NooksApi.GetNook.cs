@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Nooks.Data;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,13 +15,15 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<NookSummary>> GetAsync(Actor actor, NookId id, CancellationToken ct)
     {
-        Result<Nook> nook = await FindNookAsync(actor, id, AccessLevel.Read, ct);
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Nook> nook = await FindNookAsync(db, actor, id, AccessLevel.Read, ct);
         if (nook.Failed)
         {
             return new Result<NookSummary>(nook.Error);
         }
 
         List<SourceCopy> copies = await db.SourceCopies.AsNoTracking().Where(copy => copy.NookId == id).OrderBy(copy => copy.Name).ToListAsync(ct);
-        return new Result<NookSummary>(nook.Output.ToSummary([.. copies.Select(copy => copy.ToContract())]));
+        return new Result<NookSummary>(SummaryOf(nook.Output, [.. copies.Select(copy => copy.ToContract())]));
     }
 }

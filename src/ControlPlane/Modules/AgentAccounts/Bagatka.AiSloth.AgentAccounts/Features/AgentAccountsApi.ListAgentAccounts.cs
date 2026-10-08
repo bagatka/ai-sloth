@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.AgentAccounts.Data;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,6 +15,8 @@ internal sealed partial class AgentAccountsApi
 {
     public async Task<Result<IReadOnlyList<AgentAccountSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct)
     {
+        await using AgentAccountsDbContext db = await databases.CreateDbContextAsync(ct);
+
         if (actor is not UserActor user)
         {
             return new Result<IReadOnlyList<AgentAccountSummary>>(WorkspacesErrors.NotFound);

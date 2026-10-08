@@ -77,8 +77,8 @@ internal static class NookProcesses
         {
             yield return item.EventType switch
             {
-                "output" => new ProcessEvent(JsonSerializer.Deserialize<ProcessOutput>(item.Data, FoundationJson.Options)!),
-                "exit" => new ProcessEvent(JsonSerializer.Deserialize<ProcessExited>(item.Data, FoundationJson.Options)!),
+                nameof(ProcessOutput) => new ProcessEvent(JsonSerializer.Deserialize<ProcessOutput>(item.Data, FoundationJson.Options)!),
+                nameof(ProcessExited) => new ProcessEvent(JsonSerializer.Deserialize<ProcessExited>(item.Data, FoundationJson.Options)!),
                 _ => throw new InvalidOperationException("Unexpected event " + item.EventType),
             };
         }

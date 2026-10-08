@@ -7,8 +7,9 @@ using Xunit;
 namespace Bagatka.AiSloth.EndToEndTests;
 
 /// <summary>
-/// A second app whose nooks fall asleep after 8 idle seconds and are evicted after 20 asleep, and whose
-/// drafts go after 30 seconds, for the tests of nooks' lives; the other tests' app keeps the defaults,
+/// A second app whose nooks fall asleep after 8 idle seconds and are evicted after 20 asleep, whose
+/// workspaces have at most two nooks awake, and whose drafts go after 30 seconds, for the tests of
+/// nooks' lives; the other tests' app keeps the defaults,
 /// so their nooks never sleep halfway. It starts when a test first asks for it, so runs without those
 /// tests never wait for it, and every class that uses it runs at the same time as the others.
 /// </summary>
@@ -22,7 +23,7 @@ public sealed class SleepyControlPlane : IAsyncDisposable
 
     public static readonly TimeSpan Eviction = TimeSpan.FromMinutes(2);
 
-    private readonly ControlPlane _app = new ControlPlane(["Parameters:nook-sleep-after=00:00:08", "Parameters:nook-evict-after=00:00:20", "Parameters:chat-draft-lifetime=00:00:30"]);
+    private readonly ControlPlane _app = new ControlPlane([], [("Modules__Nooks__SleepAfter", "00:00:08"), ("Modules__Nooks__EvictAfter", "00:00:20"), ("Modules__Nooks__MaxAwakePerWorkspace", "2"), ("Modules__Chats__DraftLifetime", "00:00:30")]);
     private readonly Lazy<Task> _started;
 
     public SleepyControlPlane()

@@ -8,7 +8,7 @@ how we build, for people and agents alike.
 
 - A computer with Linux, or Windows with WSL.
 - [Nix](https://nixos.org/download/), which gives you every other tool.
-- A Docker Engine with [Sysbox](https://github.com/nestybox/sysbox). Nooks run their own Docker, and
+- Docker Engine 28 or later, with [Sysbox](https://github.com/nestybox/sysbox). Nooks run their own Docker, and
   Sysbox lets them do that without special rights on your computer. Nix cannot install Sysbox, so
   step 2 tells you how.
 

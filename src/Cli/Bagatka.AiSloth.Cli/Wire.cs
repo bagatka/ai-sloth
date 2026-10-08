@@ -106,11 +106,10 @@ internal static class Wire
 
     internal sealed record StartChat(string Provider, string Harness, Guid Account, IReadOnlyList<NookRepository> Repositories, Guid? CopyOf, int? Checkpoint);
 
-    internal sealed record SendMessage(string Text, bool ConfirmNearlyFullDisk);
+    internal sealed record SendMessage(string Text);
 
-    internal sealed record Prepare(bool ConfirmNearlyFullDisk);
 
-    internal sealed record HarnessState(string Harness, DateTimeOffset SavedAt, long Bytes, Guid SavedFrom);
+    internal sealed record HarnessState(string Harness, bool Shared, DateTimeOffset SavedAt, long Bytes, Guid? SavedFrom);
 
     internal sealed record Instructions(string Workspace, string Personal);
 

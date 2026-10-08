@@ -11,10 +11,10 @@ namespace Bagatka.AiSloth.Users;
 public static class UsersModule
 {
     /// <summary>Registers the module. The host must also register a <see cref="System.TimeProvider"/>.</summary>
-    public static IServiceCollection AddUsersModule(this IServiceCollection services, UsersSettings settings)
+    public static IServiceCollection AddUsersModule(this IServiceCollection services)
     {
-        services.AddModuleDbContext<UsersDbContext>(settings.ConnectionString, UsersDbContext.Schema);
-        services.AddScoped<IUsersApi, UsersApi>();
+        services.AddModuleDbContext<UsersDbContext>(UsersDbContext.Schema);
+        services.AddSingleton<IUsersApi, UsersApi>();
         return services;
     }
 }

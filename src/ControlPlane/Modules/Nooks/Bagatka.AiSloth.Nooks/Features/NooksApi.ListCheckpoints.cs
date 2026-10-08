@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Nooks.Data;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -15,7 +16,9 @@ internal sealed partial class NooksApi
 {
     public async Task<Result<Page<CheckpointSummary>>> ListCheckpointsAsync(Actor actor, NookId nookId, PageRequest page, CancellationToken ct)
     {
-        Result<Nook> nook = await FindNookAsync(actor, nookId, AccessLevel.Read, ct);
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Nook> nook = await FindNookAsync(db, actor, nookId, AccessLevel.Read, ct);
         if (nook.Failed)
         {
             return new Result<Page<CheckpointSummary>>(nook.Error);
@@ -30,7 +33,7 @@ internal sealed partial class NooksApi
         }
 
         List<Checkpoint> fetched = await paged.Output.ToListAsync(ct);
-        Page<Checkpoint> checkpoints = Keyset.ToPage(fetched, page, checkpoint => checkpoint.Id.Value);
-        return new Result<Page<CheckpointSummary>>(new Page<CheckpointSummary>([.. checkpoints.Items.Select(checkpoint => checkpoint.ToSummary())], checkpoints.NextCursor));
+        Page<Checkpoint> listed = Keyset.ToPage(fetched, page, checkpoint => checkpoint.Id.Value);
+        return new Result<Page<CheckpointSummary>>(new Page<CheckpointSummary>([.. listed.Items.Select(checkpoint => checkpoint.ToSummary())], listed.NextCursor));
     }
 }

@@ -17,7 +17,7 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261006082504_ReadyCopies";
+    public override string LastMigrationId => "20261008130530_Initial";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -99,6 +99,48 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("checkpoint_parts", "nooks");
             });
 
+        modelBuilder.Entity("Bagatka.AiSloth.Nooks.Model.KeptFolder", b =>
+            {
+                b.Property<string>("Name")
+                    .HasMaxLength(200)
+                    .HasColumnType("character varying(200)")
+                    .HasColumnName("name");
+
+                b.Property<long>("Bytes")
+                    .HasColumnType("bigint")
+                    .HasColumnName("bytes");
+
+                b.Property<string>("Head")
+                    .IsRequired()
+                    .HasMaxLength(64)
+                    .HasColumnType("character varying(64)")
+                    .HasColumnName("head");
+
+                b.Property<DateTimeOffset>("SavedAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("saved_at");
+
+                b.Property<Guid>("SavedBy")
+                    .HasColumnType("uuid")
+                    .HasColumnName("saved_by");
+
+                b.PrimitiveCollection<List<string>>("Saves")
+                    .IsRequired()
+                    .HasColumnType("text[]")
+                    .HasColumnName("saves");
+
+                b.Property<uint>("Version")
+                    .IsConcurrencyToken()
+                    .ValueGeneratedOnAddOrUpdate()
+                    .HasColumnType("xid")
+                    .HasColumnName("xmin");
+
+                b.HasKey("Name")
+                    .HasName("pk_kept_folders");
+
+                b.ToTable("kept_folders", "nooks");
+            });
+
         modelBuilder.Entity("Bagatka.AiSloth.Nooks.Model.Nook", b =>
             {
                 b.Property<Guid>("Id")
@@ -125,22 +167,18 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("bytea")
                     .HasColumnName("daemon_token_hash");
 
-                b.Property<long?>("DiskAvailableBytes")
-                    .HasColumnType("bigint")
-                    .HasColumnName("disk_available_bytes");
-
-                b.Property<long?>("DiskTotalBytes")
-                    .HasColumnType("bigint")
-                    .HasColumnName("disk_total_bytes");
+                b.Property<bool>("Evicted")
+                    .HasColumnType("boolean")
+                    .HasColumnName("evicted");
 
                 b.Property<bool>("FromScratch")
                     .HasColumnType("boolean")
                     .HasColumnName("from_scratch");
 
-                b.Property<string>("Harness")
+                b.Property<string>("Image")
                     .HasMaxLength(32)
                     .HasColumnType("character varying(32)")
-                    .HasColumnName("harness");
+                    .HasColumnName("image");
 
                 b.PrimitiveCollection<List<string>>("KeptPaths")
                     .IsRequired()
@@ -165,6 +203,10 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
                 b.Property<DateTimeOffset?>("ReadyCopyMadeAt")
                     .HasColumnType("timestamp with time zone")
                     .HasColumnName("ready_copy_made_at");
+
+                b.Property<Guid?>("ReservedFor")
+                    .HasColumnType("uuid")
+                    .HasColumnName("reserved_for");
 
                 b.Property<bool>("ResumeDue")
                     .HasColumnType("boolean")

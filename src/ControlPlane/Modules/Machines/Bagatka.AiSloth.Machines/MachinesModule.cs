@@ -15,15 +15,15 @@ namespace Bagatka.AiSloth.Machines;
 public static class MachinesModule
 {
     /// <summary>Registers the module. The host also registers a <see cref="System.TimeProvider"/> and the Workspaces module.</summary>
-    public static IServiceCollection AddMachinesModule(this IServiceCollection services, MachinesSettings settings)
+    public static IServiceCollection AddMachinesModule(this IServiceCollection services)
     {
-        services.AddModuleDbContext<MachinesDbContext>(settings.ConnectionString, MachinesDbContext.Schema);
+        services.AddModuleDbContext<MachinesDbContext>(MachinesDbContext.Schema);
         services.AddOutbox<MachinesDbContext>();
         services.AddSingleton<MachineConnections>();
         services.AddSingleton<ISandboxProvider, MachineSandboxProvider>();
-        services.AddScoped<MachinesApi>();
-        services.AddScoped<IMachinesApi>(provider => provider.GetRequiredService<MachinesApi>());
-        services.AddScoped<IMachineConnectionsApi>(provider => provider.GetRequiredService<MachinesApi>());
+        services.AddSingleton<MachinesApi>();
+        services.AddSingleton<IMachinesApi>(provider => provider.GetRequiredService<MachinesApi>());
+        services.AddSingleton<IMachineConnectionsApi>(provider => provider.GetRequiredService<MachinesApi>());
         return services;
     }
 }

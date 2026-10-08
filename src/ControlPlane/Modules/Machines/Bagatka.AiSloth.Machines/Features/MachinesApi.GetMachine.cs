@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Machines.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Machines.Contracts;
@@ -12,6 +13,8 @@ internal sealed partial class MachinesApi
 {
     public async Task<Result<MachineSummary>> GetAsync(Actor actor, MachineId id, CancellationToken ct)
     {
+        await using MachinesDbContext db = await databases.CreateDbContextAsync(ct);
+
         Machine? machine = await db.Machines.AsNoTracking().SingleOrDefaultAsync(found => found.Id == id, ct);
         if (machine is null)
         {

@@ -14,8 +14,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// <summary>
 /// Journey: a nook starts with everything its files need. Their setups, then resumes, run in their
 /// folders before the agent starts; a failed setup shows in <c>sloth</c>, in full on request, and the
-/// agent starts knowing it; <c>sloth chat prepare</c> has the agent write a setup until it works in a
-/// fresh nook; a slow setup leaves a ready copy the next chat starts from; and a nook runs containers.
+/// agent starts knowing it; <c>sloth chat prepare</c> has the agent write a setup the next chat's nook
+/// runs; a slow setup leaves a ready copy the next chat starts from; and a nook runs containers.
 /// </summary>
 public sealed class FastStartJourney(ControlPlane app) : IDisposable
 {
@@ -33,7 +33,7 @@ public sealed class FastStartJourney(ControlPlane app) : IDisposable
         _dev = app.ClientFor(_person);
         ChatSummary first = await SlothShowsAFailedSetupAndTheAgentStartsKnowingItAsync(sloth);
         await SetupsThenResumesRunInTheirFoldersBeforeTheAgentStartsAsync(first);
-        await SlothPreparesAChatUntilItsSetupWorksInAFreshNookAsync(sloth);
+        await SlothHasTheAgentPrepareAChatAndTheNextChatStartsSetUpAsync(sloth);
         await Task.WhenAll(ASlowSetupLeavesAReadyCopyTheNextChatStartsFromAsync(), ANookRunsContainersOfItsOwnAsync(first));
     }
 
@@ -91,22 +91,24 @@ public sealed class FastStartJourney(ControlPlane app) : IDisposable
         Assert.True(IndexOf(watch, "setup-ended") < IndexOf(watch, "turn-started"));
     }
 
-    private async Task SlothPreparesAChatUntilItsSetupWorksInAFreshNookAsync(SlothCli sloth)
+    private async Task SlothHasTheAgentPrepareAChatAndTheNextChatStartsSetUpAsync(SlothCli sloth)
     {
         await sloth.RunAsync("chat", "say hello", "--harness", "claude-code");
         string shortId = sloth.Output[5..11];
-        ChatSummary chat = await SlothCli.NewestChatAsync(Dev);
-        await WriteAsync(chat, "/opt/by-hand", "installed by hand", "644");
 
         int prepared = await sloth.RunAsync("chat", "prepare", shortId);
         string output = sloth.Output;
+        int started = await sloth.RunAsync("chat", "say hello", "--from", shortId);
+        string next = sloth.Output;
+        ChatSummary nextChat = await SlothCli.NewestChatAsync(Dev);
+        int? installed = await NookProcesses.ExitCodeAsync(Dev, nextChat.NookId, "test", "-f", "/opt/by-hand");
 
-        Assert.Equal(0, prepared);
+        Assert.Equal((0, 0), (prepared, started));
         Assert.StartsWith("Asked the agent to write a setup for this chat's files, so new nooks start with everything installed.", output, StringComparison.Ordinal);
-        Assert.Matches("\nSetup failed in a fresh nook after [0-9]+s \\(exit 1\\):\n", output);
-        Assert.Contains("\nSent to the agent to fix; it's tested again after its turn.\n", output, StringComparison.Ordinal);
-        Assert.Contains("\nTesting the setup in a fresh nook again (test 2 of 3)…\n", output, StringComparison.Ordinal);
-        Assert.Matches("\nSetup works from scratch: [0-9]+s; run again: [0-9]+s\\.\n", output);
+        Assert.Contains("Try it in a fresh nook: sloth chat \"<message>\" --from " + shortId, output, StringComparison.Ordinal);
+        Assert.Contains("\nSetting up: .agents/setup\n", next, StringComparison.Ordinal);
+        Assert.Contains("\nSet up in ", next, StringComparison.Ordinal);
+        Assert.Equal(0, installed);
     }
 
     private async Task ASlowSetupLeavesAReadyCopyTheNextChatStartsFromAsync()
@@ -117,7 +119,7 @@ public sealed class FastStartJourney(ControlPlane app) : IDisposable
         JsonElement firstStarted = await firstWatch.NextAsync("setup-started");
         await firstWatch.NextAsync("setup-ended", TimeSpan.FromMinutes(2));
         await repository.Workspace.SendAsync(first, "Please write hello.txt for me");
-        await firstWatch.NextAsync("checkpoint-saved");
+        await firstWatch.NextAsync("turn-ended");
         await repository.MoveOnAsync();
 
         ChatSummary second = await repository.StartChatAsync("docker");

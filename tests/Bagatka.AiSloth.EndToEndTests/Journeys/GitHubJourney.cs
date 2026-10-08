@@ -59,7 +59,7 @@ public sealed class GitHubJourney(ControlPlane app) : IDisposable
         string chatOutput = sloth.Output;
         ChatSummary chat = await SlothCli.NewestChatAsync(Ada);
         int? copied = await NookProcesses.ExitCodeAsync(Ada, chat.NookId, "grep", "-q", "hello from api", "/work/api/README.md");
-        int? guided = await NookProcesses.ExitCodeAsync(Ada, chat.NookId, "grep", "-q", "`api/`", "/work/AGENTS.md");
+        int? guided = await NookProcesses.ExitCodeAsync(Ada, chat.NookId, "grep", "-q", "`api/`", "/root/.claude/CLAUDE.md");
         await NookProcesses.ExitCodeAsync(Ada, chat.NookId, "sh", "-c", "echo hi > /work/api/CHANGE.md");
         int pushed = await sloth.RunAsync("chat", "push", ShortId(chat), "--pr");
         string pushedOutput = sloth.Output;

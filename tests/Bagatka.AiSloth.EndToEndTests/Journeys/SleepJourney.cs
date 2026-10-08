@@ -41,7 +41,8 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
             ANookAsleepForLongIsEvictedAndComesBackFromItsLatestCheckpointAsync(app),
             AnEvictedNookComesBackThroughTheReadyCopyItsSlowSetupLeftAsync(app),
             ANookWhoseContainerIsLostComesBackFromItsCheckpointAsync(app),
-            ANookStaysAwakeWhileSomeoneWatchesItsProcessAsync(app));
+            ANookStaysAwakeWhileSomeoneWatchesItsProcessAsync(app),
+            AWorkspaceHasAtMostTwoNooksAwakeAsync(app));
     }
 
     private static async Task ABusyNookStaysAwakeWhileAnIdleOneSleepsAndWakesForItsNextMessageAsync(ControlPlane app)
@@ -53,12 +54,12 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
         await using ChatWatch idleWatch = await ChatWatch.OpenAsync(alice, idle);
         await using ChatWatch busyWatch = await ChatWatch.OpenAsync(alice, busy);
         await acme.SendAsync(idle, "Please write hello.txt for me");
-        await idleWatch.NextAsync("checkpoint-saved");
+        await idleWatch.NextAsync("turn-ended");
         app.Model.ForgetHolds();
         await acme.SendAsync(busy, "wait for me");
         await app.Model.Holds.ReadAsync(TestContext.Current.CancellationToken);
 
-        NookStatus asleep = await acme.StatusAsync(idle.NookId, status => status is NookStatus.Stopped, SleepyControlPlane.Sleep);
+        NookStatus asleep = await acme.StatusAsync(idle.NookId, status => status is NookStatus.Asleep, SleepyControlPlane.Sleep);
         NookSummary busyNook = await acme.NookAsync(busy.NookId);
         app.Model.Release();
         await busyWatch.NextAsync("turn-ended");
@@ -67,7 +68,7 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
         await idleWatch.NextAsync("turn-ended");
         int? kept = await acme.RunAsync(idle.NookId, "grep -q 'hi from the fake model' /work/hello.txt");
 
-        Assert.Equal((NookStatus.Stopped, NookStatus.Running), (asleep, busyNook.Status));
+        Assert.Equal((NookStatus.Asleep, NookStatus.Ready), (asleep, busyNook.Status));
         Assert.True(restarted.GetProperty("remembers").GetBoolean());
         Assert.Contains(idleWatch.Seen, seen => string.Equals(seen.Type, "agent-update", StringComparison.Ordinal)
             && seen.Event.GetProperty("update").ToString().Contains("You first said: Please write hello.txt for me", StringComparison.Ordinal));
@@ -81,13 +82,13 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
         ChatSummary chat = await acme.StartChatAsync();
         await using ChatWatch watch = await ChatWatch.OpenAsync(bob, chat);
         await acme.SendAsync(chat, "say hello");
-        await watch.NextAsync("checkpoint-saved");
-        NookStatus asleep = await acme.StatusAsync(chat.NookId, status => status is NookStatus.Stopped, SleepyControlPlane.Sleep);
+        await watch.NextAsync("turn-ended");
+        NookStatus asleep = await acme.StatusAsync(chat.NookId, status => status is NookStatus.Asleep, SleepyControlPlane.Sleep);
 
         await Api.ExpectAsync(bob.SendPostAsync(Paths.Nook(chat.NookId) + "/wake", new { }), HttpStatusCode.NoContent);
-        NookStatus awake = await acme.StatusAsync(chat.NookId, status => status is NookStatus.Running, SleepyControlPlane.Sleep);
+        NookStatus awake = await acme.StatusAsync(chat.NookId, status => status is NookStatus.Ready, SleepyControlPlane.Sleep);
 
-        Assert.Equal((NookStatus.Stopped, NookStatus.Running), (asleep, awake));
+        Assert.Equal((NookStatus.Asleep, NookStatus.Ready), (asleep, awake));
     }
 
     private static async Task ANookAsleepForLongIsEvictedAndComesBackFromItsLatestCheckpointAsync(ControlPlane app)
@@ -97,16 +98,16 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
         ChatSummary chat = await acme.StartChatAsync();
         await using ChatWatch watch = await ChatWatch.OpenAsync(carol, chat);
         await acme.SendAsync(chat, "Please write hello.txt for me");
-        await watch.NextAsync("checkpoint-saved");
+        await watch.NextAsync("turn-ended");
         await acme.ChangeAsync(chat.NookId, "touch /tmp/outside-the-checkpoint");
 
-        NookStatus evicted = await acme.StatusAsync(chat.NookId, status => status is NookStatus.Evicted, SleepyControlPlane.Eviction);
+        bool evicted = await app.SandboxGoneAsync(chat.NookId.Value, SleepyControlPlane.Eviction);
         await acme.SendAsync(chat, "What was my first message?");
         JsonElement restarted = await watch.NextAsync("agent-restarted", SleepyControlPlane.Sleep);
         await watch.NextAsync("turn-ended");
         int? restored = await acme.RunAsync(chat.NookId, "grep -q 'hi from the fake model' /work/hello.txt && test ! -e /tmp/outside-the-checkpoint");
 
-        Assert.Equal(NookStatus.Evicted, evicted);
+        Assert.True(evicted);
         Assert.True(restarted.GetProperty("remembers").GetBoolean());
         Assert.Equal(0, restored);
     }
@@ -119,16 +120,16 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
         ChatSummary chat = await repository.StartChatAsync("docker");
         await using ChatWatch watch = await ChatWatch.OpenAsync(dev, chat);
         await acme.SendAsync(chat, "Please write hello.txt for me");
-        await watch.NextAsync("checkpoint-saved", TimeSpan.FromMinutes(2));
+        await watch.NextAsync("turn-ended", TimeSpan.FromMinutes(2));
 
-        NookStatus evicted = await acme.StatusAsync(chat.NookId, status => status is NookStatus.Evicted, SleepyControlPlane.Eviction);
+        bool evicted = await app.SandboxGoneAsync(chat.NookId.Value, SleepyControlPlane.Eviction);
         await acme.SendAsync(chat, "What was my first message?");
         JsonElement started = await watch.NextAsync("setup-started", SleepyControlPlane.Sleep);
         JsonElement ended = await watch.NextAsync("setup-ended");
         await watch.NextAsync("turn-ended");
         int? kept = await acme.RunAsync(chat.NookId, "test -f /work/api/deps/installed && grep -q 'hi from the fake model' /work/hello.txt");
 
-        Assert.Equal(NookStatus.Evicted, evicted);
+        Assert.True(evicted);
         Assert.True(started.GetProperty("fromReadyCopy").GetBoolean());
         Assert.True(TimeSpan.Parse(ended.GetProperty("took").GetString()!, CultureInfo.InvariantCulture) < TimeSpan.FromSeconds(SlowSetupRepository.SetupSeconds));
         Assert.Equal(0, kept);
@@ -143,10 +144,57 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
 
         bool outputKeptComing = await WatchAsync(frank, nook.Id, ticking.Id, WatchedFor);
         NookSummary watched = await acme.NookAsync(nook.Id);
-        NookStatus afterwards = await acme.StatusAsync(nook.Id, status => status is NookStatus.Stopped, SleepyControlPlane.Sleep);
+        NookStatus afterwards = await acme.StatusAsync(nook.Id, status => status is NookStatus.Asleep, SleepyControlPlane.Sleep);
 
         Assert.True(outputKeptComing, "The process's output ended while it was watched.");
-        Assert.Equal((NookStatus.Running, NookStatus.Stopped), (watched.Status, afterwards));
+        Assert.Equal((NookStatus.Ready, NookStatus.Asleep), (watched.Status, afterwards));
+    }
+
+    // The sleepy app lets a workspace have two nooks awake. While both are at work, a third can't start;
+    // once one of them isn't, a third starts, and that one falls asleep to make room.
+    private static async Task AWorkspaceHasAtMostTwoNooksAwakeAsync(ControlPlane app)
+    {
+        using HttpClient grace = app.ClientFor("grace-" + Guid.CreateVersion7());
+        TestWorkspace acme = await TestWorkspace.CreateAsync(app, grace);
+        NookSummary first = await Api.ReadAsync<NookSummary>(grace.SendPostAsync(acme.Path + "/nooks", new { provider = "docker" }), HttpStatusCode.Created);
+        NookSummary second = await Api.ReadAsync<NookSummary>(grace.SendPostAsync(acme.Path + "/nooks", new { provider = "docker" }), HttpStatusCode.Created);
+        using CancellationTokenSource watchingFirst = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        using CancellationTokenSource watchingSecond = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        await using IAsyncEnumerator<ProcessEvent> firstAtWork = await AtWorkAsync(grace, first.Id, watchingFirst.Token);
+        await using IAsyncEnumerator<ProcessEvent> secondAtWork = await AtWorkAsync(grace, second.Id, watchingSecond.Token);
+
+        Problem refused = await Api.ProblemAsync(grace.SendPostAsync(acme.Path + "/nooks", new { provider = "docker" }), HttpStatusCode.Conflict);
+        await watchingFirst.CancelAsync();
+        await firstAtWork.DisposeAsync();
+        NookSummary third = await Api.EventuallyAsync(async () =>
+        {
+            using HttpResponseMessage response = await grace.SendPostAsync(acme.Path + "/nooks", new { provider = "docker" });
+            if (response.StatusCode != HttpStatusCode.Created)
+            {
+                return null;
+            }
+
+            NookSummary created = await Api.ReadAsync<NookSummary>(response, HttpStatusCode.Created);
+            return created;
+        });
+        NookStatus firstAfter = await acme.StatusAsync(first.Id, status => status is NookStatus.Asleep, SleepyControlPlane.Sleep);
+        NookSummary secondAfter = await acme.NookAsync(second.Id);
+        await watchingSecond.CancelAsync();
+        await secondAtWork.DisposeAsync();
+
+        Assert.Equal(NooksErrors.TooManyAwake.Code, refused.Code);
+        Assert.NotEqual(first.Id, third.Id);
+        Assert.Equal((NookStatus.Asleep, NookStatus.Ready), (firstAfter, secondAfter.Status));
+    }
+
+    // A person watching a process that keeps printing: the nook is at work while the watch is open.
+    private static async Task<IAsyncEnumerator<ProcessEvent>> AtWorkAsync(HttpClient person, NookId nook, CancellationToken watching)
+    {
+        ProcessSummary ticking = await NookProcesses.StartAsync(person, nook, "sh", "-c", "while true; do echo tick; sleep 1; done");
+        IAsyncEnumerator<ProcessEvent> output = NookProcesses.WatchAsync(person, nook, ticking.Id, fromOffset: 0, watching).GetAsyncEnumerator(watching);
+        bool watched = await output.MoveNextAsync();
+        Assert.True(watched, "The process's output never came.");
+        return output;
     }
 
     // Reads the process's output for the time given, as a person watching it would; returns whether
@@ -176,7 +224,7 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
         ChatSummary chat = await acme.StartChatAsync();
         await using ChatWatch watch = await ChatWatch.OpenAsync(erin, chat);
         await acme.SendAsync(chat, "Please write hello.txt for me");
-        await watch.NextAsync("checkpoint-saved");
+        await watch.NextAsync("turn-ended");
 
         await app.LoseSandboxAsync(chat.NookId.Value);
         await acme.SendAsync(chat, "What was my first message?");

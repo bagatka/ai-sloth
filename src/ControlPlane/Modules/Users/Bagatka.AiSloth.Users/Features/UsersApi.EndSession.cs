@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Users.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Users.Contracts;
@@ -12,6 +13,8 @@ internal sealed partial class UsersApi
 {
     public async Task<Result> EndSessionAsync(Actor actor, SessionId id, CancellationToken ct)
     {
+        await using UsersDbContext db = await databases.CreateDbContextAsync(ct);
+
         if (actor is not UserActor user)
         {
             return new Result(Error.Unauthorized);

@@ -114,7 +114,6 @@ public sealed class DaemonTests
         ProcessExited exited = await NextExitAsync(second, process);
         List<ProcessOutput> output = await WatchAsync(controlPlane, second, process, fromOffset: 0);
 
-        Assert.Contains(second.Hello.RunningProcesses, running => string.Equals(running.ProcessId, process, StringComparison.Ordinal));
         Assert.Equal("before\nafter\n", Text(output, OutputChannel.StandardOutput));
         Assert.Equal(128 + 15, exited.ExitCode);
     }
@@ -148,8 +147,10 @@ public sealed class DaemonTests
 
         await first.Instructions.Writer.WriteAsync(new DaemonInstruction { Reconnect = new Reconnect() }, ct);
         FakeControlPlane.Connection second = await controlPlane.Endpoint.NextConnectionAsync(ct);
+        await second.Instructions.Writer.WriteAsync(Stop(process), ct);
+        ProcessExited exited = await NextExitAsync(second, process);
 
-        Assert.Contains(second.Hello.RunningProcesses, running => string.Equals(running.ProcessId, process, StringComparison.Ordinal));
+        Assert.Equal(128 + 15, exited.ExitCode);
     }
 
     [Fact(Timeout = Timeout)]
@@ -248,17 +249,19 @@ public sealed class DaemonTests
     }
 
     [Fact(Timeout = Timeout)]
-    public async Task The_daemon_reports_how_full_the_disk_is_when_it_connects()
+    public async Task The_daemon_reports_what_the_nook_uses_when_it_connects()
     {
         CancellationToken ct = TestContext.Current.CancellationToken;
         await using FakeControlPlane controlPlane = await FakeControlPlane.StartAsync();
         await using DaemonUnderTest daemon = DaemonUnderTest.Start(controlPlane.Url);
         FakeControlPlane.Connection connection = await controlPlane.Endpoint.NextConnectionAsync(ct);
 
-        DiskUsage disk = await NextDiskUsageAsync(connection);
+        Usage usage = await NextUsageAsync(connection);
 
-        Assert.True(disk.TotalBytes > 0);
-        Assert.InRange(disk.AvailableBytes, 0, disk.TotalBytes);
+        Assert.True(usage.DiskTotalBytes > 0);
+        Assert.InRange(usage.DiskAvailableBytes, 0, usage.DiskTotalBytes);
+        Assert.InRange(usage.MemoryUsedBytes, 1, usage.MemoryTotalBytes);
+        Assert.True(usage.CpuTotalMillicores > 0);
     }
 
     [Fact(Timeout = Timeout)]
@@ -269,17 +272,17 @@ public sealed class DaemonTests
         await using FakeControlPlane controlPlane = await FakeControlPlane.StartAsync();
         await using DaemonUnderTest daemon = DaemonUnderTest.Start(controlPlane.Url, SmallLimits, smallDisk.Path, diskReserveBytes: 1 << 20);
         FakeControlPlane.Connection connection = await controlPlane.Endpoint.NextConnectionAsync(ct);
-        DiskUsage before = await NextDiskUsageAsync(connection);
+        Usage before = await NextUsageAsync(connection);
         await smallDisk.FillAsync();
         string process = NewId();
 
         await connection.Instructions.Writer.WriteAsync(Start(process, OutputRetention.Complete, "sh", "-c", EightThousandBytes), ct);
         List<ProcessOutput> output = await WatchAsync(controlPlane, connection, process, fromOffset: 0);
-        DiskUsage full = await NextDiskUsageAsync(connection);
+        Usage full = await NextUsageAsync(connection);
 
         string expected = string.Concat(Enumerable.Range(0, 80).Select(line => line.ToString("D99", CultureInfo.InvariantCulture) + "\n"));
         Assert.Equal(expected, Text(output, OutputChannel.StandardOutput));
-        Assert.True(full.AvailableBytes < before.AvailableBytes);
+        Assert.True(full.DiskAvailableBytes < before.DiskAvailableBytes);
     }
 
     private static string NewId()
@@ -327,17 +330,17 @@ public sealed class DaemonTests
         throw new InvalidOperationException("The connection ended before the process exited.");
     }
 
-    private static async Task<DiskUsage> NextDiskUsageAsync(FakeControlPlane.Connection connection)
+    private static async Task<Usage> NextUsageAsync(FakeControlPlane.Connection connection)
     {
         await foreach (DaemonEvent daemonEvent in connection.Events.Reader.ReadAllAsync(Ct))
         {
-            if (daemonEvent.DiskUsage is { } disk)
+            if (daemonEvent.Usage is { } usage)
             {
-                return disk;
+                return usage;
             }
         }
 
-        throw new InvalidOperationException("The connection ended before the daemon reported its disk.");
+        throw new InvalidOperationException("The connection ended before the daemon reported what the nook uses.");
     }
 
     // Watches from an offset and returns everything uploaded until the upload ends.

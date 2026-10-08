@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Nooks.Data;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -16,6 +17,8 @@ internal sealed partial class NooksApi
 
     public async Task<Result> AcceptOutputAsync(Actor actor, OutputUpload upload, IAsyncEnumerable<ProcessEvent> events, CancellationToken ct)
     {
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
         Nook? nook = await db.Nooks.AsNoTracking().SingleOrDefaultAsync(found => found.Id == upload.NookId, ct);
         if (nook is null || !nook.AcceptsDaemonToken(upload.Token))
         {

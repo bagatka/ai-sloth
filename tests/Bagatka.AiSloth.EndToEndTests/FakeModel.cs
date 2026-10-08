@@ -23,8 +23,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// A model provider at the HTTP boundary: the real agent runs in a real nook, only the model is fake.
 /// It speaks the Anthropic Messages API well enough for Claude Code, answering by the last user
 /// message's latest text: a tool result last ends the turn, "write hello" asks to write <c>/work/hello.txt</c>, a
-/// request to prepare a chat writes a <c>.agents/setup</c> that needs what was installed by hand
-/// (<c>/opt/by-hand</c>), and a failed test of it fixes it to install that, "wait"
+/// request to prepare a chat writes a <c>.agents/setup</c> that installs what was installed by hand
+/// (<c>/opt/by-hand</c>), "wait"
 /// holds the answer until <see cref="Release"/>, "first message" answers with the conversation's first
 /// message, and anything else gets a short text. It speaks
 /// OpenAI's Responses API well enough for Codex and pi, answering every call with a short text.
@@ -244,8 +244,7 @@ internal sealed class FakeModel : IAsyncDisposable
         return new JsonObject { ["type"] = "text", ["text"] = text };
     }
 
-    // What the agent runs when asked to fix its setup after a failed test, or to prepare the project:
-    // each once in a conversation. Any text of the message counts, because Claude Code sends a
+    // What the agent runs when asked to prepare the project, once in a conversation. Any text of the message counts, because Claude Code sends a
     // later turn's prompt with the earlier turn's tool result and adds reminders.
     private static string? SetupCommand(JsonArray messages, JsonNode? message)
     {
@@ -254,8 +253,7 @@ internal sealed class FakeModel : IAsyncDisposable
             : string.Join("\n", Blocks(message).Select(block => block["text"]?.GetValue<string>()));
         (string Asked, string Command)[] steps =
         [
-            ("in a fresh nook, with only this chat's files, and it failed", "printf '#!/bin/sh\\nmkdir -p /opt && touch /opt/by-hand\\n' > /work/.agents/setup"),
-            ("Write a setup for the code in your working directory", "mkdir -p /work/.agents && printf '#!/bin/sh\\ntest -f /opt/by-hand\\n' > /work/.agents/setup && chmod +x /work/.agents/setup"),
+            ("Prepare this chat's files for AiSloth", "mkdir -p /work/.agents && printf '#!/bin/sh\\nmkdir -p /opt && touch /opt/by-hand\\n' > /work/.agents/setup && chmod +x /work/.agents/setup"),
         ];
         return steps
             .Where(step => text.Contains(step.Asked, StringComparison.Ordinal) && !Ran(messages, step.Command))

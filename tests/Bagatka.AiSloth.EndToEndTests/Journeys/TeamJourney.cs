@@ -15,7 +15,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 
 /// <summary>
 /// Journey: Alice's team shares her workspace. An invite signs Bob up as an editor, Carol joins as a
-/// viewer, and Dan as a guest of one nook; each does exactly what their access allows, outsiders can't
+/// viewer, and Dan as a guest of one nook, who watches and proposes there but neither runs anything nor
+/// deletes it; each does exactly what their access allows, outsiders can't
 /// even learn the workspace exists, an invite works once, and Alice decides who keeps access.
 /// </summary>
 public sealed class TeamJourney(ControlPlane app) : IDisposable
@@ -119,6 +120,8 @@ public sealed class TeamJourney(ControlPlane app) : IDisposable
         await Api.ExpectAsync(_dan.SendGetAsync(Paths.Nook(other.Id)), HttpStatusCode.NotFound);
         await Api.ExpectAsync(_dan.SendGetAsync(Acme.Path), HttpStatusCode.NotFound);
         ChatMessage proposal = await Api.ReadAsync<ChatMessage>(_dan.SendPostAsync(Paths.Chat(Chat) + "/messages", new { text = "Please write hello.txt" }), HttpStatusCode.OK);
+        await Api.ExpectAsync(_dan.SendPostAsync(Paths.Nook(Chat.NookId) + "/processes", new { command = "env" }), HttpStatusCode.Forbidden);
+        await Api.ExpectAsync(_dan.DeleteAsync(new Uri(Paths.Nook(Chat.NookId), UriKind.Relative), Ct), HttpStatusCode.Forbidden);
 
         Assert.Equal(Resource.Nook(Chat.NookId.Value), joined);
         Assert.True(proposal.IsProposal);

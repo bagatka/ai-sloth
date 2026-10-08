@@ -10,8 +10,7 @@ internal sealed class DraftConfiguration : IEntityTypeConfiguration<Draft>
     {
         builder.HasKey(draft => draft.ChatId);
 
-        // A person's drafts in a workspace, newest first, and drafts nobody wrote in for long.
-        builder.HasIndex(draft => new { draft.StartedBy, draft.WorkspaceId, draft.StartedAt });
+        // Drafts nobody wrote in for long.
         builder.HasIndex(draft => draft.StartedAt);
     }
 }

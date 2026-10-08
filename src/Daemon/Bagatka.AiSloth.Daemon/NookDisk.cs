@@ -1,7 +1,6 @@
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Bagatka.AiSloth.DaemonProtocol.V1;
 using Microsoft.Extensions.Logging;
 
 namespace Bagatka.AiSloth.Daemon;
@@ -32,10 +31,10 @@ internal sealed class NookDisk(DaemonSettings settings, ILogger<NookDisk> logger
     }
 
     /// <summary>How full the working directory's disk is.</summary>
-    public DiskUsage Measure()
+    public DriveUsage Measure()
     {
         DriveInfo drive = new DriveInfo(settings.WorkingDirectory);
-        return new DiskUsage { TotalBytes = drive.TotalSize, AvailableBytes = drive.AvailableFreeSpace };
+        return new DriveUsage(drive.TotalSize, drive.AvailableFreeSpace);
     }
 
     /// <summary>

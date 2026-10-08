@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Users.Data;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,6 +15,8 @@ internal sealed partial class UsersApi
     // Not handled: a call with thousands of IDs; clients ask for the people on one screen.
     public async Task<IReadOnlyList<UserSummary>> GetManyAsync(Actor actor, IReadOnlyCollection<UserId> ids, CancellationToken ct)
     {
+        await using UsersDbContext db = await databases.CreateDbContextAsync(ct);
+
         if (actor is AnonymousActor || ids.Count == 0)
         {
             return [];

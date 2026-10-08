@@ -55,9 +55,6 @@ internal sealed class Chat
 
     public int? SetupExitCode { get; private set; }
 
-    // The message whose turn calls for testing the nook's setup in a fresh nook afterwards, until
-    // the test ended; the next turn waits for it.
-    public MessageId? SetupTestAfter { get; private set; }
 
     // The agent's process, while it runs, and the SHA-256 of the token its model calls carry.
     public ProcessId? HarnessProcessId { get; private set; }
@@ -79,12 +76,7 @@ internal sealed class Chat
 
     public bool LoadingSession { get; private set; }
 
-    // The message whose turn ended, until the checkpoint after it is taken.
-    public MessageId? CheckpointAfter { get; private set; }
 
-    // The manifest of the harness state its nook held when it last synced with its starter's
-    // (StateFiles); null before the first sync.
-    public string? HarnessStateFiles { get; private set; }
 
     // The message whose turn is running.
     public MessageId? TurnMessageId { get; private set; }
@@ -204,35 +196,14 @@ internal sealed class Chat
         OutputOffset = offset;
     }
 
-    public void TurnStarted(MessageId messageId, bool testsSetup)
+    public void TurnStarted(MessageId messageId)
     {
         TurnMessageId = messageId;
-        if (testsSetup)
-        {
-            SetupTestAfter = messageId;
-        }
     }
 
-    public void SetupTestEnded()
-    {
-        SetupTestAfter = null;
-    }
-
-    // The turn ended, so a checkpoint of the files it changed is due.
     public void TurnEnded()
     {
-        CheckpointAfter = TurnMessageId;
         TurnMessageId = null;
-    }
-
-    public void CheckpointTaken()
-    {
-        CheckpointAfter = null;
-    }
-
-    public void HarnessStateSynced(string? manifest)
-    {
-        HarnessStateFiles = manifest;
     }
 
     public StoredEvent Record(ChatEventBody body, TimeProvider time)

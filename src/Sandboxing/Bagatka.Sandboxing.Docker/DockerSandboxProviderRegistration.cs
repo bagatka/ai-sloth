@@ -19,7 +19,7 @@ public static class DockerSandboxProviderRegistration
         ArgumentNullException.ThrowIfNull(settings);
         services.AddDockerClient(settings.Client);
         services.AddSingleton<ISandboxProvider>(provider =>
-            new DockerSandboxProvider(provider.GetRequiredService<DockerClient>(), settings.Scope));
+            new DockerSandboxProvider(provider.GetRequiredService<DockerClient>(), settings.Scope, settings.HostPorts));
         return services;
     }
 }

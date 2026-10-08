@@ -1,8 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.Foundation;
@@ -15,9 +21,10 @@ namespace Bagatka.Sandboxing.Docker;
 /// its own without privileges on the host. Suspending stops the container, which frees its memory and
 /// keeps its files, so a suspended sandbox is <see cref="SandboxState.Stopped"/>: a container whose
 /// entry point exited cleanly, as it does when asked to stop. Snapshots are images committed from
-/// containers.
+/// containers. Each sandbox has a network and a router of its own, which let it reach the internet and
+/// the host's ports in <c>hostPorts</c>, and nothing else (README, "Network").
 /// </summary>
-internal sealed class DockerSandboxProvider(DockerClient docker, string scope) : ISandboxProvider
+internal sealed class DockerSandboxProvider(DockerClient docker, string scope, IReadOnlyList<int> hostPorts) : ISandboxProvider
 {
     private const string LabelPrefix = "com.bagatka.sandboxing.";
     private const string ScopeLabel = LabelPrefix + "scope";
@@ -32,8 +39,40 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
     // How long a stopping sandbox's entry point has to end its processes before it is killed.
     private static readonly TimeSpan StopGrace = TimeSpan.FromSeconds(30);
 
-    // Lets a sandbox reach services on the Docker host, such as a control plane in development.
+    // Names the Docker host, whose ports in hostPorts sandboxes reach, such as a control plane's in
+    // development.
     private static readonly IReadOnlyList<string> ExtraHosts = ["host.docker.internal:host-gateway"];
+
+    // Routers run Alpine with iptables, an image each engine builds once (BuildRouterImageAsync). A
+    // new tag makes engines build it again, when what it installs changes.
+    private const string RouterBase = "alpine:3.22";
+    private const string RouterRepository = "bagatka-router";
+    private const string RouterTag = "1";
+    private const string RouterImage = RouterRepository + ":" + RouterTag;
+    private const string RouterRuntime = "runc";
+    private const long RouterNanoCpus = 250_000_000;
+    private const long RouterMemoryBytes = 32L * 1024 * 1024;
+    private static readonly TimeSpan RouterStopGrace = TimeSpan.FromSeconds(5);
+    private static readonly string RouterScript = ReadRouterScript();
+
+    // The network routers reach the internet through: the engine's default bridge.
+    private const string Uplink = "bridge";
+
+    // Every sandbox's network is a /29 of 198.18.0.0/15, a range reserved for benchmarks that no real
+    // network uses: 16,384 of them, tried from a random one on.
+    private const int Subnets = 16_384;
+    private const int SubnetAttempts = 32;
+
+    // The host takes no part in a sandbox's network: it has no address there, so nothing but the
+    // router leads anywhere; it doesn't masquerade the network's traffic; and the bridge's MTU is
+    // below IPv6's minimum of 1280, so the host has no IPv6 there either, not even link-local, which a
+    // sandbox's root could otherwise reach the host's services at.
+    private static readonly IReadOnlyDictionary<string, string> NetworkOptions = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["com.docker.network.bridge.inhibit_ipv4"] = "true",
+        ["com.docker.network.bridge.enable_ip_masquerade"] = "false",
+        ["com.docker.network.driver.mtu"] = "1279",
+    };
 
     private static readonly Error SandboxNotFound =
         Error.NotFound("sandboxing.sandbox_not_found", "The sandbox doesn't exist.");
@@ -85,6 +124,8 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
             return new Result<SandboxObservation>(image.Error);
         }
 
+        await CreateNetworkAsync(spec.Key, ct);
+        await StartRouterAsync(spec.Key, ct);
         Result<string> created = await docker.CreateContainerAsync(name, Configuration(spec, image.Output, specHash), ct);
         if (created.Failed)
         {
@@ -100,8 +141,36 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
         }
 
         await docker.StartContainerAsync(created.Output, ct);
+        if (spec.Source.Value is SandboxImage fromImage)
+        {
+            await RemoveOtherTagsAsync(fromImage.Reference, ct);
+        }
+
         ContainerDetails started = await InspectRequiredAsync(created.Output, ct);
         return new Result<SandboxObservation>(Observe(started));
+    }
+
+    // A sandbox from one tag of an image retires the repository's other tags: each goes once no
+    // container uses it, so an engine keeps one release of an image beside what still runs, instead of
+    // every release it ever pulled. Images of other repositories are never touched.
+    private async Task RemoveOtherTagsAsync(string reference, CancellationToken ct)
+    {
+        int tagAt = reference.LastIndexOf(':', StringComparison.Ordinal);
+        bool tagged = tagAt > reference.LastIndexOf('/', StringComparison.Ordinal) && !reference.Contains('@', StringComparison.Ordinal);
+        if (!tagged)
+        {
+            return;
+        }
+
+        string repository = reference[..(tagAt + 1)];
+        IReadOnlyList<ImageListItem> images = await docker.ListImagesAsync([], ct);
+        List<string> others = [.. images.SelectMany(image => image.RepoTags)
+            .Where(tag => tag.StartsWith(repository, StringComparison.Ordinal) && !string.Equals(tag, reference, StringComparison.Ordinal))];
+        foreach (string other in others)
+        {
+            // False when a container still uses it.
+            _ = await docker.RemoveImageAsync(other, force: false, ct);
+        }
     }
 
     public async Task<Result<SandboxObservation>> SuspendAsync(SandboxKey key, CancellationToken ct)
@@ -118,6 +187,7 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
             container = await InspectRequiredAsync(container.Id, ct);
         }
 
+        await docker.StopContainerAsync(RouterName(key), RouterStopGrace, ct);
         return new Result<SandboxObservation>(Observe(container));
     }
 
@@ -129,6 +199,8 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
             return new Result<SandboxObservation>(SandboxNotFound);
         }
 
+        // The router first, so the sandbox's network works once it runs.
+        await docker.StartContainerAsync(RouterName(key), ct);
         if (string.Equals(container.Status, "paused", StringComparison.Ordinal))
         {
             await docker.UnpauseContainerAsync(container.Id, ct);
@@ -151,7 +223,8 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
 
     public async IAsyncEnumerable<SandboxObservation> ListAsync([EnumeratorCancellation] CancellationToken ct)
     {
-        IReadOnlyList<ContainerListItem> containers = await docker.ListContainersAsync([ScopeFilter], ct);
+        // Sandboxes only, not their routers.
+        IReadOnlyList<ContainerListItem> containers = await docker.ListContainersAsync([ScopeFilter, KeyLabel], ct);
         foreach (ContainerListItem container in containers)
         {
             // The list has no exit codes, which tell a stopped sandbox from a failed one.
@@ -174,13 +247,23 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
 
     public async Task DeleteAsync(SandboxKey key, CancellationToken ct)
     {
+        // The router and network go with their sandbox, also when creating it stopped halfway. Once
+        // begun, removing them finishes even if the caller cancels: a router or network left without
+        // its sandbox is found by nothing that lists sandboxes, so it would stay forever.
+        // Not handled: creating a sandbox that stops halfway and is never deleted by its key, as when
+        // its machine is removed meanwhile; its network and router stay.
         ContainerDetails? container = await docker.InspectContainerAsync(ContainerName(key), ct);
+        if (container is not null)
+        {
+            await docker.RemoveContainerAsync(container.Id, CancellationToken.None);
+        }
+
+        _ = await docker.RemoveContainerAsync(RouterName(key), CancellationToken.None);
+        _ = await docker.RemoveNetworkAsync(NetworkName(key), CancellationToken.None);
         if (container is null)
         {
             return;
         }
-
-        await docker.RemoveContainerAsync(container.Id, ct);
 
         // A deleted snapshot's image stays, untagged, while sandboxes created from it exist; the last
         // of them removes it. Without force, the removal succeeds only once no other sandbox uses it.
@@ -409,12 +492,169 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope) :
             NanoCpus: spec.Resources.CpuMillicores * 1_000_000L,
             MemoryBytes: spec.Resources.MemoryMebibytes * 1024L * 1024L,
             ExtraHosts,
-            DockerSandboxSettings.Runtime);
+            DockerSandboxSettings.Runtime,
+            NetworkName(spec.Key));
+    }
+
+    // The sandbox's network, on a subnet no other network uses; one left by an earlier attempt to
+    // create the sandbox does.
+    private async Task CreateNetworkAsync(SandboxKey key, CancellationToken ct)
+    {
+        Dictionary<string, string> labels = new Dictionary<string, string>(StringComparer.Ordinal) { [ScopeLabel] = scope };
+        int first = RandomNumberGenerator.GetInt32(Subnets);
+        for (int attempt = 0; attempt < SubnetAttempts; attempt++)
+        {
+            int offset = (first + attempt) % Subnets * 8;
+            string subnet = string.Create(CultureInfo.InvariantCulture, $"198.{18 + (offset >> 16)}.{(offset >> 8) & 255}.{offset & 255}/29");
+            Result created = await docker.CreateNetworkAsync(NetworkName(key), subnet, NetworkOptions, labels, ct);
+            if (!created.Failed || created.Error.Code is "docker.network_exists")
+            {
+                return;
+            }
+
+            if (created.Error.Code is not "docker.subnet_in_use")
+            {
+                throw new InvalidOperationException(created.Error.Message);
+            }
+        }
+
+        // Not handled: an engine with thousands of networks in 198.18.0.0/15.
+        throw new InvalidOperationException("No subnet of 198.18.0.0/15 was free for sandbox " + Format(key.Value) + "'s network.");
+    }
+
+    // The sandbox's router, started before the sandbox, so its rules are in place when the sandbox's
+    // first packet arrives; until then, the sandbox's packets go nowhere. One left by an earlier
+    // attempt to create the sandbox is started as it is.
+    private async Task StartRouterAsync(SandboxKey key, CancellationToken ct)
+    {
+        await BuildRouterImageAsync(ct);
+        Result<string> created = await docker.CreateContainerAsync(RouterName(key), RouterConfiguration(key), ct);
+        if (created.Failed && created.Error.Kind != ErrorKind.Conflict)
+        {
+            throw new InvalidOperationException(created.Error.Message);
+        }
+
+        await docker.StartContainerAsync(RouterName(key), ct);
+    }
+
+    private ContainerConfiguration RouterConfiguration(SandboxKey key)
+    {
+        List<string> environment =
+        [
+            "HOST_PORTS=" + string.Join(' ', hostPorts.Select(port => port.ToString(CultureInfo.InvariantCulture))),
+            "BLOCKED=" + string.Join(' ', OwnAddresses()),
+        ];
+        return new ContainerConfiguration(
+            RouterImage,
+            environment,
+            new Dictionary<string, string>(StringComparer.Ordinal) { [ScopeLabel] = scope },
+            RouterNanoCpus,
+            RouterMemoryBytes,
+            ExtraHosts,
+            RouterRuntime,
+            Uplink)
+        {
+            Command = ["/bin/sh", "-c", RouterScript],
+            Capabilities = ["NET_ADMIN"],
+            Sysctls = new Dictionary<string, string>(StringComparer.Ordinal) { ["net.ipv4.ip_forward"] = "1" },
+            ExtraNetworks = [NetworkName(key)],
+        };
+    }
+
+    // The routers' image, built once per engine by committing a container that installed iptables on
+    // Alpine, which takes the internet that once. Another tag's image goes once no router uses it.
+    private async Task BuildRouterImageAsync(CancellationToken ct)
+    {
+        ImageDetails? built = await docker.InspectImageAsync(RouterImage, ct);
+        if (built is not null)
+        {
+            return;
+        }
+
+        ImageDetails? alpine = await docker.InspectImageAsync(RouterBase, ct);
+        if (alpine is null)
+        {
+            await docker.PullImageAsync(RouterBase, ct);
+        }
+
+        ContainerConfiguration install = new ContainerConfiguration(
+            RouterBase,
+            [],
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            NanoCpus: 1_000_000_000,
+            MemoryBytes: 256L * 1024 * 1024,
+            [],
+            RouterRuntime,
+            Uplink)
+        {
+            Command = ["apk", "add", "--no-cache", "iptables"],
+        };
+
+        // Concurrent builds each use a container of their own and commit the same image.
+        string name = RouterRepository + "-build-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+        Result<string> created = await docker.CreateContainerAsync(name, install, ct);
+        if (created.Failed)
+        {
+            throw new InvalidOperationException(created.Error.Message);
+        }
+
+        try
+        {
+            await docker.StartContainerAsync(created.Output, ct);
+            int exitCode = await docker.WaitContainerAsync(created.Output, ct);
+            if (exitCode != 0)
+            {
+                throw new InvalidOperationException(string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Installing iptables in {RouterBase} for sandboxes' routers exited with {exitCode}; building {RouterImage} needs the internet once."));
+            }
+
+            await docker.CommitContainerAsync(created.Output, RouterRepository, RouterTag, new CommitConfiguration([], new Dictionary<string, string>(StringComparer.Ordinal)), ct);
+        }
+        finally
+        {
+            await docker.RemoveContainerAsync(created.Output, CancellationToken.None);
+        }
+
+        await RemoveOtherTagsAsync(RouterImage, ct);
+    }
+
+    // This computer's IPv4 addresses, which routers keep sandboxes from, as on a server whose public
+    // address is its own: the provider reaches its engine over a Unix socket, so it runs beside it.
+    private static IEnumerable<string> OwnAddresses()
+    {
+        return NetworkInterface.GetAllNetworkInterfaces()
+            .SelectMany(network => network.GetIPProperties().UnicastAddresses)
+            .Select(unicast => unicast.Address)
+            .Where(address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address))
+            .Select(address => address.ToString());
+    }
+
+    private static string ReadRouterScript()
+    {
+        using Stream? stream = typeof(DockerSandboxProvider).Assembly.GetManifestResourceStream("router.sh");
+        if (stream is null)
+        {
+            throw new InvalidOperationException("The script router.sh isn't embedded in the Docker sandbox provider.");
+        }
+
+        using StreamReader reader = new StreamReader(stream, Encoding.UTF8);
+        return reader.ReadToEnd();
     }
 
     private string ContainerName(SandboxKey key)
     {
         return "bagatka-" + scope + "-" + Format(key.Value);
+    }
+
+    private string NetworkName(SandboxKey key)
+    {
+        return ContainerName(key);
+    }
+
+    private string RouterName(SandboxKey key)
+    {
+        return ContainerName(key) + "-router";
     }
 
     private string SnapshotReference(SnapshotKey snapshot)

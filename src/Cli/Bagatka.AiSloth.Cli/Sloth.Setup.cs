@@ -60,13 +60,13 @@ internal sealed partial class Sloth
                 await foreach (SseItem<string> item in SseParser.Create(stream).EnumerateAsync(ct))
                 {
                     reconnects = 0;
-                    if (item.EventType is "output")
+                    if (item.EventType is "ProcessOutput")
                     {
                         Wire.ProcessOutput output = JsonSerializer.Deserialize(item.Data, CliJsonContext.Default.ProcessOutput)!;
                         await terminal.WriteAsync(Encoding.UTF8.GetString(output.Data));
                         offset = output.Offset + output.Data.Length;
                     }
-                    else if (item.EventType is "exit")
+                    else if (item.EventType is "ProcessExited")
                     {
                         Wire.ProcessExit exit = JsonSerializer.Deserialize(item.Data, CliJsonContext.Default.ProcessExit)!;
                         return exit.ExitCode == 0 ? 0 : 1;
@@ -86,9 +86,12 @@ internal sealed partial class Sloth
         return 1;
     }
 
-    // Asks the agent to prepare the chat, then follows the chat until the setup's last test ended,
-    // without taking input: the setup is the point. Ctrl+C leaves it working.
-    private async Task<int> PrepareChatAsync(string id, bool anyway, CancellationToken ct)
+    // What `sloth chat prepare` asks the agent; AiSloth's instructions tell every agent how setups work.
+    private const string PrepareRequest = "Prepare this chat's files for AiSloth: write their setup, run it twice, and commit it.";
+
+    // Asks the agent to prepare the chat, then follows its turn without taking input: the setup is
+    // the point. Ctrl+C leaves it working.
+    private async Task<int> PrepareChatAsync(string id, CancellationToken ct)
     {
         HostsFile hosts = await ReadHostsAsync(ct);
         SignedInHost? host = await CurrentHostAsync(hosts);
@@ -104,14 +107,13 @@ internal sealed partial class Sloth
             return 1;
         }
 
-        Wire.SentMessage sent = await api.SendAsync(
-            HttpMethod.Post, "/chats/" + chat.Id + "/prepare", new Wire.Prepare(anyway), CliJsonContext.Default.Prepare, CliJsonContext.Default.SentMessage, ct);
+        Wire.SentMessage sent = await SendMessageAsync(api, chat.Id, PrepareRequest, ct);
         await terminal.WriteLineAsync("Asked the agent to write a setup for this chat's files, so new nooks start with everything installed. Ctrl+C leaves it working.");
         ChatPrinter printer = new ChatPrinter(terminal, api, host.UserId, chat.Id, suggestPrepare: false);
-        int tested;
+        int prepared;
         try
         {
-            tested = await WatchAsync(api, chat, printer, sent.Id, untilTested: true, ct);
+            prepared = await WatchAsync(api, chat, printer, sent.Id, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -120,12 +122,11 @@ internal sealed partial class Sloth
             return 0;
         }
 
-        Wire.Nook nook = await api.GetAsync("/nooks/" + chat.NookId, CliJsonContext.Default.Nook, ct);
-        if (tested == 0 && nook.Sources.Count > 0)
+        if (prepared == 0)
         {
-            await terminal.WriteLineAsync("Push it: sloth chat push " + ShortId(chat.Id) + " --pr");
+            await terminal.WriteLineAsync("Try it in a fresh nook: sloth chat \"<message>\" --from " + ShortId(chat.Id));
         }
 
-        return tested;
+        return prepared;
     }
 }

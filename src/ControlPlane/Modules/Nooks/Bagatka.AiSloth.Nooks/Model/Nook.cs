@@ -8,25 +8,26 @@ using Bagatka.Foundation;
 
 namespace Bagatka.AiSloth.Nooks.Model;
 
-// Where agents work. The record comes first; the reconciler creates its sandbox, and its daemon
-// connecting makes it Running.
+// Where agents work. The record comes first; the lifecycle job creates its sandbox, and its daemon
+// connecting makes it Ready.
 internal sealed class Nook
 {
     public const int MaxProviderLength = 40;
     public const int MaxLocationLength = 64;
-    public const int MaxHarnessLength = 32;
+    public const int MaxImageLength = 32;
 
     // Used by Create and by EF: parameter names match property names.
-    private Nook(NookId id, WorkspaceId workspaceId, string provider, string? location, string? harness, NookStatus status, DateTimeOffset createdAt, UserId? createdBy, NookId? copyOf, int? copyCheckpoint, List<string> keptPaths, bool fromScratch)
+    private Nook(NookId id, WorkspaceId workspaceId, string provider, string? location, string? image, NookStatus status, DateTimeOffset createdAt, UserId? createdBy, UserId? reservedFor, NookId? copyOf, int? copyCheckpoint, List<string> keptPaths, bool fromScratch)
     {
         Id = id;
         WorkspaceId = workspaceId;
         Provider = provider;
         Location = location;
-        Harness = harness;
+        Image = image;
         Status = status;
         CreatedAt = createdAt;
         CreatedBy = createdBy;
+        ReservedFor = reservedFor;
         CopyOf = copyOf;
         CopyCheckpoint = copyCheckpoint;
         KeptPaths = keptPaths;
@@ -42,8 +43,9 @@ internal sealed class Nook
 
     public string? Location { get; private set; }
 
-    // The harness its image carries for its chat's agent; it never changes, because the image doesn't.
-    public string? Harness { get; private set; }
+    // The image it starts from, by the name the deployment offers it under; none for the base image.
+    // It never changes, so neither does what is installed in the nook.
+    public string? Image { get; private set; }
 
     public NookStatus Status { get; private set; }
 
@@ -51,6 +53,10 @@ internal sealed class Nook
 
     // Whose GitHub connection copies its repositories in; none for a nook the control plane created.
     public UserId? CreatedBy { get; private set; }
+
+    // The one person who may change what runs in it or its files; none for everyone with Write on its
+    // workspace.
+    public UserId? ReservedFor { get; private set; }
 
     // The nook whose files it starts with, if any, and which of its checkpoints; none until one is
     // taken for the copy. A nook that lost its sandbox starts again from its own latest checkpoint.
@@ -71,9 +77,8 @@ internal sealed class Nook
     // Whether its setup started after its files arrived and a ready copy may be taken once it ended.
     public bool ReadyCopyDue { get; private set; }
 
-    // Whether its sources are in place: its repositories copied in, or another nook's files, and the
-    // agents' guide to them.
-    // Nothing else runs in it before.
+    // Whether its sources are in place: its repositories copied in, or another nook's files. Nothing
+    // else runs in it before.
     public bool SourcesReady { get; private set; }
 
     // The setup scripts found when its files arrived, relative to /work, and the process
@@ -82,25 +87,24 @@ internal sealed class Nook
 
     public ProcessId? SetupProcessId { get; private set; }
 
-    // When it fell asleep, while it sleeps; and whether its resume scripts run again before anything
-    // else, because it woke.
+    // When it fell asleep, while it sleeps; whether its sandbox was deleted since, so it comes back
+    // from its latest checkpoint; and whether its resume scripts run again before anything else,
+    // because it woke.
     public DateTimeOffset? SleptAt { get; private set; }
+
+    public bool Evicted { get; private set; }
 
     public bool ResumeDue { get; private set; }
 
     // The SHA-256 of the daemon's token; the token itself is never stored.
     public byte[]? DaemonTokenHash { get; private set; }
 
-    public long? DiskTotalBytes { get; private set; }
-
-    public long? DiskAvailableBytes { get; private set; }
-
     // PostgreSQL's xmin: concurrent changes to one nook conflict instead of overwriting each other.
     public uint Version { get; private set; }
 
-    public static Nook Create(WorkspaceId workspaceId, ProviderId provider, string? harness, UserId? createdBy, NookId? copyOf, int? copyCheckpoint, List<string> keptPaths, bool fromScratch, TimeProvider time)
+    public static Nook Create(WorkspaceId workspaceId, ProviderId provider, string? image, UserId? createdBy, UserId? reservedFor, NookId? copyOf, int? copyCheckpoint, List<string> keptPaths, bool fromScratch, TimeProvider time)
     {
-        return new Nook(NookId.New(), workspaceId, provider.Name, provider.Location, harness, NookStatus.Creating, time.GetUtcNow(), createdBy, copyOf, copyCheckpoint, keptPaths, fromScratch);
+        return new Nook(NookId.New(), workspaceId, provider.Name, provider.Location, image, NookStatus.Starting, time.GetUtcNow(), createdBy, reservedFor, copyOf, copyCheckpoint, keptPaths, fromScratch);
     }
 
     // Its sandbox is about to be created, from the ready copy made then, or from its image.
@@ -130,38 +134,20 @@ internal sealed class Nook
         ReadyCopyDue = false;
     }
 
-    // Nobody used it for a while, so its provider releases its compute. Returns whether it was awake.
-    public bool FallAsleep()
+    // Its provider released its compute, keeping its memory or only its files.
+    public void FellAsleep(TimeProvider time)
     {
-        if (Status != NookStatus.Running)
-        {
-            return false;
-        }
-
-        Status = NookStatus.Sleeping;
-        return true;
-    }
-
-    // Its provider released its compute, keeping its memory (Paused) or only its files (Stopped).
-    public void FellAsleep(NookStatus asleep, TimeProvider time)
-    {
-        if (asleep is not (NookStatus.Paused or NookStatus.Stopped))
-        {
-            throw new ArgumentOutOfRangeException(nameof(asleep), asleep, "A nook sleeps Paused or Stopped.");
-        }
-
-        Status = asleep;
+        Status = NookStatus.Asleep;
         SleptAt = time.GetUtcNow();
     }
 
-    // Its provider gave it compute again; its daemon connecting makes it Running, and its resume
-    // scripts run again first. One a failure left going to sleep counts as Stopped, so its daemon
-    // connecting wakes it too.
+    // Its provider gave it compute again; its daemon connecting makes it Ready, and its resume scripts
+    // run again first.
     public void Woke()
     {
-        if (Status == NookStatus.Sleeping)
+        if (Status == NookStatus.Asleep)
         {
-            Status = NookStatus.Stopped;
+            Status = NookStatus.Starting;
         }
 
         SleptAt = null;
@@ -171,8 +157,7 @@ internal sealed class Nook
     // Asleep so long that its sandbox goes; it comes back from its latest checkpoint.
     public void Evict()
     {
-        Status = NookStatus.Evicted;
-        SleptAt = null;
+        Evicted = true;
         ResumeDue = false;
         ReadyCopyDue = false;
         SourcesReady = false;
@@ -181,7 +166,7 @@ internal sealed class Nook
         DaemonTokenHash = null;
     }
 
-    public bool Asleep => Status is NookStatus.Sleeping or NookStatus.Paused or NookStatus.Stopped or NookStatus.Evicted;
+    public bool Asleep => Status == NookStatus.Asleep;
 
     // The checkpoint of the nook it copies that its files come from, once taken.
     public void Copies(int checkpoint)
@@ -193,11 +178,12 @@ internal sealed class Nook
     // there is one, and otherwise from where they first came from.
     public void Replace(int? latestCheckpoint)
     {
-        Status = NookStatus.Creating;
+        Status = NookStatus.Starting;
         SourcesReady = false;
         ResumeDue = false;
         ReadyCopyDue = false;
         SleptAt = null;
+        Evicted = false;
         SetupScripts = [];
         SetupProcessId = null;
         DaemonTokenHash = null;
@@ -222,34 +208,30 @@ internal sealed class Nook
         return DaemonTokenHash is not null && CryptographicOperations.FixedTimeEquals(DaemonTokenHash, Hash(token));
     }
 
-    // Its daemon dialed in, so the nook runs. A nook being deleted takes no more instructions, and one
-    // going to sleep stays so, its daemon about to be frozen or stopped.
+    // Its daemon dialed in, so the nook runs, even one its provider resumed by itself, such as a
+    // machine that restarted. A nook being deleted takes no more instructions.
     public bool DaemonConnected()
     {
-        switch (Status)
-        {
-            case NookStatus.Deleting:
-                return false;
-            case NookStatus.Sleeping:
-                return true;
-            case NookStatus.Creating or NookStatus.Running or NookStatus.Paused or NookStatus.Stopped or NookStatus.Unreachable or NookStatus.Failed or NookStatus.Evicted:
-                Status = NookStatus.Running;
-                return true;
-        }
-
-        throw new InvalidOperationException("Nook " + Id.Value + " has no status.");
-    }
-
-    // Its daemon is away and its provider can't say what became of its sandbox, such as on a machine
-    // that is offline. Returns whether that is news.
-    public bool Unreachable()
-    {
-        if (Status != NookStatus.Running)
+        if (Status == NookStatus.Deleting)
         {
             return false;
         }
 
-        Status = NookStatus.Unreachable;
+        Status = NookStatus.Ready;
+        SleptAt = null;
+        return true;
+    }
+
+    // Its daemon is away and its provider can't say what became of its sandbox, such as on a machine
+    // that is offline. Returns whether that is news.
+    public bool Offline()
+    {
+        if (Status != NookStatus.Ready)
+        {
+            return false;
+        }
+
+        Status = NookStatus.Offline;
         return true;
     }
 
@@ -275,16 +257,10 @@ internal sealed class Nook
         Status = NookStatus.Deleting;
     }
 
-    public void ReportDisk(DiskUsage disk)
+    public NookSummary ToSummary(IReadOnlyList<NookSource> copies, NookUsage? usage, double nearlyFull)
     {
-        DiskTotalBytes = disk.TotalBytes;
-        DiskAvailableBytes = disk.AvailableBytes;
-    }
-
-    public NookSummary ToSummary(IReadOnlyList<NookSource> copies)
-    {
-        DiskUsage? disk = DiskTotalBytes is long total && DiskAvailableBytes is long available ? new DiskUsage(total, available) : null;
-        return new NookSummary(Id, WorkspaceId, new ProviderId(Provider, Location).ToString(), Status, CreatedAt, disk, Harness, copies);
+        bool diskNearlyFull = usage is { DiskTotalBytes: > 0 } && (double)usage.DiskUsedBytes / usage.DiskTotalBytes >= nearlyFull;
+        return new NookSummary(Id, WorkspaceId, new ProviderId(Provider, Location).ToString(), Status, CreatedAt, usage, diskNearlyFull, Image, ReservedFor, copies);
     }
 
     // Whether the scripts of a run set the nook up, rather than only resume it.

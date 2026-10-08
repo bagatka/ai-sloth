@@ -1,7 +1,7 @@
 // The protocol between the control plane and `sloth machine run`, the machine mode of the sloth CLI
 // on a computer a workspace added to run its nooks. This file is the single source: the control
-// plane's endpoint and sloth's client are both generated from it. Change it additively; a breaking change is a new
-// package version (v2).
+// plane's endpoint and sloth's client are both generated from it. Change it additively; a breaking
+// change is a new package version (v2).
 
 syntax = "proto3";
 
@@ -28,6 +28,7 @@ service Machines {
 
 message RegisterRequest {
   string code = 1;
+  // For compatibility checks, once a control plane needs them.
   string sloth_version = 2;
 }
 
@@ -49,5 +50,6 @@ message MachineMessage {
 // The first message on every connection.
 message Hello {
   string machine_id = 1;
+  // For compatibility checks, once a control plane needs them.
   string sloth_version = 2;
 }

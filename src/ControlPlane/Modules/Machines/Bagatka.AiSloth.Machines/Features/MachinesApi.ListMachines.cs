@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Machines.Data;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,6 +15,8 @@ internal sealed partial class MachinesApi
 {
     public async Task<Result<IReadOnlyList<MachineSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct)
     {
+        await using MachinesDbContext db = await databases.CreateDbContextAsync(ct);
+
         AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(workspaceId), ct);
         if (access is null)
         {

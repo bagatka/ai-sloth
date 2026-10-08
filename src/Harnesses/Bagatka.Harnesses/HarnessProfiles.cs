@@ -8,7 +8,10 @@ namespace Bagatka.Harnesses;
 /// The harnesses this library knows. A host's image for each installs its programs, at the versions
 /// its start script (<c>src/Harnesses/start</c>) is written for, and that script as <see cref="HarnessProfile.Command"/>.
 /// Its paths are where those versions keep files when run as root, whose home is <c>/root</c>. Claude
-/// Code's start script points its memory at <c>~/.claude/memory</c>, wherever it works.
+/// Code's start script points its memory at <c>~/.claude/memory</c>, wherever it works. Codex, pi,
+/// and Copilot write no memory of their own that we know of, so they keep no state. Copilot's
+/// instructions file is confirmed by <c>copilot instruction list</c>, not by a test, since no fake
+/// serves Copilot.
 /// </summary>
 public static class HarnessProfiles
 {

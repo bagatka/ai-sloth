@@ -126,9 +126,7 @@ jobs:
           Parameters__nook-image-repository: ${{ needs.ready.outputs.repository }}
           Parameters__nook-image-tag: ${{ github.sha }}
           Parameters__postgres-connection-string: ${{ secrets.POSTGRES_CONNECTION_STRING }}
-          Parameters__agent-accounts-key: ${{ secrets.AGENT_ACCOUNTS_KEY }}
-          Parameters__sources-key: ${{ secrets.SOURCES_KEY }}
-          Parameters__secrets-key: ${{ secrets.SECRETS_KEY }}
+          Parameters__encryption-key: ${{ secrets.ENCRYPTION_KEY }}
           Parameters__custom-domain: ${{ vars.CUSTOM_DOMAIN }}
           Parameters__custom-domain-certificate: ${{ vars.CUSTOM_DOMAIN_CERTIFICATE }}
           Parameters__allow-chatgpt-plans: ${{ vars.ALLOW_CHATGPT_PLANS }}

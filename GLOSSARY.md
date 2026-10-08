@@ -50,8 +50,9 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Resource | Something people are given access to: a workspace or a nook, later a project. Access to it reaches everything in it. | Workspaces | place, scope, space |
 | Grant | One person's access level on one resource, given directly | Workspaces | membership, ACL entry |
 | Invite | A one-time code that gives whoever accepts it first an access level on a resource, for 7 days | Workspaces | invitation, link |
-| Guest | Someone with access to a nook but not to its workspace | Workspaces | external user |
+| Guest | Someone with access to a nook but not to its workspace: they watch it and propose in its chat, but never operate it | Workspaces | external user |
 | Nook | Where an agent works: an isolated machine with its files and processes, owned by a workspace, created by its chat; with it, the basic unit. A nook without a chat runs processes only. A provider's sandbox underneath. | Nooks | sandbox, orb, VM, container, environment, workspace |
+| Reserved nook | A nook only one person may operate, besides the control plane: run, feed, and stop its processes and move its files. A chat on a personal account reserves its nook for that account's owner; any other nook is operated by everyone with Write on its workspace | Nooks | private nook, owned nook, operator |
 | Chat | A conversation between people and one coding agent, in the nook the chat creates for it; one chat per nook | Chats | thread, session, conversation |
 | Turn | One message in a chat and everything the agent did in reply, ending with a stop reason | Chats | step, exchange |
 | Draft | A chat nobody wrote in yet, started as someone starts writing so its nook is ready when they send; not listed, and gone with its nook after a while unsent | Chats | — |
@@ -69,16 +70,16 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Git settings | How a person's commits and branches look: author, committer, AiSloth as co-author, and branch prefix | Sources | git config, identity (alone) |
 | Folder | A source whose files AiSloth keeps, starting empty or from an upload, with versions | Sources (planned) | upload, directory, bucket |
 | Changes | What differs in a nook's copy of a source from what it started with: its commits since, and what isn't committed | Nooks, Sources | diff, patch (except as a download format) |
-| Agents' guide | `/work/AGENTS.md` in a nook with sources, telling agents each folder is its own repository with its own instructions | Nooks | root AGENTS.md |
-| Instructions | What AiSloth tells every agent to follow, whatever its harness: a workspace's, for everyone's chats there, and a person's own, for the chats they start; written to the file each harness reads its user's instructions from | Chats | system prompt, rules, custom instructions |
+| Instructions | What AiSloth tells every agent to follow, whatever its harness: AiSloth's own (the nook, its repositories, how setups work), a workspace's, for everyone's chats there, and a person's own, for the chats they start; written to the file each harness reads its user's instructions from | Chats | system prompt, rules, custom instructions |
 | Setup | Scripts that come with a nook's files and prepare it, `.agents/setup` installing what the code needs and `.agents/resume` starting its services, at the top of the files or of a repository in them; they run whenever a nook gets its files, before its agent starts. People see it as the setup of a chat's files, never where they are | Nooks | recipe, bootstrap, init script, project setup |
-| Prepare | Having a chat's agent write a setup for its files, then testing it in a fresh nook, from scratch and again, sending failures back to the agent, three tests at most | Chats | init, onboard, bootstrap |
+| Prepare | Asking a chat's agent to write, run, and commit the setup of its files; an ordinary message, which AiSloth's instructions tell agents how to answer | Chats | init, onboard, bootstrap |
 | Ready copy | A copy of a nook right after a setup that took a while, which the next nooks with the same repositories and image start from and catch up | Nooks | template, image, cache, warm pool |
 | Project | An optional group of nooks, chats, and sources for a team working toward one goal | Projects (planned) | space, board, workspace |
 | Harness | The program that runs a coding agent, such as Claude Code or Codex; in a nook, through its ACP adapter | Chats | agent (that's what it runs), CLI, client |
 | Harness profile | What AiSloth knows about one harness: its ID, name, the credentials it takes, and where it keeps its sessions and its state; its image's start script configures it | `Bagatka.Harnesses` | adapter, plugin |
 | Start script | A harness image's `harness` command: it reads the same three variables for every harness and configures and runs its harness | `src/Harnesses/start` | wrapper, entrypoint |
-| Harness state | What a harness writes for itself to use in later sessions, such as Claude Code's memory: kept for the person who started the chat, in its workspace, and merged across their chats there at each turn's edges | Chats | memory (ours), context |
+| Harness state | What a harness writes for itself to use in later sessions, such as Claude Code's memory: kept in its workspace as a kept folder for whoever may direct the agents, a person for the chats on their own accounts or the workspace for the chats on its accounts, and synced when an agent starts and after each turn | Chats | memory (ours), context |
+| Kept folder | A folder AiSloth keeps outside every nook, by name, which nooks sync a folder of theirs with: what each changed comes together, a text file both changed keeping the lines of both | Nooks | synced folder, volume, shared folder |
 | Agent account | An account at an agent vendor that pays for agents' work, such as an OpenAI API key or a ChatGPT plan: a workspace's, which every member uses, or a person's own | AgentAccounts | subscription (for API keys), credential, account (alone) |
 | Secret | An environment variable a workspace gives to every process in its nooks, agents included, such as `GH_TOKEN`; readable by everyone who may write in a nook | Secrets | env var (alone), credential, key |
 | Endpoint | The base URL of the API an API key is for, when it isn't the vendor's own, such as OpenRouter's for OpenAI's API | AgentAccounts | base URL, provider, upstream |
@@ -86,17 +87,19 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Sign-in | Proving who you are in a browser or with a code: to a host, which starts a session (Users), or at a plan's vendor, which adds the plan, finished with the address the browser returns to (AgentAccounts) | Users, AgentAccounts | OAuth flow, login, connect |
 | Account kind | What an agent account is at its vendor, named so vendors can't be confused: `chatgpt-plan`, `claude-plan`, `copilot-plan`, `openai-api-key`, `anthropic-api-key` | AgentAccounts | provider, type |
 | Proposal | A message in a chat from someone who may not use its account; it never reaches the agent until the account's owner sends it on, as is or edited | Chats | suggestion, draft |
-| Sleep | A nook releasing its compute when nobody used it for its sleep period, two minutes by default: Sleeping while its provider does, then Paused or Stopped, and Evicted after a long sleep; any use wakes it. People see all of these as asleep | Nooks | suspend (in the product), hibernate, idle shutdown |
+| Sleep | A nook releasing its compute when nobody used it for its sleep period, two minutes by default: Asleep, its provider keeping its memory (Paused) or only its files (Stopped), and Evicted after a long sleep; any use wakes it. People see all of these as asleep | Nooks | suspend (in the product), hibernate, idle shutdown |
 | Paused | A sleeping nook whose compute is released with memory and files kept; it resumes in about a second and processes continue | Nooks | hibernated, hot |
 | Stopped | A sleeping nook whose compute is released with files kept; it resumes in seconds and processes start again | Nooks | archived, cold, shut down |
 | Evicted | A nook asleep so long, a day by default, that its sandbox was deleted; its files are in its latest checkpoint, and it starts again from there when used | Nooks | shelved, archived, deleted |
+| Offline | A nook whose daemon is away and whose provider can't be asked, such as on a machine that is off; its daemon dialing in again makes it Ready | Nooks | disconnected, unreachable, lost |
+| Usage | What a nook uses of its disk, memory, and CPU, as its daemon last reported while it runs; a disk nearly full is told | Nooks | metrics, stats, quota |
 | Process | A program the daemon runs in a nook until it exits or is stopped, independent of the control plane. Agents, setup scripts, and one-off commands are all processes. | Nooks | job, task, command |
 | Watch | Streaming a process's output from an offset, first what was kept and then live; any number per process | Nooks | subscription, tail |
 | Preview | A web server running in a nook, opened in a browser through the control plane | Nooks (planned) | port forward, tunnel |
 | Daemon | `slothd`, the process in every nook that dials the control plane and runs processes for it | `src/Daemon` | agent, sidecar, runner |
 | Daemon token | The secret a daemon proves its nook with; issued by Nooks, stored only as a hash | Nooks | API key, password |
 | Daemon endpoint | The WebApi's HTTP/2-only gRPC endpoint that daemons and machines dial | WebApi | agent API, callback |
-| Nook image | An image nooks start from: `slothd` under tini, on Ubuntu 26.04 with git and the Docker engine, alone or with one harness; a nook's harness is chosen when it is created and never changes | `src/Daemon/Dockerfile` | base image, runner image |
+| Nook image | An image nooks start from: `slothd` under tini, on Ubuntu 26.04 with git and the Docker engine, alone or with one harness; a nook's image is chosen when it is created and never changes | `src/Daemon/Dockerfile` | base image, runner image |
 | Disk reserve | Space a daemon holds in a file and releases when the disk fills, so output and cleanup keep working | `src/Daemon` | ballast, buffer |
 | Reconciler | The Nooks job that makes providers match the records: it creates the sandboxes of new nooks and deletes those of deleted ones | Nooks | sync job, worker |
 | Instruction | A message from the control plane telling a daemon what to do | Nooks, `daemon.proto` | command, request |

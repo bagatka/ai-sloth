@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Sources.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,13 +15,15 @@ internal sealed partial class SourcesApi
 {
     public async Task<Result<AvailableRepositories>> ListAvailableRepositoriesAsync(Actor actor, CancellationToken ct)
     {
-        Result<SourcesGitHubApp> app = App();
+        await using SourcesDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<GitHubAppSettings> app = App();
         if (app.Failed)
         {
             return new Result<AvailableRepositories>(app.Error);
         }
 
-        Result<Connected> connected = await ConnectedAsync(actor, ct);
+        Result<Connected> connected = await ConnectedAsync(db, actor, ct);
         if (connected.Failed)
         {
             return new Result<AvailableRepositories>(connected.Error);

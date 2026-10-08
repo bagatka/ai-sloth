@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.AgentAccounts.Data;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,7 +17,9 @@ internal sealed partial class AgentAccountsApi
 {
     public async Task<Result<AgentAccountCredential>> UseAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct)
     {
-        AgentAccount? account = await FindInWorkspaceAsync(id, workspaceId, ct);
+        await using AgentAccountsDbContext db = await databases.CreateDbContextAsync(ct);
+
+        AgentAccount? account = await FindInWorkspaceAsync(db, id, workspaceId, ct);
         if (account is null)
         {
             return new Result<AgentAccountCredential>(AgentAccountsErrors.NotFound);
@@ -28,6 +31,7 @@ internal sealed partial class AgentAccountsApi
             return new Result<AgentAccountCredential>(AgentAccountsErrors.NotFound);
         }
 
+        // Not handled: signing in again while keeping the account; its owner removes it and adds it again.
         if (account.NeedsSignIn)
         {
             return new Result<AgentAccountCredential>(AgentAccountsErrors.SignInEnded);
@@ -36,7 +40,7 @@ internal sealed partial class AgentAccountsApi
         bool renewalDue = account.RenewalDue(box, time.GetUtcNow());
         if (renewalDue)
         {
-            Result<AgentAccount> renewed = await RenewAsync(id);
+            Result<AgentAccount> renewed = await RenewAsync(db, id);
             if (renewed.Failed)
             {
                 return new Result<AgentAccountCredential>(renewed.Error);
@@ -50,7 +54,9 @@ internal sealed partial class AgentAccountsApi
 
     public async Task<bool?> MayUseAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct)
     {
-        AgentAccount? account = await FindInWorkspaceAsync(id, workspaceId, ct);
+        await using AgentAccountsDbContext db = await databases.CreateDbContextAsync(ct);
+
+        AgentAccount? account = await FindInWorkspaceAsync(db, id, workspaceId, ct);
         if (account is null)
         {
             return null;
@@ -63,7 +69,7 @@ internal sealed partial class AgentAccountsApi
     // token with every renewal and refuses one used twice, so the account's row stays locked while
     // OpenAI answers (within the client's timeout), and whoever waited finds it renewed. The caller's
     // cancellation doesn't apply: a renewal OpenAI completed but this side dropped would end the sign-in.
-    private async Task<Result<AgentAccount>> RenewAsync(AgentAccountId id)
+    private async Task<Result<AgentAccount>> RenewAsync(AgentAccountsDbContext db, AgentAccountId id)
     {
         await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(CancellationToken.None);
         AgentAccount? account = await db.Accounts
@@ -114,7 +120,7 @@ internal sealed partial class AgentAccountsApi
     }
 
     // The account, unless it doesn't exist or is another workspace's.
-    private async Task<AgentAccount?> FindInWorkspaceAsync(AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct)
+    private static async Task<AgentAccount?> FindInWorkspaceAsync(AgentAccountsDbContext db, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct)
     {
         AgentAccount? account = await db.Accounts.AsNoTracking().SingleOrDefaultAsync(found => found.Id == id, ct);
         bool anotherWorkspaces = account?.WorkspaceId is not null && account.WorkspaceId != workspaceId;

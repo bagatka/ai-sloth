@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Nooks.Data;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -16,6 +17,8 @@ internal sealed partial class NooksApi
 
     public async Task<Result<IAsyncEnumerable<ReadOnlyMemory<byte>>>> ReadInputAsync(Actor actor, ReadInput command, CancellationToken ct)
     {
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
         Nook? nook = await db.Nooks.AsNoTracking().SingleOrDefaultAsync(found => found.Id == command.NookId, ct);
         if (nook is null || !nook.AcceptsDaemonToken(command.Token))
         {

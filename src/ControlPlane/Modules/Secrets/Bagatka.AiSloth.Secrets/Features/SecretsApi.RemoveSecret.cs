@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Secrets.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Secrets.Contracts;
@@ -13,6 +14,8 @@ internal sealed partial class SecretsApi
 {
     public async Task<Result> RemoveAsync(Actor actor, RemoveSecret command, CancellationToken ct)
     {
+        await using SecretsDbContext db = await databases.CreateDbContextAsync(ct);
+
         AccessLevel? access = await workspaces.GetAccessAsync(actor, Resource.Workspace(command.WorkspaceId), ct);
         if (access is null)
         {

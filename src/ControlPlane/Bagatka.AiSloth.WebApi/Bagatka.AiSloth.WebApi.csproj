@@ -10,6 +10,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The API's description for review and clients (HostJourney checks it); the host serves its own. -->
+    <Content Remove="openapi.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\Aspire\Bagatka.ServiceDefaults\Bagatka.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\Cli\Bagatka.AiSloth.MachineProtocol\Bagatka.AiSloth.MachineProtocol.csproj" />
     <ProjectReference Include="..\..\Daemon\Bagatka.AiSloth.DaemonProtocol\Bagatka.AiSloth.DaemonProtocol.csproj" />

@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Chats.Data;
 using System.Threading.Tasks;
 using System.Threading;
 using Bagatka.AiSloth.Chats.Contracts;
@@ -11,7 +12,9 @@ internal sealed partial class ChatsApi
 {
     public async Task<Result> StopAsync(Actor actor, ChatId id, CancellationToken ct)
     {
-        Result<Chat> chat = await FindChatAsync(actor, id, AccessLevel.Write, ct);
+        await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Chat> chat = await FindChatAsync(db, actor, id, AccessLevel.Write, ct);
         if (chat.Failed)
         {
             return new Result(chat.Error);

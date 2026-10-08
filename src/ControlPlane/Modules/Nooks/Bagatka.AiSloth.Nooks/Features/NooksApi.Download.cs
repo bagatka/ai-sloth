@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.Nooks.Data;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,7 +18,9 @@ internal sealed partial class NooksApi
 {
     public async Task<Result> DownloadAsync(Actor actor, DownloadFiles command, Stream destination, CancellationToken ct)
     {
-        Result<Nook> nook = await FindNookAsync(actor, command.NookId, AccessLevel.Read, ct);
+        await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
+
+        Result<Nook> nook = await FindNookAsync(db, actor, command.NookId, AccessLevel.Read, ct);
         if (nook.Failed)
         {
             return new Result(nook.Error);
@@ -33,7 +36,7 @@ internal sealed partial class NooksApi
         List<KeptPlace>? places = null;
         if (command.Checkpoint is int number)
         {
-            places = await PlacesAsync(command.NookId, number, ct);
+            places = await Checkpoints.PlacesAsync(db, command.NookId, number, ct);
             if (places is null)
             {
                 return new Result(NooksErrors.CheckpointNotFound);
@@ -48,26 +51,22 @@ internal sealed partial class NooksApi
             }
         }
 
-        DaemonConnection? connection = await ConnectionAsync(actor, command.NookId, ct);
-        if (connection is null)
+        Result<DaemonConnection> ready = await ReadyAsync(db, actor, nook.Output, changes: false, ct);
+        if (ready.Failed)
         {
-            return new Result(NooksErrors.NotReady);
+            return new Result(ready.Error);
         }
 
-        Result prepared = await PrepareSourcesAsync(nook.Output, connection, ct);
-        if (prepared.Failed)
-        {
-            return prepared;
-        }
+        DaemonConnection connection = ready.Output;
 
         ProcessRun archived;
         if (places is null)
         {
-            archived = await RunAsync(connection, "tar -czf - -C /work \"$1\"", [command.Source ?? "."], NoVariables, input: null, destination, ct);
+            archived = await processes.RunAsync(connection, Scripts.Archive, [command.Source ?? "."], NookProcesses.NoVariables, input: null, ScriptOutput.To(destination), ct);
         }
         else
         {
-            archived = await RestoreAsync(connection, places, command.Source ?? ".", destination, ct);
+            archived = await checkpoints.RestoreAsync(connection, places, command.Source ?? ".", destination, ct);
         }
 
         return archived.Succeeded

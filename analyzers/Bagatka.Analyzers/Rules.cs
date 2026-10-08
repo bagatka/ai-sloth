@@ -23,7 +23,7 @@ internal static class Rules
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "PATTERNS.md entry 1, no out in our own APIs. Allowed: as a statement, a local's initial value, an assignment's right side, and in a while condition reading the next item.");
+        description: "PATTERNS.md entry 1, no out or ref in our own APIs. Allowed: as a statement, a local's initial value, an assignment's right side, and in a while condition reading the next item.");
 
     public static readonly DiagnosticDescriptor ThrowIsAStatement = new DiagnosticDescriptor(
         id: "BAG0008",
@@ -36,12 +36,12 @@ internal static class Rules
 
     public static readonly DiagnosticDescriptor NoOutParameters = new DiagnosticDescriptor(
         id: "BAG0003",
-        title: "Our methods don't declare out parameters",
-        messageFormat: "'{0}' declares an out parameter; return a nullable or a Result instead",
+        title: "Our methods don't declare out or ref parameters",
+        messageFormat: "'{0}' declares an out or ref parameter; return a nullable, a Result, or a record instead",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "PATTERNS.md entry 1, no out in our own APIs. Overrides, interface implementations, and Deconstruct follow the signature they must match.");
+        description: "PATTERNS.md entry 1, no out or ref in our own APIs. Overrides, interface implementations, and Deconstruct follow the signature they must match.");
 
     public static readonly DiagnosticDescriptor NoLocalFunctions = new DiagnosticDescriptor(
         id: "BAG0004",
@@ -77,5 +77,5 @@ internal static class Rules
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "PATTERNS.md entry 1, no out in our own APIs. A rule here rather than a banned API, because source generators' output calls TryGetValue and banned APIs are checked there too.");
+        description: "PATTERNS.md entry 1, no out or ref in our own APIs. A rule here rather than a banned API, because source generators' output calls TryGetValue and banned APIs are checked there too.");
 }

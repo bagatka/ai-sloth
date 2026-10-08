@@ -73,13 +73,16 @@ answers pings however many calls it runs.
 
 ## Configuration
 
-`MachinesSettings`, passed by the host (`PATTERNS.md`, entry 20): the connection string.
+None; the host passes the shared database.
 
 ## Decisions and constraints
 
 - **A machine is a place, not a kind of nook.** One provider, `machine`, serves every workspace's
-  machines; `SandboxSpec.Location` says which machine. Nooks, the reconciler, and the conformance
-  suite treat it like any other provider.
+  machines; `SandboxSpec.Location` says which machine. Nooks, its lifecycle job, and the
+  conformance suite treat it like any other provider.
+- **What a machine needs.** It pulls the nook image from a registry, so the local development image,
+  `aisloth-nook:dev`, works only on the developer's own Docker Engine; and its nooks dial the
+  control plane's daemon URL, which must be reachable from there.
 - **Registration.** An owner adds a machine and gets a 16-character code, valid for an hour and
   usable once, compared without regard to case or surrounding spaces. Registering trades it for a
   random token. Only hashes are stored; the token stays on the machine, in
@@ -90,7 +93,7 @@ answers pings however many calls it runs.
 - **Placements are recorded before the call.** Creating a sandbox records its machine first, so a
   call by key finds it even if the create was interrupted. A snapshot's sandboxes start on the
   snapshot's machine. A disconnected machine makes calls for its sandboxes throw, as an unreachable
-  backend does, and the reconciler retries.
+  backend does, and the lifecycle job retries.
 - **The same providers, elsewhere.** Machine mode runs the providers the cloud uses, and the
   conformance suite runs every provider through `Bagatka.Sandboxing.Remote` too. The Docker provider
   works with a Docker Engine on a Unix socket that has Sysbox, so nooks run Docker of their own
@@ -103,15 +106,3 @@ answers pings however many calls it runs.
   command to run on its own operating system.
 - **One active instance at a time**, as for daemons: connections live in the instance they dialed,
   and one that hands over ends them, so machines dial the active one.
-
-## Not built yet
-
-- **The nook image must be in a registry the machine can pull from.** The local development image,
-  `aisloth-nook:dev`, exists only on the developer's Docker Engine.
-- **Network reach.** Nooks on a machine dial the control plane's daemon URL, which must be reachable
-  from there.
-- **Lists skip offline machines.** `ListAsync` and `ListSnapshotsAsync` answer for connected
-  machines only. Nothing uses them yet; the reconciler will before it deletes sandboxes without a
-  record.
-- **Capacity.** A machine doesn't report how many nooks it can run; macOS virtual machines will need
-  it (Apple silicon only, about two at a time per Mac).

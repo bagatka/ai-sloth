@@ -15,8 +15,8 @@ feeds, watches, and stops processes on its instructions. It is a single .NET Nat
 `daemon.proto` is the single source; never hand-edit generated code.
 
 - **Control stream.** The daemon opens `ControlPlane.Connect`, a bidirectional gRPC stream, and
-  sends `Hello` first, listing the processes still running. It reconnects with backoff when the
-  stream drops. A newer stream for the same nook replaces an older one.
+  sends `Hello` first, then the exits of processes that ended while it was away. It reconnects
+  with backoff when the stream drops. A newer stream for the same nook replaces an older one.
 - **Bulk streams.** Output travels in a separate `UploadOutput` call per watch, on its own HTTP/2
   stream over the same connection, so a busy process never delays instructions. An upload ends with
   the process's exit, so a watch gets everything from one stream; one that ends without it broke off.
@@ -54,8 +54,9 @@ feeds, watches, and stops processes on its instructions. It is a single .NET Nat
 A full disk must never cost output or leave a nook unrecoverable (`ARCHITECTURE.md`, "Nothing
 delivered is lost").
 
-- **Reported.** The daemon reports how full the working directory's disk is, so the control plane
-  can ask for confirmation before it fills up.
+- **Reported.** Every 30 seconds the daemon reports the nook's usage: how full the working
+  directory's disk is, and the memory and CPU its cgroup uses, so people are told before the disk
+  fills up.
 - **A reserve.** The daemon keeps a 256 MiB reserve file in its state directory, preallocated so the
   space is really held, and takes it only while the disk has twice that free. When output can't be
   written because the disk is full, it deletes the reserve and reports at once, so watchers still
@@ -101,12 +102,6 @@ builds them all as `aisloth-nook:dev`, `aisloth-nook-claude-code:dev`, and `aisl
 
 The tests run the real daemon against a fake control plane: a real gRPC server on a loopback port.
 The full-disk test mounts a small tmpfs, which needs root, and skips elsewhere.
-
-## Not built yet
-
-- **Compressed uploads.** Output travels uncompressed; gzip on `UploadOutput` is a few lines, worth
-  it once nooks and the control plane run in different clouds and egress costs money.
-- **Version checks.** The control plane accepts any daemon version.
 
 ## Open questions
 

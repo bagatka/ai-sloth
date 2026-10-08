@@ -10,7 +10,7 @@ internal sealed class SecretsDbContextFactory : IDesignTimeDbContextFactory<Secr
     public SecretsDbContext CreateDbContext(string[] args)
     {
         DbContextOptionsBuilder<SecretsDbContext> options = new DbContextOptionsBuilder<SecretsDbContext>();
-        options.UseModuleDatabase("Host=localhost", SecretsDbContext.Schema);
+        options.UseModuleDatabase(database: null, SecretsDbContext.Schema);
         return new SecretsDbContext(options.Options);
     }
 }

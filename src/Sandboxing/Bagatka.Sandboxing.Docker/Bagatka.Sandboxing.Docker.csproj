@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <EmbeddedResource Include="router.sh" LogicalName="router.sh" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Bagatka.Sandboxing\Bagatka.Sandboxing.csproj" />
     <ProjectReference Include="..\..\Sdk\Bagatka.Sdk.Docker\Bagatka.Sdk.Docker.csproj" />
   </ItemGroup>
