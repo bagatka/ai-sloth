@@ -259,7 +259,8 @@ These decisions are fixed:
   away once it reconnects.
 - **Checkpoints are git, kept outside the nook.** A checkpoint saves `/work`, its repositories with
   their history and branches, and paths the nook's creator names, such as an agent's sessions, as
-  git bundles in object storage: each holds only what changed since the last one. A running nook
+  git bundles in object storage: each holds only what changed since the last one, and every 32nd
+  holds what changed whole, so putting one back never takes more than a few dozen. A running nook
   whose sandbox is gone is created again from its latest checkpoint; copies of a nook start from
   one of its checkpoints too.
 - **The daemon dials out,** over a protocol defined once in `daemon.proto`: a small control stream,

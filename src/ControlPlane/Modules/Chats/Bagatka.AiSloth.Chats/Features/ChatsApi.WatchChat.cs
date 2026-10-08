@@ -51,7 +51,9 @@ internal sealed partial class ChatsApi
                 yield return stored.ToContract();
             }
 
-            if (batch.Count == 0)
+            // A short batch is all there was. Its signal was taken before the query, so whatever was saved
+            // since has set it, and nothing is missed by waiting instead of asking again.
+            if (batch.Count < WatchBatch)
             {
                 bool more = await NextEventAsync(next, ct);
                 if (!more)

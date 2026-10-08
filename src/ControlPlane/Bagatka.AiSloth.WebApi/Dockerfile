@@ -4,12 +4,14 @@
 #   docker build -f src/ControlPlane/Bagatka.AiSloth.WebApi/Dockerfile -t aisloth-webapi .
 
 FROM mcr.microsoft.com/dotnet/sdk:11.0.100-rc.1-resolute AS build
+ARG TARGETARCH
 WORKDIR /src
 COPY global.json NuGet.Config Directory.Build.props Directory.Packages.props .editorconfig BannedSymbols.txt LoggerParameterTypes.txt ./
 COPY analyzers/Bagatka.Analyzers/ analyzers/Bagatka.Analyzers/
 COPY src/ src/
 RUN dotnet restore src/ControlPlane/Bagatka.AiSloth.WebApi --locked-mode
-RUN dotnet publish src/ControlPlane/Bagatka.AiSloth.WebApi -c Release --no-restore -o /out
+RUN dotnet publish src/ControlPlane/Bagatka.AiSloth.WebApi -c Release --no-restore --self-contained false -o /out \
+    -r linux-$(if [ "$TARGETARCH" = arm64 ]; then echo arm64; else echo x64; fi)
 
 FROM mcr.microsoft.com/dotnet/aspnet:11.0.0-rc.1-resolute
 RUN apt-get update \

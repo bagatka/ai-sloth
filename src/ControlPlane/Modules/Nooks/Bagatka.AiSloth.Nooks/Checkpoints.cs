@@ -31,7 +31,12 @@ internal sealed class Checkpoints(NookProcesses processes, IObjectStorage storag
     // The most places one checkpoint keeps; more fails the checkpoint.
     private const int MaxPlaces = 100;
 
+    // Every checkpoint brings a place back with the bundles of each change since its last whole one,
+    // which every so many checkpoints keeps of each place they change, so putting a checkpoint back
+    // fetches a few dozen bundles, not one per turn since the nook began.
+    private const int WholeEvery = 32;
 
+    private static readonly IReadOnlyDictionary<string, string> Whole = new Dictionary<string, string>(StringComparer.Ordinal) { ["WHOLE"] = "1" };
 
     // Saves the nook's files as its next checkpoint, or, when only a change matters, returns the latest
     // if every place is as it was. Its sources must be in place, or the checkpoint would keep a nook
@@ -50,7 +55,8 @@ internal sealed class Checkpoints(NookProcesses processes, IObjectStorage storag
         Checkpoint checkpoint = Checkpoint.Take(nook.Id, (latest?.Number ?? 0) + 1, note, time);
         string path = Path.GetTempFileName();
         await using FileStream taken = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None, bufferSize: 81920, FileOptions.DeleteOnClose | FileOptions.Asynchronous);
-        ProcessRun run = await processes.RunAsync(connection, Scripts.Snapshot, nook.KeptPaths, NookProcesses.NoVariables, async (stream, token) => { await stream.WriteAsync(commits, token); }, ScriptOutput.To(taken), ct);
+        IReadOnlyDictionary<string, string> environment = checkpoint.Number % WholeEvery == 0 ? Whole : NookProcesses.NoVariables;
+        ProcessRun run = await processes.RunAsync(connection, Scripts.Snapshot, nook.KeptPaths, environment, async (stream, token) => { await stream.WriteAsync(commits, token); }, ScriptOutput.To(taken), ct);
         if (!run.Succeeded)
         {
             return new Result<Checkpoint>(Failed(run.Errors));

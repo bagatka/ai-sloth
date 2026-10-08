@@ -117,9 +117,10 @@ when people are warned (85%), and how many of a workspace's nooks may be awake (
   2 GiB. At most two large and eight small runs hold output at once; others wait.
 - **Checkpoints are git.** Each place (each repository directly in `/work`, the rest of `/work`, and
   the kept paths) becomes a snapshot commit made with a separate index, so the nook's repositories
-  never change, bundled with only what the previous checkpoint lacks. Ignored files, tags, git's
-  settings besides remotes, and repositories deeper than directly in `/work` aren't kept;
-  checkpoints are kept until the nook is deleted.
+  never change, bundled with only what the previous checkpoint lacks; every 32nd checkpoint bundles
+  each place it changes whole, so a restore fetches a few dozen bundles, not one per turn. Ignored
+  files, tags, git's settings besides remotes, and repositories deeper than directly in `/work`
+  aren't kept; checkpoints are kept until the nook is deleted.
 - **Kept folders merge by lines.** A text file two nooks changed keeps the lines of both; any other
   file keeps the syncing nook's version. A kept folder holds up to 16 MiB.
 - **One active instance** holds daemon connections (`ActiveInstance`); one that hands over tells its

@@ -13,7 +13,7 @@ export GIT_COMMITTER_NAME=AiSloth GIT_COMMITTER_EMAIL=checkpoints@aisloth.invali
 # keep PATH GIT_DIR WORK_TREE PATHSPEC...: commits the files at the pathspecs, as they are, with the
 # repository's branches and HEAD as parents and named in the message, without touching its index or
 # refs. The same commit as last time means nothing changed: no bundle. Otherwise the bundle holds
-# what the previous commit lacks, or everything when the nook no longer has it.
+# what the previous commit lacks, or everything when the nook no longer has it or WHOLE is 1.
 keep() (
   path=$1
   export GIT_DIR="$2" GIT_WORK_TREE="$3" GIT_INDEX_FILE="$out/index"
@@ -40,6 +40,7 @@ keep() (
     return
   fi
   git cat-file -e "$previous^{commit}" 2>/dev/null || previous=""
+  if [ "${WHOLE:-}" = 1 ]; then previous=""; fi
   bundle=$(find "$out/bundles" -name "*.bundle" | wc -l)
   git update-ref refs/aisloth/checkpoint "$commit"
   git bundle create -q "$out/bundles/$bundle.bundle" refs/aisloth/checkpoint ${previous:+"^$previous"}

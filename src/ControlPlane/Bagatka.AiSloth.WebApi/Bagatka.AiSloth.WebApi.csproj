@@ -1,5 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <PropertyGroup>
+    <!-- Its image is published ahead-of-time compiled for its architecture, which starts it about a
+         third faster on a third less CPU than compiling everything on first use. Every restore
+         includes both, so the image's publish can skip restoring and the lock file stays the same. -->
+    <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Grpc.AspNetCore.Server" />
