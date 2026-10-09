@@ -43,6 +43,11 @@ IResourceBuilder<ParameterResource> encryptionKey = builder.ExecutionContext.IsP
     ? builder.AddParameter("encryption-key", secret: true)
     : builder.AddParameter("encryption-key", new GenerateParameterDefault { MinLength = 48, Special = false }, secret: true, persist: true);
 
+// The host's logs, traces, metrics, and errors go to a PostHog project when one is given: set
+// posthog-host, such as https://eu.i.posthog.com, and posthog-project-token, its phc_ token, which is
+// public. Settings left empty, as a deploy workflow passes ones a fork doesn't set, count as not given.
+string? postHogHost = builder.Configuration["Parameters:posthog-host"] is { Length: > 0 } givenPostHog ? givenPostHog : null;
+
 // People connect GitHub through the host's GitHub App, which `sloth github create-app` makes: give
 // github-app-client-id, -client-secret, and -slug as user secrets of this project.
 string? gitHubAppClientId = builder.Configuration["Parameters:github-app-client-id"];
@@ -287,6 +292,12 @@ foreach (IResourceBuilder<IResourceWithEnvironment> mode in modes)
                 environment.EnvironmentVariables["SignIn__Provider__ClientId"] = builder.Configuration["Parameters:sign-in-provider-client-id"] ?? string.Empty;
                 environment.EnvironmentVariables["SignIn__Provider__ClientSecret"] = builder.Configuration["Parameters:sign-in-provider-client-secret"] ?? string.Empty;
                 environment.EnvironmentVariables["SignIn__Provider__Name"] = builder.Configuration["Parameters:sign-in-provider-name"] ?? string.Empty;
+            }
+
+            if (postHogHost is not null)
+            {
+                environment.EnvironmentVariables["PostHog__Host"] = postHogHost;
+                environment.EnvironmentVariables["PostHog__ProjectToken"] = builder.Configuration["Parameters:posthog-project-token"] ?? string.Empty;
             }
 
             if (inviteSignUp is not null)

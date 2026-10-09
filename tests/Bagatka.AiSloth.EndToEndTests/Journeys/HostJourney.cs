@@ -17,7 +17,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// Journey: a host's first person signs in with its setup code; anyone can learn how to sign in, and
 /// only the host's own sessions sign calls in; someone signs in with <c>sloth</c> in the browser, then
 /// on a phone with a link code, and signs the phone out again. The host describes its API as the
-/// committed <c>openapi.json</c> does, so every change to it shows in review.
+/// committed <c>openapi.json</c> does, so every change to it shows in review, and sends its telemetry
+/// to its PostHog project.
 /// </summary>
 public sealed partial class HostJourney(ControlPlane app)
 {
@@ -32,6 +33,15 @@ public sealed partial class HostJourney(ControlPlane app)
         await SomeoneSignsInOnALaptopThenAPhoneAndSignsThePhoneOutAsync();
         await TheHostDescribesItsApiAsCommittedAsync();
         await SomeoneStartingNooksFasterThanTheHostAllowsIsAskedToWaitAsync();
+        await TheHostSendsItsTracesAndLogsToItsPostHogProjectAsync();
+    }
+
+    // The calls above are traced, and the host logs warnings as it starts; both are exported within
+    // seconds of happening.
+    private async Task TheHostSendsItsTracesAndLogsToItsPostHogProjectAsync()
+    {
+        await app.PostHog.ReceivedAsync("/i/v1/traces", TimeSpan.FromSeconds(30));
+        await app.PostHog.ReceivedAsync("/i/v1/logs", TimeSpan.FromSeconds(30));
     }
 
     private async Task AnyoneLearnsHowToSignInAsync()

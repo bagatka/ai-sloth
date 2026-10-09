@@ -37,6 +37,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
     private readonly int _modelsPort;
     private FakeIssuer? _issuer;
     private FakeModel? _model;
+    private FakePostHog? _postHog;
     private FakeChatGpt? _chatGpt;
     private FakeGitHub? _gitHub;
     private DistributedApplication? _app;
@@ -57,6 +58,20 @@ public sealed partial class ControlPlane : IAsyncLifetime
 
     // This run's checkpoints, deleted with it.
     private string ObjectStorage => Path.Combine(Path.GetTempPath(), "aisloth-" + Scope);
+
+    /// <summary>The PostHog project the host sends its telemetry, events, and errors to.</summary>
+    internal FakePostHog PostHog
+    {
+        get
+        {
+            if (_postHog is null)
+            {
+                throw new InvalidOperationException("PostHog hasn't started.");
+            }
+
+            return _postHog;
+        }
+    }
 
     /// <summary>The model agents talk to through the gateway.</summary>
     internal FakeModel Model
@@ -137,6 +152,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
         CancellationToken ct = TestContext.Current.CancellationToken;
         _issuer = await FakeIssuer.StartAsync();
         _model = await FakeModel.StartAsync();
+        _postHog = await FakePostHog.StartAsync();
         _chatGpt = await FakeChatGpt.StartAsync();
         _gitHub = await FakeGitHub.StartAsync();
         IDistributedApplicationTestingBuilder appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Bagatka_AiSloth_AppHost>(
@@ -154,6 +170,8 @@ public sealed partial class ControlPlane : IAsyncLifetime
                 "Parameters:github-app-client-secret=" + FakeGitHub.ClientSecret,
                 "Parameters:github-app-slug=" + FakeGitHub.AppSlug,
                 "Parameters:encryption-key=" + RandomNumberGenerator.GetHexString(64),
+                "Parameters:posthog-host=" + _postHog.Url.AbsoluteUri,
+                "Parameters:posthog-project-token=" + FakePostHog.ProjectToken,
                 "DaemonPort=" + _daemonPort.ToString(CultureInfo.InvariantCulture),
                 "ModelsPort=" + _modelsPort.ToString(CultureInfo.InvariantCulture),
                 "DOCKER_HOST=" + DockerEndpoint,
@@ -181,8 +199,9 @@ public sealed partial class ControlPlane : IAsyncLifetime
             anonymous.SendPostAsync("/sign-in/code", new { code = SetupCode, name = "Owner", device = "e2e" }), HttpStatusCode.OK);
     }
 
-    // The paid and external services are fakes in this process; no dashboard runs to send telemetry
-    // to, and flushing it would hold every stop of the WebApi for seconds; every journey signs people
+    // The paid and external services are fakes in this process, PostHog among them, which takes the
+    // telemetry; no dashboard runs to send it to, and flushing it there would hold every stop of the
+    // WebApi for seconds; every journey signs people
     // in from this computer's one address; and the rest of the settings are the test's own, such as
     // short sleep periods.
     private void ConfigureWebApi(IResourceBuilder<ProjectResource> webApi)
@@ -370,6 +389,11 @@ public sealed partial class ControlPlane : IAsyncLifetime
         if (_model is not null)
         {
             await _model.DisposeAsync();
+        }
+
+        if (_postHog is not null)
+        {
+            await _postHog.DisposeAsync();
         }
 
         if (_chatGpt is not null)

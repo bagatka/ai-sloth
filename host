@@ -226,6 +226,11 @@ Modules__AgentAccounts__AllowChatGptPlans=true
 #SignIn__Provider__ClientId=
 #SignIn__Provider__ClientSecret=
 #SignIn__Provider__Name=
+
+# Error reports, logs, traces, metrics, and product analytics in your PostHog project, such as one on
+# eu.posthog.com: its host, and its project token, phc_ and the rest.
+#PostHog__Host=https://eu.i.posthog.com
+#PostHog__ProjectToken=
 EOF
     )
     say "Made host.env with this host's settings and its encryption key. Keep a copy of it somewhere"
@@ -489,6 +494,11 @@ EOF
     if [ -z "$(setting SignIn__Provider__Issuer)" ]; then
         off="$off
   sign-in with your company's accounts"
+    fi
+
+    if [ -z "$(setting PostHog__ProjectToken)" ]; then
+        off="$off
+  error reports and usage analytics in your PostHog project"
     fi
 
     if [ -n "$off" ]; then

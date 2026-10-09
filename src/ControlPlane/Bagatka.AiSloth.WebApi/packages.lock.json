@@ -545,6 +545,9 @@
           "Bagatka.ObjectStorage": "[1.0.0, )"
         }
       },
+      "bagatka.posthog": {
+        "type": "Project"
+      },
       "bagatka.sandboxing": {
         "type": "Project",
         "dependencies": {

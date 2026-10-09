@@ -523,8 +523,7 @@
         "dependencies": {
           "Bagatka.AiSloth.Chats.Contracts": "[1.0.0, )",
           "Bagatka.Foundation.Modules": "[1.0.0, )",
-          "Bagatka.Harnesses": "[1.0.0, )",
-          "Bagatka.ObjectStorage": "[1.0.0, )"
+          "Bagatka.Harnesses": "[1.0.0, )"
         }
       },
       "bagatka.aisloth.chats.contracts": {
@@ -663,6 +662,7 @@
           "Bagatka.Foundation.Web": "[1.0.0, )",
           "Bagatka.ObjectStorage": "[1.0.0, )",
           "Bagatka.ObjectStorage.AzureBlob": "[1.0.0, )",
+          "Bagatka.PostHog": "[0.1.0-preview.1, )",
           "Bagatka.Sandboxing.Azure": "[1.0.0, )",
           "Bagatka.Sandboxing.Docker": "[1.0.0, )",
           "Bagatka.ServiceDefaults": "[1.0.0, )",
@@ -719,6 +719,9 @@
           "Azure.Storage.Blobs": "[12.30.0, )",
           "Bagatka.ObjectStorage": "[1.0.0, )"
         }
+      },
+      "bagatka.posthog": {
+        "type": "Project"
       },
       "bagatka.sandboxing": {
         "type": "Project",

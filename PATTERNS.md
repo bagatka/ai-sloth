@@ -1019,6 +1019,11 @@ UserId;System.Guid
 - **Levels.** Information records routine events, such as a nook falling asleep, for local runs
   and tests. Deployed hosts keep Warning and above (`appsettings.json`), so every line there is
   worth an operator's look; to investigate, raise a category with `Logging__LogLevel__<category>`.
+- **Where it goes.** A host with a PostHog project (`PostHog:Host`, `PostHog:ProjectToken`) sends
+  its logs, traces, and metrics there over OTLP, and every exception it logs at Error or worse
+  becomes an error tracking issue (`src/ControlPlane/Bagatka.AiSloth.WebApi/ExceptionsToPostHog.cs`,
+  through `Bagatka.PostHog`), so an Error log is a failure someone sees. Without a project, a host
+  sends nothing anywhere.
 - **Traces and metrics.**
   - OpenTelemetry is configured by `Bagatka.ServiceDefaults` in every host.
   - A module adds an `ActivitySource` or `Meter` named `Bagatka.AiSloth.<Module>` only when it

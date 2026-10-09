@@ -1,0 +1,53 @@
+#nullable enable
+Bagatka.PostHog.PostHogClient
+Bagatka.PostHog.PostHogClient.Capture(Bagatka.PostHog.PostHogEvent! event) -> bool
+Bagatka.PostHog.PostHogClient.CaptureException(System.Exception! exception, string! distinctId, System.Text.Json.Nodes.JsonObject? properties = null) -> bool
+Bagatka.PostHog.PostHogClient.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Bagatka.PostHog.PostHogClient.FlushAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Bagatka.PostHog.PostHogClient.GroupIdentify(string! groupType, string! groupKey, System.Text.Json.Nodes.JsonObject! set) -> bool
+Bagatka.PostHog.PostHogClient.Identify(string! distinctId, System.Text.Json.Nodes.JsonObject! set) -> bool
+Bagatka.PostHog.PostHogClient.PostHogClient(Bagatka.PostHog.PostHogClientOptions! options) -> void
+Bagatka.PostHog.PostHogClient.PostHogClient(Bagatka.PostHog.PostHogClientOptions! options, System.Net.Http.HttpMessageHandler! handler) -> void
+Bagatka.PostHog.PostHogClientOptions
+Bagatka.PostHog.PostHogClientOptions.<Clone>$() -> Bagatka.PostHog.PostHogClientOptions!
+Bagatka.PostHog.PostHogClientOptions.DeliveryFailed.get -> System.Action<Bagatka.PostHog.PostHogDeliveryFailure!>?
+Bagatka.PostHog.PostHogClientOptions.DeliveryFailed.init -> void
+Bagatka.PostHog.PostHogClientOptions.Equals(Bagatka.PostHog.PostHogClientOptions? other) -> bool
+Bagatka.PostHog.PostHogClientOptions.FlushInterval.get -> System.TimeSpan
+Bagatka.PostHog.PostHogClientOptions.FlushInterval.init -> void
+Bagatka.PostHog.PostHogClientOptions.Host.get -> System.Uri!
+Bagatka.PostHog.PostHogClientOptions.PostHogClientOptions(System.Uri! host, string! projectToken) -> void
+Bagatka.PostHog.PostHogClientOptions.ProjectToken.get -> string!
+Bagatka.PostHog.PostHogClientOptions.TimeProvider.get -> System.TimeProvider!
+Bagatka.PostHog.PostHogClientOptions.TimeProvider.init -> void
+Bagatka.PostHog.PostHogDeliveryFailure
+Bagatka.PostHog.PostHogDeliveryFailure.<Clone>$() -> Bagatka.PostHog.PostHogDeliveryFailure!
+Bagatka.PostHog.PostHogDeliveryFailure.Deconstruct(out int Events, out string! Reason, out int? StatusCode, out System.Exception? Exception) -> void
+Bagatka.PostHog.PostHogDeliveryFailure.Equals(Bagatka.PostHog.PostHogDeliveryFailure? other) -> bool
+Bagatka.PostHog.PostHogDeliveryFailure.Events.get -> int
+Bagatka.PostHog.PostHogDeliveryFailure.Events.init -> void
+Bagatka.PostHog.PostHogDeliveryFailure.Exception.get -> System.Exception?
+Bagatka.PostHog.PostHogDeliveryFailure.Exception.init -> void
+Bagatka.PostHog.PostHogDeliveryFailure.PostHogDeliveryFailure(int Events, string! Reason, int? StatusCode, System.Exception? Exception) -> void
+Bagatka.PostHog.PostHogDeliveryFailure.Reason.get -> string!
+Bagatka.PostHog.PostHogDeliveryFailure.Reason.init -> void
+Bagatka.PostHog.PostHogDeliveryFailure.StatusCode.get -> int?
+Bagatka.PostHog.PostHogDeliveryFailure.StatusCode.init -> void
+Bagatka.PostHog.PostHogEvent
+Bagatka.PostHog.PostHogEvent.DistinctId.get -> string!
+Bagatka.PostHog.PostHogEvent.Groups.get -> System.Collections.Generic.IDictionary<string!, string!>!
+Bagatka.PostHog.PostHogEvent.Name.get -> string!
+Bagatka.PostHog.PostHogEvent.PostHogEvent(string! name, string! distinctId) -> void
+Bagatka.PostHog.PostHogEvent.Properties.get -> System.Text.Json.Nodes.JsonObject!
+Bagatka.PostHog.PostHogEvent.Timestamp.get -> System.DateTimeOffset?
+Bagatka.PostHog.PostHogEvent.Timestamp.init -> void
+override Bagatka.PostHog.PostHogClientOptions.Equals(object? obj) -> bool
+override Bagatka.PostHog.PostHogClientOptions.GetHashCode() -> int
+override Bagatka.PostHog.PostHogClientOptions.ToString() -> string!
+override Bagatka.PostHog.PostHogDeliveryFailure.Equals(object? obj) -> bool
+override Bagatka.PostHog.PostHogDeliveryFailure.GetHashCode() -> int
+override Bagatka.PostHog.PostHogDeliveryFailure.ToString() -> string!
+static Bagatka.PostHog.PostHogClientOptions.operator !=(Bagatka.PostHog.PostHogClientOptions? left, Bagatka.PostHog.PostHogClientOptions? right) -> bool
+static Bagatka.PostHog.PostHogClientOptions.operator ==(Bagatka.PostHog.PostHogClientOptions? left, Bagatka.PostHog.PostHogClientOptions? right) -> bool
+static Bagatka.PostHog.PostHogDeliveryFailure.operator !=(Bagatka.PostHog.PostHogDeliveryFailure? left, Bagatka.PostHog.PostHogDeliveryFailure? right) -> bool
+static Bagatka.PostHog.PostHogDeliveryFailure.operator ==(Bagatka.PostHog.PostHogDeliveryFailure? left, Bagatka.PostHog.PostHogDeliveryFailure? right) -> bool

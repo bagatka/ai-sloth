@@ -82,6 +82,8 @@ Change `host.env`, then run `./host up` again. Its comments say what each settin
   Entra ID: set the four `SignIn__Provider__` settings.
 - **Other people on your host:** set `Modules__AgentAccounts__AllowChatGptPlans=false`. OpenAI
   allows ChatGPT plans only when you run AiSloth for yourself.
+- **Error reports and usage analytics** in your own PostHog project: set `PostHog__Host` and
+  `PostHog__ProjectToken`. Without them, the host sends nothing anywhere.
 
 ### Other commands
 
@@ -340,6 +342,16 @@ such as WorkOS or Microsoft Entra ID, add these settings to your deploy command:
 --Parameters:sign-in-provider-issuer=<issuer URL> --Parameters:sign-in-provider-client-id=<client ID> --Parameters:sign-in-provider-client-secret=<client secret> --Parameters:sign-in-provider-name=<name that people see>
 ```
 
+### Optional: see errors and usage in PostHog
+
+Do this so that the host sends its errors, logs, traces, metrics, and usage analytics to your own
+PostHog project. Without it, the host sends nothing anywhere. Add these settings to your deploy
+command, with your project's host, such as `https://eu.i.posthog.com`, and its project token:
+
+```sh
+--Parameters:posthog-host=<host> --Parameters:posthog-project-token=<project token>
+```
+
 ### Optional: deploy from GitHub on each push
 
 The `Control plane / Deploy` workflow deploys a fork's `main` branch after each push, when its tests
@@ -366,6 +378,7 @@ deploy again without a push, run the workflow in Actions, or run
    |---|---|
    | `CUSTOM_DOMAIN`, `CUSTOM_DOMAIN_CERTIFICATE` | Your domain and the name of its certificate |
    | `ALLOW_CHATGPT_PLANS` | `false` if other people use your host: OpenAI allows ChatGPT plans only for your own use |
+   | `POSTHOG_HOST`, `POSTHOG_PROJECT_TOKEN` | Your PostHog project's host and project token |
 
 ### If something goes wrong
 

@@ -8,6 +8,7 @@ Attempts;System.Int32
 ChatId;System.Guid
 Deadline;System.TimeSpan
 EventId;System.Guid
+Events;System.Int32
 EventType;System.String
 Instance;System.Guid
 MachineId;System.Guid

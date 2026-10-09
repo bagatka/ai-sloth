@@ -20,6 +20,7 @@ using Bagatka.Foundation.Modules;
 using Bagatka.Foundation.Web;
 using Bagatka.ObjectStorage;
 using Bagatka.ObjectStorage.AzureBlob;
+using Bagatka.PostHog;
 using Bagatka.Sandboxing.Azure;
 using Bagatka.Sandboxing.Docker;
 using Bagatka.Sdk.GitHub;
@@ -32,6 +33,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
@@ -40,7 +42,14 @@ CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
 CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-builder.AddServiceDefaults();
+
+// The host's PostHog project, when it has one, takes its logs, traces, and metrics, which PostHog
+// accepts over OTLP under /i, and its errors (below). Read here, before the rest of configuration
+// (PATTERNS.md, entry 20), because OpenTelemetry starts first.
+PostHogClientOptions? postHog = builder.Configuration.GetSection("PostHog").Exists()
+    ? builder.Configuration.GetRequired<PostHogClientOptions>("PostHog")
+    : null;
+builder.AddServiceDefaults(postHog is null ? null : new OtlpDestination(new Uri(postHog.Host, "i/"), "Authorization=Bearer " + postHog.ProjectToken));
 
 // Every environment checks the container at startup, not only Development: a missing registration
 // or a singleton holding a scoped service fails before the first request.
@@ -90,6 +99,26 @@ if ((folderStorage is null) == (blobStorage is null))
 // One Azure sign-in for whatever the host uses in Azure: its managed identity when hosted, or the
 // developer's Azure CLI.
 DefaultAzureCredential azureCredential = new DefaultAzureCredential();
+
+// Every exception the host logs at Error or worse becomes an error tracking issue in its PostHog
+// project. Events PostHog loses are logged as warnings once the app is built, as logging needs it;
+// the client outlives the app, so it sends what the app's last moments report.
+ILogger? postHogLog = null;
+await using PostHogClient? postHogClient = postHog is null ? null : new PostHogClient(postHog with
+{
+    DeliveryFailed = failure =>
+    {
+        if (postHogLog is not null)
+        {
+            Log.PostHogEventsLost(postHogLog, failure.Exception, failure.Events, failure.StatusCode is int status ? string.Create(CultureInfo.InvariantCulture, $"{failure.Reason} ({status})") : failure.Reason);
+        }
+    },
+});
+if (postHogClient is not null)
+{
+    builder.Services.AddSingleton<ILoggerProvider>(_ => new ExceptionsToPostHog(postHogClient));
+}
+
 ModelGatewaySettings modelGateway = builder.Configuration.GetSection("ModelGateway").Exists() ? builder.Configuration.GetRequired<ModelGatewaySettings>("ModelGateway") : new ModelGatewaySettings();
 
 builder.Services.AddSingleton(TimeProvider.System);
@@ -179,6 +208,7 @@ builder.Services
     .AddChatsModule(chats);
 
 await using WebApplication app = builder.Build();
+postHogLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Bagatka.PostHog");
 
 // `migrate` applies every module's migrations and exits: the deployment step that runs before a new
 // version starts (PATTERNS.md, entry 14). The AppHost runs it before the WebApi.

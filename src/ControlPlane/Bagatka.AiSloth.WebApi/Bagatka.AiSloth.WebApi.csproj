@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\Daemon\Bagatka.AiSloth.DaemonProtocol\Bagatka.AiSloth.DaemonProtocol.csproj" />
     <ProjectReference Include="..\..\Foundation\Bagatka.Foundation.Web\Bagatka.Foundation.Web.csproj" />
     <ProjectReference Include="..\..\Sandboxing\Bagatka.Sandboxing.Azure\Bagatka.Sandboxing.Azure.csproj" />
+    <ProjectReference Include="..\..\Sdk\Bagatka.PostHog\Bagatka.PostHog.csproj" />
     <ProjectReference Include="..\..\Sandboxing\Bagatka.Sandboxing.Docker\Bagatka.Sandboxing.Docker.csproj" />
     <ProjectReference Include="..\..\Storage\Bagatka.ObjectStorage\Bagatka.ObjectStorage.csproj" />
     <ProjectReference Include="..\..\Storage\Bagatka.ObjectStorage.AzureBlob\Bagatka.ObjectStorage.AzureBlob.csproj" />

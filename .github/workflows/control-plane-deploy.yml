@@ -132,3 +132,5 @@ jobs:
           Parameters__custom-domain: ${{ vars.CUSTOM_DOMAIN }}
           Parameters__custom-domain-certificate: ${{ vars.CUSTOM_DOMAIN_CERTIFICATE }}
           Parameters__allow-chatgpt-plans: ${{ vars.ALLOW_CHATGPT_PLANS }}
+          Parameters__posthog-host: ${{ vars.POSTHOG_HOST }}
+          Parameters__posthog-project-token: ${{ vars.POSTHOG_PROJECT_TOKEN }}

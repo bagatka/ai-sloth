@@ -1,14 +1,18 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 namespace Bagatka.ServiceDefaults;
@@ -22,14 +26,15 @@ public static class ServiceDefaultsExtensions
     private const string AlivenessEndpointPath = "/alive";
 
     /// <summary>
-    /// Registers OpenTelemetry (exported over OTLP when <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> is set),
-    /// the default health checks, and HTTPS-only service discovery for HTTP clients.
+    /// Registers OpenTelemetry, the default health checks, and HTTPS-only service discovery for HTTP
+    /// clients. Telemetry goes over OTLP to <paramref name="otlp"/> when the host gives one, or else
+    /// to <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> when it is set, such as the Aspire dashboard's.
     /// HTTP resilience is not added here: retries are configured per integration.
     /// </summary>
-    public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder)
+    public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder, OtlpDestination? otlp = null)
         where TBuilder : IHostApplicationBuilder
     {
-        builder.ConfigureOpenTelemetry();
+        builder.ConfigureOpenTelemetry(otlp);
 
         builder.AddDefaultHealthChecks();
 
@@ -54,7 +59,7 @@ public static class ServiceDefaultsExtensions
         return builder;
     }
 
-    private static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder)
+    private static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder, OtlpDestination? otlp)
         where TBuilder : IHostApplicationBuilder
     {
         builder.Logging.AddOpenTelemetry(
@@ -99,14 +104,32 @@ public static class ServiceDefaultsExtensions
                 }
             );
 
-        builder.AddOpenTelemetryExporters();
+        builder.AddOpenTelemetryExporters(otlp);
 
         return builder;
     }
 
-    private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder)
+    private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder, OtlpDestination? otlp)
         where TBuilder : IHostApplicationBuilder
     {
+        // The destination names the service, as nothing else there does. The exporter reads its
+        // headers and metrics' temporality from configuration, by their standard names: metrics go as
+        // deltas, which stores that add up what they receive, such as PostHog's, take.
+        if (otlp is not null)
+        {
+            builder.Configuration.AddInMemoryCollection(
+                [
+                    new KeyValuePair<string, string?>("OTEL_EXPORTER_OTLP_HEADERS", otlp.Headers),
+                    new KeyValuePair<string, string?>("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", "delta"),
+                ]
+            );
+            builder.Services
+                .AddOpenTelemetry()
+                .ConfigureResource(resource => resource.AddService(builder.Environment.ApplicationName))
+                .UseOtlpExporter(OtlpExportProtocol.HttpProtobuf, otlp.BaseAddress);
+            return builder;
+        }
+
         bool useOtlpExporter = !string.IsNullOrWhiteSpace(
             builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]
         );

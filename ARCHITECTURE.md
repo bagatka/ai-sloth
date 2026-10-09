@@ -94,7 +94,7 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 | CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API: hosts, sign-in, agent accounts, secrets, and chats; its machine mode runs nooks on people's own computers (`src/Cli/README.md`) | Built |
 | Foundation | `Bagatka.Foundation` (+ `.Modules`, `.Web`) | Plumbing: results, errors, actors, typed IDs | Built |
 | Object storage | `Bagatka.ObjectStorage` (+ `.<Backend>` for cloud backends) | Store and read objects by key: checkpoints and kept folders | Contract; a folder of this computer and Azure Blob Storage as backends |
-| Sdk | `Bagatka.Sdk.<Vendor>`, `Bagatka.Azure.Sandboxes` | Clients for vendor APIs without an official .NET SDK | Docker Engine, Sign in with ChatGPT, GitHub, Azure Container Apps Sandboxes |
+| Sdk | `Bagatka.Sdk.<Vendor>`, `Bagatka.Azure.Sandboxes`, `Bagatka.PostHog` | Clients for vendor APIs without a usable official .NET SDK | Docker Engine, Sign in with ChatGPT, GitHub, Azure Container Apps Sandboxes, PostHog |
 | Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration and the Azure deployment; defaults every service host shares | Built |
 | One server | `host`, `hosting/` (shell and Compose, not .NET) | Runs a host on one server or computer from main's published images: PostgreSQL, the WebApi, and Caddy for HTTPS, with nooks on its Docker | Built |
 | Site | `site/` (Astro, not .NET) | The landing page at aisloth.dev and `install.sh`, which installs or updates sloth, published to GitHub Pages from main | Built |
