@@ -127,11 +127,15 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("Sandboxing__Azure__Scope", sandboxScope)
         .PublishAsAzureContainerApp((infrastructure, app) =>
         {
-            // One replica: background work and daemons' connections aren't shared between replicas yet.
-            // A deploy runs the new one beside the old one, which hands its work over and then gets
-            // the longest grace Container Apps allows to finish requests in flight, such as agents'
-            // model calls (the WebApi's shutdown timeout is a little shorter).
-            app.Template.Scale.MinReplicas = 1;
+            // At most one replica: background work and daemons' connections aren't shared between
+            // replicas yet. None while nobody uses the host: the first request starts it, waiting some
+            // seconds longer, and requests in flight keep it, such as awake nooks' daemons' and
+            // machines' connections. Background work for what sleeps, such as evicting nooks and
+            // deleting expired drafts, waits until it starts again. A deploy runs the new one beside the
+            // old one, which hands its work over and then gets the longest grace Container Apps allows
+            // to finish requests in flight, such as agents' model calls (the WebApi's shutdown timeout
+            // is a little shorter).
+            app.Template.Scale.MinReplicas = 0;
             app.Template.Scale.MaxReplicas = 1;
             app.Template.TerminationGracePeriodSeconds = 600;
 
@@ -139,9 +143,10 @@ if (builder.ExecutionContext.IsPublishMode)
             ContainerAppContainer container = app.Template.Containers.Single().Value!;
 
             // Checkpoints, downloads, and copies of repositories pass through this replica's disk, which
-            // Container Apps sizes with it: 2 vCPU and 4 GiB come with 8 GiB of disk, room for the two
-            // large outputs and two copies of repositories it holds at once.
-            container.Resources = new AppContainerResources { Cpu = 2, Memory = "4Gi" };
+            // Container Apps sizes with its CPU: more than 1 vCPU comes with 8 GiB, room for the two
+            // large outputs and two copies of repositories it holds at once. Measured, the host uses a
+            // seventh of this memory and under half this CPU at its busiest.
+            container.Resources = new AppContainerResources { Cpu = 1.25, Memory = "2.5Gi" };
             container.Env.Add(new ContainerAppEnvironmentVariable { Name = "Sandboxing__Azure__SubscriptionId", Value = BicepFunction.GetSubscription().SubscriptionId });
             container.Env.Add(new ContainerAppEnvironmentVariable { Name = "Sandboxing__Azure__ResourceGroup", Value = BicepFunction.GetResourceGroup().Name });
             container.Env.Add(new ContainerAppEnvironmentVariable { Name = "Sandboxing__Azure__Region", Value = BicepFunction.GetResourceGroup().Location });

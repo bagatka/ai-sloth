@@ -130,7 +130,8 @@ is one command.
 - **Storage:** a PostgreSQL database, and storage for the files that chats save.
 
 All of these go into one Azure resource group. Azure charges you for what they use. A nook uses
-compute only while it is awake: it goes to sleep when nobody uses it.
+compute only while it is awake: it goes to sleep when nobody uses it. The host stops too when nobody
+uses it, and the next request starts it again, which takes some seconds.
 
 ### What you need
 
