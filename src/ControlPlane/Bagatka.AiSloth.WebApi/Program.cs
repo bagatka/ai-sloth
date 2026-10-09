@@ -30,6 +30,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.XmlEncryption;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -153,10 +154,13 @@ builder.Services.AddHttpClient(ModelGatewayEndpoints.HttpClientName, client => c
 
 // Each call carries its device's session; Users decides whose it is. People sign in with codes, or
 // through the host's identity provider when it has one (Endpoints/SignInEndpoints.cs), whose browser
-// round trip Data Protection keeps safe instead of state here. That round trip lasts minutes, so its
-// keys live in memory only: a sign-in begun before a restart starts again after it.
+// round trip Data Protection keeps safe instead of state here, with keys in memory (SignInKeys.cs).
 builder.Services.AddSingleton(host);
-builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
+builder.Services.AddDataProtection().AddKeyManagementOptions(options =>
+{
+    options.XmlRepository = new SignInKeys();
+    options.XmlEncryptor = new NullXmlEncryptor();
+});
 builder.Services.AddAuthentication(SessionAuthentication.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, SessionAuthentication>(SessionAuthentication.SchemeName, configureOptions: null);
 if (signInProvider is not null)
