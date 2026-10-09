@@ -925,6 +925,7 @@
         "type": "Project",
         "dependencies": {
           "Bagatka.AiSloth.MachineProtocol": "[1.0.0, )",
+          "Bagatka.PostHog": "[0.1.0-preview.1, )",
           "Bagatka.Sandboxing.Docker": "[1.0.0, )",
           "Grpc.Net.Client": "[2.84.0, )"
         }
@@ -986,6 +987,9 @@
         }
       },
       "bagatka.foundation": {
+        "type": "Project"
+      },
+      "bagatka.posthog": {
         "type": "Project"
       },
       "bagatka.sandboxing": {

@@ -114,9 +114,6 @@
       "bagatka.harnesses": {
         "type": "Project"
       },
-      "bagatka.objectstorage": {
-        "type": "Project"
-      },
       "EFCore.NamingConventions": {
         "type": "CentralTransitive",
         "requested": "[10.0.1, )",
