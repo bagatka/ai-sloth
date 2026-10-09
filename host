@@ -1,9 +1,10 @@
 #!/bin/sh
 # Runs AiSloth on this computer: a server of your own, such as one from Hetzner or Hostinger, or your
-# own PC (docs/self-hosting.md). Everything comes from published images; nothing is built here.
+# own PC (docs/self-hosting.md), from main's published images or from this checkout.
 #
 #   ./host up          starts AiSloth, after installing Docker and Sysbox on a fresh Ubuntu 24.04;
 #                      after git pull it updates AiSloth, and after a change to host.env applies it
+#   ./host up --build  the same, with images built from this checkout, changes and all
 #   ./host remove      deletes AiSloth from this computer: its data, nooks, and images
 #   ./host <command>   runs any docker compose command, such as ./host logs webapi or ./host down
 set -eu
@@ -15,7 +16,8 @@ settings=host.env
 running=hosting/running.env
 
 # Where versions' images are published, and a version's images (hosting/compose.yaml). A version is
-# the commit they were built from.
+# the commit they were built from; one built here from changes the commit doesn't have also says
+# when, so its tags never move away from running nooks.
 images=${AISLOTH_IMAGES:-ghcr.io/bagatka}
 version_images="aisloth-webapi aisloth-nook aisloth-nook-claude-code aisloth-nook-codex aisloth-nook-pi aisloth-nook-copilot"
 
@@ -252,6 +254,41 @@ port_of() {
     esac
 }
 
+# The version this checkout builds.
+built_version() {
+    commit=$(git -c safe.directory="$PWD" rev-parse HEAD)
+    if [ -n "$(git -c safe.directory="$PWD" status --porcelain)" ]; then
+        say "$commit-$(date -u +%Y%m%d%H%M%S)"
+    else
+        say "$commit"
+    fi
+}
+
+# Builds a version's images from this checkout as CI does, each from a stage of its Dockerfile.
+build_images() {
+    for image in $version_images; do
+        case $image in
+            aisloth-webapi)
+                file=src/ControlPlane/Bagatka.AiSloth.WebApi/Dockerfile
+                target=webapi
+                ;;
+            aisloth-nook)
+                file=src/Daemon/Dockerfile
+                target=nook
+                ;;
+            *)
+                file=src/Daemon/Dockerfile
+                target=${image#aisloth-nook-}
+                ;;
+        esac
+
+        say "  $image"
+        if ! docker build --quiet --provenance=false --file "$file" --target "$target" --tag "$images/$image:$version" . >/dev/null; then
+            fail "Building $image failed; what docker printed above says why."
+        fi
+    done
+}
+
 # Waits up to two minutes for an address to answer; curl's other options come first.
 answers() {
     tries=0
@@ -266,6 +303,14 @@ answers() {
 }
 
 up() {
+    build=false
+    for argument in "$@"; do
+        case $argument in
+            --build) build=true ;;
+            *) fail "./host up takes only --build, not $argument." ;;
+        esac
+    done
+
     if [ "$(uname -s)" != Linux ]; then
         fail "AiSloth runs nooks on Linux: a server, a Linux PC, or Windows in WSL. Macs come later."
     fi
@@ -311,9 +356,14 @@ up() {
     # Not handled: an engine whose host-gateway-ip isn't its default bridge's gateway, where nooks
     # find the host; they never connect, and nothing starts.
     bridge=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}} {{end}}' | tr ' ' '\n' | grep -m 1 '\.')
-    version=${AISLOTH_VERSION:-$(pick_version)}
-    if [ -z "$version" ]; then
-        fail "None of this checkout's last 30 commits has images at $images. Main's are published some minutes after each push: run git pull, then ./host up again."
+    if [ "$build" = true ]; then
+        images=local
+        version=$(built_version)
+    else
+        version=${AISLOTH_VERSION:-$(pick_version)}
+        if [ -z "$version" ]; then
+            fail "None of this checkout's last 30 commits has images at $images. Main's are published some minutes after each push: run git pull, then ./host up again, or build them here with ./host up --build."
+        fi
     fi
 
     cat > "$running" << EOF
@@ -339,12 +389,23 @@ EOF
         say "Note: Docker has $free GB of disk left; the images take about 5 GB, and each nook takes what it installs."
     fi
 
-    say "Getting AiSloth $(echo "$version" | cut -c1-7), which takes some minutes the first time..."
-    for image in $version_images; do
-        if ! docker image inspect "$images/$image:$version" >/dev/null 2>&1 && ! docker pull --quiet "$images/$image:$version" >/dev/null; then
-            fail "Getting $images/$image:$version failed."
+    short=$(echo "$version" | cut -c1-7)
+    if [ "$build" = true ]; then
+        say "Building AiSloth from this checkout, which takes some minutes the first time:"
+        build_images
+    else
+        say "Getting AiSloth $short, which takes some minutes the first time..."
+        for image in $version_images; do
+            if ! docker image inspect "$images/$image:$version" >/dev/null 2>&1 && ! docker pull --quiet "$images/$image:$version" >/dev/null; then
+                fail "Getting $images/$image:$version failed."
+            fi
+        done
+
+        # Code changed here, or in commits whose images aren't published yet, isn't in what runs.
+        if ! git -c safe.directory="$PWD" diff --quiet "$version" -- src analyzers '*.props' global.json; then
+            say "Note: this checkout's code differs from $short's, which runs; ./host up --build runs it as it is."
         fi
-    done
+    fi
 
     # Ports something else holds stop the host or Caddy from starting, so they're checked first.
     if [ -z "$(compose ps --quiet webapi 2>/dev/null)" ]; then
@@ -389,7 +450,7 @@ EOF
 
     # Older versions' images go, except those nooks still use, which Docker keeps. Only versions':
     # an engine shared with development has others, such as main's.
-    docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E "^$images/aisloth-[a-z-]+:[0-9a-f]{40}\$" | grep -v ":$version\$" | while read -r image; do
+    docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E "^$images/aisloth-[a-z-]+:[0-9a-f]{40}(-[0-9]{14})?\$" | grep -v ":$version\$" | while read -r image; do
         docker image rm "$image" >/dev/null 2>&1 || true
     done
 
@@ -446,20 +507,21 @@ remove() {
     docker ps --all --quiet --filter "$scope" | xargs -r docker rm --force >/dev/null
     docker network ls --quiet --filter "$scope" | xargs -r docker network rm >/dev/null
     docker image ls --quiet --filter "$scope" | xargs -r docker image rm --force >/dev/null
-    docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E "^$images/aisloth-[a-z-]+:[0-9a-f]{40}\$" | xargs -r docker image rm >/dev/null
+    docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E "^$images/aisloth-[a-z-]+:[0-9a-f]{40}(-[0-9]{14})?\$" | xargs -r docker image rm >/dev/null
     rm -f "$running"
     say "Deleted AiSloth from this computer."
 }
 
 case ${1:-} in
     up)
-        up
+        shift
+        up "$@"
         ;;
     remove)
         remove
         ;;
     "" | help | -h | --help)
-        sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
         ;;
     *)
         if [ ! -f "$running" ]; then

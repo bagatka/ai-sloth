@@ -124,6 +124,15 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: dotnet test --project tests/Bagatka.AiSloth.EndToEndTests --configuration Release --no-build
 
+      # A host on one server, as docs/self-hosting.md starts one, from this commit's code: ./host up
+      # --build builds its images, where the journeys' builds left the nook images' layers, starts
+      # it, and waits until it answers; ./host remove leaves the engine as it was.
+      - name: Run a host on one server
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        run: |
+          ./host up --build
+          echo remove | ./host remove
+
       # The journeys write each app's own output to files instead of the test output.
       - name: Keep the apps' logs of a failed run
         if: failure()

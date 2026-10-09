@@ -61,8 +61,14 @@ git pull
 ./host up
 ```
 
-The host restarts in a few seconds, once the model calls in flight end. Nooks and their agents keep
-running meanwhile.
+Add `--build` if you run your own changes. The host restarts in a few seconds, once the model calls
+in flight end. Nooks and their agents keep running meanwhile.
+
+### Run your own changes
+
+`./host up --build` builds AiSloth from your checkout, with your changes, instead of getting main's
+images. Run it again after each change; it rebuilds only what changed. The first build takes some
+minutes and about 4 GB of memory.
 
 ### Change settings
 
