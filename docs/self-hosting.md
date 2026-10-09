@@ -14,7 +14,7 @@ Run AiSloth on a computer of yours:
 - A server with Ubuntu 24.04 and a public IPv4 address, with ports 80 and 443 open. Take 8 GB of
   memory or more: each awake nook can use up to 4 GB.
 - Or your own PC with Linux, or Windows with Ubuntu 24.04 in WSL. Macs come later.
-- An x86-64 processor (Intel or AMD). ARM comes next.
+- An x86-64 processor (Intel or AMD) or a 64-bit ARM one, such as in Hetzner's CAX servers.
 
 Nooks run on this server or PC. Other computers can't run its nooks as machines yet.
 
