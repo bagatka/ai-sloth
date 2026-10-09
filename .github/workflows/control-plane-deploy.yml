@@ -2,20 +2,22 @@ name: Control plane / Deploy
 run-name: Control plane / Deploy / production
 
 # Deploys main to Azure with `dotnet aspire deploy` (docs/self-hosting.md) after every push to it
-# that changes more than the landing page and the docs, once its journeys pass, with the nook images
-# main published for the same commit; run by hand, it deploys main again. The production environment
-# holds the deployment's secrets and settings, and only main deploys to it; GitHub's OIDC token signs
-# in to Azure, so no Azure secret is stored.
+# that changes more than the landing page, the docs, and the tests, once its journeys pass, with the
+# nook images main published for the same commit; run by hand, it deploys main again. The production
+# environment holds the deployment's secrets and settings, and only main deploys to it; GitHub's OIDC
+# token signs in to Azure, so no Azure secret is stored.
 on:
   push:
     branches: [main]
-    # The landing page and the docs alone change nothing here; Site / Publish publishes the page.
+    # The landing page, the docs, and the tests alone change nothing here; Site / Publish publishes
+    # the page, and .NET solution / Validate still runs the tests.
     paths-ignore:
       - site/**
       - .github/workflows/site-publish.yml
       - docs/**
       - '**/*.md'
       - LICENSE
+      - tests/**
   workflow_dispatch:
 
 permissions:

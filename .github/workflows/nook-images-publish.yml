@@ -6,13 +6,15 @@ run-name: Nook images / Publish / ${{ github.ref_name }}
 on:
   push:
     branches: [main]
-    # The landing page and the docs alone change nothing here; Site / Publish publishes the page.
+    # The landing page, the docs, and the tests alone change nothing here; Site / Publish publishes
+    # the page, and .NET solution / Validate still runs the tests.
     paths-ignore:
       - site/**
       - .github/workflows/site-publish.yml
       - docs/**
       - '**/*.md'
       - LICENSE
+      - tests/**
   workflow_dispatch:
 
 permissions:

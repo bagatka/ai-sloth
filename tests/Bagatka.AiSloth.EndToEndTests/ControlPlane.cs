@@ -18,6 +18,7 @@ using Bagatka.AiSloth.Cli;
 using Bagatka.Foundation;
 using Bagatka.Sandboxing;
 using Bagatka.Sandboxing.Docker;
+using Bagatka.Sdk.Docker;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -345,11 +346,15 @@ public sealed partial class ControlPlane : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         // The app goes first: while it runs, its reconciler would recreate the sandbox of any nook still being created.
+        List<string> leftBehind = [];
         if (_app is not null)
         {
             await _app.DisposeAsync();
             await DeleteSandboxesAsync(Scope);
             await DeleteSandboxesAsync(MachineScope);
+            List<string> app = await RemoveLeftBehindAsync(Scope);
+            List<string> machine = await RemoveLeftBehindAsync(MachineScope);
+            leftBehind = [.. app, .. machine];
             if (Directory.Exists(ObjectStorage))
             {
                 Directory.Delete(ObjectStorage, recursive: true);
@@ -376,6 +381,29 @@ public sealed partial class ControlPlane : IAsyncLifetime
         {
             await _gitHub.DisposeAsync();
         }
+
+        // Deleting every sandbox through the provider removes everything it made; anything else, such
+        // as a router whose sandbox is gone, would stay on people's engines unnoticed, so it fails the run.
+        if (leftBehind.Count > 0)
+        {
+            throw new InvalidOperationException("The run left containers on the Docker Engine, removed now: " + string.Join(", ", leftBehind));
+        }
+    }
+
+    // Removes the containers of a scope that outlived its sandboxes; returns their names.
+    private static async Task<List<string>> RemoveLeftBehindAsync(string scope)
+    {
+        using DockerClient docker = new DockerClient(new DockerClientSettings(DockerEndpoint));
+        IReadOnlyList<ContainerListItem> left = await docker.ListContainersAsync(["com.bagatka.sandboxing.scope=" + scope], CancellationToken.None);
+        List<string> names = [];
+        foreach (ContainerListItem container in left)
+        {
+            ContainerDetails? details = await docker.InspectContainerAsync(container.Id, CancellationToken.None);
+            names.Add(details?.Name ?? container.Id);
+            await docker.RemoveContainerAsync(container.Id, CancellationToken.None);
+        }
+
+        return names;
     }
 
     // The line the WebApi prints to its console: "First sign-in: sloth host add <url> --code <code> ...".
