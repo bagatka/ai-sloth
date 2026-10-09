@@ -14,6 +14,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Contract | A module's public interface `I<Module>Api` and its records | `<Module>.Contracts` | facade, client, port |
 | Feature | One contract method, implemented in one file | `Features/<Module>Api.<Feature>.cs` | use case, handler, command handler |
 | Command | Record carrying input to a state-changing feature, named verb plus object (`RenameUser`) | Contracts | request, DTO |
+| Product event | Something a person did with the product, or what it led to, such as a turn ended, with plain facts about it and never content; captured by modules, sent to the host's PostHog project | `IProductEvents` in Foundation | analytics event, tracking, telemetry (which is logs, traces, and metrics) |
 | DTO | Record a contract returns | Contracts | model, view model, response |
 | Request | HTTP input record in the WebApi | `Endpoints/` | command |
 | WebApi | The HTTP host and composition root of the control plane | `Bagatka.AiSloth.WebApi` | gateway, API layer, BFF, controllers |

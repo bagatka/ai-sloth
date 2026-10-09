@@ -35,6 +35,7 @@ internal sealed class ChatRunner(
     ChatsMeter meter,
     ChatsSettings settings,
     ChatSignals signals,
+    IProductEvents productEvents,
     TimeProvider time,
     ILogger logger)
 {
@@ -59,8 +60,10 @@ internal sealed class ChatRunner(
     private bool _agentFinishedTurn;
     private int _stopRequested;
 
-    // When the message of the running turn was sent, until its agent first did something for it.
+    // When the message of the running turn was sent, until its agent first did something for it; then
+    // how long that took.
     private DateTimeOffset? _firstActionDue;
+    private TimeSpan? _firstActionWaited;
 
     // When this runner last kept the chat's nook awake.
     private DateTimeOffset _keptAwakeAt = DateTimeOffset.MinValue;
@@ -323,8 +326,8 @@ internal sealed class ChatRunner(
     private async Task EndTurnAsync(ChatsDbContext db, Chat chat, MessageId turn, TurnEnded ended, CancellationToken ct)
     {
         await SaveAsync(db, ct);
-        string text = await db.Messages.Where(message => message.Id == turn).Select(message => message.Text).SingleAsync(ct);
-        Result<CheckpointSummary> taken = await nooks.CheckpointAsync(SystemActors.Harness, new CheckpointNook(chat.NookId, Note(text)), ct);
+        TurnMessage message = await db.Messages.Where(found => found.Id == turn).Select(found => new TurnMessage(found.Text, found.SentBy, found.SentAt)).SingleAsync(ct);
+        Result<CheckpointSummary> taken = await nooks.CheckpointAsync(SystemActors.Harness, new CheckpointNook(chat.NookId, Note(message.Text)), ct);
         ChatEventBody told = taken.Failed
             ? new ChatEventBody(new CheckpointFailed(taken.Error.Message))
             : new ChatEventBody(new CheckpointSaved(taken.Output.Number));
@@ -338,7 +341,28 @@ internal sealed class ChatRunner(
         db.Events.Add(chat.Record(new ChatEventBody(ended), time));
         chat.TurnEnded();
         _agentFinishedTurn = false;
+        CaptureTurnEnded(chat, message, ended, checkpointSaved: !taken.Failed);
         await states.SyncAsync(chat, ct);
+    }
+
+    // What a turn came to, for product analytics: how it ended, how long its message waited for that,
+    // and for the agent's first action, when this runner saw it.
+    private void CaptureTurnEnded(Chat chat, TurnMessage message, TurnEnded ended, bool checkpointSaved)
+    {
+        Dictionary<string, ProductFact> facts = new Dictionary<string, ProductFact>(StringComparer.Ordinal)
+        {
+            ["harness"] = new ProductFact(chat.Harness),
+            ["outcome"] = new ProductFact(ended.StopReason),
+            ["seconds"] = new ProductFact((time.GetUtcNow() - message.SentAt).TotalSeconds),
+            ["checkpoint_saved"] = new ProductFact(checkpointSaved),
+        };
+        if (_firstActionWaited is TimeSpan waited)
+        {
+            facts["first_action_seconds"] = new ProductFact(waited.TotalSeconds);
+        }
+
+        productEvents.Capture(new ProductEvent("turn_ended", message.SentBy, chat.WorkspaceId.Value, facts));
+        _firstActionWaited = null;
     }
 
 
@@ -368,6 +392,7 @@ internal sealed class ChatRunner(
             first.Deliver();
             chat.TurnStarted(first.Id);
             _firstActionDue = first.SentAt;
+            _firstActionWaited = null;
             outgoing.Add(Acp.Prompt(first.Id.Value, sessionId, first.Text));
         }
 
@@ -615,7 +640,8 @@ internal sealed class ChatRunner(
         bool acted = named && kind.GetString() is "agent_thought_chunk" or "agent_message_chunk" or "tool_call" or "plan";
         if (acted && chat.TurnMessageId is not null && _firstActionDue is DateTimeOffset sentAt)
         {
-            meter.FirstAction(chat.Harness, time.GetUtcNow() - sentAt);
+            _firstActionWaited = time.GetUtcNow() - sentAt;
+            meter.FirstAction(chat.Harness, _firstActionWaited.Value);
             _firstActionDue = null;
         }
     }
@@ -900,4 +926,7 @@ internal sealed class ChatRunner(
             _stop.Dispose();
         }
     }
+
+    // The message a turn answered: its first line names the checkpoint, and it says whose turn it was.
+    private sealed record TurnMessage(string Text, UserId SentBy, DateTimeOffset SentAt);
 }

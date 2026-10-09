@@ -232,10 +232,11 @@ internal static class ChatsEndpoints
         [FromServices] INooksApi nooks,
         [FromServices] ISourcesApi sources,
         [FromServices] IWorkspacesApi workspaces,
+        [FromServices] IProductEvents productEvents,
         CancellationToken ct)
     {
         Result<IReadOnlyList<ChatPush.PushedSource>> result = await ChatPush.PushAsync(
-            principal.ToActor(), ChatId.From(id), request.Sources, request.Branch, request.PullRequest, request.Message, chats, nooks, sources, workspaces, ct);
+            principal.ToActor(), ChatId.From(id), request.Sources, request.Branch, request.PullRequest, request.Message, chats, nooks, sources, workspaces, productEvents, ct);
         return result.ToOk();
     }
 

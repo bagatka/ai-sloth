@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Chats.Data;
 using Bagatka.AiSloth.Chats.Model;
+using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -31,6 +32,7 @@ internal sealed class ChatRunners(
     ChatsSettings settings,
     ChatSignals signals,
     ActiveInstance active,
+    IProductEvents productEvents,
     TimeProvider time,
     ILogger<ChatRunners> logger) : BackgroundService
 {
@@ -125,7 +127,7 @@ internal sealed class ChatRunners(
                 return _runners[chat].Runner;
             }
 
-            ChatRunner runner = new ChatRunner(chat, databases, nooks, accounts, agent, states, instructions, setups, meter, settings, signals, time, logger);
+            ChatRunner runner = new ChatRunner(chat, databases, nooks, accounts, agent, states, instructions, setups, meter, settings, signals, productEvents, time, logger);
             Task running = Task.Run(() => runner.RunAsync(Retire, _stopping.Token), CancellationToken.None);
             _runners[chat] = (runner, running);
             return runner;

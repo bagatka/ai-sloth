@@ -1,9 +1,11 @@
-using Bagatka.AiSloth.Chats.Data;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
+using Bagatka.AiSloth.Chats.Data;
 using Bagatka.AiSloth.Chats.Harness;
 using Bagatka.AiSloth.Chats.Model;
 using Bagatka.AiSloth.Nooks.Contracts;
@@ -73,6 +75,8 @@ internal sealed partial class ChatsApi
             return new Result<ChatSummary>(saved.Error);
         }
 
+        CaptureStarted(user, command, harness, account.Output.Kind);
+
         // The agent starts now, after the nook's setup, while people write their first message.
         runners.Wake(chat.Id);
         return new Result<ChatSummary>(chat.ToSummary(messagesWaiting: false));
@@ -85,5 +89,20 @@ internal sealed partial class ChatsApi
         Result<AgentAccountCredential> account = await accounts.UseAsync(actor, command.Account, command.WorkspaceId, ct);
         bool usable = !account.Failed && harness.Accepts(AccountCredentials.KindOf(account.Output.Kind));
         return usable ? account : new Result<AgentAccountCredential>(unusable);
+    }
+
+    // A chat started, for product analytics. It has no message yet: people who leave before writing
+    // one show as starts without a first message_sent.
+    private void CaptureStarted(UserActor user, StartChat command, HarnessProfile harness, AgentAccountKind accountKind)
+    {
+        productEvents.Capture(new ProductEvent("chat_started", user.UserId, command.WorkspaceId.Value, new Dictionary<string, ProductFact>(StringComparer.Ordinal)
+        {
+            ["harness"] = new ProductFact(harness.Id),
+            ["provider"] = new ProductFact(command.Provider),
+            ["account_kind"] = new ProductFact(accountKind.ToString()),
+            ["repositories"] = new ProductFact(command.Repositories.Count),
+            ["copy"] = new ProductFact(command.CopyOf is not null),
+            ["from_checkpoint"] = new ProductFact(command.Checkpoint is not null),
+        }));
     }
 }

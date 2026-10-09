@@ -27,6 +27,7 @@ internal sealed class FakePostHog : IAsyncDisposable
 
     private readonly WebApplication _app;
     private readonly ConcurrentDictionary<string, TaskCompletionSource> _received = new ConcurrentDictionary<string, TaskCompletionSource>(StringComparer.Ordinal);
+    private TaskCompletionSource _nextBatch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private FakePostHog(WebApplication app)
     {
@@ -65,6 +66,25 @@ internal sealed class FakePostHog : IAsyncDisposable
         return Signal(path).Task.WaitAsync(timeout);
     }
 
+    /// <summary>Waits for an event of the name that matches, captured so far or within the timeout.</summary>
+    public async Task<JsonElement> EventAsync(string name, Func<JsonElement, bool> matches, TimeSpan timeout)
+    {
+        using CancellationTokenSource deadline = new CancellationTokenSource(timeout);
+        while (true)
+        {
+            Task nextBatch = Volatile.Read(ref _nextBatch).Task;
+            foreach (JsonElement captured in Events)
+            {
+                if (string.Equals(captured.GetProperty("event").GetString(), name, StringComparison.Ordinal) && matches(captured))
+                {
+                    return captured;
+                }
+            }
+
+            await nextBatch.WaitAsync(deadline.Token);
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         await _app.DisposeAsync();
@@ -85,6 +105,7 @@ internal sealed class FakePostHog : IAsyncDisposable
         }
 
         Signal("/batch/").TrySetResult();
+        Interlocked.Exchange(ref _nextBatch, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
         return Results.Ok();
     }
 

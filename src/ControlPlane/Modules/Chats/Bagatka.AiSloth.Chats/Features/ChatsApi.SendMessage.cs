@@ -1,11 +1,13 @@
-using Bagatka.AiSloth.Chats.Data;
-using System.Threading.Tasks;
+using System;
+using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Bagatka.AiSloth.Chats.Contracts;
+using Bagatka.AiSloth.Chats.Data;
 using Bagatka.AiSloth.Chats.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
-using Bagatka.Foundation.Modules;
 using Bagatka.Foundation;
+using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Chats;
@@ -55,12 +57,19 @@ internal sealed partial class ChatsApi
 
         // Recorded only; the chat's runner announces and delivers it.
         Message message = sent.Output;
-        await AddMessageAsync(db, message, ct);
+        bool first = await AddMessageAsync(db, message, ct);
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)
         {
             return new Result<ChatMessage>(saved.Error);
         }
+
+        productEvents.Capture(new ProductEvent("message_sent", user.UserId, chat.WorkspaceId.Value, new Dictionary<string, ProductFact>(StringComparer.Ordinal)
+        {
+            ["harness"] = new ProductFact(chat.Harness),
+            ["first"] = new ProductFact(first),
+            ["proposal"] = new ProductFact(isProposal),
+        }));
 
         runners.Wake(command.ChatId);
         return new Result<ChatMessage>(message.ToContract());

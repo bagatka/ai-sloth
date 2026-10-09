@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Text;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -80,6 +81,7 @@ internal static class SignInEndpoints
         [FromServices] IWorkspacesApi workspaces,
         [FromServices] HostSettings host,
         [FromServices] SignInProvider? provider,
+        [FromServices] IProductEvents productEvents,
         CancellationToken ct)
     {
         SignIn withCode = new SignIn(new SignInProof(new SignInCode(request.Code, request.Name)), request.Device);
@@ -95,7 +97,7 @@ internal static class SignInEndpoints
             return session.Error.ToProblem();
         }
 
-        return await AnswerAsync(session.Output, workspaces, ct);
+        return await AnswerAsync(session.Output, mayBeInvite ? "invite" : "setup_code", workspaces, productEvents, ct);
     }
 
     /// <summary>
@@ -179,6 +181,7 @@ internal static class SignInEndpoints
         [FromServices] IUsersApi users,
         [FromServices] IWorkspacesApi workspaces,
         [FromServices] IDataProtectionProvider protection,
+        [FromServices] IProductEvents productEvents,
         CancellationToken ct)
     {
         ClientCode? code = Unprotect<ClientCode>(protection, "sign-in.code", request.Code);
@@ -196,7 +199,7 @@ internal static class SignInEndpoints
             return session.Error.ToProblem();
         }
 
-        return await AnswerAsync(session.Output, workspaces, ct);
+        return await AnswerAsync(session.Output, "provider", workspaces, productEvents, ct);
     }
 
     // Someone new joins with an invite: the invite must be good before they are recorded, then it is
@@ -228,9 +231,10 @@ internal static class SignInEndpoints
         return session;
     }
 
-    // The client's answer. Someone new first gets a workspace of their own, named after them.
+    // The client's answer. Someone new first gets a workspace of their own, named after them, and is
+    // counted as signed up, by how: with the host's setup code, an invite, or its provider.
     // Not handled: that workspace failing to be created; the person signs in again without one.
-    private static async Task<Results<Ok<SignedIn>, ProblemHttpResult>> AnswerAsync(StartedSession session, IWorkspacesApi workspaces, CancellationToken ct)
+    private static async Task<Results<Ok<SignedIn>, ProblemHttpResult>> AnswerAsync(StartedSession session, string method, IWorkspacesApi workspaces, IProductEvents productEvents, CancellationToken ct)
     {
         WorkspaceId? workspace = null;
         if (session.IsNew)
@@ -242,6 +246,10 @@ internal static class SignInEndpoints
             }
 
             workspace = own.Output.Id;
+            productEvents.Capture(new ProductEvent("signed_up", session.Person.Id, workspace.Value.Value, new Dictionary<string, ProductFact>(StringComparer.Ordinal)
+            {
+                ["method"] = new ProductFact(method),
+            }));
         }
 
         return TypedResults.Ok(new SignedIn(session.Token, session.Id, session.Person, workspace));

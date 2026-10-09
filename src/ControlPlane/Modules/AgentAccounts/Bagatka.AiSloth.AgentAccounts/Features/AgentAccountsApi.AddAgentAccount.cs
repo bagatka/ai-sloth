@@ -56,8 +56,7 @@ internal sealed partial class AgentAccountsApi
             endpoint = parsed.Output;
         }
 
-        UserId? ownerId = command.WorkspaceId is null ? user.UserId : null;
-        Result<AgentAccount> added = AgentAccount.Add(command.WorkspaceId, ownerId, command.Kind, name.Output, command.Secret, endpoint, box, time);
+        Result<AgentAccount> added = AgentAccount.Add(command.WorkspaceId, command.WorkspaceId is null ? user.UserId : null, command.Kind, name.Output, command.Secret, endpoint, box, time);
         if (added.Failed)
         {
             return new Result<AgentAccountSummary>(added.Error);
@@ -71,6 +70,7 @@ internal sealed partial class AgentAccountsApi
             return new Result<AgentAccountSummary>(saved.Error);
         }
 
+        CaptureAdded(user.UserId, added.Output);
         return new Result<AgentAccountSummary>(added.Output.ToSummary());
     }
 

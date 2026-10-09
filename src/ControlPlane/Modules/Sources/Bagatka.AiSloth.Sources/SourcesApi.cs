@@ -29,6 +29,7 @@ internal sealed partial class SourcesApi(
     GitScratch scratches,
     [FromKeyedServices(SourcesDbContext.Schema)] SecretBox box,
     SourcesSettings settings,
+    IProductEvents productEvents,
     TimeProvider time,
     ILogger<SourcesApi> logger) : ISourcesApi
 {

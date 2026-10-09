@@ -25,11 +25,13 @@ internal sealed partial class ChatsApi(
     ChatRunners runners,
     ChatSignals signals,
     ActiveInstance active,
+    IProductEvents productEvents,
     TimeProvider time) : IChatsApi, IChatHarnessesApi
 {
-    // Adds a message to be saved. A chat's first message ends its draft in the same save, so a draft is
-    // never deleted with a message in it: when the draft went meanwhile, the save conflicts.
-    private static async Task AddMessageAsync(ChatsDbContext db, Message message, CancellationToken ct)
+    // Adds a message to be saved, and says whether it is the chat's first. A chat's first message ends
+    // its draft in the same save, so a draft is never deleted with a message in it: when the draft went
+    // meanwhile, the save conflicts.
+    private static async Task<bool> AddMessageAsync(ChatsDbContext db, Message message, CancellationToken ct)
     {
         db.Messages.Add(message);
         Draft? draft = await db.Drafts.SingleOrDefaultAsync(found => found.ChatId == message.ChatId, ct);
@@ -37,6 +39,8 @@ internal sealed partial class ChatsApi(
         {
             db.Drafts.Remove(draft);
         }
+
+        return draft is not null;
     }
 
     // The chat, if the actor may do at least `needed` with it: a chat is as open as its nook. Not found

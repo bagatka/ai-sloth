@@ -119,6 +119,9 @@ if (postHogClient is not null)
     builder.Services.AddSingleton<ILoggerProvider>(_ => new ExceptionsToPostHog(postHogClient));
 }
 
+// What people do, as modules capture it, goes to the same project as product analytics.
+builder.Services.AddSingleton<IProductEvents>(postHogClient is null ? new NoProductEvents() : new ProductEventsToPostHog(postHogClient));
+
 ModelGatewaySettings modelGateway = builder.Configuration.GetSection("ModelGateway").Exists() ? builder.Configuration.GetRequired<ModelGatewaySettings>("ModelGateway") : new ModelGatewaySettings();
 
 builder.Services.AddSingleton(TimeProvider.System);

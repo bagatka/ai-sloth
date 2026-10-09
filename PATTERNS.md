@@ -1024,6 +1024,17 @@ UserId;System.Guid
   becomes an error tracking issue (`src/ControlPlane/Bagatka.AiSloth.WebApi/ExceptionsToPostHog.cs`,
   through `Bagatka.PostHog`), so an Error log is a failure someone sees. Without a project, a host
   sends nothing anywhere.
+- **Product events.** What people do and what it led to, for product analytics: a module that
+  sees it happen captures a `ProductEvent` through `IProductEvents` (`Bagatka.Foundation`), named
+  in the past tense and snake_case, with the person, the workspace, and plain facts: kinds,
+  counts, durations in seconds, outcomes, yes or no. Never what people wrote, names, repositories,
+  or secrets. Canonical example: `CaptureTurnEnded` in
+  `src/ControlPlane/Modules/Chats/Bagatka.AiSloth.Chats/Harness/ChatRunner.cs`. The events so far:
+  `signed_up` (method), `agent_account_added` (kind, workspace_account), `repository_added`,
+  `chat_started` (harness, provider, account_kind, repositories, copy, from_checkpoint),
+  `message_sent` (harness, first, proposal), `turn_ended` (harness, outcome, seconds,
+  first_action_seconds, checkpoint_saved), and `changes_pushed` (pull_request, repositories,
+  failed). A new event is added here in the same change.
 - **Traces and metrics.**
   - OpenTelemetry is configured by `Bagatka.ServiceDefaults` in every host.
   - A module adds an `ActivitySource` or `Meter` named `Bagatka.AiSloth.<Module>` only when it

@@ -31,6 +31,7 @@ internal static class ChatPush
         INooksApi nooks,
         ISourcesApi sources,
         IWorkspacesApi workspaces,
+        IProductEvents productEvents,
         CancellationToken ct)
     {
         Result<ChatSummary> chat = await chats.GetAsync(actor, chatId, ct);
@@ -76,6 +77,16 @@ internal static class ChatPush
         {
             PushedSource outcome = await PushSourceAsync(actor, push, name, nooks, sources, ct);
             pushed.Add(outcome);
+        }
+
+        if (actor is UserActor person)
+        {
+            productEvents.Capture(new ProductEvent("changes_pushed", person.UserId, chat.Output.WorkspaceId.Value, new Dictionary<string, ProductFact>(StringComparer.Ordinal)
+            {
+                ["pull_request"] = new ProductFact(pullRequest),
+                ["repositories"] = new ProductFact(pushed.Count),
+                ["failed"] = new ProductFact(pushed.Count(source => source.Problem is not null)),
+            }));
         }
 
         return new Result<IReadOnlyList<PushedSource>>(pushed);

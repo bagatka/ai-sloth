@@ -65,6 +65,7 @@ internal sealed partial class AgentAccountsApi
             return new Result<AgentAccountSummary>(saved.Error);
         }
 
+        CaptureAdded(user.UserId, account);
         return new Result<AgentAccountSummary>(account.ToSummary());
     }
 }

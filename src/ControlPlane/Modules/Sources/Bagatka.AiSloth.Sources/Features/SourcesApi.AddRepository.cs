@@ -1,8 +1,10 @@
-using Bagatka.AiSloth.Sources.Data;
+using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Sources.Contracts;
+using Bagatka.AiSloth.Sources.Data;
 using Bagatka.AiSloth.Sources.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
@@ -65,6 +67,7 @@ internal sealed partial class SourcesApi
             return new Result<RepositorySummary>(saved.Error == ModuleDbContextExtensions.AlreadyExists ? SourcesErrors.RepositoryAlreadyAdded : saved.Error);
         }
 
+        productEvents.Capture(new ProductEvent("repository_added", user.UserId, command.WorkspaceId.Value, new Dictionary<string, ProductFact>(StringComparer.Ordinal)));
         return new Result<RepositorySummary>(repository.ToSummary());
     }
 }
