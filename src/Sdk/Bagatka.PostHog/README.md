@@ -35,7 +35,7 @@ catch (HttpRequestException exception)
   background every `FlushInterval` (five seconds unless given), up to 1,000 a request, gzipped, to
   the project's `/batch/` endpoint. A request PostHog fails or can't be reached for is sent again
   twice; events carry UUIDs, so PostHog keeps one of each. Disposing sends what is still queued, for
-  up to five seconds.
+  up to `ShutdownTimeout` (five seconds unless given).
 - **Lost events:** dropped when the queue is full, refused by PostHog, or out of reach after
   retries; `DeliveryFailed` is told how many and why.
 - **Privacy:** GeoIP is off unless an event turns it on, as a server's address says nothing about

@@ -19,6 +19,7 @@ internal sealed partial class Sloth(
     string device,
     string? dockerHost,
     SlothBuild build,
+    bool reportsUsage,
     TimeProvider time)
 {
     private const string Usage = """
@@ -110,6 +111,10 @@ internal sealed partial class Sloth(
         sloth itself
           sloth version
           sloth update [<version>]   Install the newest sloth, or the version named
+
+        sloth tells the PostHog project of the host you use, when it has one, each command's name,
+        exit code, and time, and what made sloth fail; never what you typed after the command's
+        name. DO_NOT_TRACK=1 turns this off.
         """;
 
     private string HostsPath => Path.Combine(home, "hosts.json");
@@ -117,8 +122,25 @@ internal sealed partial class Sloth(
     public async Task<int> RunAsync(string[] args, CancellationToken ct)
     {
         using CancellationTokenSource stopping = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        long started = time.GetTimestamp();
         Task<Version?> newer = NewerReleaseAsync(args, stopping.Token);
-        int exitCode = await CommandOrFailureAsync(args, ct);
+        Task<UsageReport?> usage = UsageReportAsync(ct);
+        int exitCode = 1;
+        Exception? failure = null;
+        try
+        {
+            exitCode = await CommandOrFailureAsync(args, ct);
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+            throw;
+        }
+        finally
+        {
+            await ReportUsageAsync(usage, args, exitCode, failure, time.GetElapsedTime(started));
+        }
+
         await TellNewerReleaseAsync(newer, stopping);
         return exitCode;
     }

@@ -1034,7 +1034,8 @@ UserId;System.Guid
   `chat_started` (harness, provider, account_kind, repositories, copy, from_checkpoint),
   `message_sent` (harness, first, proposal), `turn_ended` (harness, outcome, seconds,
   first_action_seconds, checkpoint_saved), and `changes_pushed` (pull_request, repositories,
-  failed). A new event is added here in the same change.
+  failed). `sloth` sends `command_ran` (command, exit_code, seconds, version, platform) itself
+  (`src/Cli/Bagatka.AiSloth.Cli/Sloth.Usage.cs`). A new event is added here in the same change.
 - **Traces and metrics.**
   - OpenTelemetry is configured by `Bagatka.ServiceDefaults` in every host.
   - A module adds an `ActivitySource` or `Meter` named `Bagatka.AiSloth.<Module>` only when it

@@ -83,7 +83,8 @@ Change `host.env`, then run `./host up` again. Its comments say what each settin
 - **Other people on your host:** set `Modules__AgentAccounts__AllowChatGptPlans=false`. OpenAI
   allows ChatGPT plans only when you run AiSloth for yourself.
 - **Error reports and usage analytics** in your own PostHog project: set `PostHog__Host` and
-  `PostHog__ProjectToken`. Without them, the host sends nothing anywhere.
+  `PostHog__ProjectToken`. Without them, the host sends nothing anywhere. With them, `sloth` reports
+  its commands there too, unless people set `DO_NOT_TRACK=1`.
 
 ### Other commands
 

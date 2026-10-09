@@ -40,6 +40,10 @@ release. All are written whole and, on Linux and macOS, with mode 600.
 
 ## Decisions and constraints
 
+- **Usage reports go to the host's PostHog project, never ours.** Each command's name, exit
+  code, and time, and what made sloth fail, as the person signed in, when the host names a
+  project in `/.well-known/aisloth`; the command's name comes from a fixed list, so nothing typed
+  after it is sent. `DO_NOT_TRACK=1` turns them off, and sending waits two seconds at most.
 - **Ctrl+C only leaves a chat.** The agent keeps working; stopping it is explicit (`/stop`,
   `sloth chat stop`). Anything typed while following goes to the agent at once.
 - **Choices are remembered per host:** a chat runs with what the command names, else what the last

@@ -18,6 +18,8 @@ Bagatka.PostHog.PostHogClientOptions.FlushInterval.init -> void
 Bagatka.PostHog.PostHogClientOptions.Host.get -> System.Uri!
 Bagatka.PostHog.PostHogClientOptions.PostHogClientOptions(System.Uri! host, string! projectToken) -> void
 Bagatka.PostHog.PostHogClientOptions.ProjectToken.get -> string!
+Bagatka.PostHog.PostHogClientOptions.ShutdownTimeout.get -> System.TimeSpan
+Bagatka.PostHog.PostHogClientOptions.ShutdownTimeout.init -> void
 Bagatka.PostHog.PostHogClientOptions.TimeProvider.get -> System.TimeProvider!
 Bagatka.PostHog.PostHogClientOptions.TimeProvider.init -> void
 Bagatka.PostHog.PostHogDeliveryFailure

@@ -3101,7 +3101,8 @@
         "required": [
           "name",
           "apiVersion",
-          "signIn"
+          "signIn",
+          "postHog"
         ],
         "type": "object",
         "properties": {
@@ -3114,6 +3115,16 @@
           },
           "signIn": {
             "$ref": "#/components/schemas/SignInMethods"
+          },
+          "postHog": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PostHogProject"
+              }
+            ]
           }
         }
       },
@@ -3698,6 +3709,22 @@
           }
         },
         "description": "One page of a keyset-paginated list."
+      },
+      "PostHogProject": {
+        "required": [
+          "host",
+          "projectToken"
+        ],
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "format": "uri"
+          },
+          "projectToken": {
+            "type": "string"
+          }
+        }
       },
       "ProblemDetails": {
         "type": "object",

@@ -22,7 +22,7 @@ namespace Bagatka.PostHog;
 /// PostHog fails or can't be reached for is sent again twice, a second and two seconds later; every
 /// event carries its own UUID, so PostHog keeps one of each. Events lost on the way are reported to
 /// <see cref="PostHogClientOptions.DeliveryFailed"/>. Disposing sends what is still queued, for up to
-/// five seconds. Every member is safe to call from any thread.
+/// <see cref="PostHogClientOptions.ShutdownTimeout"/>. Every member is safe to call from any thread.
 /// </summary>
 public sealed class PostHogClient : IAsyncDisposable
 {
@@ -31,7 +31,6 @@ public sealed class PostHogClient : IAsyncDisposable
     private const int MaxBatch = 1_000;
     private static readonly TimeSpan[] RetryDelays = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2)];
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan DisposeLimit = TimeSpan.FromSeconds(5);
     private static readonly string LibraryVersion = ReadLibraryVersion();
 
     private readonly PostHogClientOptions _options;
@@ -137,7 +136,7 @@ public sealed class PostHogClient : IAsyncDisposable
         return SendQueuedAsync(cancellationToken);
     }
 
-    /// <summary>Sends what is still queued, for up to five seconds, then stops; events not sent by then are reported lost.</summary>
+    /// <summary>Sends what is still queued, for up to <see cref="PostHogClientOptions.ShutdownTimeout"/>, then stops; events not sent by then are reported lost.</summary>
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 1)
@@ -146,7 +145,7 @@ public sealed class PostHogClient : IAsyncDisposable
         }
 
         _queue.Writer.TryComplete();
-        _abandoning.CancelAfter(DisposeLimit);
+        _abandoning.CancelAfter(_options.ShutdownTimeout);
         await _stopping.CancelAsync().ConfigureAwait(false);
         await _sendingPeriodically.ConfigureAwait(false);
         await SendQueuedAsync(_abandoning.Token).ConfigureAwait(false);

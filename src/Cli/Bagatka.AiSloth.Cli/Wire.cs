@@ -7,7 +7,9 @@ namespace Bagatka.AiSloth.Cli;
 // The shapes of a host's public HTTP API as sloth sends and reads them, with only the fields it uses.
 internal static class Wire
 {
-    internal sealed record HostDiscovery(string Name, int ApiVersion, SignInMethods SignIn);
+    internal sealed record HostDiscovery(string Name, int ApiVersion, SignInMethods SignIn, PostHogProject? PostHog);
+
+    internal sealed record PostHogProject(Uri Host, string ProjectToken);
 
     internal sealed record SignInMethods(string? Provider, bool InviteSignUp);
 

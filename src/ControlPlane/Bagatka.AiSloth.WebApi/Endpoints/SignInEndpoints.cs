@@ -10,6 +10,7 @@ using Bagatka.AiSloth.Users.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Web;
+using Bagatka.PostHog;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -37,7 +38,9 @@ internal static class SignInEndpoints
     // Who signs people in, to Users.
     private static readonly Actor SignInActor = Actor.ForSystem("webapi.sign-in");
 
-    internal sealed record HostDiscovery(string Name, int ApiVersion, SignInMethods SignIn);
+    internal sealed record HostDiscovery(string Name, int ApiVersion, SignInMethods SignIn, PostHogProject? PostHog);
+
+    internal sealed record PostHogProject(Uri Host, string ProjectToken);
 
     internal sealed record SignInMethods(string? Provider, bool InviteSignUp);
 
@@ -64,10 +67,15 @@ internal static class SignInEndpoints
         signIn.MapPost("/token", ExchangeCode);
     }
 
-    /// <summary>What this host is and how people sign in to it: with codes always, and with its identity provider when <c>signIn.provider</c> names one.</summary>
-    private static Ok<HostDiscovery> Discover([FromServices] HostSettings host, [FromServices] SignInProvider? provider)
+    /// <summary>
+    /// What this host is and how people sign in to it: with codes always, and with its identity
+    /// provider when <c>signIn.provider</c> names one. <c>postHog</c> names the PostHog project the
+    /// host's clients send their usage and errors to, when it has one; its token can only send.
+    /// </summary>
+    private static Ok<HostDiscovery> Discover([FromServices] HostSettings host, [FromServices] SignInProvider? provider, [FromServices] PostHogClientOptions? postHog)
     {
-        return TypedResults.Ok(new HostDiscovery(host.Name, ApiVersion, new SignInMethods(provider?.Name, InviteSignUp(host, provider))));
+        PostHogProject? project = postHog is null ? null : new PostHogProject(postHog.Host, postHog.ProjectToken);
+        return TypedResults.Ok(new HostDiscovery(host.Name, ApiVersion, new SignInMethods(provider?.Name, InviteSignUp(host, provider)), project));
     }
 
     /// <summary>

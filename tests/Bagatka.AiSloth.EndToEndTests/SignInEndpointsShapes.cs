@@ -9,7 +9,9 @@ internal static class SignInEndpointsShapes
 {
     public sealed record SignedIn(string Token, SessionId Session, UserSummary User, WorkspaceId? Workspace);
 
-    public sealed record HostDiscovery(string Name, int ApiVersion, SignInMethods SignIn);
+    public sealed record HostDiscovery(string Name, int ApiVersion, SignInMethods SignIn, PostHogProject? PostHog);
+
+    public sealed record PostHogProject(Uri Host, string ProjectToken);
 
     public sealed record SignInMethods(string? Provider, bool InviteSignUp);
 

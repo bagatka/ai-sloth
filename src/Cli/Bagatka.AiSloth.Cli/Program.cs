@@ -31,7 +31,10 @@ Terminal terminal = new Terminal(Console.In, Console.Out, Console.Error, interac
 using SocketsHttpHandler http = new SocketsHttpHandler();
 string? dockerHost = Environment.GetEnvironmentVariable("DOCKER_HOST") is { Length: > 0 } docker ? docker : null;
 SlothBuild build = SlothBuild.Of(typeof(Sloth).Assembly, RuntimeInformation.RuntimeIdentifier, Environment.ProcessPath);
-Sloth sloth = new Sloth(terminal, folder, http, OpenBrowserAsync, "sloth on " + Environment.MachineName, dockerHost, build, TimeProvider.System);
+
+// DO_NOT_TRACK, the convention command-line tools share, set to anything but 0 turns usage reports off.
+bool reportsUsage = Environment.GetEnvironmentVariable("DO_NOT_TRACK") is null or "" or "0";
+Sloth sloth = new Sloth(terminal, folder, http, OpenBrowserAsync, "sloth on " + Environment.MachineName, dockerHost, build, reportsUsage, TimeProvider.System);
 return await sloth.RunAsync(args, shutdown.Token);
 
 // Opens a web page in the person's browser where this computer has one; sloth shows the link too.

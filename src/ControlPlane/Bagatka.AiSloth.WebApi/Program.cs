@@ -116,6 +116,7 @@ await using PostHogClient? postHogClient = postHog is null ? null : new PostHogC
 });
 if (postHogClient is not null)
 {
+    builder.Services.AddSingleton(postHog!);
     builder.Services.AddSingleton<ILoggerProvider>(_ => new ExceptionsToPostHog(postHogClient));
 }
 

@@ -35,6 +35,12 @@ public sealed record PostHogClientOptions
     /// <summary>How long captured events wait to be sent together: five seconds unless given.</summary>
     public TimeSpan FlushInterval { get; init; } = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// How long disposing waits to send what is still queued: five seconds unless given. A
+    /// command-line tool keeps it short, so a PostHog out of reach never holds its exit.
+    /// </summary>
+    public TimeSpan ShutdownTimeout { get; init; } = TimeSpan.FromSeconds(5);
+
     /// <summary>The clock events are stamped and batches are timed by: the system's unless given.</summary>
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 

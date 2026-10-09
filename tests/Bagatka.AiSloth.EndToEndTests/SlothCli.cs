@@ -41,7 +41,7 @@ internal sealed class SlothCli(string loginHint, SlothBuild? build = null, bool 
         using StringWriter errors = new StringWriter();
         using StringReader reader = new StringReader(input);
         Terminal terminal = new Terminal(reader, output, errors, interactive);
-        Sloth sloth = new Sloth(terminal, _folder.FullName, _http, Browse, "e2e", dockerHost: null, build ?? FromSource, TimeProvider.System);
+        Sloth sloth = new Sloth(terminal, _folder.FullName, _http, Browse, "e2e", dockerHost: null, build ?? FromSource, reportsUsage: true, TimeProvider.System);
         int exit = await sloth.RunAsync(args, TestContext.Current.CancellationToken);
         Output = output.ToString();
         Errors = errors.ToString();
@@ -59,6 +59,13 @@ internal sealed class SlothCli(string loginHint, SlothBuild? build = null, bool 
     {
         HostsFile? hosts = await PrivateFile.ReadAsync(Path.Combine(_folder.FullName, "hosts.json"), CliJsonContext.Default.HostsFile, TestContext.Current.CancellationToken);
         return hosts?.Find(host)?.Token;
+    }
+
+    /// <summary>The person signed in to a host, by their ID, read as sloth reads it.</summary>
+    public async Task<Guid?> PersonForAsync(string host)
+    {
+        HostsFile? hosts = await PrivateFile.ReadAsync(Path.Combine(_folder.FullName, "hosts.json"), CliJsonContext.Default.HostsFile, TestContext.Current.CancellationToken);
+        return hosts?.Find(host)?.UserId;
     }
 
     /// <summary>The chat sloth started last, as its person sees it through the API in their own workspace.</summary>

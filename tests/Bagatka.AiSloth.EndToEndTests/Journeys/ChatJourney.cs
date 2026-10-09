@@ -20,7 +20,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// Journey: a chat with the real agent, Claude Code, in a real nook. <c>sloth</c> shows its work until
 /// its turn ends; everyone sees each step; every turn ends with a checkpoint of the files; a message
 /// sent while the agent works joins its turn, and stopping ends the turn. Product analytics see the
-/// chat start, its first message, and its turns end. Only the model and PostHog are fake.
+/// chat start, its first message, and its turns end, and sloth's commands by their names only. Only
+/// the model and PostHog are fake.
 /// </summary>
 public sealed class ChatJourney(ControlPlane app) : IDisposable
 {
@@ -63,6 +64,29 @@ public sealed class ChatJourney(ControlPlane app) : IDisposable
         Assert.Contains("(files saved as checkpoint 1)", chat, StringComparison.Ordinal);
         Assert.Equal(0, listed);
         Assert.StartsWith(chat[5..11] + "  claude-code", sloth.Output, StringComparison.Ordinal);
+        await SlothReportsItsCommandsButNotWhatFollowsThemAsync(sloth);
+    }
+
+    // sloth tells the host's PostHog project each command it ran, as the person signed in, by the
+    // command's name only: the chat's message stays out.
+    private async Task SlothReportsItsCommandsButNotWhatFollowsThemAsync(SlothCli sloth)
+    {
+        Guid? signedIn = await sloth.PersonForAsync(app.WebApiUrl.Authority);
+        string erin = signedIn!.Value.ToString("D", CultureInfo.InvariantCulture);
+        TimeSpan wait = TimeSpan.FromSeconds(30);
+
+        JsonElement started = await app.PostHog.EventAsync("command_ran", captured => Ran(captured, erin, "chat"), wait);
+        JsonElement listed = await app.PostHog.EventAsync("command_ran", captured => Ran(captured, erin, "chat list"), wait);
+
+        Assert.Equal(0, started.GetProperty("properties").GetProperty("exit_code").GetInt32());
+        Assert.Equal("source", listed.GetProperty("properties").GetProperty("version").GetString());
+        Assert.DoesNotContain("hello.txt", started.GetRawText(), StringComparison.Ordinal);
+    }
+
+    private static bool Ran(JsonElement captured, string person, string command)
+    {
+        return string.Equals(captured.GetProperty("distinct_id").GetString(), person, StringComparison.Ordinal)
+            && string.Equals(captured.GetProperty("properties").GetProperty("command").GetString(), command, StringComparison.Ordinal);
     }
 
     // The same person, by their ID, in the workspace's group; the events reach PostHog within seconds.

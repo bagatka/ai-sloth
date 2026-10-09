@@ -18,7 +18,7 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// only the host's own sessions sign calls in; someone signs in with <c>sloth</c> in the browser, then
 /// on a phone with a link code, and signs the phone out again. The host describes its API as the
 /// committed <c>openapi.json</c> does, so every change to it shows in review, and sends its telemetry
-/// to its PostHog project.
+/// to its PostHog project, which it names to its clients.
 /// </summary>
 public sealed partial class HostJourney(ControlPlane app)
 {
@@ -53,6 +53,7 @@ public sealed partial class HostJourney(ControlPlane app)
         Assert.Equal("AiSloth", host.Name);
         Assert.Equal("Fake", host.SignIn.Provider);
         Assert.True(host.SignIn.InviteSignUp);
+        Assert.Equal(new SignInEndpointsShapes.PostHogProject(app.PostHog.Url, FakePostHog.ProjectToken), host.PostHog);
     }
 
     private async Task TheFirstPersonTookTheSetupCodeWhichWorksOnceAsync()
