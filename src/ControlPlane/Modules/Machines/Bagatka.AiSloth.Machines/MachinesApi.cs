@@ -4,8 +4,9 @@ using Bagatka.AiSloth.Machines.Contracts;
 using Bagatka.AiSloth.Machines.Data;
 using Bagatka.AiSloth.Machines.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
-using Microsoft.Extensions.Logging;
+using Bagatka.Foundation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Bagatka.AiSloth.Machines;
 
@@ -15,6 +16,7 @@ internal sealed partial class MachinesApi(
     IDbContextFactory<MachinesDbContext> databases,
     IWorkspacesApi workspaces,
     MachineConnections connections,
+    IProductEvents productEvents,
     TimeProvider time,
     ILogger<MachinesApi> logger) : IMachinesApi, IMachineConnectionsApi
 {

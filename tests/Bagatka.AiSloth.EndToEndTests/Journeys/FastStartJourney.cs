@@ -16,6 +16,7 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// folders before the agent starts; a failed setup shows in <c>sloth</c>, in full on request, and the
 /// agent starts knowing it; <c>sloth chat prepare</c> has the agent write a setup the next chat's nook
 /// runs; a slow setup leaves a ready copy the next chat starts from; and a nook runs containers.
+/// Product analytics see a setup that failed.
 /// </summary>
 public sealed class FastStartJourney(ControlPlane app) : IDisposable
 {
@@ -56,6 +57,9 @@ public sealed class FastStartJourney(ControlPlane app) : IDisposable
         string setup = sloth.Output;
         ChatSummary secondChat = await SlothCli.NewestChatAsync(Dev);
         NookSetup reported = await Api.ReadAsync<NookSetup>(Dev.SendGetAsync(Paths.Nook(secondChat.NookId) + "/setup"), HttpStatusCode.OK);
+        string workspace = secondChat.WorkspaceId.Value.ToString("D", CultureInfo.InvariantCulture);
+        JsonElement setupEnded = await app.PostHog.EventAsync(
+            "setup_ended", captured => FakePostHog.InWorkspace(captured, workspace) && !captured.GetProperty("properties").GetProperty("succeeded").GetBoolean(), TimeSpan.FromSeconds(30));
 
         Assert.Equal(0, started);
         Assert.Contains("\nSetting up: .agents/setup\n", chat, StringComparison.Ordinal);
@@ -67,6 +71,7 @@ public sealed class FastStartJourney(ControlPlane app) : IDisposable
         Assert.Equal([".agents/setup"], reported.Scripts);
         Assert.Equal(2, reported.Run?.ExitCode);
         Assert.Contains(app.Model.Requests, body => body.Contains("setup failed with exit code 2", StringComparison.Ordinal));
+        Assert.Equal(1, setupEnded.GetProperty("properties").GetProperty("scripts").GetInt32());
         return firstChat;
     }
 

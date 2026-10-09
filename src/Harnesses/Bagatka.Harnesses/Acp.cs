@@ -161,7 +161,7 @@ public static class Acp
     {
         if (string.Equals(response.Id, RequestIds.LoadSession, StringComparison.Ordinal))
         {
-            return response.Error is null ? new AcpEvent(new AcpSessionLoaded()) : new AcpEvent(new AcpLoadFailed(response.Error));
+            return response.Error is null ? new AcpEvent(new AcpSessionLoaded(response.Model)) : new AcpEvent(new AcpLoadFailed(response.Error));
         }
 
         bool initialized = string.Equals(response.Id, RequestIds.Initialize, StringComparison.Ordinal);
@@ -178,7 +178,7 @@ public static class Acp
                 return new AcpEvent(new AcpInitialized(response.SupportsSteering, response.SupportsLoading));
             }
 
-            return new AcpEvent(new AcpSessionCreated(response.SessionId));
+            return new AcpEvent(new AcpSessionCreated(response.SessionId, response.Model));
         }
 
         Guid? prompt = RequestIds.Prompted(response.Id);

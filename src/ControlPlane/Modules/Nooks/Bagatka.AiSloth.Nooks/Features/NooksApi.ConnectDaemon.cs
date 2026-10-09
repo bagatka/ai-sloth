@@ -31,6 +31,8 @@ internal sealed partial class NooksApi
             return new Result<IAsyncEnumerable<DaemonInstruction>>(saved.Error);
         }
 
+        starts.Ready(nook);
+
         return new Result<IAsyncEnumerable<DaemonInstruction>>(RelayAsync(nook.Id, reports, ct));
     }
 

@@ -1,8 +1,9 @@
-using Bagatka.AiSloth.Workspaces.Data;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.AiSloth.Workspaces.Data;
 using Bagatka.AiSloth.Workspaces.Model;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
@@ -46,6 +47,13 @@ internal sealed partial class WorkspacesApi
         {
             return new Result<Resource>(saved.Error);
         }
+
+        Guid? workspace = invite.Resource.Kind == ResourceKind.Workspace ? invite.Resource.Id : null;
+        productEvents.Capture(new ProductEvent("invite_accepted", user.UserId, workspace, new Dictionary<string, ProductFact>(StringComparer.Ordinal)
+        {
+            ["access"] = new ProductFact(invite.Access.ToString()),
+            ["resource"] = new ProductFact(invite.Resource.Kind.ToString()),
+        }));
 
         return new Result<Resource>(invite.Resource);
     }

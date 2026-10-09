@@ -9,6 +9,33 @@ internal sealed record AcpResponse(string Id, JsonElement Result, string? Error)
     // The new session's ID, from the answer to Acp.NewSession.
     public string SessionId => Result.GetProperty("sessionId").GetString()!;
 
+    // The model the session uses, from the answer to Acp.NewSession or Acp.LoadSession, when the agent
+    // says: the current value of its config option of the model category, such as "gpt-5-codex", or
+    // "default" for the agent's own choice.
+    public string? Model
+    {
+        get
+        {
+            JsonElement? options = Json.Property(Result, "configOptions");
+            if (options?.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            foreach (JsonElement option in options.Value.EnumerateArray())
+            {
+                string? category = Json.Property(option, "category") is { ValueKind: JsonValueKind.String } named ? named.GetString() : null;
+                JsonElement? current = string.Equals(category, "model", System.StringComparison.Ordinal) ? Json.Property(option, "currentValue") : null;
+                if (current?.ValueKind == JsonValueKind.String)
+                {
+                    return current.Value.GetString();
+                }
+            }
+
+            return null;
+        }
+    }
+
     // Why the turn ended, from the answer to Acp.Prompt, such as end_turn or cancelled.
     public string StopReason => Result.GetProperty("stopReason").GetString()!;
 

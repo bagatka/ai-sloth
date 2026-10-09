@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Bagatka.AiSloth.Workspaces;
 
 // The front door: dependencies and the access rule every feature shares. Each feature is a file in Features/.
-internal sealed partial class WorkspacesApi(IDbContextFactory<WorkspacesDbContext> databases, TimeProvider time) : IWorkspacesApi
+internal sealed partial class WorkspacesApi(IDbContextFactory<WorkspacesDbContext> databases, IProductEvents productEvents, TimeProvider time) : IWorkspacesApi
 {
     // How deep resources nest: a nook in a project in a workspace, with room to spare.
     private const int MaxDepth = 4;

@@ -1,7 +1,9 @@
-using Bagatka.AiSloth.Machines.Data;
+using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Machines.Contracts;
+using Bagatka.AiSloth.Machines.Data;
 using Bagatka.AiSloth.Machines.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
@@ -39,6 +41,11 @@ internal sealed partial class MachinesApi
         if (saved.Failed)
         {
             return new Result<MachineRegistration>(saved.Error);
+        }
+
+        if (actor is UserActor person)
+        {
+            productEvents.Capture(new ProductEvent("machine_added", person.UserId, command.WorkspaceId.Value, new Dictionary<string, ProductFact>(StringComparer.Ordinal)));
         }
 
         return new Result<MachineRegistration>(new MachineRegistration(Summary(machine), code, machine.CodeExpiresAt!.Value));

@@ -30,6 +30,7 @@ public static class NooksModule
         services.AddSingleton<FileLocks>();
         services.AddSingleton<ReadyCopies>();
         services.AddSingleton<NookActivity>();
+        services.AddSingleton<NookStarts>();
         services.AddSingleton<NookProcesses>();
         services.AddSingleton<Checkpoints>();
         services.AddSingleton<NookLifecycle>();

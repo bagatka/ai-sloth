@@ -96,4 +96,13 @@ public sealed record NooksSettings
 
     /// <summary>How many of a workspace's nooks may be awake at once.</summary>
     public int MaxAwakePerWorkspace { get; }
+
+    /// <summary>
+    /// The PostHog project nooks' daemons report their crashes to, by its ingestion host, such as
+    /// <c>https://eu.i.posthog.com</c>; none unless given, and then they report nothing.
+    /// </summary>
+    public Uri? CrashReportsHost { get; init; }
+
+    /// <summary>That project's token, which can only send.</summary>
+    public string? CrashReportsToken { get; init; }
 }

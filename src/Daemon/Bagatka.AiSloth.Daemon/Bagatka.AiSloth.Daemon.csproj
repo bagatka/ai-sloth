@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Bagatka.AiSloth.DaemonProtocol\Bagatka.AiSloth.DaemonProtocol.csproj" />
+    <ProjectReference Include="..\..\Sdk\Bagatka.PostHog\Bagatka.PostHog.csproj" />
   </ItemGroup>
 
 </Project>

@@ -29,6 +29,7 @@ using Bagatka.AiSloth.Users.Contracts;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -80,7 +81,8 @@ AzureSandboxSettings? azure = builder.Configuration.GetSection("Sandboxing:Azure
     : null;
 DatabaseSettings database = builder.Configuration.GetRequired<DatabaseSettings>("Database");
 EncryptionSettings encryption = builder.Configuration.GetRequired<EncryptionSettings>("Encryption");
-NooksSettings nooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
+NooksSettings configuredNooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
+NooksSettings nooks = postHog is null ? configuredNooks : configuredNooks with { CrashReportsHost = postHog.Host, CrashReportsToken = postHog.ProjectToken };
 AgentAccountsSettings agentAccounts = builder.Configuration.GetRequired<AgentAccountsSettings>("Modules:AgentAccounts");
 SourcesSettings sources = builder.Configuration.GetSection("Modules:Sources").Exists() ? builder.Configuration.GetRequired<SourcesSettings>("Modules:Sources") : new SourcesSettings();
 GitHubSettings gitHub = builder.Configuration.GetSection("GitHub").Exists() ? builder.Configuration.GetRequired<GitHubSettings>("GitHub") : GitHubSettings.Public;
@@ -151,9 +153,10 @@ builder.Services.AddHttpClient(ModelGatewayEndpoints.HttpClientName, client => c
 
 // Each call carries its device's session; Users decides whose it is. People sign in with codes, or
 // through the host's identity provider when it has one (Endpoints/SignInEndpoints.cs), whose browser
-// round trip Data Protection keeps safe instead of state here.
+// round trip Data Protection keeps safe instead of state here. That round trip lasts minutes, so its
+// keys live in memory only: a sign-in begun before a restart starts again after it.
 builder.Services.AddSingleton(host);
-builder.Services.AddDataProtection();
+builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
 builder.Services.AddAuthentication(SessionAuthentication.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, SessionAuthentication>(SessionAuthentication.SchemeName, configureOptions: null);
 if (signInProvider is not null)

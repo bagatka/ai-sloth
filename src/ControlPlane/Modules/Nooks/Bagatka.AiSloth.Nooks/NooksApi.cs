@@ -32,6 +32,7 @@ internal sealed partial class NooksApi(
     KeptFolders folders,
     NookLifecycle lifecycle,
     NookActivity activity,
+    NookStarts starts,
     NooksSettings settings,
     TimeProvider time) : INooksApi, INookDaemonsApi
 {

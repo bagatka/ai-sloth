@@ -1,8 +1,10 @@
 using System;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text.Json.Nodes;
 using System.Threading;
 using Bagatka.AiSloth.Daemon;
+using Bagatka.PostHog;
 using Microsoft.Extensions.Logging;
 
 // The daemon's composition root: the only code that reads its environment, which the nook was
@@ -41,6 +43,16 @@ catch (Exception exception) when (exception is InvalidOperationException or Argu
     return 2;
 }
 
+// The host's PostHog project, when it gave one, hears of a crash before the daemon exits, waiting two
+// seconds at most to send it; nothing else is reported from here.
+Uri? crashReportsHost = Optional("SLOTHD_POSTHOG_HOST") is string reportsTo ? ParseUrl(reportsTo) : null;
+string? crashReportsToken = Optional("SLOTHD_POSTHOG_TOKEN");
+await using PostHogClient? crashReports = crashReportsHost is not null && crashReportsToken is not null
+    ? new PostHogClient(new PostHogClientOptions(crashReportsHost, crashReportsToken) { ShutdownTimeout = TimeSpan.FromSeconds(2) })
+    : null;
+bool crashReported = false;
+AppDomain.CurrentDomain.UnhandledException += (_, unhandled) => ReportCrash(unhandled.ExceptionObject as Exception, flush: true);
+
 using ILoggerFactory loggers = LoggerFactory.Create(logging => logging.AddSimpleConsole(console =>
 {
     console.SingleLine = true;
@@ -61,8 +73,39 @@ catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
 {
     // Asked to stop; disposing the daemon kills its processes.
 }
+catch (Exception exception)
+{
+    // A crash goes on as one; disposing the client on the way out sends its report.
+    ReportCrash(exception, flush: false);
+    throw;
+}
 
 return 0;
+
+// A crash for error tracking, as the daemon of its nook, once. One the runtime reports, of a thread
+// the daemon doesn't await, is sent at once, as the process ends when this returns.
+void ReportCrash(Exception? exception, bool flush)
+{
+    if (crashReports is null || exception is null || crashReported)
+    {
+        return;
+    }
+
+    crashReported = true;
+
+    JsonObject properties = new JsonObject
+    {
+        ["$process_person_profile"] = false,
+        ["nook_id"] = settings.NookId.ToString("D", CultureInfo.InvariantCulture),
+        ["version"] = typeof(SlothDaemon).Assembly.GetName().Version?.ToString() ?? "0",
+    };
+    crashReports.CaptureException(exception, "slothd", properties);
+    if (flush)
+    {
+        using CancellationTokenSource limit = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        crashReports.FlushAsync(limit.Token).GetAwaiter().GetResult();
+    }
+}
 
 void Stop(PosixSignalContext context)
 {

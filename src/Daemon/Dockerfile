@@ -17,6 +17,7 @@ COPY global.json NuGet.Config Directory.Build.props Directory.Packages.props .ed
 COPY analyzers/Bagatka.Analyzers/ analyzers/Bagatka.Analyzers/
 COPY src/Daemon/Bagatka.AiSloth.DaemonProtocol/ src/Daemon/Bagatka.AiSloth.DaemonProtocol/
 COPY src/Daemon/Bagatka.AiSloth.Daemon/ src/Daemon/Bagatka.AiSloth.Daemon/
+COPY src/Sdk/Bagatka.PostHog/ src/Sdk/Bagatka.PostHog/
 RUN dotnet restore src/Daemon/Bagatka.AiSloth.Daemon --locked-mode
 RUN dotnet publish src/Daemon/Bagatka.AiSloth.Daemon -c Release --no-restore -o /out \
     -r linux-$(if [ "$TARGETARCH" = arm64 ]; then echo arm64; else echo x64; fi)

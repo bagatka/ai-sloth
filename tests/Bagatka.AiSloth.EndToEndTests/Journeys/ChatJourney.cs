@@ -89,15 +89,16 @@ public sealed class ChatJourney(ControlPlane app) : IDisposable
             && string.Equals(captured.GetProperty("properties").GetProperty("command").GetString(), command, StringComparison.Ordinal);
     }
 
-    // The same person, by their ID, in the workspace's group; the events reach PostHog within seconds.
+    // The same person, by their ID, in the workspace's group, with the nook's start, the turn's model
+    // and account kind; the events reach PostHog within seconds.
     private async Task ProductAnalyticsSeeTheChatStartItsFirstMessageAndItsTurnEndAsync(TestWorkspace acme)
     {
         string workspace = acme.Id.Value.ToString("D", CultureInfo.InvariantCulture);
         TimeSpan wait = TimeSpan.FromSeconds(30);
 
-        JsonElement started = await app.PostHog.EventAsync("chat_started", captured => InWorkspace(captured, workspace), wait);
-        JsonElement first = await app.PostHog.EventAsync("message_sent", captured => InWorkspace(captured, workspace) && captured.GetProperty("properties").GetProperty("first").GetBoolean(), wait);
-        JsonElement ended = await app.PostHog.EventAsync("turn_ended", captured => InWorkspace(captured, workspace), wait);
+        JsonElement started = await app.PostHog.EventAsync("chat_started", captured => FakePostHog.InWorkspace(captured, workspace), wait);
+        JsonElement first = await app.PostHog.EventAsync("message_sent", captured => FakePostHog.InWorkspace(captured, workspace) && captured.GetProperty("properties").GetProperty("first").GetBoolean(), wait);
+        JsonElement ended = await app.PostHog.EventAsync("turn_ended", captured => FakePostHog.InWorkspace(captured, workspace), wait);
 
         string person = started.GetProperty("distinct_id").GetString()!;
         bool isId = Guid.TryParse(person, out _);
@@ -105,17 +106,16 @@ public sealed class ChatJourney(ControlPlane app) : IDisposable
         Assert.Equal(person, first.GetProperty("distinct_id").GetString());
         Assert.Equal(person, ended.GetProperty("distinct_id").GetString());
         Assert.Equal("claude-code", started.GetProperty("properties").GetProperty("harness").GetString());
+        JsonElement nook = await app.PostHog.EventAsync("nook_started", captured => FakePostHog.InWorkspace(captured, workspace), wait);
         JsonElement turn = ended.GetProperty("properties");
         Assert.Equal("end_turn", turn.GetProperty("outcome").GetString());
         Assert.True(turn.GetProperty("checkpoint_saved").GetBoolean());
         Assert.True(turn.GetProperty("first_action_seconds").GetDouble() <= turn.GetProperty("seconds").GetDouble());
-    }
-
-    private static bool InWorkspace(JsonElement captured, string workspace)
-    {
-        JsonElement properties = captured.GetProperty("properties");
-        bool grouped = properties.TryGetProperty("$groups", out JsonElement groups);
-        return grouped && string.Equals(groups.GetProperty("workspace").GetString(), workspace, StringComparison.Ordinal);
+        Assert.Equal("AnthropicApiKey", turn.GetProperty("account_kind").GetString());
+        Assert.Equal("claude-fake", turn.GetProperty("model").GetString());
+        Assert.Equal("new", nook.GetProperty("properties").GetProperty("how").GetString());
+        Assert.True(nook.GetProperty("properties").GetProperty("seconds").GetDouble() > 0);
+        Assert.Equal(person, nook.GetProperty("distinct_id").GetString());
     }
 
     private async Task EveryoneSeesEachStepAndEachTurnSavesTheFilesAsync(TestWorkspace acme, ChatSummary chat, ChatWatch watch)

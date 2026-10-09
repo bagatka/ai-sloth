@@ -82,6 +82,7 @@ internal static class NooksEndpoints
         ClaimsPrincipal principal,
         HttpContext context,
         [FromServices] INooksApi api,
+        [FromServices] IProductEvents productEvents,
         CancellationToken ct)
     {
         // The archive is complete before it is sent, so a failure midway is a problem, not a broken
@@ -101,6 +102,15 @@ internal static class NooksEndpoints
         if (downloaded.Failed)
         {
             return downloaded.Error.ToProblem();
+        }
+
+        if (principal.ToActor() is UserActor person)
+        {
+            productEvents.Capture(new ProductEvent("files_downloaded", person.UserId, Workspace: null, new Dictionary<string, ProductFact>(StringComparer.Ordinal)
+            {
+                ["from_checkpoint"] = new ProductFact(checkpoint is not null),
+                ["one_source"] = new ProductFact(source is not null),
+            }));
         }
 
         string at = checkpoint is int number ? "@" + number.ToString(CultureInfo.InvariantCulture) : string.Empty;

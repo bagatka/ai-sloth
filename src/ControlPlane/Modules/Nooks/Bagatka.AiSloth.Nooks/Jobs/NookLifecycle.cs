@@ -33,6 +33,7 @@ internal sealed class NookLifecycle(
     IEnumerable<ISandboxProvider> providers,
     DaemonConnections daemons,
     NookActivity activity,
+    NookStarts starts,
     FileLocks fileLocks,
     NookProcesses processes,
     Checkpoints checkpoints,
@@ -122,15 +123,18 @@ internal sealed class NookLifecycle(
         {
             int? latest = await LatestCheckpointAsync(db, nookId, ct);
             nook.Replace(latest);
+            starts.Began(nookId, "restored");
         }
         else
         {
+            starts.Began(nookId, "woken");
             try
             {
                 await ProviderOf(nook).ResumeAsync(SandboxKey.From(nookId.Value), ct);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
+                starts.Forget(nookId);
                 Log.WakingFailed(logger, exception, nookId.Value);
                 return new Result(NooksErrors.NotReady);
             }
@@ -303,6 +307,7 @@ internal sealed class NookLifecycle(
                 await FailAsync(db, nook, sandbox.Reason ?? "The provider reports the sandbox failed.", ct);
                 return;
             case SandboxState.Paused or SandboxState.Stopped:
+                starts.Began(nook.Id, "resumed");
                 await provider.ResumeAsync(key, ct);
                 return;
             case not null:
@@ -328,6 +333,7 @@ internal sealed class NookLifecycle(
             return;
         }
 
+        starts.Began(nook.Id, copy is null ? "new" : "ready_copy", nook.CreatedAt);
         SandboxSource fromImage = new SandboxSource(new SandboxImage(image));
         Result<SandboxObservation> created = await provider.CreateAsync(Spec(nook, copy is null ? fromImage : new SandboxSource(SnapshotKey.From(copy.Snapshot)), token), ct);
 
@@ -389,6 +395,7 @@ internal sealed class NookLifecycle(
                 await processes.EndAllAsync(db, nook.Id, ct);
             }
 
+            starts.Began(nook.Id, "recovered");
             await provider.ResumeAsync(key, ct);
             nook.Woke();
             await db.SaveAsync(ct);
@@ -406,6 +413,7 @@ internal sealed class NookLifecycle(
     // in the old one end with exit code -1.
     private async Task ReplaceSandboxAsync(NooksDbContext db, ISandboxProvider provider, Nook nook, CancellationToken ct)
     {
+        starts.Began(nook.Id, "replaced");
         await provider.DeleteAsync(SandboxKey.From(nook.Id.Value), ct);
         int? latest = await LatestCheckpointAsync(db, nook.Id, ct);
 
@@ -532,6 +540,7 @@ internal sealed class NookLifecycle(
         if (!saved.Failed)
         {
             activity.Forget(nook.Id);
+            starts.Forget(nook.Id);
             Log.NookDeleted(logger, nook.Id.Value);
         }
     }
@@ -606,6 +615,7 @@ internal sealed class NookLifecycle(
         Result saved = await db.SaveAsync(ct);
         if (!saved.Failed)
         {
+            starts.Failed(nook);
             Log.NookFailed(logger, nook.Id.Value, reason);
         }
     }
@@ -623,16 +633,23 @@ internal sealed class NookLifecycle(
 
     private SandboxSpec Spec(Nook nook, SandboxSource source, string token)
     {
+        Dictionary<string, string> environment = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["SLOTHD_CONTROL_PLANE_URL"] = settings.DaemonUrl.AbsoluteUri,
+            ["SLOTHD_NOOK_ID"] = nook.Id.Value.ToString("D", CultureInfo.InvariantCulture),
+            ["SLOTHD_TOKEN"] = token,
+        };
+        if (settings.CrashReportsHost is not null && settings.CrashReportsToken is not null)
+        {
+            environment["SLOTHD_POSTHOG_HOST"] = settings.CrashReportsHost.AbsoluteUri;
+            environment["SLOTHD_POSTHOG_TOKEN"] = settings.CrashReportsToken;
+        }
+
         return new SandboxSpec(
             SandboxKey.From(nook.Id.Value),
             source,
             new SandboxResources(settings.CpuMillicores, settings.MemoryMebibytes),
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["SLOTHD_CONTROL_PLANE_URL"] = settings.DaemonUrl.AbsoluteUri,
-                ["SLOTHD_NOOK_ID"] = nook.Id.Value.ToString("D", CultureInfo.InvariantCulture),
-                ["SLOTHD_TOKEN"] = token,
-            },
+            environment,
             nook.Location);
     }
 

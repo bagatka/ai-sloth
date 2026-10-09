@@ -85,6 +85,14 @@ internal sealed class FakePostHog : IAsyncDisposable
         }
     }
 
+    /// <summary>Whether a captured event belongs to the workspace, by its ID as the host writes it.</summary>
+    public static bool InWorkspace(JsonElement captured, string workspace)
+    {
+        JsonElement properties = captured.GetProperty("properties");
+        bool grouped = properties.TryGetProperty("$groups", out JsonElement groups);
+        return grouped && string.Equals(groups.GetProperty("workspace").GetString(), workspace, StringComparison.Ordinal);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await _app.DisposeAsync();

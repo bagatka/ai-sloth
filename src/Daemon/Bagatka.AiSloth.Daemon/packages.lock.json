@@ -100,6 +100,9 @@
           "Grpc.Core.Api": "[2.84.0, )"
         }
       },
+      "bagatka.posthog": {
+        "type": "Project"
+      },
       "Google.Protobuf": {
         "type": "CentralTransitive",
         "requested": "[3.36.2, )",

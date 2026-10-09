@@ -1,8 +1,9 @@
-using Bagatka.AiSloth.Sources.Data;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Sources.Contracts;
+using Bagatka.AiSloth.Sources.Data;
 using Bagatka.AiSloth.Sources.Model;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
@@ -66,6 +67,7 @@ internal sealed partial class SourcesApi
             return new Result<GitHubConnectionProgress>(saved.Error);
         }
 
+        productEvents.Capture(new ProductEvent("github_connected", user.UserId, Workspace: null, new Dictionary<string, ProductFact>(StringComparer.Ordinal)));
         return new Result<GitHubConnectionProgress>(new GitHubConnectionProgress(connection.ToAccount(), TimeSpan.Zero));
     }
 

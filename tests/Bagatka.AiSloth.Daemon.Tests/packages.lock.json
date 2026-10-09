@@ -154,6 +154,7 @@
         "type": "Project",
         "dependencies": {
           "Bagatka.AiSloth.DaemonProtocol": "[1.0.0, )",
+          "Bagatka.PostHog": "[0.1.0-preview.1, )",
           "Grpc.Net.Client": "[2.84.0, )"
         }
       },
@@ -163,6 +164,9 @@
           "Google.Protobuf": "[3.36.2, )",
           "Grpc.Core.Api": "[2.84.0, )"
         }
+      },
+      "bagatka.posthog": {
+        "type": "Project"
       },
       "Google.Protobuf": {
         "type": "CentralTransitive",

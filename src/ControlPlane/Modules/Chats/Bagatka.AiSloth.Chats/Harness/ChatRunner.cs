@@ -65,6 +65,12 @@ internal sealed class ChatRunner(
     private DateTimeOffset? _firstActionDue;
     private TimeSpan? _firstActionWaited;
 
+    // The model that last answered, or else the one the agent's session started with, when the agent
+    // said, and the kind of account it runs on, as its last turn found it, for product analytics.
+    // A session's model can be "default", the agent's own choice, until a model answers.
+    private string? _model;
+    private AgentAccountKind? _accountKind;
+
     // When this runner last kept the chat's nook awake.
     private DateTimeOffset _keptAwakeAt = DateTimeOffset.MinValue;
 
@@ -316,14 +322,14 @@ internal sealed class ChatRunner(
             await SendAsync(chat, [Acp.Cancel(chat.SessionId)], ct);
         }
 
-        await EndTurnAsync(db, chat, turn, new TurnEnded("cancelled", Failure: null), ct);
+        await EndTurnAsync(db, chat, turn, new TurnEnded("cancelled", Failure: null), failure: null, ct);
     }
 
     // A turn ends with a checkpoint of the files it changed, and only then does everyone see that it
     // ended, so a turn that ended has its files saved. A failed checkpoint is told and the chat goes
     // on: the next turn's checkpoint keeps the files too. A nearly full disk is told too, since the
     // next checkpoints may fail. Then the harness state syncs.
-    private async Task EndTurnAsync(ChatsDbContext db, Chat chat, MessageId turn, TurnEnded ended, CancellationToken ct)
+    private async Task EndTurnAsync(ChatsDbContext db, Chat chat, MessageId turn, TurnEnded ended, string? failure, CancellationToken ct)
     {
         await SaveAsync(db, ct);
         TurnMessage message = await db.Messages.Where(found => found.Id == turn).Select(found => new TurnMessage(found.Text, found.SentBy, found.SentAt)).SingleAsync(ct);
@@ -341,27 +347,49 @@ internal sealed class ChatRunner(
         db.Events.Add(chat.Record(new ChatEventBody(ended), time));
         chat.TurnEnded();
         _agentFinishedTurn = false;
-        CaptureTurnEnded(chat, message, ended, checkpointSaved: !taken.Failed);
+        CaptureTurnEnded(chat, message.SentBy, message.SentAt, ended, failure, checkpointSaved: !taken.Failed);
         await states.SyncAsync(chat, ct);
     }
 
-    // What a turn came to, for product analytics: how it ended, how long its message waited for that,
-    // and for the agent's first action, when this runner saw it.
-    private void CaptureTurnEnded(Chat chat, TurnMessage message, TurnEnded ended, bool checkpointSaved)
+    // What a turn came to, for product analytics: how it ended, and for a failed one where it failed
+    // (start: the agent couldn't start; agent_error: it answered with an error, such as its model's;
+    // agent_exited: it stopped), never the failure's words, which can quote a vendor; how long its
+    // message waited for that, and for the agent's first action, when this runner saw it; the model,
+    // when the agent said; and whether the turn's files were saved, for a turn that had any.
+    private void CaptureTurnEnded(Chat chat, UserId sentBy, DateTimeOffset sentAt, TurnEnded ended, string? failure, bool? checkpointSaved)
     {
         Dictionary<string, ProductFact> facts = new Dictionary<string, ProductFact>(StringComparer.Ordinal)
         {
             ["harness"] = new ProductFact(chat.Harness),
             ["outcome"] = new ProductFact(ended.StopReason),
-            ["seconds"] = new ProductFact((time.GetUtcNow() - message.SentAt).TotalSeconds),
-            ["checkpoint_saved"] = new ProductFact(checkpointSaved),
+            ["seconds"] = new ProductFact((time.GetUtcNow() - sentAt).TotalSeconds),
         };
+        if (failure is not null)
+        {
+            facts["failure"] = new ProductFact(failure);
+        }
+
         if (_firstActionWaited is TimeSpan waited)
         {
             facts["first_action_seconds"] = new ProductFact(waited.TotalSeconds);
         }
 
-        productEvents.Capture(new ProductEvent("turn_ended", message.SentBy, chat.WorkspaceId.Value, facts));
+        if (_model is not null)
+        {
+            facts["model"] = new ProductFact(_model);
+        }
+
+        if (_accountKind is AgentAccountKind kind)
+        {
+            facts["account_kind"] = new ProductFact(kind.ToString());
+        }
+
+        if (checkpointSaved is bool saved)
+        {
+            facts["checkpoint_saved"] = new ProductFact(saved);
+        }
+
+        productEvents.Capture(new ProductEvent("turn_ended", sentBy, chat.WorkspaceId.Value, facts));
         _firstActionWaited = null;
     }
 
@@ -416,6 +444,7 @@ internal sealed class ChatRunner(
         Result<AgentAccountCredential> used = await accounts.UseAsync(SystemActors.Harness, chat.AgentAccountId, chat.WorkspaceId, ct);
         if (!used.Failed)
         {
+            _accountKind = used.Output.Kind;
             return true;
         }
 
@@ -523,6 +552,13 @@ internal sealed class ChatRunner(
         TimeSpan took = (run.EndedAt ?? time.GetUtcNow()) - run.StartedAt;
         string? output = ended.ExitCode == 0 ? null : ended.Output;
         db.Events.Add(chat.Record(new ChatEventBody(new SetupEnded(ended.ExitCode, took, output)), time));
+        productEvents.Capture(new ProductEvent("setup_ended", chat.StartedBy, chat.WorkspaceId.Value, new Dictionary<string, ProductFact>(StringComparer.Ordinal)
+        {
+            ["succeeded"] = new ProductFact(ended.ExitCode == 0),
+            ["seconds"] = new ProductFact(took.TotalSeconds),
+            ["scripts"] = new ProductFact(setup.Output.Scripts.Count),
+            ["from_ready_copy"] = new ProductFact(setup.Output.ReadyCopyMadeAt is not null),
+        }));
         return true;
     }
 
@@ -589,6 +625,7 @@ internal sealed class ChatRunner(
             case AcpUpdate update when !chat.LoadingSession:
                 db.Events.Add(chat.Record(new ChatEventBody(new AgentUpdate(update.Update)), time));
                 MeasureFirstAction(chat, update);
+                _model = update.Model ?? _model;
                 break;
             case AcpUpdate:
                 // The loaded session's history, which the chat recorded the first time.
@@ -600,7 +637,8 @@ internal sealed class ChatRunner(
                 string? earlier = chat.Initialized(initialized.SupportsSteering, initialized.SupportsLoading);
                 outgoing.Add(earlier is null ? Acp.NewSession(AgentProcess.WorkingDirectory) : Acp.LoadSession(earlier, AgentProcess.WorkingDirectory));
                 break;
-            case AcpSessionLoaded:
+            case AcpSessionLoaded loaded:
+                _model = loaded.Model;
                 chat.SessionLoaded();
                 db.Events.Add(chat.Record(new ChatEventBody(new AgentRestarted(Remembers: true)), time));
                 await CarryOverTurnAsync(db, chat, outgoing, ct);
@@ -610,6 +648,7 @@ internal sealed class ChatRunner(
                 outgoing.Add(Acp.NewSession(AgentProcess.WorkingDirectory));
                 break;
             case AcpSessionCreated created:
+                _model = created.Model;
                 bool tookOver = chat.SessionReady(created.SessionId);
                 if (tookOver)
                 {
@@ -673,7 +712,8 @@ internal sealed class ChatRunner(
     {
         if (chat.TurnMessageId == prompt)
         {
-            await EndTurnAsync(db, chat, prompt, ended, ct);
+            string? failure = string.Equals(ended.StopReason, "failed", StringComparison.Ordinal) ? "agent_error" : null;
+            await EndTurnAsync(db, chat, prompt, ended, failure, ct);
         }
     }
 
@@ -705,7 +745,7 @@ internal sealed class ChatRunner(
         if (chat.TurnMessageId is MessageId turn && !lost)
         {
             string failure = string.Create(CultureInfo.InvariantCulture, $"The agent stopped with exit code {exitCode}.");
-            await EndTurnAsync(db, chat, turn, new TurnEnded("failed", failure), ct);
+            await EndTurnAsync(db, chat, turn, new TurnEnded("failed", failure), "agent_exited", ct);
         }
 
         List<Message> steering = await db.Messages.Where(message => message.ChatId == chatId && message.State == MessageState.Steering).ToListAsync(ct);
@@ -733,13 +773,15 @@ internal sealed class ChatRunner(
     {
         if (chat.TurnMessageId is MessageId turn)
         {
-            await EndTurnAsync(db, chat, turn, new TurnEnded("failed", failure), ct);
+            await EndTurnAsync(db, chat, turn, new TurnEnded("failed", failure), "start", ct);
         }
         else if (message is not null)
         {
+            TurnEnded failed = new TurnEnded("failed", failure);
             db.Events.Add(chat.Record(new ChatEventBody(new TurnStarted(message.Id)), time));
-            db.Events.Add(chat.Record(new ChatEventBody(new TurnEnded("failed", failure)), time));
+            db.Events.Add(chat.Record(new ChatEventBody(failed), time));
             message.Deliver();
+            CaptureTurnEnded(chat, message.SentBy, message.SentAt, failed, "start", checkpointSaved: null);
         }
 
         Log.AgentFailed(logger, chatId.Value, failure);
