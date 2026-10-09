@@ -13,7 +13,8 @@ machines, and local Docker for development, tests, and single-machine self-hosti
    through a managed identity kept out of its sandboxes, and a push-notification relay any host can
    use. Before people are invited: logs, traces, metrics, and product analytics from the control
    plane and every client in PostHog, through a .NET PostHog SDK of our own that works with Native
-   AOT and anyone can use.
+   AOT and anyone can use; and the hosted WebApi always running again (one replica at least, sized
+   from those metrics), so nobody waits for it to start.
 2. **Apps.** The web app, served by every host, and native iOS and Android apps that connect to any
    number of hosts.
 3. **Working together.** A chat brings in another chat's changes; agents use AiSloth's own API
