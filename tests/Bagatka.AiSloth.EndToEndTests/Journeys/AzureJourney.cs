@@ -22,7 +22,7 @@ public sealed class AzureJourney(AzureControlPlane azure)
     public async Task Nooks_on_Azure_work_sleep_and_come_back()
     {
         ControlPlane? app = await azure.StartedAsync();
-        Assert.SkipWhen(app is null, "Set BAGATKA_AZURE_SANDBOXES_GROUP and BAGATKA_NGROK_ENV_FILE to run nooks on Azure.");
+        Assert.SkipWhen(app is null, "Set BAGATKA_AZURE_SANDBOXES_GROUP, BAGATKA_NGROK_ENV_FILE and BAGATKA_NOOK_IMAGE_REPOSITORY to run nooks on Azure.");
 
         await Task.WhenAll(
             ANookRunsItsAgentAndDockerAndSleepsAndWakesWithItsMemoryAsync(app),

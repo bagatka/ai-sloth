@@ -1,5 +1,4 @@
 using System;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Identity;
@@ -15,8 +14,10 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// <summary>
 /// An app whose nooks run on Azure and sleep as the sleepy app's do, started by the first test that
 /// asks, and only when BAGATKA_AZURE_SANDBOXES_GROUP is <c>subscription/resource-group/group/region</c>
-/// (with <c>az login</c>) and BAGATKA_NGROK_ENV_FILE is an env file with <c>NGROK_AUTHTOKEN</c>. Nooks
-/// reach the app through ngrok and pull its images from ttl.sh.
+/// (with <c>az login</c>), BAGATKA_NGROK_ENV_FILE is an env file with <c>NGROK_AUTHTOKEN</c>, and
+/// BAGATKA_NOOK_IMAGE_REPOSITORY is a public repository this computer's Docker can push to, such as
+/// <c>ghcr.io/bagatka</c>. Nooks reach the app through ngrok and pull its images, tagged <c>e2e</c>,
+/// from that repository; a run pushes only the layers it doesn't have yet.
 /// </summary>
 public sealed class AzureControlPlane : IAsyncDisposable
 {
@@ -29,6 +30,7 @@ public sealed class AzureControlPlane : IAsyncDisposable
 
     private static readonly string? Group = Environment.GetEnvironmentVariable("BAGATKA_AZURE_SANDBOXES_GROUP") is { Length: > 0 } group ? group : null;
     private static readonly string? TokenFile = Environment.GetEnvironmentVariable("BAGATKA_NGROK_ENV_FILE") is { Length: > 0 } file ? file : null;
+    private static readonly string? ImageRepository = Environment.GetEnvironmentVariable("BAGATKA_NOOK_IMAGE_REPOSITORY") is { Length: > 0 } repository ? repository : null;
 
     private readonly Lazy<Task<ControlPlane?>> _started;
     private NgrokTunnels? _tunnels;
@@ -80,7 +82,7 @@ public sealed class AzureControlPlane : IAsyncDisposable
 
     private async Task<ControlPlane?> StartAsync()
     {
-        if (Group is null || TokenFile is null)
+        if (Group is null || TokenFile is null || ImageRepository is null)
         {
             return null;
         }
@@ -89,12 +91,12 @@ public sealed class AzureControlPlane : IAsyncDisposable
         int daemonPort = ControlPlane.FreePort();
         int modelsPort = ControlPlane.FreePort();
         _tunnels = await NgrokTunnels.StartAsync(TokenFile, daemonPort, modelsPort, ct);
-        string repository = "ttl.sh/aisloth-e2e-" + RandomNumberGenerator.GetHexString(12, lowercase: true);
         _app = new ControlPlane(
             [
                 "Parameters:nook-harnesses=claude-code",
                 "Parameters:azure-sandbox-group=" + Group,
-                "Parameters:nook-image-repository=" + repository,
+                "Parameters:nook-image-repository=" + ImageRepository,
+                "Parameters:nook-image-tag=e2e",
                 "Parameters:nook-daemon-url=" + _tunnels.DaemonUrl,
                 "Parameters:nook-models-url=" + _tunnels.ModelsUrl,
             ],

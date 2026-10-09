@@ -78,8 +78,10 @@ az role assignment create --role "Container Apps SandboxGroup Data Owner" \
 The AppHost takes it as `azure-sandbox-group` (`subscription/resource-group/group/region`). Nooks
 there need the images in a public repository (`nook-image-repository`) and public addresses for this
 computer's daemon and model endpoints (`nook-daemon-url`, `nook-models-url`). We test with ngrok and
-ttl.sh, and anyone can: the end-to-end suite's Azure tests run when `BAGATKA_AZURE_SANDBOXES_GROUP`
-is set and `BAGATKA_NGROK_ENV_FILE` names an env file with `NGROK_AUTHTOKEN`.
+GitHub's registry, and anyone can: the end-to-end suite's Azure tests run when
+`BAGATKA_AZURE_SANDBOXES_GROUP` is set, `BAGATKA_NGROK_ENV_FILE` names an env file with
+`NGROK_AUTHTOKEN`, and `BAGATKA_NOOK_IMAGE_REPOSITORY` names a public repository your Docker can push
+to, such as `ghcr.io/<you>` after `docker login ghcr.io`. The tests push the images tagged `e2e`.
 
 ## Network
 
