@@ -96,6 +96,7 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 | Object storage | `Bagatka.ObjectStorage` (+ `.<Backend>` for cloud backends) | Store and read objects by key: checkpoints and kept folders | Contract; a folder of this computer and Azure Blob Storage as backends |
 | Sdk | `Bagatka.Sdk.<Vendor>`, `Bagatka.Azure.Sandboxes` | Clients for vendor APIs without an official .NET SDK | Docker Engine, Sign in with ChatGPT, GitHub, Azure Container Apps Sandboxes |
 | Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration and the Azure deployment; defaults every service host shares | Built |
+| One server | `host`, `hosting/` (shell and Compose, not .NET) | Runs a host on one server or computer from main's published images: PostgreSQL, the WebApi, and Caddy for HTTPS, with nooks on its Docker | Built |
 | Site | `site/` (Astro, not .NET) | The landing page at aisloth.dev and `install.sh`, which installs or updates sloth, published to GitHub Pages from main | Built |
 
 The web and mobile apps are not in this repository. They use the same public HTTP API as the CLI.
@@ -110,6 +111,8 @@ BannedSymbols.txt                  APIs nobody may call
 LoggerParameterTypes.txt           log placeholder names and their types
 CONTRIBUTING.md                    developing, releasing, agent environments
 docs/                              self-hosting, the README's images, templates (module README)
+host                               runs AiSloth on one server or computer (docs/self-hosting.md)
+hosting/                           what host runs: compose.yaml and the Caddyfile
 site/                              the landing page (Astro) and install.sh
 analyzers/
   Bagatka.Analyzers/               our own code-shape rules, run on every project (PATTERNS.md, entry 26)
@@ -302,6 +305,16 @@ vendor-shaped, product-agnostic, and used from module internals. Rules are in `s
 - **`Bagatka.ServiceDefaults`** gives every service host the same OpenTelemetry, health checks,
   and service discovery: the WebApi today, and each service extracted from it later. It is
   general-purpose.
+
+### One server: `host` and `hosting/`
+
+`./host up` runs a host on one server or computer (docs/self-hosting.md) with Docker Compose, from
+the images main publishes for each commit: it takes the newest commit of its checkout whose images
+are published, and installs Docker and Sysbox first on a fresh Ubuntu 24.04. `host.env` holds the
+WebApi's own settings, which its operator keeps. The WebApi runs on the computer's network, as a
+process there would, because nooks' routers keep them from the addresses it finds on its network
+interfaces; the endpoints nooks reach listen on Docker's bridge only. PostgreSQL has no network,
+only a socket it shares with the WebApi, and Caddy gives a public address HTTPS.
 
 ## Dependency rules
 

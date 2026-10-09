@@ -1,0 +1,471 @@
+#!/bin/sh
+# Runs AiSloth on this computer: a server of your own, such as one from Hetzner or Hostinger, or your
+# own PC (docs/self-hosting.md). Everything comes from published images; nothing is built here.
+#
+#   ./host up          starts AiSloth, after installing Docker and Sysbox on a fresh Ubuntu 24.04;
+#                      after git pull it updates AiSloth, and after a change to host.env applies it
+#   ./host remove      deletes AiSloth from this computer: its data, nooks, and images
+#   ./host <command>   runs any docker compose command, such as ./host logs webapi or ./host down
+set -eu
+cd "$(dirname "$0")"
+
+# host.env holds the host's own settings: made once, then its operator's. running.env holds what
+# ./host up last started, for compose; each ./host up makes it again.
+settings=host.env
+running=hosting/running.env
+
+# Where versions' images are published, and a version's images (hosting/compose.yaml). A version is
+# the commit they were built from.
+images=${AISLOTH_IMAGES:-ghcr.io/bagatka}
+version_images="aisloth-webapi aisloth-nook aisloth-nook-claude-code aisloth-nook-codex aisloth-nook-pi aisloth-nook-copilot"
+
+# What a fresh Ubuntu 24.04 gets, as CI does (.github/workflows/dotnet-solution-validate.yml).
+docker_key=9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+sysbox_version=0.7.1
+sysbox_sha256=9d6d5484f980d0a17f86c492c1262015c2afb66280bdb97215b79fde6a0261c5
+
+say() {
+    printf '%s\n' "$*"
+}
+
+fail() {
+    printf 'error: %s\n' "$*" >&2
+    exit 1
+}
+
+compose() {
+    docker compose --project-directory hosting --file hosting/compose.yaml --env-file "$running" "$@"
+}
+
+# apt-get, saying only what goes wrong; a fresh server's own updates may hold its lock for a while.
+apt() {
+    env DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 apt-get --quiet --quiet --option DPkg::Lock::Timeout=300 "$@" >/dev/null
+}
+
+# What this computer's Docker lacks for nooks, one line each; nothing when it has everything.
+docker_lacks() {
+    if ! command -v docker >/dev/null 2>&1; then
+        say "Docker"
+        return
+    fi
+
+    if ! info=$(docker info --format '{{.ServerVersion}}|{{json .Runtimes}}|{{json .DriverStatus}}' 2>&1); then
+        case $info in
+            *"permission denied"*) fail "You can't use this computer's Docker: run sudo ./host up." ;;
+            *) say "Docker, running"; return ;;
+        esac
+    fi
+
+    if [ "${info%%.*}" -lt 28 ]; then
+        say "Docker 28 or later (it has ${info%%|*})"
+    fi
+
+    if ! docker compose version >/dev/null 2>&1; then
+        say "Docker Compose"
+    fi
+
+    case $info in
+        *'"sysbox-runc"'*) ;;
+        *) say "Sysbox, which keeps nooks apart and lets them run Docker of their own" ;;
+    esac
+
+    case $info in
+        *io.containerd.snapshotter*) ;;
+        *) say "Docker's containerd image store" ;;
+    esac
+}
+
+# Installs Docker and Sysbox, or what of them is missing, on Ubuntu 24.04 with nothing running in
+# Docker: installing restarts it.
+install_docker() {
+    say "Installing Docker and Sysbox $sysbox_version (once)..."
+    apt update
+    apt install --yes ca-certificates curl gpg jq
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --batch --quiet --dearmor --yes --output /etc/apt/keyrings/docker.gpg
+    if ! gpg --batch --show-keys --with-colons /etc/apt/keyrings/docker.gpg 2>/dev/null | grep -q "^fpr:::::::::$docker_key:"; then
+        fail "Docker's signing key from download.docker.com isn't the one expected."
+    fi
+
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list
+    apt update
+    apt install --yes docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+    # Sysbox's file system service sometimes hangs as it starts, until systemd stops it; then systemd
+    # starts it again (CONTRIBUTING.md). Its package sets Docker up for it and restarts Docker.
+    mkdir -p /etc/systemd/system/sysbox-fs.service.d
+    printf '[Service]\nRestart=on-failure\nRestartSec=1\n' > /etc/systemd/system/sysbox-fs.service.d/restart.conf
+    systemctl daemon-reload
+    package=$(mktemp -d)
+    curl -fsSL --output "$package/sysbox.deb" "https://github.com/nestybox/sysbox/releases/download/v$sysbox_version/sysbox-ce_${sysbox_version}.linux_amd64.deb"
+    if ! echo "$sysbox_sha256  $package/sysbox.deb" | sha256sum --check --quiet; then
+        fail "The Sysbox package from GitHub isn't the one expected."
+    fi
+
+    apt install --yes "$package/sysbox.deb"
+    rm -r "$package"
+    tries=0
+    until docker info >/dev/null 2>&1; do
+        tries=$((tries + 1))
+        if [ "$tries" -ge 60 ]; then
+            fail "Docker didn't start again after Sysbox was installed: systemctl status docker shows why."
+        fi
+
+        sleep 1
+    done
+
+    # Docker 29 keeps images in containerd when installed fresh; one installed earlier switches here.
+    if ! docker info --format '{{json .DriverStatus}}' | grep -q io.containerd.snapshotter; then
+        jq '.features["containerd-snapshotter"] = true' /etc/docker/daemon.json > /etc/docker/daemon.json.new
+        mv /etc/docker/daemon.json.new /etc/docker/daemon.json
+        systemctl restart docker
+    fi
+}
+
+ready_docker() {
+    lacks=$(docker_lacks)
+    if [ -z "$lacks" ]; then
+        return
+    fi
+
+    say "This computer's Docker lacks:"
+    say "$lacks" | sed 's/^/  /'
+    if command -v docker >/dev/null 2>&1 && docker info --format '{{.OperatingSystem}}' 2>/dev/null | grep -q "Docker Desktop"; then
+        fail "Docker Desktop can't run Sysbox. On Windows, turn off Docker Desktop's WSL integration for this distribution (Settings, Resources, WSL integration), then run sudo ./host up again to install Docker here."
+    fi
+
+    # shellcheck source=/dev/null
+    . /etc/os-release
+    if [ "$ID" != ubuntu ] || [ "$VERSION_CODENAME" != noble ]; then
+        fail "./host installs them on Ubuntu 24.04. On $PRETTY_NAME, install them yourself (docs/self-hosting.md, \"Other Linux\"), then run ./host up again."
+    fi
+
+    if [ "$(id -u)" -ne 0 ]; then
+        fail "Installing them needs root: run sudo ./host up."
+    fi
+
+    if command -v docker >/dev/null 2>&1 && [ -n "$(docker ps --quiet 2>/dev/null)" ]; then
+        fail "This Docker runs other containers, and installing restarts it. Stop them, or install by hand (docs/self-hosting.md, \"Other Linux\"), then run ./host up again."
+    fi
+
+    install_docker
+    lacks=$(docker_lacks)
+    if [ -n "$lacks" ]; then
+        fail "After installing, Docker still lacks: $lacks"
+    fi
+}
+
+# This computer's first public IPv4 address, if it has one; servers from Hetzner, Hostinger, and
+# most others do, while cloud VMs behind NAT and PCs on a home or office network don't.
+public_address() {
+    ip -4 -o address show scope global 2>/dev/null | awk '{ split($4, address, "/"); print address[1] }' | while read -r address; do
+        case $address in
+            10.* | 192.168.* | 169.254.* | 172.1[6-9].* | 172.2[0-9].* | 172.3[01].*) ;;
+            100.6[4-9].* | 100.[7-9][0-9].* | 100.1[01][0-9].* | 100.12[0-7].*) ;;
+            *)
+                say "$address"
+                break
+                ;;
+        esac
+    done
+}
+
+make_settings() {
+    address=$(public_address)
+    if [ -n "$address" ]; then
+        url="https://$address"
+    else
+        url="http://localhost:5170"
+    fi
+
+    key=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+    (
+        umask 077
+        cat > "$settings" << EOF
+# This host's settings, made by ./host up. After a change, run ./host up again.
+#
+# Keep a copy of this file somewhere other than this computer. Encryption__Key encrypts the API keys,
+# tokens, and secrets people save here, and without it nobody can read them again.
+
+# Where people and their apps reach this host: https:// and this server's public IP address or a
+# domain whose DNS points here, or http://localhost:5170 when it is for this computer only.
+Host__PublicUrl=$url
+
+Encryption__Key=$key
+
+# ChatGPT plans as agent accounts. OpenAI allows them only when you run AiSloth for yourself, so set
+# this to false when other people use this host.
+Modules__AgentAccounts__AllowChatGptPlans=true
+
+# Optional. Remove the # in front of a setting to turn it on.
+
+# GitHub, so agents work in your repositories and open pull requests: sign in to this host, run
+# sloth github create-app on your computer, and put the three settings it shows here.
+#Modules__Sources__GitHubApp__ClientId=
+#Modules__Sources__GitHubApp__ClientSecret=
+#Modules__Sources__GitHubApp__Slug=
+
+# Agent accounts whose model runs on this computer or its network, such as with Ollama: the host
+# forwards agents' model calls only to public addresses unless this is true.
+#ModelGateway__AllowPrivateNetworks=true
+
+# Sign-in with your company's accounts, through an OpenID Connect provider such as Microsoft Entra
+# ID, Okta, or Google. Give the provider <Host__PublicUrl>/sign-in/callback as the redirect URI.
+#SignIn__Provider__Issuer=
+#SignIn__Provider__ClientId=
+#SignIn__Provider__ClientSecret=
+#SignIn__Provider__Name=
+EOF
+    )
+    say "Made host.env with this host's settings and its encryption key. Keep a copy of it somewhere"
+    say "other than this computer: without the key, nobody can read the API keys people save here."
+}
+
+# The value of a setting in host.env; nothing when it's not set.
+setting() {
+    sed -n "s/^$1=//p" "$settings" | tail -n 1 | tr -d '\r'
+}
+
+# The newest commit, from this checkout's back, whose images are on this computer or published.
+pick_version() {
+    for commit in $(git -c safe.directory="$PWD" rev-list --max-count=30 HEAD); do
+        if version_found "$commit"; then
+            say "$commit"
+            return
+        fi
+    done
+}
+
+version_found() {
+    for image in $version_images; do
+        if ! docker image inspect "$images/$image:$1" >/dev/null 2>&1 && ! docker manifest inspect "$images/$image:$1" >/dev/null 2>&1; then
+            return 1
+        fi
+    done
+}
+
+# The port of a site such as example.com or example.com:8443.
+port_of() {
+    case $1 in
+        *:*) say "${1##*:}" ;;
+        *) say 443 ;;
+    esac
+}
+
+# Waits up to two minutes for an address to answer; curl's other options come first.
+answers() {
+    tries=0
+    until curl --silent --fail --output /dev/null --max-time 5 "$@"; do
+        tries=$((tries + 1))
+        if [ "$tries" -ge 60 ]; then
+            return 1
+        fi
+
+        sleep 2
+    done
+}
+
+up() {
+    if [ "$(uname -s)" != Linux ]; then
+        fail "AiSloth runs nooks on Linux: a server, a Linux PC, or Windows in WSL. Macs come later."
+    fi
+
+    if [ "$(uname -m)" != x86_64 ]; then
+        fail "AiSloth's images are for x86-64 computers for now; ARM ones come next."
+    fi
+
+    ready_docker
+    if [ ! -f "$settings" ]; then
+        make_settings
+    fi
+
+    url=$(setting Host__PublicUrl)
+    url=${url%/}
+    case $url in
+        https://*/* | https://)
+            fail "Host__PublicUrl in host.env is $url: make it https:// and an address or domain, without a path."
+            ;;
+        https://*)
+            site=${url#https://}
+            profile=https
+            protocols=Http2
+            behind_proxy=true
+            ;;
+        http://localhost:5170)
+            site=
+            profile=
+            protocols=Http1
+            behind_proxy=false
+            ;;
+        *)
+            fail "Host__PublicUrl in host.env is $url: make it https:// and this server's public address or a domain, or http://localhost:5170 for this computer only."
+            ;;
+    esac
+
+    docker_host=${DOCKER_HOST:-unix:///var/run/docker.sock}
+    case $docker_host in
+        unix://*) socket=${docker_host#unix://} ;;
+        *) fail "AiSloth runs nooks on this computer's Docker, through its Unix socket, not at $docker_host." ;;
+    esac
+
+    # Not handled: an engine whose host-gateway-ip isn't its default bridge's gateway, where nooks
+    # find the host; they never connect, and nothing starts.
+    bridge=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}} {{end}}' | tr ' ' '\n' | grep -m 1 '\.')
+    version=${AISLOTH_VERSION:-$(pick_version)}
+    if [ -z "$version" ]; then
+        fail "None of this checkout's last 30 commits has images at $images. Main's are published some minutes after each push: run git pull, then ./host up again."
+    fi
+
+    cat > "$running" << EOF
+# What ./host up last started, for compose.yaml. ./host up makes it again; don't change it.
+COMPOSE_PROFILES=$profile
+AISLOTH_IMAGES=$images
+AISLOTH_VERSION=$version
+AISLOTH_SITE=$site
+AISLOTH_PUBLIC_PROTOCOLS=$protocols
+AISLOTH_BEHIND_PROXY=$behind_proxy
+AISLOTH_BRIDGE=$bridge
+AISLOTH_DOCKER_SOCKET=$socket
+AISLOTH_DOCKER_GROUP=$(stat -c %g "$socket")
+EOF
+
+    memory=$(awk '/^MemTotal:/ { print int($2 / 1048576 + 0.5) }' /proc/meminfo)
+    if [ "$memory" -lt 4 ]; then
+        say "Note: this computer has $memory GB of memory, and each awake nook may use up to 4 GB."
+    fi
+
+    free=$(df -P "$(docker info --format '{{.DockerRootDir}}')" | awk 'NR == 2 { print int($4 / 1048576) }')
+    if [ "$free" -lt 20 ]; then
+        say "Note: Docker has $free GB of disk left; the images take about 5 GB, and each nook takes what it installs."
+    fi
+
+    say "Getting AiSloth $(echo "$version" | cut -c1-7), which takes some minutes the first time..."
+    for image in $version_images; do
+        if ! docker image inspect "$images/$image:$version" >/dev/null 2>&1 && ! docker pull --quiet "$images/$image:$version" >/dev/null; then
+            fail "Getting $images/$image:$version failed."
+        fi
+    done
+
+    # Ports something else holds stop the host or Caddy from starting, so they're checked first.
+    if [ -z "$(compose ps --quiet webapi 2>/dev/null)" ]; then
+        ports="5170"
+        if [ "$profile" = https ]; then
+            ports="5170 80 443"
+        fi
+
+        for port in $ports; do
+            if ss -Hltn "sport = :$port" | grep -q .; then
+                fail "Something on this computer already uses port $port, which AiSloth needs. Stop it, then run ./host up again."
+            fi
+        done
+    fi
+
+    # Not handled: a host that had a public address and now is for this computer only keeps Caddy
+    # running until ./host down.
+    say "Starting AiSloth..."
+    if ! compose --progress quiet up --detach --remove-orphans; then
+        fail "AiSloth didn't start: ./host logs migrations webapi shows why."
+    fi
+
+    if [ "$profile" = https ]; then
+        protocol=--http2-prior-knowledge
+    else
+        protocol=--http1.1
+    fi
+
+    if ! answers "$protocol" http://127.0.0.1:5170/alive; then
+        fail "AiSloth didn't answer within two minutes: ./host logs webapi shows why."
+    fi
+
+    # Caddy takes a changed Caddyfile without dropping connections. The host answers through it at its
+    # address here, which needs no route out and back in.
+    if [ "$profile" = https ] && ! compose exec -T caddy caddy reload --config /etc/aisloth/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+        fail "Caddy didn't take hosting/Caddyfile: ./host logs caddy shows why."
+    fi
+
+    if [ "$profile" = https ] && ! answers --resolve "${site%:*}:$(port_of "$site"):127.0.0.1" "$url/.well-known/aisloth"; then
+        fail "AiSloth runs, but not yet at $url. Let's Encrypt certifies it once it reaches this server there on ports 80 and 443: open them in your provider's firewall, and point a domain's DNS here. ./host logs caddy shows more."
+    fi
+
+    # Older versions' images go, except those nooks still use, which Docker keeps. Only versions':
+    # an engine shared with development has others, such as main's.
+    docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E "^$images/aisloth-[a-z-]+:[0-9a-f]{40}\$" | grep -v ":$version\$" | while read -r image; do
+        docker image rm "$image" >/dev/null 2>&1 || true
+    done
+
+    say ""
+    say "AiSloth runs at $url."
+    first=$(compose logs --no-log-prefix webapi | sed -n 's/^First sign-in: //p' | tail -n 1)
+    if [ -n "$first" ]; then
+        say ""
+        say "Sign in as its first person on your computer, with sloth:"
+        say "  curl -fsSL https://aisloth.dev/install.sh | sh"
+        say "  $first"
+    fi
+
+    off=""
+    if [ -z "$(setting Modules__Sources__GitHubApp__ClientId)" ]; then
+        off="$off
+  GitHub, so agents work in your repositories and open pull requests"
+    fi
+
+    case $site in
+        *[!0-9.]*) ;;
+        ?*) off="$off
+  your own domain, instead of this IP address" ;;
+    esac
+
+    if [ -z "$(setting SignIn__Provider__Issuer)" ]; then
+        off="$off
+  sign-in with your company's accounts"
+    fi
+
+    if [ -n "$off" ]; then
+        say ""
+        say "Turned off until you set them in host.env, then run ./host up again:$off"
+    fi
+}
+
+# Nooks are containers the host makes, not compose's, so they go by the label their provider gives
+# them, with this host's scope (Sandboxing__Docker__Scope in compose.yaml).
+remove() {
+    say "This deletes AiSloth from this computer: its database, the files chats saved, every nook with"
+    say "its files, and its images. host.env stays."
+    printf 'Type remove to go on: '
+    read -r answer || answer=
+    if [ "$answer" != remove ]; then
+        fail "Nothing was deleted."
+    fi
+
+    if [ -f "$running" ]; then
+        compose --progress quiet down --volumes --remove-orphans
+        images=$(sed -n 's/^AISLOTH_IMAGES=//p' "$running")
+    fi
+
+    scope=label=com.bagatka.sandboxing.scope=aisloth
+    docker ps --all --quiet --filter "$scope" | xargs -r docker rm --force >/dev/null
+    docker network ls --quiet --filter "$scope" | xargs -r docker network rm >/dev/null
+    docker image ls --quiet --filter "$scope" | xargs -r docker image rm --force >/dev/null
+    docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E "^$images/aisloth-[a-z-]+:[0-9a-f]{40}\$" | xargs -r docker image rm >/dev/null
+    rm -f "$running"
+    say "Deleted AiSloth from this computer."
+}
+
+case ${1:-} in
+    up)
+        up
+        ;;
+    remove)
+        remove
+        ;;
+    "" | help | -h | --help)
+        sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+        ;;
+    *)
+        if [ ! -f "$running" ]; then
+            fail "AiSloth hasn't started here yet: run ./host up first."
+        fi
+
+        compose "$@"
+        ;;
+esac

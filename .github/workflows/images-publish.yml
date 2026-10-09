@@ -1,8 +1,9 @@
-name: Nook images / Publish
-run-name: Nook images / Publish / ${{ github.ref_name }}
+name: Images / Publish
+run-name: Images / Publish / ${{ github.ref_name }}
 
-# Main's nook images, public on GHCR as ghcr.io/<owner>/aisloth-nook[-<harness>]:<commit>, each
-# with a signed build provenance attestation. Deployments pull them by commit (docs/self-hosting.md).
+# Main's images, public on GHCR as ghcr.io/<owner>/<image>:<commit>, each with a signed build
+# provenance attestation: nooks' (aisloth-nook[-<harness>]), and the control plane's (aisloth-webapi),
+# which hosts on one server run. Deployments pull them by commit (docs/self-hosting.md).
 on:
   push:
     branches: [main]
@@ -25,12 +26,12 @@ permissions:
 
 # A newer push to main replaces the build of the commit it follows, which nobody deploys.
 concurrency:
-  group: nook-images-${{ github.ref }}
+  group: images-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   publish:
-    name: Nook images / ${{ matrix.target }}
+    name: Images / ${{ matrix.image }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -39,14 +40,28 @@ jobs:
         include:
           - target: nook
             image: aisloth-nook
+            file: src/Daemon/Dockerfile
+            cache: nook-images
           - target: claude-code
             image: aisloth-nook-claude-code
+            file: src/Daemon/Dockerfile
+            cache: nook-images
           - target: codex
             image: aisloth-nook-codex
+            file: src/Daemon/Dockerfile
+            cache: nook-images
           - target: pi
             image: aisloth-nook-pi
+            file: src/Daemon/Dockerfile
+            cache: nook-images
           - target: copilot
             image: aisloth-nook-copilot
+            file: src/Daemon/Dockerfile
+            cache: nook-images
+          - target: webapi
+            image: aisloth-webapi
+            file: src/ControlPlane/Bagatka.AiSloth.WebApi/Dockerfile
+            cache: webapi
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -66,13 +81,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # The harness images build on the base, so every job shares one layer cache.
+      # The harness images build on the base, so nook images' jobs share one layer cache.
       - name: Build and push
         id: push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          file: src/Daemon/Dockerfile
+          file: ${{ matrix.file }}
           target: ${{ matrix.target }}
           platforms: linux/amd64
           push: true
@@ -82,8 +97,8 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha,scope=nook-images
-          cache-to: type=gha,scope=nook-images,mode=max
+          cache-from: type=gha,scope=${{ matrix.cache }}
+          cache-to: type=gha,scope=${{ matrix.cache }},mode=max
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2

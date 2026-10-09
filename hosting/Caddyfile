@@ -1,0 +1,21 @@
+# HTTPS for the host at its public address, a domain or an IP address (compose.yaml). Let's Encrypt
+# certifies IP addresses only with its short-lived profile, six days, which Caddy renews; domains
+# take it too, so both work the same way. The host speaks HTTP/2 without TLS behind it, as gRPC
+# needs, and streams answers as they come.
+
+# Clients name no server when they reach an IP address, so Caddy answers those with this site's
+# certificate.
+{
+	default_sni {$AISLOTH_SITE}
+}
+
+{$AISLOTH_SITE} {
+	tls {
+		issuer acme {
+			profile shortlived
+		}
+	}
+	reverse_proxy h2c://127.0.0.1:5170 {
+		flush_interval -1
+	}
+}

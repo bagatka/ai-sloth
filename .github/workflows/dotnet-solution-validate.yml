@@ -106,8 +106,8 @@ jobs:
       - name: Verify C# formatting and code style
         run: dotnet format AiSloth.slnx --verify-no-changes --no-restore
 
-      - name: Check the scripts the control plane runs in nooks and their routers
-        run: shellcheck src/ControlPlane/Modules/Nooks/Bagatka.AiSloth.Nooks/Scripts/*.sh src/Sandboxing/Bagatka.Sandboxing.Docker/router.sh
+      - name: Check the scripts the control plane runs in nooks and their routers, and host
+        run: shellcheck src/ControlPlane/Modules/Nooks/Bagatka.AiSloth.Nooks/Scripts/*.sh src/Sandboxing/Bagatka.Sandboxing.Docker/router.sh host
 
       - name: Run the tests other than the journeys
         run: |

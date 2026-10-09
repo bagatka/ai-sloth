@@ -90,7 +90,7 @@ if ((folderStorage is null) == (blobStorage is null))
 // One Azure sign-in for whatever the host uses in Azure: its managed identity when hosted, or the
 // developer's Azure CLI.
 DefaultAzureCredential azureCredential = new DefaultAzureCredential();
-ModelGatewaySettings modelGateway = builder.Configuration.GetRequired<ModelGatewaySettings>("ModelGateway");
+ModelGatewaySettings modelGateway = builder.Configuration.GetSection("ModelGateway").Exists() ? builder.Configuration.GetRequired<ModelGatewaySettings>("ModelGateway") : new ModelGatewaySettings();
 
 builder.Services.AddSingleton(TimeProvider.System);
 

@@ -43,7 +43,7 @@ jobs:
         id: images
         run: echo "repository=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
-      # Nooks start from this commit's images, which Nook images / Publish makes after every push.
+      # Nooks start from this commit's images, which Images / Publish makes after every push.
       - name: Wait for this commit's nook images
         env:
           REPOSITORY: ${{ steps.images.outputs.repository }}
@@ -54,7 +54,7 @@ jobs:
                 break
               fi
               if [ "$attempt" = 40 ]; then
-                echo "::error::$REPOSITORY/$image:$GITHUB_SHA isn't published; run Nook images / Publish for this commit (a commit that changed only the landing page or the docs publishes none)."
+                echo "::error::$REPOSITORY/$image:$GITHUB_SHA isn't published; run Images / Publish for this commit (a commit that changed only the landing page or the docs publishes none)."
                 exit 1
               fi
               sleep 30

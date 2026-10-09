@@ -10,3 +10,7 @@ TestResults/
 
 # Orb portal metadata
 .amp/portals/*
+
+# A host run by ./host: its settings, and what it last started
+/host.env
+/hosting/running.env

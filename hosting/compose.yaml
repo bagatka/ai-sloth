@@ -1,0 +1,107 @@
+# AiSloth on one server or computer. Start, update, and run any compose command with ./host, which
+# sets the ${...} values in running.env (docs/self-hosting.md). PostgreSQL keeps the data; the host
+# serves people's apps and starts nooks as containers on this computer's Docker; Caddy gives the
+# host HTTPS when people reach it at a public address. host.env holds the host's own settings.
+name: aisloth
+
+# What the host runs with besides host.env: where its database, files, and Docker are, and where it
+# listens. People's apps reach it at Public, through Caddy or on this computer; nooks reach it at
+# Daemon and Models, which listen on Docker's bridge only, never on the internet.
+x-host: &host
+  image: ${AISLOTH_IMAGES}/aisloth-webapi:${AISLOTH_VERSION}
+  env_file: ../host.env
+  environment:
+    Database__ConnectionString: Host=/var/run/postgresql;Database=aisloth;Username=postgres
+    ObjectStorage__FileSystem__Root: /var/lib/aisloth/objects
+    Sandboxing__Docker__Endpoint: unix:///var/run/docker.sock
+    Sandboxing__Docker__Scope: aisloth
+    Host__BehindProxy: ${AISLOTH_BEHIND_PROXY}
+    Kestrel__Endpoints__Public__Url: http://127.0.0.1:5170
+    Kestrel__Endpoints__Public__Protocols: ${AISLOTH_PUBLIC_PROTOCOLS}
+    Kestrel__Endpoints__Daemon__Url: http://${AISLOTH_BRIDGE}:5171
+    Kestrel__Endpoints__Daemon__Protocols: Http2
+    Kestrel__Endpoints__Models__Url: http://${AISLOTH_BRIDGE}:5172
+    Kestrel__Endpoints__Models__Protocols: Http1
+    # Not handled: machines, people's computers that run a workspace's nooks: their nooks dial these
+    # addresses on their own computer. They need the host's public address, which nooks here can't
+    # reach until their routers let them reach this computer's own addresses at its HTTPS port.
+    Modules__Nooks__DaemonUrl: http://host.docker.internal:5171
+    Modules__Chats__ModelGatewayUrl: http://host.docker.internal:5172/models
+    # The images nooks start from: the base, and one per harness (./host pulls them all).
+    Modules__Nooks__Image: ${AISLOTH_IMAGES}/aisloth-nook:${AISLOTH_VERSION}
+    Modules__Nooks__Images__claude-code: ${AISLOTH_IMAGES}/aisloth-nook-claude-code:${AISLOTH_VERSION}
+    Modules__Nooks__Images__codex: ${AISLOTH_IMAGES}/aisloth-nook-codex:${AISLOTH_VERSION}
+    Modules__Nooks__Images__pi: ${AISLOTH_IMAGES}/aisloth-nook-pi:${AISLOTH_VERSION}
+    Modules__Nooks__Images__copilot: ${AISLOTH_IMAGES}/aisloth-nook-copilot:${AISLOTH_VERSION}
+
+services:
+  # Reached only through its socket, which it shares with the host in a volume: it has no network.
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    network_mode: none
+    command: [postgres, -c, listen_addresses=]
+    environment:
+      POSTGRES_DB: aisloth
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres:/var/lib/postgresql
+      - postgres-socket:/var/run/postgresql
+    stop_grace_period: 1m
+    healthcheck:
+      test: [CMD, pg_isready, --host=/var/run/postgresql, --username=postgres, --dbname=aisloth]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  # Applies every module's migrations, then exits; each ./host up runs it before the host starts.
+  migrations:
+    <<: *host
+    command: [migrate]
+    network_mode: none
+    volumes:
+      - postgres-socket:/var/run/postgresql
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # On this computer's network, as a process here would be: nooks' routers keep them from this
+  # computer's own addresses, which the host reads from its network interfaces
+  # (src/Sandboxing/README.md, "Network"). It runs nooks through Docker's socket. Stopping, it hands
+  # its work over and lets requests in flight, such as agents' model calls, finish.
+  webapi:
+    <<: *host
+    restart: unless-stopped
+    network_mode: host
+    group_add: ["${AISLOTH_DOCKER_GROUP}"]
+    volumes:
+      - postgres-socket:/var/run/postgresql
+      - objects:/var/lib/aisloth/objects
+      - ${AISLOTH_DOCKER_SOCKET}:/var/run/docker.sock
+    stop_grace_period: 10m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+
+  # HTTPS at the host's public address, with a certificate from Let's Encrypt for its domain or IP
+  # address, which it renews. Only when the address is public (./host turns the profile on). It
+  # reads the Caddyfile from this folder, which git pull changes in place, and ./host up reloads it.
+  caddy:
+    image: caddy:2.11
+    restart: unless-stopped
+    profiles: [https]
+    network_mode: host
+    command: [caddy, run, --config, /etc/aisloth/Caddyfile, --adapter, caddyfile]
+    environment:
+      AISLOTH_SITE: ${AISLOTH_SITE:-}
+    volumes:
+      - .:/etc/aisloth:ro
+      - caddy:/data
+
+volumes:
+  postgres:
+  postgres-socket:
+  objects:
+  caddy:
