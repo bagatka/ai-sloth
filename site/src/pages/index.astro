@@ -16,10 +16,10 @@ type Line =
 const session: Line[] = [
   { kind: "command", text: 'sloth chat "Fix the flaky checkout test" --repo shop' },
   { kind: "output", text: "Chat 4f2a91 · Claude Code · anthropic · cloud · shop" },
-  { kind: "left", text: "^C Left the chat; the agent keeps working." },
+  { kind: "left", text: "^C Left the chat; the agent keeps working. Follow it again: sloth chat open 4f2a91" },
   { kind: "command", text: 'sloth chat "Add dark mode" --repo shop --harness codex' },
   { kind: "output", text: "Chat 8c03d7 · Codex · openai · cloud · shop" },
-  { kind: "left", text: "^C Left the chat; the agent keeps working." },
+  { kind: "left", text: "^C Left the chat; the agent keeps working. Follow it again: sloth chat open 8c03d7" },
   { kind: "command", text: "sloth chat push 4f2a91 --pr" },
   { kind: "pushed", text: "shop: 2 commits on aisloth/4f2a91  ", url: "https://github.com/you/shop/pull/41" },
   { kind: "command", text: "sloth chat push 8c03d7 --pr" },
