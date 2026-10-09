@@ -25,8 +25,8 @@ internal sealed class SandboxNetworks(DockerClient docker, string scope, IReadOn
     // Names the Docker host, as sandboxes and routers know it.
     public static readonly IReadOnlyList<string> ExtraHosts = ["host.docker.internal:host-gateway"];
 
-    // Routers run Alpine with iptables, an image each engine builds once (BuildRouterImageAsync). A
-    // new tag makes engines build it again, when what it installs changes.
+    // Routers run Alpine with iptables, an image each engine builds once (RouterImageAsync). A new tag
+    // makes engines build it again, when what it installs changes.
     private const string RouterBase = "alpine:3.22";
     private const string RouterRepository = "bagatka-router";
     private const string RouterTag = "1";
@@ -128,8 +128,8 @@ internal sealed class SandboxNetworks(DockerClient docker, string scope, IReadOn
 
     private async Task StartRouterAsync(SandboxKey key, CancellationToken ct)
     {
-        await BuildRouterImageAsync(ct);
-        Result<string> created = await docker.CreateContainerAsync(RouterName(key), RouterConfiguration(key), ct);
+        string image = await RouterImageAsync(ct);
+        Result<string> created = await docker.CreateContainerAsync(RouterName(key), RouterConfiguration(key, image), ct);
         if (created.Failed && created.Error.Kind != ErrorKind.Conflict)
         {
             throw new InvalidOperationException(created.Error.Message);
@@ -138,14 +138,14 @@ internal sealed class SandboxNetworks(DockerClient docker, string scope, IReadOn
         await docker.StartContainerAsync(RouterName(key), ct);
     }
 
-    private ContainerConfiguration RouterConfiguration(SandboxKey key)
+    private ContainerConfiguration RouterConfiguration(SandboxKey key, string image)
     {
         List<string> environment =
         [
             "HOST_PORTS=" + string.Join(' ', hostPorts.Select(port => port.ToString(CultureInfo.InvariantCulture))),
             "BLOCKED=" + string.Join(' ', OwnAddresses()),
         ];
-        return new ContainerConfiguration(RouterImage, environment, labels, RouterNanoCpus, RouterMemoryBytes, ExtraHosts, RouterRuntime, Uplink)
+        return new ContainerConfiguration(image, environment, labels, RouterNanoCpus, RouterMemoryBytes, ExtraHosts, RouterRuntime, Uplink)
         {
             Command = ["/bin/sh", "-c", RouterScript],
             Capabilities = ["NET_ADMIN"],
@@ -154,14 +154,18 @@ internal sealed class SandboxNetworks(DockerClient docker, string scope, IReadOn
         };
     }
 
-    // The routers' image, built once per engine by committing a container that installed iptables on
-    // Alpine, which takes the internet that once. Another tag's image goes once no router uses it.
-    private async Task BuildRouterImageAsync(CancellationToken ct)
+    // The routers' image's ID, built once per engine by committing a container that installed iptables
+    // on Alpine, which takes the internet that once. Routers start from the ID, not the tag: sandboxes
+    // created together on a new engine each build it, and while a commit moves the tag to its image,
+    // Docker's containerd image store has no image by that tag for a moment. Another tag's image goes
+    // once no router uses it.
+    // Not handled: such simultaneous builds leave a spare copy of the image, 15 MB.
+    private async Task<string> RouterImageAsync(CancellationToken ct)
     {
         ImageDetails? built = await docker.InspectImageAsync(RouterImage, ct);
         if (built is not null)
         {
-            return;
+            return built.Id;
         }
 
         ImageDetails? alpine = await docker.InspectImageAsync(RouterBase, ct);
@@ -191,6 +195,7 @@ internal sealed class SandboxNetworks(DockerClient docker, string scope, IReadOn
             throw new InvalidOperationException(created.Error.Message);
         }
 
+        string image;
         try
         {
             await docker.StartContainerAsync(created.Output, ct);
@@ -202,7 +207,7 @@ internal sealed class SandboxNetworks(DockerClient docker, string scope, IReadOn
                     $"Installing iptables in {RouterBase} for sandboxes' routers exited with {exitCode}; building {RouterImage} needs the internet once."));
             }
 
-            await docker.CommitContainerAsync(created.Output, RouterRepository, RouterTag, new CommitConfiguration([], new Dictionary<string, string>(StringComparer.Ordinal)), ct);
+            image = await docker.CommitContainerAsync(created.Output, RouterRepository, RouterTag, new CommitConfiguration([], new Dictionary<string, string>(StringComparer.Ordinal)), ct);
         }
         finally
         {
@@ -210,6 +215,7 @@ internal sealed class SandboxNetworks(DockerClient docker, string scope, IReadOn
         }
 
         await ImageTags.RetireOthersAsync(docker, RouterImage, ct);
+        return image;
     }
 
     // This computer's IPv4 addresses, which routers keep sandboxes from, as on a server whose public
