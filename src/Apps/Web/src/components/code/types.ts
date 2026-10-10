@@ -33,14 +33,14 @@ export type DiffListProps = {
   /** The changed files, in the order shown; `inTreeOrder` matches a tree beside them. Paths must be unique. */
   files: readonly FileChange[]
   layout?: DiffLayout
-  /** Called when the reader scrolls a different file into view. */
-  onFileInView?: (path: string) => void
+  /** Called with the files on screen, in order, whenever they change. */
+  onFilesInView?: (paths: readonly string[]) => void
   ref?: React.Ref<DiffListHandle>
   className?: string
 }
 
 export type DiffListHandle = {
-  /** Jumps to a file's diff. It counts as the file in view, without calling onFileInView. */
+  /** Jumps to a file's diff, as far as the list scrolls, and briefly marks its header. */
   showFile: (path: string) => void
 }
 
@@ -57,9 +57,12 @@ export type FileTreeProps = {
   paths: readonly string[]
   /** Files that changed, marked in the tree. */
   changes?: readonly { path: string; status: FileChangeStatus }[]
-  /** The selected file. The tree follows it when it changes, and scrolls it into view. */
-  selected?: string
-  /** Called when the reader picks a file, not when `selected` changes. */
+  /**
+   * The files shown as selected: a run of files, such as the ones on screen in a list beside the
+   * tree. The tree marks them as one band, folders between them included, and keeps it in view.
+   */
+  selected?: readonly string[]
+  /** Called when the reader picks a file. To show the pick, the caller changes `selected`. */
   onSelect?: (path: string) => void
   /** Show a search field above the tree. */
   search?: boolean

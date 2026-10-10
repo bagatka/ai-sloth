@@ -728,12 +728,14 @@ function EditCall({ change }: { change: SampleChange }) {
 }
 
 // Changes on demand: every changed file's diff in one scroll, beside a tree of the files that
-// follows along and jumps to the one picked.
+// marks the ones on screen and jumps to the one picked.
 const changedFiles = inTreeOrder(changes)
 
 function ChangesPanel() {
   const list = React.useRef<DiffListHandle>(null)
-  const [current, setCurrent] = React.useState(changedFiles[0].path)
+  const [inView, setInView] = React.useState<readonly string[]>([
+    changedFiles[0].path,
+  ])
   const [layout, setLayout] = React.useState<DiffLayout>("unified")
   const totals = changes.reduce(
     (sum, file) => ({
@@ -743,11 +745,6 @@ function ChangesPanel() {
     { additions: 0, deletions: 0 }
   )
   const statuses = changes.map(({ path, status }) => ({ path, status }))
-
-  function show(path: string) {
-    setCurrent(path)
-    list.current?.showFile(path)
-  }
 
   return (
     <Sheet>
@@ -787,13 +784,17 @@ function ChangesPanel() {
             <ToggleGroupItem value="split">Split</ToggleGroupItem>
           </ToggleGroup>
         </div>
-        {/* Phones have no room for the tree or a split view: a list of the files takes the tree's place. */}
+        {/* Phones have no room for the tree or a split view. A list of the files jumps to one, and
+            the header at the top of the list says which file is on screen. */}
         <NativeSelect
-          aria-label="File"
-          value={current}
-          onChange={(event) => show(event.target.value)}
+          aria-label="Go to a file"
+          value=""
+          onChange={(event) => list.current?.showFile(event.target.value)}
           className="mx-3 mb-3 w-auto md:hidden"
         >
+          <NativeSelectOption value="" disabled>
+            Go to a file
+          </NativeSelectOption>
           {changedFiles.map((file) => (
             <NativeSelectOption key={file.path} value={file.path}>
               {file.path}
@@ -804,8 +805,8 @@ function ChangesPanel() {
           <FileTree
             paths={changedPaths}
             changes={statuses}
-            selected={current}
-            onSelect={show}
+            selected={inView}
+            onSelect={(path) => list.current?.showFile(path)}
             className="hidden w-60 shrink-0 md:block"
           />
           <div className="min-w-0 flex-1 overflow-hidden rounded-xl bg-card shadow-raised">
@@ -813,7 +814,7 @@ function ChangesPanel() {
               ref={list}
               files={changedFiles}
               layout={layout}
-              onFileInView={setCurrent}
+              onFilesInView={setInView}
             />
           </div>
         </div>

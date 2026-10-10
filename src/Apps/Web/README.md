@@ -47,8 +47,8 @@ shadcn's own style and needs the same treatment.
 
 `src/components/code` shows code: `Diff` (one change, inline in a conversation), `DiffList` (many
 changes in one scroll, unified or split), `CodeFile`, and `FileTree` with each file's change. A list
-beside a tree takes its files through `inTreeOrder`, follows the tree with `showFile`, and reports
-the file in view with `onFileInView`, so the two move together. They are built on
+beside a tree takes its files through `inTreeOrder`, jumps to a picked file with `showFile`, and
+reports the files on screen with `onFilesInView`, which the tree marks as one band. They are built on
 [@pierre/diffs](https://diffs.com) and [@pierre/trees](https://trees.software), which draw in shadow
 DOM and take their colors, fonts, and spacing from the `--diffs-*` and `--trees-*` variables in
 `src/index.css`. Highlighting runs in workers. The views load on first use: a screen likely to show

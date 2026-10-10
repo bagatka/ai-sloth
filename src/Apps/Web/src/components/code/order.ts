@@ -23,14 +23,18 @@ export function comparePaths(left: PathEntry, right: PathEntry): number {
   return left.segments.length - right.segments.length
 }
 
+export function compareFilePaths(left: string, right: string): number {
+  return comparePaths(
+    { segments: left.split("/"), isDirectory: false },
+    { segments: right.split("/"), isDirectory: false }
+  )
+}
+
 /** Files in the order a FileTree shows them, for a list that sits beside one. */
 export function inTreeOrder<File extends { path: string }>(
   files: readonly File[]
 ): File[] {
   return [...files].sort((left, right) =>
-    comparePaths(
-      { segments: left.path.split("/"), isDirectory: false },
-      { segments: right.path.split("/"), isDirectory: false }
-    )
+    compareFilePaths(left.path, right.path)
   )
 }

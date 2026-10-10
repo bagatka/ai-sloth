@@ -11,14 +11,13 @@ import { ChangeCounts } from "./change-counts"
 import { diffOptions, parseChange, workerPool } from "./setup"
 import type { DiffListProps } from "./types"
 
-type Viewer = Parameters<
-  NonNullable<React.ComponentProps<typeof CodeView>["onScroll"]>
->[1]
+// A file counts as on screen once at least a line of it shows (the line height of code views).
+const seenHeight = 20
 
 export default function DiffList({
   files,
   layout = "unified",
-  onFileInView,
+  onFilesInView,
   ref,
   className,
 }: DiffListProps) {
@@ -27,9 +26,9 @@ export default function DiffList({
   const mounted = React.useDeferredValue(true, false)
   const view = React.useRef<CodeViewHandle<unknown, unknown>>(null)
   const scroller = React.useRef<HTMLDivElement>(null)
-  // The file in view is the one at the top, except when the reader picked a file near the end,
-  // which can't scroll up to the top: it stays the file in view while it's on screen.
-  const fileInView = React.useRef(files[0]?.path)
+  const reported = React.useRef<string | null>(null)
+  // The list's height, kept from resize reports so scrolling never has to measure it.
+  const viewportHeight = React.useRef(0)
   const items: CodeViewDiffItem[] = files.map((file) => ({
     id: file.path,
     type: "diff",
@@ -38,38 +37,70 @@ export default function DiffList({
 
   React.useImperativeHandle(ref, () => ({
     showFile(path) {
-      fileInView.current = path
       view.current?.scrollTo({ type: "item", id: path, behavior: "instant" })
+      // Mark the file's header once the view has drawn it there, so a pick always answers, even
+      // when the file is already on screen and the list can't move.
+      requestAnimationFrame(() => {
+        const header = view.current
+          ?.getInstance()
+          ?.getRenderedItems()
+          .find((item) => item.id === path)
+          ?.element.shadowRoot?.querySelector("[data-diffs-header]")
+        header?.animate(
+          {
+            backgroundColor: [
+              "color-mix(in oklch, var(--card), var(--primary) 14%)",
+              getComputedStyle(header).backgroundColor,
+            ],
+          },
+          { duration: 900, easing: "ease-out" }
+        )
+      })
     },
   }))
 
-  function trackFileInView(scrollTop: number, viewer: Viewer) {
-    let top = files[0]?.path
-    for (const file of files) {
-      const fileTop = viewer.getTopForItem(file.path)
-      if (fileTop === undefined || fileTop > scrollTop + 1) break
-      top = file.path
-    }
-    if (top === undefined || top === fileInView.current) return
-
-    const root = scroller.current
-    const shownTop =
-      fileInView.current === undefined
-        ? undefined
-        : viewer.getTopForItem(fileInView.current)
-    if (root && shownTop !== undefined) {
-      const bottom = scrollTop + root.clientHeight
-      const atEnd = bottom >= root.scrollHeight - 1
-      if (atEnd && shownTop > scrollTop && shownTop < bottom) return
-    }
-    fileInView.current = top
-    onFileInView?.(top)
+  // Reports the files on screen when they change: scrolling, resizing, or a different layout.
+  function reportFilesInView() {
+    const viewer = view.current?.getInstance()
+    if (!viewer || !onFilesInView) return
+    const top = viewer.getScrollTop()
+    const bottom = top + viewportHeight.current
+    const inView = files.flatMap((file, index) => {
+      const next = files[index + 1]
+      const start = viewer.getTopForItem(file.path) ?? Infinity
+      const end = next
+        ? (viewer.getTopForItem(next.path) ?? Infinity)
+        : Infinity
+      return Math.min(end, bottom) - Math.max(start, top) >= seenHeight
+        ? [file.path]
+        : []
+    })
+    const key = inView.join("\n")
+    if (key === reported.current) return
+    reported.current = key
+    onFilesInView(inView)
   }
 
-  // The code would paint over the scroller's own focus outline, so a wrapper lays the ring on top.
   return (
     <WorkerPoolContextProvider {...workerPool}>
+      {/* The code would paint over the scroller's own focus outline, so this lays the ring on top.
+          It also watches the view's size and its content's height for files coming into view
+          without a scroll. */}
       <div
+        ref={(node) => {
+          const content = scroller.current?.firstElementChild
+          if (!mounted || !node || !content) return
+          const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+              if (entry.target === node)
+                viewportHeight.current = entry.contentRect.height
+            }
+            reportFilesInView()
+          })
+          observer.observe(node)
+          observer.observe(content)
+          return () => observer.disconnect()
+        }}
         className={cn("focus-ring-over size-full rounded-[inherit]", className)}
       >
         {mounted && (
@@ -77,8 +108,8 @@ export default function DiffList({
             ref={view}
             containerRef={(node) => {
               scroller.current = node
-              // The view takes its scroller out of the tab order; put it back, so the keyboard can
-              // scroll it.
+              // The view takes its scroller out of the tab order; put it back, so the keyboard
+              // can scroll it.
               if (!node) return
               node.tabIndex = 0
               node.setAttribute("role", "region")
@@ -107,7 +138,7 @@ export default function DiffList({
                 />
               )
             }
-            onScroll={trackFileInView}
+            onScroll={reportFilesInView}
             className="size-full overflow-auto rounded-[inherit] outline-none"
           />
         )}
