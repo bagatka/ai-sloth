@@ -30,12 +30,12 @@ public sealed class DeployJourney(DeployedControlPlane deployed)
         await using ChatWatch watch = await ChatWatch.OpenAsync(alice, chat);
         await acme.SendAsync(chat, "Please write hello.txt for me");
         await watch.NextAsync("turn-ended");
-        app.Model.ForgetHolds();
+        app.Model.HoldOn("wait for me");
         await acme.SendAsync(chat, "wait for me");
-        await app.Model.Holds.ReadAsync(TestContext.Current.CancellationToken);
+        await app.Model.HeldAsync("wait for me");
         Guid orphan = await app.LeaveOrphanSandboxAsync();
 
-        await app.ReplaceWebApiAsync(whileStopping: app.Model.ReleaseForGood);
+        await app.ReplaceWebApiAsync(whileStopping: () => app.Model.ReleaseForGood("wait for me"));
         JsonElement ended = await watch.NextAsync("turn-ended", Swap);
         await acme.SendAsync(chat, "say hello");
         JsonElement next = await watch.NextAsync("turn-ended");

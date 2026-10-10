@@ -46,8 +46,11 @@ import {
   QuestionnaireTitle,
 } from "@/components/ui/questionnaire"
 import { toast } from "@/components/ui/toast"
-import { AgentWorking } from "./agent-working"
+import { AgentWorking } from "@/components/agent-working"
 import { Section, Specimen } from "./section"
+
+// The sample turn started 72 seconds before the page opened.
+const turnStarted = Date.now() - 72_000
 
 type Row =
   | { id: string; kind: "person"; text: string; attachments?: string[] }
@@ -213,7 +216,17 @@ export function Chat() {
 
 function TranscriptRow({ row }: { row: Row }) {
   if (row.kind === "working") {
-    return <AgentWorking />
+    return (
+      <AgentWorking
+        agent="Claude Code"
+        since={turnStarted}
+        activity={{
+          command: "npm test -- orders",
+          output:
+            " PASS  src/orders/refund.test.ts\n RUNS  src/orders/export.test.ts",
+        }}
+      />
+    )
   }
 
   if (row.kind === "marker") {

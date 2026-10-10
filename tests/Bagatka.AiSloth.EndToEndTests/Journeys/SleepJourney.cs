@@ -57,13 +57,13 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
         await using ChatWatch busyWatch = await ChatWatch.OpenAsync(alice, busy);
         await acme.SendAsync(idle, "Please write hello.txt for me");
         await idleWatch.NextAsync("turn-ended");
-        app.Model.ForgetHolds();
+        app.Model.HoldOn("wait for me");
         await acme.SendAsync(busy, "wait for me");
-        await app.Model.Holds.ReadAsync(TestContext.Current.CancellationToken);
+        await app.Model.HeldAsync("wait for me");
 
         NookStatus asleep = await acme.StatusAsync(idle.NookId, status => status is NookStatus.Asleep, SleepyControlPlane.Sleep);
         NookSummary busyNook = await acme.NookAsync(busy.NookId);
-        app.Model.Release();
+        app.Model.Release("wait for me");
         await busyWatch.NextAsync("turn-ended");
         await acme.SendAsync(idle, "What was my first message?");
         JsonElement restarted = await idleWatch.NextAsync("agent-restarted", SleepyControlPlane.Sleep);

@@ -22,6 +22,7 @@
     <!-- The Azure tests clean up as the person running them (az login). -->
     <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.Playwright" />
   </ItemGroup>
 
   <ItemGroup>

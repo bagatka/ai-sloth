@@ -142,20 +142,20 @@ public sealed class ChatJourney(ControlPlane app) : IDisposable
 
     private async Task AMessageSentWhileTheAgentWorksJoinsItsTurnAsync(TestWorkspace acme, ChatSummary chat, ChatWatch watch)
     {
-        app.Model.ForgetHolds();
+        app.Model.HoldOn("wait for me");
         await acme.SendAsync(chat, "wait for me");
-        await app.Model.Holds.ReadAsync(Ct);
+        await app.Model.HeldAsync("wait for me");
 
         ChatMessage second = await acme.SendAsync(chat, "and then say hello");
         JsonElement steered = await watch.NextAsync("message-steered");
-        app.Model.Release();
+        app.Model.Release("wait for me");
         JsonElement ended = await watch.NextAsync("turn-ended");
 
         Assert.Equal(second.Id.Value, steered.GetProperty("messageId").GetGuid());
         Assert.Equal("end_turn", ended.GetProperty("stopReason").GetString());
     }
 
-    // The model holds a call that says "wait", so the turn runs until stopped. The agent's own side
+    // The model holds a call that says "wait for me", so the turn runs until stopped. The agent's own side
     // calls from the turn before, such as for a title, can be held too, so the journey waits for the
     // turn itself rather than a hold.
     private async Task StoppingEndsTheTurnAndTheNextMessageWorksAsync(TestWorkspace acme, ChatSummary chat, ChatWatch watch)

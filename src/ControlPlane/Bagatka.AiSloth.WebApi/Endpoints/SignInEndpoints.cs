@@ -1,6 +1,8 @@
 using System;
 using System.Buffers.Text;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -21,11 +23,13 @@ using Microsoft.AspNetCore.Routing;
 namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 /// <summary>
-/// How people sign in to this host, from any client: with a code (the host's setup code, a link code
-/// from another of their devices, or an invite where invites sign people up), or through the host's
-/// identity provider in a browser, as OAuth's authorization code flow with PKCE and a loopback
-/// redirect. Either way the client ends with a session token, and someone new gets a workspace of
-/// their own. The browser round trip keeps no state here: what it carries is protected and expires.
+/// How people sign in to this host and out, from any client: with a code (the host's setup code, a
+/// link code from another of their devices, or an invite where invites sign people up), or through
+/// the host's identity provider in a browser, as OAuth's authorization code flow with PKCE and a
+/// loopback redirect. Either way the client ends with a session token, and someone new gets a
+/// workspace of their own. The web app signs in the same two ways, and its session goes into the
+/// browser's cookie instead (<see cref="SessionCookie"/>), so no script sees the token. The browser
+/// round trip keeps no state here: what it carries is protected and expires.
 /// </summary>
 internal static class SignInEndpoints
 {
@@ -51,8 +55,17 @@ internal static class SignInEndpoints
     // The session's ID lets the device end it when it signs out (DELETE /users/me/sessions/{id}).
     internal sealed record SignedIn(string Token, SessionId Session, UserSummary User, WorkspaceId? Workspace);
 
+    // The web app's answer: its session is in the browser's cookie, never in the page.
+    internal sealed record SignedInBrowser(SessionId Session, UserSummary User, WorkspaceId? Workspace);
+
     // What the browser carries to the provider and back.
     internal sealed record PendingSignIn(Uri RedirectUri, string ClientState, string CodeChallenge, string Device, string Nonce, string ProviderVerifier);
+
+    // What the web app's browser carries to the provider and back: where in the app it returns to.
+    internal sealed record PendingBrowserSignIn(Uri ReturnTo, string Device, string Nonce, string ProviderVerifier);
+
+    // A session that started, and the workspace someone new got with it.
+    private sealed record Welcomed(StartedSession Session, WorkspaceId? Workspace);
 
     // What the client exchanges for its session: who the provider verified, for this client only.
     internal sealed record ClientCode(VerifiedIdentity Identity, string CodeChallenge, Uri RedirectUri, string Device);
@@ -65,6 +78,9 @@ internal static class SignInEndpoints
         signIn.MapGet("/", StartInBrowser).ExcludeFromDescription();
         signIn.MapGet("/callback", ReturnFromProvider).ExcludeFromDescription();
         signIn.MapPost("/token", ExchangeCode);
+        signIn.MapGet("/browser", StartForBrowser).ExcludeFromDescription();
+        signIn.MapPost("/browser/code", SignInBrowserWithCode);
+        app.MapPost("/sign-out", SignOut).WithTags("Sign-in");
     }
 
     /// <summary>
@@ -92,6 +108,73 @@ internal static class SignInEndpoints
         [FromServices] IProductEvents productEvents,
         CancellationToken ct)
     {
+        Result<Welcomed> welcomed = await SignInWithCodeAsync(request, users, workspaces, host, provider, productEvents, ct);
+        if (welcomed.Failed)
+        {
+            return welcomed.Error.ToProblem();
+        }
+
+        StartedSession session = welcomed.Output.Session;
+        return TypedResults.Ok(new SignedIn(session.Token, session.Id, session.Person, welcomed.Output.Workspace));
+    }
+
+    /// <summary>
+    /// Signs the web app's browser in with a code, as <c>POST /sign-in/code</c> does, keeping the session
+    /// in the browser's cookie instead of answering its token.
+    /// </summary>
+    private static async Task<Results<Ok<SignedInBrowser>, ProblemHttpResult>> SignInBrowserWithCode(
+        [FromBody] CodeSignInRequest request,
+        HttpResponse response,
+        [FromServices] IUsersApi users,
+        [FromServices] IWorkspacesApi workspaces,
+        [FromServices] HostSettings host,
+        [FromServices] SignInProvider? provider,
+        [FromServices] IProductEvents productEvents,
+        CancellationToken ct)
+    {
+        Result<Welcomed> welcomed = await SignInWithCodeAsync(request, users, workspaces, host, provider, productEvents, ct);
+        if (welcomed.Failed)
+        {
+            return welcomed.Error.ToProblem();
+        }
+
+        StartedSession session = welcomed.Output.Session;
+        SessionCookie.Write(response, session.Token);
+        return TypedResults.Ok(new SignedInBrowser(session.Id, session.Person, welcomed.Output.Workspace));
+    }
+
+    /// <summary>Signs this device out: its session stops working, and a browser forgets its cookie.</summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> SignOut(
+        ClaimsPrincipal principal,
+        HttpResponse response,
+        [FromServices] IUsersApi users,
+        CancellationToken ct)
+    {
+        string? session = principal.FindFirst(SessionAuthentication.SessionClaim)?.Value;
+        if (session is null)
+        {
+            return Error.Unauthorized.ToProblem();
+        }
+
+        Result ended = await users.EndSessionAsync(principal.ToActor(), SessionId.From(Guid.Parse(session, CultureInfo.InvariantCulture)), ct);
+        SessionCookie.Clear(response);
+        if (ended.Failed)
+        {
+            return ended.Error.ToProblem();
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Result<Welcomed>> SignInWithCodeAsync(
+        CodeSignInRequest request,
+        IUsersApi users,
+        IWorkspacesApi workspaces,
+        HostSettings host,
+        SignInProvider? provider,
+        IProductEvents productEvents,
+        CancellationToken ct)
+    {
         SignIn withCode = new SignIn(new SignInProof(new SignInCode(request.Code, request.Name)), request.Device);
         Result<StartedSession> session = await users.SignInAsync(SignInActor, withCode, ct);
         bool mayBeInvite = session.Failed && session.Error == UsersErrors.CodeNotFound && InviteSignUp(host, provider);
@@ -102,10 +185,43 @@ internal static class SignInEndpoints
 
         if (session.Failed)
         {
-            return session.Error.ToProblem();
+            return new Result<Welcomed>(session.Error);
         }
 
-        return await AnswerAsync(session.Output, mayBeInvite ? "invite" : "setup_code", workspaces, productEvents, ct);
+        return await WelcomeAsync(session.Output, mayBeInvite ? "invite" : "setup_code", workspaces, productEvents, ct);
+    }
+
+    /// <summary>
+    /// Opens sign-in with the host's identity provider for the web app: the browser comes back to the
+    /// app at <c>return_to</c>, a path within it (its start when not given), signed in, its session in
+    /// its cookie, or with <c>sign_in_error</c> when sign-in didn't finish.
+    /// </summary>
+    private static async Task<IResult> StartForBrowser(
+        [FromQuery] string? device,
+        [FromQuery(Name = "return_to")] string? returnTo,
+        [FromQuery(Name = "login_hint")] string? loginHint,
+        [FromServices] HostSettings host,
+        [FromServices] SignInProvider? provider,
+        [FromServices] IDataProtectionProvider protection,
+        CancellationToken ct)
+    {
+        if (provider is null)
+        {
+            return TypedResults.NotFound("This host signs in with codes.");
+        }
+
+        Uri? target = WithinApp(host, returnTo);
+        if (target is null || device is not { Length: > 0 and <= 100 })
+        {
+            return TypedResults.BadRequest("Sign-in for the web app needs a device name, and return_to as a path within the app.");
+        }
+
+        string providerVerifier = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
+        string nonce = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
+        PendingBrowserSignIn pending = new PendingBrowserSignIn(target, device, nonce, providerVerifier);
+        string protectedState = Protect(protection, "sign-in.browser", pending, BrowserLifetime);
+        Uri authorize = await provider.AuthorizationUrlAsync(Callback(host), protectedState, nonce, Challenge(providerVerifier), loginHint, ct);
+        return TypedResults.Redirect(authorize.AbsoluteUri);
     }
 
     /// <summary>
@@ -148,16 +264,27 @@ internal static class SignInEndpoints
         return TypedResults.Redirect(authorize.AbsoluteUri);
     }
 
-    // The provider sends the browser back here; it goes on to the client with a code of the host's own.
+    // The provider sends the browser back here; it goes on to the client with a code of the host's own,
+    // or, for the web app, back into the app signed in.
     private static async Task<IResult> ReturnFromProvider(
         [FromQuery] string? code,
         [FromQuery] string? state,
         [FromQuery] string? error,
+        HttpResponse response,
         [FromServices] HostSettings host,
         [FromServices] SignInProvider? provider,
         [FromServices] IDataProtectionProvider protection,
+        [FromServices] IUsersApi users,
+        [FromServices] IWorkspacesApi workspaces,
+        [FromServices] IProductEvents productEvents,
         CancellationToken ct)
     {
+        PendingBrowserSignIn? browser = Unprotect<PendingBrowserSignIn>(protection, "sign-in.browser", state);
+        if (provider is not null && browser is not null)
+        {
+            return await ReturnToBrowserAsync(browser, code, error, response, host, provider, users, workspaces, productEvents, ct);
+        }
+
         PendingSignIn? pending = Unprotect<PendingSignIn>(protection, "sign-in.pending", state);
         if (provider is null || pending is null)
         {
@@ -178,6 +305,45 @@ internal static class SignInEndpoints
         ClientCode clientCode = new ClientCode(identity, pending.CodeChallenge, pending.RedirectUri, pending.Device);
         string protectedCode = Protect(protection, "sign-in.code", clientCode, ClientCodeLifetime);
         return TypedResults.Redirect(ClientRedirect(pending, "code=" + Uri.EscapeDataString(protectedCode)));
+    }
+
+    private static async Task<IResult> ReturnToBrowserAsync(
+        PendingBrowserSignIn browser,
+        string? code,
+        string? error,
+        HttpResponse response,
+        HostSettings host,
+        SignInProvider provider,
+        IUsersApi users,
+        IWorkspacesApi workspaces,
+        IProductEvents productEvents,
+        CancellationToken ct)
+    {
+        if (error is not null || code is null)
+        {
+            return TypedResults.Redirect(WithSignInError(browser.ReturnTo, "access_denied"));
+        }
+
+        VerifiedIdentity? identity = await provider.ExchangeAsync(Callback(host), code, browser.ProviderVerifier, browser.Nonce, ct);
+        if (identity is null)
+        {
+            return TypedResults.Redirect(WithSignInError(browser.ReturnTo, "server_error"));
+        }
+
+        Result<StartedSession> session = await users.SignInAsync(SignInActor, new SignIn(new SignInProof(identity), browser.Device), ct);
+        if (session.Failed)
+        {
+            return TypedResults.Redirect(WithSignInError(browser.ReturnTo, session.Error.Code));
+        }
+
+        Result<Welcomed> welcomed = await WelcomeAsync(session.Output, "provider", workspaces, productEvents, ct);
+        if (welcomed.Failed)
+        {
+            return TypedResults.Redirect(WithSignInError(browser.ReturnTo, welcomed.Error.Code));
+        }
+
+        SessionCookie.Write(response, session.Output.Token);
+        return TypedResults.Redirect(browser.ReturnTo.AbsoluteUri);
     }
 
     /// <summary>
@@ -207,7 +373,13 @@ internal static class SignInEndpoints
             return session.Error.ToProblem();
         }
 
-        return await AnswerAsync(session.Output, "provider", workspaces, productEvents, ct);
+        Result<Welcomed> welcomed = await WelcomeAsync(session.Output, "provider", workspaces, productEvents, ct);
+        if (welcomed.Failed)
+        {
+            return welcomed.Error.ToProblem();
+        }
+
+        return TypedResults.Ok(new SignedIn(session.Output.Token, session.Output.Id, session.Output.Person, welcomed.Output.Workspace));
     }
 
     // Someone new joins with an invite: the invite must be good before they are recorded, then it is
@@ -239,10 +411,10 @@ internal static class SignInEndpoints
         return session;
     }
 
-    // The client's answer. Someone new first gets a workspace of their own, named after them, and is
-    // counted as signed up, by how: with the host's setup code, an invite, or its provider.
+    // Someone new first gets a workspace of their own, named after them, and is counted as signed up,
+    // by how: with the host's setup code, an invite, or its provider.
     // Not handled: that workspace failing to be created; the person signs in again without one.
-    private static async Task<Results<Ok<SignedIn>, ProblemHttpResult>> AnswerAsync(StartedSession session, string method, IWorkspacesApi workspaces, IProductEvents productEvents, CancellationToken ct)
+    private static async Task<Result<Welcomed>> WelcomeAsync(StartedSession session, string method, IWorkspacesApi workspaces, IProductEvents productEvents, CancellationToken ct)
     {
         WorkspaceId? workspace = null;
         if (session.IsNew)
@@ -250,7 +422,7 @@ internal static class SignInEndpoints
             Result<WorkspaceSummary> own = await workspaces.CreateAsync(Actor.ForUser(session.Person.Id), new CreateWorkspace(session.Person.Name), ct);
             if (own.Failed)
             {
-                return own.Error.ToProblem();
+                return new Result<Welcomed>(own.Error);
             }
 
             workspace = own.Output.Id;
@@ -260,12 +432,33 @@ internal static class SignInEndpoints
             }));
         }
 
-        return TypedResults.Ok(new SignedIn(session.Token, session.Id, session.Person, workspace));
+        return new Result<Welcomed>(new Welcomed(session, workspace));
     }
 
     private static bool InviteSignUp(HostSettings host, SignInProvider? provider)
     {
         return host.InviteSignUp ?? provider is null;
+    }
+
+    // A path within the web app, resolved against its address; nothing outside it, so sign-in can't
+    // send a browser to another site.
+    private static Uri? WithinApp(HostSettings host, string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return host.AppUrl;
+        }
+
+        bool resolved = Uri.TryCreate(host.AppUrl, path, out Uri? target);
+        return resolved && HostSettings.SameOrigin(target!, host.AppUrl) && target!.AbsolutePath.StartsWith(host.AppUrl.AbsolutePath, StringComparison.Ordinal)
+            ? target
+            : null;
+    }
+
+    private static string WithSignInError(Uri returnTo, string error)
+    {
+        string separator = string.IsNullOrEmpty(returnTo.Query) ? "?" : "&";
+        return returnTo.AbsoluteUri + separator + "sign_in_error=" + Uri.EscapeDataString(error);
     }
 
     private static Uri Callback(HostSettings host)

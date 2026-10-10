@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
@@ -14,6 +15,9 @@ namespace Bagatka.AiSloth.Chats.Model;
 // far the agent's output is read, and the sequence number of the last event.
 internal sealed class Chat
 {
+    /// <summary>The longest title, in characters; titles come from the start of the first message.</summary>
+    public const int TitleLength = 80;
+
     public const int MaxHarnessLength = 32;
 
     // Used by Start and by EF: parameter names match property names.
@@ -212,8 +216,23 @@ internal sealed class Chat
         return StoredEvent.From(Id, LastSequence, time.GetUtcNow(), body);
     }
 
-    public ChatSummary ToSummary(bool messagesWaiting)
+    /// <param name="messagesWaiting">Whether messages wait for the agent.</param>
+    /// <param name="firstMessage">The start of its first message, if anyone wrote in it.</param>
+    public ChatSummary ToSummary(bool messagesWaiting, string? firstMessage)
     {
-        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, AgentAccountId, AccountOwnerId);
+        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, AgentAccountId, AccountOwnerId, TitleFrom(firstMessage));
+    }
+
+    // A title is the first line with words in it, its spaces collapsed, cut at a word near 80 characters.
+    private static string? TitleFrom(string? firstMessage)
+    {
+        string? line = firstMessage?.Split('\n').Select(text => string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))).FirstOrDefault(text => text.Length > 0);
+        if (line is null || line.Length <= TitleLength)
+        {
+            return line;
+        }
+
+        int cut = line.AsSpan(0, TitleLength).LastIndexOf(' ');
+        return line[..(cut > TitleLength / 2 ? cut : TitleLength - 1)].TrimEnd() + "…";
     }
 }

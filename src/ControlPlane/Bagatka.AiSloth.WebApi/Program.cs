@@ -138,7 +138,7 @@ builder.Services.AddModuleDatabase(database);
 builder.Services.AddActiveInstance();
 builder.Services.ConfigureHttpJsonOptions(json => FoundationJson.Configure(json.SerializerOptions));
 builder.Services.AddProblemDetails();
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.AddSchemaTransformer(OpenApiTypedIds.DescribeAsync));
 builder.Services.AddGrpc();
 builder.Services.AddSingleton(modelGateway);
 
@@ -161,6 +161,11 @@ builder.Services.AddDataProtection().AddKeyManagementOptions(options =>
     options.XmlRepository = new SignInKeys();
     options.XmlEncryptor = new NullXmlEncryptor();
 });
+if (host.AppElsewhere)
+{
+    builder.Services.AddWebAppCors(host);
+}
+
 builder.Services.AddAuthentication(SessionAuthentication.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, SessionAuthentication>(SessionAuthentication.SchemeName, configureOptions: null);
 if (signInProvider is not null)
@@ -240,6 +245,14 @@ if (host.BehindProxy)
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+
+// The web app at its address, before anything that signs callers in: its files are public (WebApp.cs).
+app.UseWebApp(host);
+if (host.AppElsewhere)
+{
+    app.UseWebAppCors();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();

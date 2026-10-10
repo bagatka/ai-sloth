@@ -25,7 +25,8 @@ const noEffects =
   'Effects are not how this app loads data or reacts to things: load data through the router and the query cache, subscribe with useSyncExternalStore, compute derived values while rendering, and act on events in their handlers.'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // The API's types are generated from openapi.json (npm run api), never written by hand.
+  globalIgnores(['dist', 'src/api/schema.d.ts']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

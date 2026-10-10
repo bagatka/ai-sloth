@@ -116,6 +116,9 @@ staging environment. Give the AppHost these settings with `dotnet user-secrets s
 | The journey closest to your change | `dotnet test --project tests/Bagatka.AiSloth.EndToEndTests --filter-class "*.ChatJourney"` |
 | All tests | `dotnet test --solution AiSloth.slnx` |
 | Format | `dotnet format AiSloth.slnx --verify-no-changes` |
+| The web app, in `src/Apps/Web` | `npm run lint`, `npm run format:check`, and `npm run build` |
+
+The journeys serve the web app as last built, so build it before `WebJourney`.
 
 On each push to `main`, CI runs all the journeys. Pushes that change only the landing page or the
 docs skip them.
@@ -126,6 +129,25 @@ The flake does not manage personal coding tools, such as Claude Code or Codex. I
 them with their own installers. `./dev` adds `$HOME/.local/bin` to your PATH and keeps the PATH you
 had, so these tools stay available. To use them outside `./dev` too, add `$HOME/.local/bin` to the
 PATH in the startup file of your shell.
+
+## The web app
+
+The web app is in `src/Apps/Web` ([its README](src/Apps/Web/README.md)). With AiSloth running, work
+on it with hot reload:
+
+```sh
+cd src/Apps/Web
+npm ci
+npm run dev
+```
+
+Open `http://localhost:5173/app/`, and sign in with a link code:
+
+```sh
+dotnet run --project src/Cli/Bagatka.AiSloth.Cli -- host link
+```
+
+The host serves the app at `/app/` too, as it was built when the host started.
 
 ## The landing page
 

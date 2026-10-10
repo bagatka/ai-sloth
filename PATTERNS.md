@@ -1239,3 +1239,32 @@ metadata service, and read the answer.
 - **Canonical example:** the model gateway's client in
   `src/ControlPlane/Bagatka.AiSloth.WebApi/Program.cs`, with `ModelGatewaySettings` and
   `Endpoints/ModelGatewayEndpoints.cs`.
+
+## 30. Browser sessions
+
+A browser must never hold a session a script can read, yet every client uses the same API.
+
+- **One session, two carriers.** Browsers sign in at `/sign-in/browser` (through the provider) or
+  `/sign-in/browser/code`, and the host sets the session as the `__Host-aisloth-session` cookie:
+  HttpOnly, Secure, SameSite=Strict. Every other client, such as `sloth`, native apps, and tools
+  like Postman, sends it as `Authorization: Bearer`. A bearer header wins over a cookie.
+- **Changes come from our pages.** A request carried by the cookie that changes something (any
+  method but GET, HEAD, and OPTIONS) needs an `Origin` of the host or its app address, or it is
+  unauthenticated.
+- **The app elsewhere.** When the app address is another origin, CORS allows exactly that origin,
+  with credentials.
+- **Canonical example:** `src/ControlPlane/Bagatka.AiSloth.WebApi/SessionAuthentication.cs`, with
+  `SessionCookie.cs` and `Endpoints/SignInEndpoints.cs`.
+
+## 31. Web app data
+
+- **Types from the API.** `npm run api` generates `src/Apps/Web/src/api/schema.d.ts` from the
+  committed `openapi.json`; CI fails when it's stale. One client calls the API (`src/app/api.ts`), and
+  `answer()` returns the data or throws an `ApiError` with the host's problem details.
+- **Queries are declared once** in `src/app/queries.ts` and read with `useQuery`; TanStack Query
+  owns the cache, and nothing fetches in an effect (lint).
+- **Changes** are a `useMutation` where they're made. A failure says what the host said, and puts
+  back what the person wrote.
+- **Live data** is a stream object outside React, read with `useSyncExternalStore`, which folds the
+  host's server-sent events into plain state.
+- **Canonical example:** `src/Apps/Web/src/app/chat/composer.tsx` and `chat/chat-stream.ts`.

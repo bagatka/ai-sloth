@@ -241,6 +241,10 @@ else
         .WithHttpHealthCheck("/health", endpointName: "Http");
     EndpointReference httpEndpoint = webApi.GetEndpoint("Http");
     webApi.WithEnvironment("Kestrel__Endpoints__Http__Url", ReferenceExpression.Create($"http://localhost:{httpEndpoint.Property(EndpointProperty.TargetPort)}"));
+
+    // The web app as last built (npm run build in src/Apps/Web), at /app/ on the WebApi's address;
+    // npm run dev serves it with hot reload instead, at http://localhost:5173/app/.
+    webApi.WithEnvironment("Host__AppFolder", Path.Combine(repositoryRoot, "src", "Apps", "Web", "dist"));
     EndpointReference daemonEndpoint = NookFacing(webApi, "Daemon", builder.Configuration["DaemonPort"] ?? "5171");
     webApi.WithEnvironment("Kestrel__Endpoints__Daemon__Protocols", "Http2");
     EndpointReference modelsEndpoint = NookFacing(webApi, "Models", builder.Configuration["ModelsPort"] ?? "5172");

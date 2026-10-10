@@ -109,6 +109,25 @@ jobs:
       - name: Check the scripts the control plane runs in nooks and their routers, and host
         run: shellcheck src/ControlPlane/Modules/Nooks/Bagatka.AiSloth.Nooks/Scripts/*.sh src/Sandboxing/Bagatka.Sandboxing.Docker/router.sh host
 
+      - name: Install Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/Apps/Web/package-lock.json
+
+      # Packages' install scripts don't run; the build needs none. The app's API types are generated
+      # from the WebApi's OpenAPI document, and the journeys serve what it builds.
+      - name: Lint, check the style of, and build the web app
+        working-directory: src/Apps/Web
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run api
+          git diff --exit-code -- src/api/schema.d.ts
+          npm run lint
+          npm run format:check
+          npm run build
+
       - name: Run the tests other than the journeys
         run: |
           for project in tests/*/*.csproj; do
@@ -120,6 +139,11 @@ jobs:
       # The journeys run the real app with real nooks, so they run on main, which deploys only once
       # they pass, and on any branch when this workflow is run by hand; day to day, run the journey
       # closest to a change locally (PATTERNS.md, entry 25).
+      # The web journey drives Playwright's Chromium, with the system libraries it needs.
+      - name: Install the journeys' browser
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        run: pwsh tests/Bagatka.AiSloth.EndToEndTests/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
+
       - name: Run the journeys
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: dotnet test --project tests/Bagatka.AiSloth.EndToEndTests --configuration Release --no-build
@@ -133,12 +157,15 @@ jobs:
           ./host up --build
           echo remove | ./host remove
 
-      # The journeys write each app's own output to files instead of the test output.
+      # The journeys write each app's own output to files instead of the test output, and the web
+      # journey shows the page where it ended.
       - name: Keep the apps' logs of a failed run
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: app-logs-attempt-${{ github.run_attempt }}
-          path: tests/*/bin/Release/*/TestResults/logs/
+          path: |
+            tests/*/bin/Release/*/TestResults/logs/
+            tests/*/bin/Release/*/TestResults/web/
           retention-days: 14
           if-no-files-found: ignore

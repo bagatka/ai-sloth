@@ -79,7 +79,7 @@ internal sealed partial class ChatsApi
 
         // The agent starts now, after the nook's setup, while people write their first message.
         runners.Wake(chat.Id);
-        return new Result<ChatSummary>(chat.ToSummary(messagesWaiting: false));
+        return new Result<ChatSummary>(chat.ToSummary(messagesWaiting: false, firstMessage: null));
     }
 
     // The account the chat's agent runs on, when the actor may use it and the harness takes its kind.

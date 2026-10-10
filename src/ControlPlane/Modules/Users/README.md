@@ -27,14 +27,14 @@ host issued.
 others' names, a link code for another device, and their sessions. The WebApi's sign-in and
 authentication use it as system code, never as a route: `SignInAsync` turns a proof of who someone is
 (a provider's verified identity, a setup or link code, or a newcomer an invite admits) into a session,
-and `AuthenticateAsync` tells whose a token is.
+and `AuthenticateAsync` tells which session a token is and whose.
 
 ```csharp
 SignIn withCode = new SignIn(new SignInProof(new SignInCode(code, "Alex")), "sloth on laptop");
 Result<StartedSession> session = await users.SignInAsync(Actor.ForSystem("webapi.sign-in"), withCode, ct);
 // UsersErrors.CodeNotFound: the code is unknown, used, or expired.
 // session.Output.Token goes to the device once; each call presents it.
-UserId? caller = await users.AuthenticateAsync(token, ct);
+AuthenticatedSession? caller = await users.AuthenticateAsync(token, ct);
 ```
 
 ## Asks

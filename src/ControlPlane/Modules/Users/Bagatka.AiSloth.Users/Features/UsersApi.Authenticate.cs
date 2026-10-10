@@ -1,9 +1,9 @@
+using Bagatka.AiSloth.Users.Contracts;
 using Bagatka.AiSloth.Users.Data;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Users.Model;
-using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +11,7 @@ namespace Bagatka.AiSloth.Users;
 
 internal sealed partial class UsersApi
 {
-    public async Task<UserId?> AuthenticateAsync(string token, CancellationToken ct)
+    public async Task<AuthenticatedSession?> AuthenticateAsync(string token, CancellationToken ct)
     {
         if (!token.StartsWith(Session.TokenPrefix, StringComparison.Ordinal))
         {
@@ -36,6 +36,6 @@ internal sealed partial class UsersApi
             _ = await db.SaveAsync(ct);
         }
 
-        return session.UserId;
+        return new AuthenticatedSession(session.Id, session.UserId);
     }
 }

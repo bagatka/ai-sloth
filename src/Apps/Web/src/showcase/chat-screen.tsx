@@ -101,7 +101,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { AgentWorking } from "./agent-working"
+import { AgentWorking } from "@/components/agent-working"
 import { changes, changedPaths, type SampleChange } from "./sample-code"
 
 // The chat shows agents' edits, so the code views warm up as soon as the page is idle. (The app's
@@ -238,6 +238,9 @@ const transcript: Row[] = [
   },
   { id: "12", kind: "working" },
 ]
+
+// The turn in the sample started 72 seconds before the page opened.
+const turnStarted = Date.now() - 72_000
 
 export default function ChatScreen() {
   // The turn runs until someone stops it; everything showing its state follows this one value.
@@ -518,7 +521,17 @@ function TranscriptRow({ row }: { row: Row }) {
         </Marker>
       )
     case "working":
-      return <AgentWorking />
+      return (
+        <AgentWorking
+          agent="Claude Code"
+          since={turnStarted}
+          activity={{
+            command: "npm test -- orders",
+            output:
+              " PASS  src/orders/refund.test.ts\n RUNS  src/orders/export.test.ts",
+          }}
+        />
+      )
   }
 }
 

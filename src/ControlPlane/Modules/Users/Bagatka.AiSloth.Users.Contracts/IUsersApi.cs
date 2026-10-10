@@ -51,10 +51,11 @@ public interface IUsersApi
     public Task<Result<StartedSession>> SignInAsync(Actor actor, SignIn command, CancellationToken ct);
 
     /// <summary>
-    /// The person a session token belongs to, or <see langword="null"/> for a token that is unknown, ended,
-    /// or unused for 90 days. Each use keeps the session alive. For the host's authentication.
+    /// The session a token belongs to, and its person, or <see langword="null"/> for a token that is
+    /// unknown, ended, or unused for 90 days. Each use keeps the session alive. For the host's
+    /// authentication.
     /// </summary>
-    public Task<UserId?> AuthenticateAsync(string token, CancellationToken ct);
+    public Task<AuthenticatedSession?> AuthenticateAsync(string token, CancellationToken ct);
 
     /// <summary>
     /// A new setup code while nobody has signed up to the host, valid for a day and only until someone

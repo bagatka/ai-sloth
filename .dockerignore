@@ -1,5 +1,7 @@
 # Only sources go into image builds; local build output would clash with the image's own.
 **/bin/
 **/obj/
+**/node_modules/
+src/Apps/Web/dist/
 .git/
 .claude-web-chat/

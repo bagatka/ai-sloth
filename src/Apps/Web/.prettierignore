@@ -5,3 +5,6 @@ pnpm-lock.yaml
 package-lock.json
 pnpm-lock.yaml
 yarn.lock
+
+# Generated from openapi.json by npm run api.
+src/api/schema.d.ts

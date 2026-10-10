@@ -1,20 +1,37 @@
 # Web app
 
-The web app, in React and TypeScript with [shadcn](https://ui.shadcn.com) components on Base UI.
-Its screens aren't built yet. It has two pages for designing them, with made-up content:
+The web app, in React and TypeScript with [shadcn](https://ui.shadcn.com) components on Base UI. A
+host serves it at its app address, `/app/` on its own address by default. Today people sign in, see
+their workspace's chats, and follow one as its agent works: a message starts the next turn or, sent
+while the agent works, goes into its turn, and Esc stops it.
 
-- `/`: the chat screen, composed from the components, to judge the look as a whole;
-- `/components`: every component, to style them one by one. It loads only when opened.
-
-Run it from `./dev`, which has Node:
+Run it from `./dev`, which has Node, with AiSloth running (`dotnet aspire run`):
 
 ```bash
-npm install
-npm run dev      # http://localhost:5173
-npm run build    # type-checks, then builds into dist/
+npm ci
+npm run dev           # http://localhost:5173/app/, talking to the host at localhost:5170
+npm run build         # type-checks, then builds into dist/, which the local host serves at /app/
 npm run lint
 npm run format
+npm run api           # the API's types, after the WebApi's openapi.json changes
 ```
+
+Sign in with a link code: `sloth host link` on a device already signed in. In development, two more
+pages show every component and a chat screen with made-up content, to judge the look:
+`/app/design/components` and `/app/design`.
+
+## How it's built
+
+- **Routes** (`src/app/router.tsx`): sign-in, and behind it, once the session checks out, the
+  chats of a workspace (`/`) and a chat (`/chats/<id>`).
+- **The API** (`src/app/api.ts`): one client whose types are generated from the WebApi's
+  OpenAPI document, so a changed API fails the type check. Failures arrive as `ApiError`, with the
+  host's problem details. Queries live in `src/app/queries.ts`, and TanStack Query owns their cache.
+- **The session** is a cookie the host sets at sign-in, which no script reads. The app never handles
+  a token; a 401 anywhere sends the person to sign in again.
+- **A chat** streams its events from the host (`src/app/chat/chat-stream.ts`), and the transcript
+  is a pure fold of them (`transcript.ts`). Following a chat again picks up after the last event
+  the app saw, and the browser reconnects by itself.
 
 ## The look
 

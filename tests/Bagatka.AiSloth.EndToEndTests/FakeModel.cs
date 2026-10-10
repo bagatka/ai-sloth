@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Xunit;
 
 namespace Bagatka.AiSloth.EndToEndTests;
 
@@ -24,9 +25,9 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// It speaks the Anthropic Messages API well enough for Claude Code, answering by the last user
 /// message's latest text: a tool result last ends the turn, "write hello" asks to write <c>/work/hello.txt</c>, a
 /// request to prepare a chat writes a <c>.agents/setup</c> that installs what was installed by hand
-/// (<c>/opt/by-hand</c>), "wait"
-/// holds the answer until <see cref="Release"/>, "first message" answers with the conversation's first
-/// message, and anything else gets a short text. It speaks
+/// (<c>/opt/by-hand</c>), a phrase a test holds on (<see cref="HoldOn"/>) holds the answer until the
+/// test releases it, "first message" answers with the conversation's first message, and anything else
+/// gets a short text. It speaks
 /// OpenAI's Responses API well enough for Codex and pi, answering every call with a short text.
 /// </summary>
 internal sealed class FakeModel : IAsyncDisposable
@@ -35,9 +36,9 @@ internal sealed class FakeModel : IAsyncDisposable
     public const string ApiKey = "e2e-model-key";
 
     private readonly WebApplication _app;
-    private readonly Channel<bool> _holds = Channel.CreateUnbounded<bool>();
-    private TaskCompletionSource _released = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-    private bool _holding = true;
+    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
+
+    private readonly ConcurrentDictionary<string, Hold> _holds = new ConcurrentDictionary<string, Hold>(StringComparer.OrdinalIgnoreCase);
     private int _cut;
 
     private FakeModel(WebApplication app)
@@ -51,19 +52,36 @@ internal sealed class FakeModel : IAsyncDisposable
     /// <summary>Its OpenAI API, as an account names it: <c>…/v1</c>.</summary>
     public Uri OpenAIUrl => new Uri(Url, "v1");
 
-    /// <summary>One item for every call that started holding, so a test knows the agent's turn is running.</summary>
-    public ChannelReader<bool> Holds => _holds.Reader;
+    /// <summary>
+    /// Holds every call whose last message says <paramref name="phrase"/> until <see cref="Release"/>.
+    /// Journeys on one host hold on phrases of their own, none containing another's, so they never
+    /// release each other's calls.
+    /// </summary>
+    public void HoldOn(string phrase)
+    {
+        _holds.GetOrAdd(phrase, _ => new Hold());
+    }
+
+    /// <summary>
+    /// Waits, a minute at most, for the next call held on <paramref name="phrase"/>, so a test knows the
+    /// agent's turn is running.
+    /// </summary>
+    public async Task HeldAsync(string phrase)
+    {
+        using CancellationTokenSource patience = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        patience.CancelAfter(Patience);
+        try
+        {
+            await _holds.GetOrAdd(phrase, _ => new Hold()).Started.Reader.ReadAsync(patience.Token);
+        }
+        catch (OperationCanceledException timedOut) when (!TestContext.Current.CancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException("No call held on \"" + phrase + "\" in time.", timedOut);
+        }
+    }
 
     /// <summary>Held calls whose caller gave up before the release, as when something between them stopped.</summary>
     public int Cut => Volatile.Read(ref _cut);
-
-    /// <summary>Forgets holds earlier tests left, so the next one read is the caller's own.</summary>
-    public void ForgetHolds()
-    {
-        while (_holds.Reader.TryRead(out _))
-        {
-        }
-    }
 
     /// <summary>Every call's body as JSON, both APIs', so tests can see what agents told the model.</summary>
     public ConcurrentQueue<string> Requests { get; } = new ConcurrentQueue<string>();
@@ -96,33 +114,37 @@ internal sealed class FakeModel : IAsyncDisposable
         return model;
     }
 
-    /// <summary>Answers the calls held so far; later ones hold until the next release.</summary>
-    public void Release()
+    /// <summary>Answers the calls held on <paramref name="phrase"/> so far; later ones hold until the next release.</summary>
+    public void Release(string phrase)
     {
-        Interlocked.Exchange(ref _released, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
+        _holds.GetOrAdd(phrase, _ => new Hold()).Release();
     }
 
     /// <summary>
-    /// Answers the calls held so far and every later one at once, as a model does: an agent's own side
-    /// calls, such as one for a chat's title, carry the message that held its turn.
+    /// Answers the calls held on <paramref name="phrase"/> so far and every later one at once, as a model
+    /// does: an agent's own side calls, such as one for a chat's title, carry the message that held its
+    /// turn.
     /// </summary>
-    public void ReleaseForGood()
+    public void ReleaseForGood(string phrase)
     {
-        Volatile.Write(ref _holding, false);
-        Release();
+        _holds.GetOrAdd(phrase, _ => new Hold()).ReleaseForGood();
     }
 
     public async ValueTask DisposeAsync()
     {
-        Release();
+        foreach (Hold hold in _holds.Values)
+        {
+            hold.ReleaseForGood();
+        }
+
         await _app.DisposeAsync();
     }
 
-    // Holds the call until the next release; one whose caller gives up first counts as cut.
-    private async Task HoldAsync(CancellationToken callerLeft)
+    // Holds the call until the hold's next release; one whose caller gives up first counts as cut.
+    private async Task HoldAsync(Hold hold, CancellationToken callerLeft)
     {
-        Task released = Volatile.Read(ref _released).Task;
-        _holds.Writer.TryWrite(true);
+        Task released = hold.Released;
+        hold.Started.Writer.TryWrite(true);
         try
         {
             await released.WaitAsync(callerLeft);
@@ -171,9 +193,9 @@ internal sealed class FakeModel : IAsyncDisposable
             JsonNode? firstUser = messages.FirstOrDefault(message => string.Equals((string?)message!["role"], "user", StringComparison.Ordinal));
             (blocks, stopReason) = ([Text("You first said: " + LatestText(firstUser))], "end_turn");
         }
-        else if (Says(lastUser, "wait") && Volatile.Read(ref _holding))
+        else if (_holds.FirstOrDefault(held => Says(lastUser, held.Key)).Value is { Holding: true } hold)
         {
-            await HoldAsync(context.RequestAborted);
+            await HoldAsync(hold, context.RequestAborted);
             (blocks, stopReason) = ([Text("Released.")], "end_turn");
         }
         else
@@ -343,5 +365,29 @@ internal sealed class FakeModel : IAsyncDisposable
         }
 
         return stream.ToString();
+    }
+
+    // The calls held on one phrase, released together.
+    private sealed class Hold
+    {
+        private TaskCompletionSource _released = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        private bool _forGood;
+
+        public Channel<bool> Started { get; } = Channel.CreateUnbounded<bool>();
+
+        public bool Holding => !Volatile.Read(ref _forGood);
+
+        public Task Released => Volatile.Read(ref _released).Task;
+
+        public void Release()
+        {
+            Interlocked.Exchange(ref _released, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
+        }
+
+        public void ReleaseForGood()
+        {
+            Volatile.Write(ref _forGood, true);
+            Release();
+        }
     }
 }

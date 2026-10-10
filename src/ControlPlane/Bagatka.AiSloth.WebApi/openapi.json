@@ -24,6 +24,18 @@
         }
       }
     },
+    "/sign-out": {
+      "post": {
+        "tags": [
+          "Sign-in"
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/invites/accept": {
       "post": {
         "tags": [
@@ -282,6 +294,45 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SignedIn"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sign-in/browser/code": {
+      "post": {
+        "tags": [
+          "Sign-in"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeSignInRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedInBrowser"
                 }
               }
             }
@@ -2307,7 +2358,9 @@
         }
       },
       "AgentAccountId": {
-        "description": "Identifies an agent account."
+        "type": "string",
+        "description": "Identifies an agent account.",
+        "format": "uuid"
       },
       "AgentAccountKind": {
         "enum": [
@@ -2543,7 +2596,9 @@
         }
       },
       "ChatId": {
-        "description": "Identifies a chat."
+        "type": "string",
+        "description": "Identifies a chat.",
+        "format": "uuid"
       },
       "ChatMessage": {
         "required": [
@@ -2594,7 +2649,8 @@
           "working",
           "harness",
           "account",
-          "accountOwner"
+          "accountOwner",
+          "title"
         ],
         "type": "object",
         "properties": {
@@ -2641,6 +2697,13 @@
                 "$ref": "#/components/schemas/UserId"
               }
             ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the chat is about, as lists show it: the first line of its first message, at most 80\ncharacters; \u0060null\u0060 until someone writes in it."
           }
         },
         "description": "A chat as the people with access to its nook see it."
@@ -2786,7 +2849,10 @@
               "$ref": "#/components/schemas/NookRepository"
             }
           },
-          "copyOf": {},
+          "copyOf": {
+            "type": "string",
+            "format": "uuid"
+          },
           "checkpoint": {
             "type": [
               "null",
@@ -2838,7 +2904,9 @@
         "description": "A person\u0027s GitHub account, connected to AiSloth."
       },
       "GitHubConnectionAttemptId": {
-        "description": "Identifies a person\u0027s attempt to connect their GitHub account."
+        "type": "string",
+        "description": "Identifies a person\u0027s attempt to connect their GitHub account.",
+        "format": "uuid"
       },
       "GitHubConnectionProgress": {
         "required": [
@@ -3207,7 +3275,9 @@
         "description": "A code that signs its creator in on another device, once, until it expires. Shown only here."
       },
       "MachineId": {
-        "description": "Identifies a machine."
+        "type": "string",
+        "description": "Identifies a machine.",
+        "format": "uuid"
       },
       "MachineRegistration": {
         "required": [
@@ -3287,7 +3357,9 @@
         }
       },
       "MessageId": {
-        "description": "Identifies a message in a chat."
+        "type": "string",
+        "description": "Identifies a message in a chat.",
+        "format": "uuid"
       },
       "MessageProposed": {
         "required": [
@@ -3350,7 +3422,9 @@
         }
       },
       "NookId": {
-        "description": "Identifies a nook."
+        "type": "string",
+        "description": "Identifies a nook.",
+        "format": "uuid"
       },
       "NookRepository": {
         "required": [
@@ -3791,7 +3865,9 @@
         }
       },
       "ProcessId": {
-        "description": "Identifies a process in a nook. The control plane creates it before the daemon starts the process."
+        "type": "string",
+        "description": "Identifies a process in a nook. The control plane creates it before the daemon starts the process.",
+        "format": "uuid"
       },
       "ProcessOutput": {
         "required": [
@@ -3966,7 +4042,9 @@
         "type": "string"
       },
       "RepositoryId": {
-        "description": "Identifies a repository a workspace connected."
+        "type": "string",
+        "description": "Identifies a repository a workspace connected.",
+        "format": "uuid"
       },
       "RepositorySummary": {
         "required": [
@@ -4045,7 +4123,9 @@
         "description": "The kinds of Resource people can be given access to."
       },
       "SecretId": {
-        "description": "Identifies a secret."
+        "type": "string",
+        "description": "Identifies a secret.",
+        "format": "uuid"
       },
       "SecretSummary": {
         "required": [
@@ -4102,11 +4182,16 @@
           "text": {
             "type": "string"
           },
-          "proposal": {}
+          "proposal": {
+            "type": "string",
+            "format": "uuid"
+          }
         }
       },
       "SessionId": {
-        "description": "Identifies a session: one signed-in device."
+        "type": "string",
+        "description": "Identifies a session: one signed-in device.",
+        "format": "uuid"
       },
       "SessionSummary": {
         "required": [
@@ -4258,8 +4343,36 @@
           }
         }
       },
+      "SignedInBrowser": {
+        "required": [
+          "session",
+          "user",
+          "workspace"
+        ],
+        "type": "object",
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/SessionId"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "workspace": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkspaceId"
+              }
+            ]
+          }
+        }
+      },
       "SignInId": {
-        "description": "Identifies a sign-in in progress."
+        "type": "string",
+        "description": "Identifies a sign-in in progress.",
+        "format": "uuid"
       },
       "SignInMethods": {
         "required": [
@@ -4330,7 +4443,10 @@
               "$ref": "#/components/schemas/NookRepository"
             }
           },
-          "copyOf": {},
+          "copyOf": {
+            "type": "string",
+            "format": "uuid"
+          },
           "checkpoint": {
             "type": [
               "null",
@@ -4455,7 +4571,9 @@
         }
       },
       "UserId": {
-        "description": "Identifies a user. It lives in Foundation, not in a module, because Actor needs it."
+        "type": "string",
+        "description": "Identifies a user. It lives in Foundation, not in a module, because Actor needs it.",
+        "format": "uuid"
       },
       "UserProfile": {
         "required": [
@@ -4499,7 +4617,10 @@
         },
         "description": "A user as others see them."
       },
-      "WorkspaceId": {},
+      "WorkspaceId": {
+        "type": "string",
+        "format": "uuid"
+      },
       "WorkspaceSummary": {
         "required": [
           "id",

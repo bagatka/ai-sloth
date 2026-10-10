@@ -42,7 +42,16 @@ internal sealed partial class ChatsApi
             .Distinct()
             .ToListAsync(ct);
         HashSet<ChatId> waiting = [.. waitingChats];
-        List<ChatSummary> fetched = [.. chats.Select(chat => chat.ToSummary(waiting.Contains(chat.Id)))];
+        Dictionary<ChatId, string> firstMessages = await db.Messages
+            .Where(message => ids.Contains(message.ChatId))
+            .GroupBy(message => message.ChatId)
+            .Select(chatMessages => new
+            {
+                ChatId = chatMessages.Key,
+                Text = chatMessages.OrderBy(message => message.SentAt).ThenBy(message => message.Id).Select(message => message.Text.Substring(0, FirstMessageStart)).First(),
+            })
+            .ToDictionaryAsync(first => first.ChatId, first => first.Text, ct);
+        List<ChatSummary> fetched = [.. chats.Select(chat => chat.ToSummary(waiting.Contains(chat.Id), firstMessages.GetValueOrDefault(chat.Id)))];
         return new Result<Page<ChatSummary>>(Keyset.ToPage(fetched, page, chat => chat.Id.Value));
     }
 }

@@ -40,8 +40,9 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 |---|---|---|---|
 | Control plane | The system that owns all state and decisions: the WebApi and its modules, later several services | `src/ControlPlane` | platform, backend, engine |
 | Host | A running control plane people sign in to, known by its address: the official one, someone's VPS, a company's | WebApi | server, instance, deployment (for the running thing) |
+| App address | Where a host serves its web app: `/app/` on the host's own address, unless the host names another | WebApi | frontend URL, SPA URL, web address |
 | User | A person who signs in. One user can have access to many workspaces and nooks. | Users | account, customer |
-| Session | One device's sign-in to a host: an opaque token the host issued, kept only as a hash, ending when signed out or after 90 days unused | Users | login, JWT, access token |
+| Session | One device's sign-in to a host: an opaque token the host issued, kept only as a hash, ending when signed out or after 90 days unused. A browser carries it as a cookie, other clients as a bearer token | Users | login, JWT, access token |
 | Setup code | The one-time code a host prints while nobody has signed up; whoever uses it first becomes the host's first person | Users | bootstrap token, admin password |
 | Link code | A one-time code from a signed-in device that signs the same person in on another, within 10 minutes | Users | pairing code, device code |
 | Sign-in provider | An OpenID Connect provider a host may sign people in with, such as WorkOS or Entra ID; the host is its client | WebApi | IdP, auth server, issuer (for the provider) |

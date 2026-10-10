@@ -85,10 +85,17 @@ internal sealed partial class ChatsApi(
         return access < needed ? new Result<UserId>(Error.Forbidden) : new Result<UserId>(user.UserId);
     }
 
+    // Enough of a first message for its first line's title.
+    private const int FirstMessageStart = 400;
+
     private static async Task<ChatSummary> SummaryAsync(ChatsDbContext db, Chat chat, CancellationToken ct)
     {
         bool waiting = await db.Messages.AnyAsync(message => message.ChatId == chat.Id
             && (message.State == MessageState.New || message.State == MessageState.Queued || message.State == MessageState.Steering), ct);
-        return chat.ToSummary(waiting);
+        string? firstMessage = await db.Messages.Where(message => message.ChatId == chat.Id)
+            .OrderBy(message => message.SentAt).ThenBy(message => message.Id)
+            .Select(message => message.Text.Substring(0, FirstMessageStart))
+            .FirstOrDefaultAsync(ct);
+        return chat.ToSummary(waiting, firstMessage);
     }
 }

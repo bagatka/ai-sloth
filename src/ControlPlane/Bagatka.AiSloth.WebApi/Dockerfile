@@ -1,7 +1,16 @@
-# The control plane's image: the WebApi, with git, which Sources runs to move code between GitHub and
-# nooks. Run with the single argument `migrate`, it applies migrations and exits instead.
+# The control plane's image: the WebApi with the web app it serves, and git, which Sources runs to move
+# code between GitHub and nooks. Run with the single argument `migrate`, it applies migrations and
+# exits instead.
 # Build from the repository root:
 #   docker build -f src/ControlPlane/Bagatka.AiSloth.WebApi/Dockerfile -t aisloth-webapi .
+
+# The web app is the same files for every processor, so it builds on the builder's own.
+FROM --platform=$BUILDPLATFORM node:24.21.0-trixie-slim AS web
+WORKDIR /web
+COPY src/Apps/Web/package.json src/Apps/Web/package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund
+COPY src/Apps/Web/ ./
+RUN npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:11.0.100-rc.1-resolute AS build
 ARG TARGETARCH
@@ -21,6 +30,7 @@ RUN apt-get update \
 # mounted here starts with this owner.
 RUN mkdir --parents /var/lib/aisloth/objects && chown app:app /var/lib/aisloth/objects
 COPY --from=build /out /app
+COPY --from=web /web/dist /app/web
 WORKDIR /app
 USER app
 # Kestrel listens on the endpoints its configuration names, not on the base image's default port.

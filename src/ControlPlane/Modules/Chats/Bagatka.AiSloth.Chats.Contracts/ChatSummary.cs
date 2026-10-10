@@ -22,6 +22,10 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// else's are proposals. <see langword="null"/> on the workspace's account, which people with Write
 /// on the workspace use.
 /// </param>
+/// <param name="Title">
+/// What the chat is about, as lists show it: the first line of its first message, at most 80
+/// characters; <see langword="null"/> until someone writes in it.
+/// </param>
 public sealed record ChatSummary(
     ChatId Id,
     NookId NookId,
@@ -31,4 +35,5 @@ public sealed record ChatSummary(
     bool Working,
     string Harness,
     AgentAccountId Account,
-    UserId? AccountOwner);
+    UserId? AccountOwner,
+    string? Title);

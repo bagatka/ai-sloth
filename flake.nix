@@ -54,6 +54,11 @@
             DOTNET_ROOT = dotnetRoot;
             DOTNET_ROOT_X64 = dotnetRoot;
             DOTNET_ROOT_ARM64 = dotnetRoot;
+
+            # The web journey drives this Chromium instead of Playwright's download, which runs only
+            # with a distribution's own libraries. Nixpkgs builds none for macOS, where Playwright's
+            # runs as it is.
+            BAGATKA_CHROMIUM = pkgs.lib.optionalString pkgs.stdenv.isLinux "${pkgs.chromium}/bin/chromium";
           };
         }
       );

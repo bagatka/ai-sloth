@@ -1,9 +1,11 @@
 using System;
+using System.IO;
 
 namespace Bagatka.AiSloth.WebApi;
 
 /// <summary>
-/// The host as people and its own clients see it: its address, its name, and who may sign up.
+/// The host as people and its own clients see it: its address, its web app's, its name, and who may
+/// sign up.
 /// </summary>
 internal sealed record HostSettings
 {
@@ -24,7 +26,15 @@ internal sealed record HostSettings
     /// </param>
     /// <param name="signInsPerMinute">How many sign-in calls one address may make a minute: 30 unless given.</param>
     /// <param name="startsPerHour">How many chats and nooks one person may start an hour, 20 at once: 120 unless given.</param>
-    public HostSettings(Uri publicUrl, string? name = null, bool? inviteSignUp = null, bool behindProxy = false, int? signInsPerMinute = null, int? startsPerHour = null)
+    /// <param name="appUrl">
+    /// Where the web app is served, ending in a slash: another name of this host, such as
+    /// <c>https://app.aisloth.dev/</c>, or a path on its address; <c>/app/</c> on its address unless given.
+    /// </param>
+    /// <param name="appFolder">
+    /// The folder holding the built web app (<c>src/Apps/Web</c>'s <c>npm run build</c>); the
+    /// <c>web</c> folder beside the WebApi unless given. Without it, the app's address says so.
+    /// </param>
+    public HostSettings(Uri publicUrl, string? name = null, bool? inviteSignUp = null, bool behindProxy = false, int? signInsPerMinute = null, int? startsPerHour = null, Uri? appUrl = null, string? appFolder = null)
     {
         ArgumentNullException.ThrowIfNull(publicUrl);
         if (!publicUrl.IsAbsoluteUri || publicUrl.Scheme is not ("https" or "http"))
@@ -40,6 +50,20 @@ internal sealed record HostSettings
         StartsPerHour = startsPerHour ?? 120;
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(SignInsPerMinute, nameof(signInsPerMinute));
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(StartsPerHour, nameof(startsPerHour));
+
+        AppUrl = appUrl ?? new Uri(publicUrl, "/app/");
+        if (!AppUrl.IsAbsoluteUri || AppUrl.Scheme is not ("https" or "http") || !AppUrl.AbsolutePath.EndsWith('/', StringComparison.Ordinal) || !string.IsNullOrEmpty(AppUrl.Query))
+        {
+            throw new ArgumentException("The app's URL must be an absolute http or https URL ending in a slash, without a query.", nameof(appUrl));
+        }
+
+        // On the host's own address, the app needs a path of its own: the API's paths are at the root.
+        if (SameOrigin(AppUrl, PublicUrl) && string.Equals(AppUrl.AbsolutePath, "/", StringComparison.Ordinal))
+        {
+            throw new ArgumentException("On the host's own address, the app needs a path, such as /app/.", nameof(appUrl));
+        }
+
+        AppFolder = appFolder ?? Path.Combine(AppContext.BaseDirectory, "web");
     }
 
     /// <summary>The address people and clients reach this host at.</summary>
@@ -59,4 +83,21 @@ internal sealed record HostSettings
 
     /// <summary>How many chats and nooks one person may start an hour.</summary>
     public int StartsPerHour { get; }
+
+    /// <summary>Where the web app is served, ending in a slash.</summary>
+    public Uri AppUrl { get; }
+
+    /// <summary>The folder holding the built web app.</summary>
+    public string AppFolder { get; }
+
+    /// <summary>Whether the web app is served from another origin than the API, so it calls the API across origins.</summary>
+    public bool AppElsewhere => !SameOrigin(AppUrl, PublicUrl);
+
+    /// <summary>Whether two addresses share a scheme, host, and port.</summary>
+    public static bool SameOrigin(Uri left, Uri right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+        return Uri.Compare(left, right, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase) == 0;
+    }
 }
