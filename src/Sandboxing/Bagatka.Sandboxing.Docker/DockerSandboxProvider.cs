@@ -101,7 +101,7 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope, I
             return raced is null ? new Result<SandboxObservation>(created.Error) : Repeated(raced, specHash);
         }
 
-        await docker.StartContainerAsync(created.Output, ct);
+        await StartCreatedAsync(created.Output, ct);
         if (spec.Source.Value is SandboxImage fromImage)
         {
             await ImageTags.RetireOthersAsync(docker, fromImage.Reference, ct);
@@ -448,6 +448,22 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope, I
         catch (Exception exception) when (exception is HttpRequestException or OperationCanceledException)
         {
             await _networks.RemoveAsync(spec.Key);
+            throw;
+        }
+    }
+
+    // Starts a container just created. One that never started goes, so the next create makes a new
+    // one: Sysbox can keep a failed start's registration and refuse every later start of the same
+    // container.
+    private async Task StartCreatedAsync(string container, CancellationToken ct)
+    {
+        try
+        {
+            await docker.StartContainerAsync(container, ct);
+        }
+        catch (HttpRequestException)
+        {
+            _ = await docker.RemoveContainerAsync(container, CancellationToken.None);
             throw;
         }
     }
