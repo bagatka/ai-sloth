@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,6 +29,9 @@ internal sealed class Drafts(
 {
     private const int BatchSize = 20;
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
+
+    // A trace for each draft dropped; looking for them leaves none.
+    private static readonly ActivitySource Traces = new ActivitySource("Bagatka.AiSloth.Chats");
 
     // Only the active instance runs it (PATTERNS.md, entry 23).
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -68,6 +73,8 @@ internal sealed class Drafts(
     // place; handling it would take a durable record of the nooks still to delete.
     private async Task DropAsync(Draft draft, CancellationToken ct)
     {
+        using Activity? traced = Traces.StartActivity("drop draft");
+        traced?.SetTag("chat.id", draft.ChatId.Value.ToString("D", CultureInfo.InvariantCulture));
         await using (ChatsDbContext db = await databases.CreateDbContextAsync(ct))
         {
             await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(ct);

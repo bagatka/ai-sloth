@@ -127,8 +127,15 @@ internal sealed class ChatRunners(
                 return _runners[chat].Runner;
             }
 
+            // A runner outlives the call that needed it, so it carries nothing of that call, such as
+            // the trace of the request that sent a message; its turns are traces of their own.
             ChatRunner runner = new ChatRunner(chat, databases, nooks, accounts, agent, states, instructions, setups, meter, settings, signals, productEvents, time, logger);
-            Task running = Task.Run(() => runner.RunAsync(Retire, _stopping.Token), CancellationToken.None);
+            Task running;
+            using (ExecutionContext.SuppressFlow())
+            {
+                running = Task.Run(() => runner.RunAsync(Retire, _stopping.Token), CancellationToken.None);
+            }
+
             _runners[chat] = (runner, running);
             return runner;
         }

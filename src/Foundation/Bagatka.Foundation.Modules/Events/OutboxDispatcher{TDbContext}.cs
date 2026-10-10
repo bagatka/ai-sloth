@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,6 +28,9 @@ internal sealed class OutboxDispatcher<TDbContext>(
     private const int MaxAttempts = 10;
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromMinutes(10);
+
+    // A trace for each message delivered, its reactions inside; looking for messages leaves none.
+    private static readonly ActivitySource Traces = new ActivitySource("Bagatka.Foundation.Modules");
 
     private readonly ILookup<string, Reaction> _reactions = reactions.ToLookup(reaction => reaction.EventType, StringComparer.Ordinal);
 
@@ -59,6 +63,8 @@ internal sealed class OutboxDispatcher<TDbContext>(
                 .ToListAsync(ct);
             foreach (OutboxMessage message in due)
             {
+                using Activity? traced = Traces.StartActivity("deliver " + message.Type);
+                traced?.SetTag("attempt", message.Attempts + 1);
                 bool delivered = await DeliverAsync(message, ct);
                 if (delivered)
                 {
@@ -66,6 +72,7 @@ internal sealed class OutboxDispatcher<TDbContext>(
                 }
                 else
                 {
+                    traced?.SetStatus(ActivityStatusCode.Error);
                     message.Failed(MaxAttempts, RetryDelay, time.GetUtcNow());
                     if (message.ParkedAt is not null)
                     {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
@@ -52,6 +53,8 @@ internal sealed class ChatRunner(
     private static readonly TimeSpan KeepAwakeFor = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan KeepAwakeEvery = TimeSpan.FromSeconds(10);
 
+    private static readonly ActivitySource Traces = new ActivitySource("Bagatka.AiSloth.Chats");
+
     private readonly Channel<RunnerInput> _inputs = Channel.CreateBounded<RunnerInput>(
         new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
 
@@ -59,6 +62,13 @@ internal sealed class ChatRunner(
     // isn't read yet, so nothing more is offered to it until the turn ends here too.
     private bool _agentFinishedTurn;
     private int _stopRequested;
+
+    // The trace of the turn the chat works on, from when a message waits for the agent, its start
+    // included, to the turn's end: a trace of its own, current only in the steps that work on the
+    // turn, so the runner's background reading and waiting stay out of it. The step that ends the
+    // turn closes its trace once it saved the end.
+    private Activity? _turn;
+    private bool _turnEnded;
 
     // When the message of the running turn was sent, until its agent first did something for it; then
     // how long that took.
@@ -99,13 +109,20 @@ internal sealed class ChatRunner(
         // What the chat waits for in the background is done only while the runner runs, and so is the
         // tick that has it keep its nook awake while it has work.
         await using Waits waits = new Waits(Wake, KeepAwakeEvery, time, ct);
-        while (true)
+        try
         {
-            bool retired = await RunOnceAsync(retire, waits, ct);
-            if (retired)
+            while (true)
             {
-                return;
+                bool retired = await RunOnceAsync(retire, waits, ct);
+                if (retired)
+                {
+                    return;
+                }
             }
+        }
+        finally
+        {
+            _turn?.Dispose();
         }
     }
 
@@ -214,6 +231,7 @@ internal sealed class ChatRunner(
     // turn, steer messages into the running one. Null when the chat is gone.
     private async Task<Progress?> AdvanceAsync(Waits waits, CancellationToken ct)
     {
+        Activity.Current = _turn;
         await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
         Chat? chat = await db.Chats.SingleOrDefaultAsync(found => found.Id == chatId, ct);
         if (chat is null)
@@ -245,6 +263,13 @@ internal sealed class ChatRunner(
         }
 
         List<Message> queued = waiting.Where(message => message.State == MessageState.Queued).ToList();
+        if (_turn is null && (queued.Count > 0 || chat.TurnMessageId is not null))
+        {
+            _turn = Traces.StartActivity("turn");
+            _turn?.SetTag("chat.id", chatId.Value.ToString("D", CultureInfo.InvariantCulture));
+            _turn?.SetTag("harness", chat.Harness);
+        }
+
         if (chat.HarnessProcessId is null && (queued.Count > 0 || chat.TurnMessageId is not null || chat.StartsAgent))
         {
             bool setUp = await SetUpAsync(db, chat, queued.FirstOrDefault(), waits, ct);
@@ -266,6 +291,13 @@ internal sealed class ChatRunner(
         {
             await KeepAwakeAsync(chat, ct);
         }
+        else if (_turn is not null && !_turnEnded)
+        {
+            // Stopped before the agent took the message.
+            EndTurnTrace("cancelled", failure: null);
+        }
+
+        CloseEndedTurnTrace();
 
         return new Progress(chat.NookId, chat.HarnessProcessId, chat.OutputOffset, idle);
     }
@@ -349,6 +381,31 @@ internal sealed class ChatRunner(
         _agentFinishedTurn = false;
         CaptureTurnEnded(chat, message.SentBy, message.SentAt, ended, failure, checkpointSaved: !taken.Failed);
         await states.SyncAsync(chat, ct);
+        EndTurnTrace(ended.StopReason, failure);
+    }
+
+    // The turn's trace ends with how it ended, and for a failed one where it failed.
+    private void EndTurnTrace(string outcome, string? failure)
+    {
+        _turn?.SetTag("outcome", outcome);
+        if (failure is not null)
+        {
+            _turn?.SetStatus(ActivityStatusCode.Error, failure);
+        }
+
+        _turnEnded = true;
+    }
+
+    private void CloseEndedTurnTrace()
+    {
+        if (!_turnEnded)
+        {
+            return;
+        }
+
+        _turn?.Dispose();
+        _turn = null;
+        _turnEnded = false;
     }
 
     // What a turn came to, for product analytics: how it ended, and for a failed one where it failed
@@ -578,6 +635,7 @@ internal sealed class ChatRunner(
     // Returns true when the agent's process ended, or the chat is gone.
     private async Task<bool> HandleAsync(List<RunnerInput> batch, CancellationToken ct)
     {
+        Activity.Current = _turn;
         await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
         Chat? chat = await db.Chats.SingleOrDefaultAsync(found => found.Id == chatId, ct);
         if (chat is null)
@@ -608,6 +666,7 @@ internal sealed class ChatRunner(
 
         await SaveAsync(db, ct);
         await SendAsync(chat, outgoing, ct);
+        CloseEndedTurnTrace();
         return exited;
     }
 
@@ -782,6 +841,7 @@ internal sealed class ChatRunner(
             db.Events.Add(chat.Record(new ChatEventBody(failed), time));
             message.Deliver();
             CaptureTurnEnded(chat, message.SentBy, message.SentAt, failed, "start", checkpointSaved: null);
+            EndTurnTrace(failed.StopReason, "start");
         }
 
         Log.AgentFailed(logger, chatId.Value, failure);

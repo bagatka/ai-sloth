@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -47,6 +48,9 @@ internal sealed class NookLifecycle(
     private const int Capacity = 32;
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan PruneInterval = TimeSpan.FromHours(1);
+
+    // A trace for each nook worked on, named for the work: start, recover, sleep, evict, or delete.
+    private static readonly ActivitySource Traces = new ActivitySource("Bagatka.AiSloth.Nooks");
     private const int OrphanBatch = 500;
 
     // Long enough for a machine on a slow connection to pull the nook image for its first sandbox, or
@@ -256,6 +260,8 @@ internal sealed class NookLifecycle(
     // The nook's work, as its record and its daemon call for it now.
     private async Task WorkOnAsync(NookId nookId, CancellationToken ct)
     {
+        using Activity? traced = Traces.StartActivity("nook work");
+        traced?.SetTag("nook.id", nookId.Value.ToString("D", CultureInfo.InvariantCulture));
         try
         {
             await using NooksDbContext db = await databases.CreateDbContextAsync(ct);
@@ -270,18 +276,23 @@ internal sealed class NookLifecycle(
             switch (nook.Status)
             {
                 case NookStatus.Deleting:
+                    traced?.DisplayName = "delete nook";
                     await DeleteSandboxAsync(db, provider, nook, ct);
                     break;
                 case NookStatus.Starting when !connected:
+                    traced?.DisplayName = "start nook";
                     await EnsureSandboxAsync(db, provider, nook, ct);
                     break;
                 case NookStatus.Ready or NookStatus.Offline when !connected:
+                    traced?.DisplayName = "recover nook";
                     await RecoverAsync(db, provider, nook, ct);
                     break;
                 case NookStatus.Ready:
+                    traced?.DisplayName = "sleep nook";
                     await SleepAsync(nook.Id, ct);
                     break;
                 case NookStatus.Asleep:
+                    traced?.DisplayName = "evict nook";
                     await EvictAsync(nook.Id, ct);
                     break;
                 case NookStatus.Starting or NookStatus.Offline or NookStatus.Failed:
@@ -290,6 +301,7 @@ internal sealed class NookLifecycle(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            traced?.SetStatus(ActivityStatusCode.Error);
             Log.NookWorkFailed(logger, exception, nookId.Value);
         }
     }

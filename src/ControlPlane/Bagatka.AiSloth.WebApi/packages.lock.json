@@ -600,8 +600,7 @@
           "OpenTelemetry.Exporter.OpenTelemetryProtocol": "[1.19.1, )",
           "OpenTelemetry.Extensions.Hosting": "[1.19.1, )",
           "OpenTelemetry.Instrumentation.AspNetCore": "[1.19.0, )",
-          "OpenTelemetry.Instrumentation.Http": "[1.19.0, )",
-          "OpenTelemetry.Instrumentation.Runtime": "[1.19.0, )"
+          "OpenTelemetry.Instrumentation.Http": "[1.19.0, )"
         }
       },
       "Azure.Core": {
@@ -723,15 +722,6 @@
         "contentHash": "+egJpWBRfYP3ldfexV2bmJyzOWkkOPVYikw/vUEtbUvf2exJfY3RGInXrYlubhBIH6rmNEn6sI/FmqenZJwkjw==",
         "dependencies": {
           "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.19.0, 2.0.0)"
-        }
-      },
-      "OpenTelemetry.Instrumentation.Runtime": {
-        "type": "CentralTransitive",
-        "requested": "[1.19.0, )",
-        "resolved": "1.19.0",
-        "contentHash": "VIH2tQ2h31j4wQyZ9Utk8ZXIyj7Z1j0xIiyPRGjYu1MmZjJtpxRh0Y/NnB6fEBimNg/WrX0jDyfMeEjPQqmaMA==",
-        "dependencies": {
-          "OpenTelemetry.Api": "[1.19.0, 2.0.0)"
         }
       }
     },

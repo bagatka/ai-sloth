@@ -28,7 +28,9 @@ public static class ServiceDefaultsExtensions
     /// <summary>
     /// Registers OpenTelemetry, the default health checks, and HTTPS-only service discovery for HTTP
     /// clients. Telemetry goes over OTLP to <paramref name="otlp"/> when the host gives one, or else
-    /// to <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> when it is set, such as the Aspire dashboard's.
+    /// to <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> when it is set, such as the Aspire dashboard's. A trace
+    /// starts with a request or a span the host's own code starts; a call out with no trace around it
+    /// records none.
     /// HTTP resilience is not added here: retries are configured per integration.
     /// </summary>
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder, OtlpDestination? otlp = null)
@@ -78,13 +80,14 @@ public static class ServiceDefaultsExtensions
                     metrics
                         .AddAspNetCoreInstrumentation()
                         .AddHttpClientInstrumentation()
-                        .AddRuntimeInstrumentation();
+                        .AddMeter("System.Runtime");
                 }
             )
             .WithTracing(
                 tracing =>
                 {
                     tracing
+                        .SetSampler(new ParentBasedSampler(new TracesStartWithWork()))
                         .AddSource(builder.Environment.ApplicationName)
                         .AddAspNetCoreInstrumentation(
                             aspNetCoreTraceInstrumentationOptions =>

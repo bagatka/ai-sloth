@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -13,15 +15,20 @@ namespace Bagatka.Foundation.Modules;
 /// Puts every module on the one PostgreSQL database the host has, each in a schema of its own
 /// (PATTERNS.md, entry 13).
 /// </summary>
-public static class ModuleDatabaseRegistration
+public static partial class ModuleDatabaseRegistration
 {
     /// <summary>
     /// The database every module and the instance lease share, registered once by the host: one pool
-    /// of connections for all of them (<see cref="DatabaseSettings.ConnectionString"/>).
+    /// of connections for all of them (<see cref="DatabaseSettings.ConnectionString"/>). Its queries'
+    /// spans are named by what they do, such as <c>SELECT nooks.nooks</c>.
     /// </summary>
     public static IServiceCollection AddModuleDatabase(this IServiceCollection services, DatabaseSettings settings)
     {
-        services.AddSingleton(_ => NpgsqlDataSource.Create(settings.ConnectionString));
+        NpgsqlDataSourceBuilder database = new NpgsqlDataSourceBuilder(settings.ConnectionString);
+        database.ConfigureTracing(tracing => tracing
+            .ConfigureCommandSpanNameProvider(command => SpanName(command.CommandText))
+            .ConfigureBatchSpanNameProvider(batch => string.Join(", ", batch.BatchCommands.Select((NpgsqlBatchCommand command) => SpanName(command.CommandText)).Distinct(StringComparer.Ordinal))));
+        services.AddSingleton(_ => database.Build());
         return services;
     }
 
@@ -49,6 +56,28 @@ public static class ModuleDatabaseRegistration
         DbContextOptionsBuilder configured = database is null ? options.UseNpgsql(npgsql) : options.UseNpgsql(database, npgsql);
         return configured.UseSnakeCaseNamingConvention();
     }
+
+    // A query's span name, as OpenTelemetry names database spans: its operation and the table it works
+    // on, such as "UPDATE chats.chats", or for one it can't tell, the first word, such as "CREATE".
+    private static string SpanName(string sql)
+    {
+        Match named = OperationAndTable().Match(sql);
+        if (named.Success)
+        {
+            return named.Groups["operation"].Value + " " + named.Groups["table"].Value.Replace("\"", string.Empty, StringComparison.Ordinal);
+        }
+
+        Match first = FirstWord().Match(sql);
+        return first.Success ? first.Value.ToUpperInvariant() : "postgresql";
+    }
+
+    // The statements EF Core writes: SELECT … FROM, DELETE FROM, INSERT INTO, or UPDATE, then a table
+    // its schema names.
+    [GeneratedRegex(@"^\s*(?:(?<operation>SELECT|DELETE)\b.*?\bFROM|(?<operation>INSERT)\s+INTO|(?<operation>UPDATE))\s+(?<table>""?\w+""?\.""?\w+""?)", RegexOptions.Singleline, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex OperationAndTable();
+
+    [GeneratedRegex(@"\w+", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex FirstWord();
 
     private static async Task MigrateAsync<TContext>(IServiceProvider services, CancellationToken ct)
         where TContext : DbContext

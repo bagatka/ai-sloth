@@ -1047,9 +1047,19 @@ UserId;System.Guid
   A new event is added here in the same change.
 - **Traces and metrics.**
   - OpenTelemetry is configured by `Bagatka.ServiceDefaults` in every host.
+  - A trace starts with work: a request served, or a span a job starts for the one thing it works
+    on, named for that work, such as `start nook` or `turn`. A query or call out with no trace
+    around it, such as a job looking for work, records none (`TracesStartWithWork`), so a host
+    nobody uses sends no traces; Npgsql's metrics still count every query. Canonical example:
+    `WorkOnAsync` in `src/ControlPlane/Modules/Nooks/Bagatka.AiSloth.Nooks/Jobs/NookLifecycle.cs`.
+  - Work that outlives the call that started it, such as a chat's runner, starts under
+    `ExecutionContext.SuppressFlow()`, so it never joins that call's trace.
+  - Database spans are named by operation and table, such as `UPDATE chats.chats`
+    (`ModuleDatabaseRegistration`).
   - A module adds an `ActivitySource` or `Meter` named `Bagatka.AiSloth.<Module>` only when it
-    has something specific to measure; the WebApi collects every `Bagatka.AiSloth.*` meter.
-    Canonical example: `src/ControlPlane/Modules/Chats/Bagatka.AiSloth.Chats/Harness/ChatsMeter.cs`.
+    has something specific to trace or measure; the WebApi collects every `Bagatka.AiSloth.*`
+    source and meter. Canonical example:
+    `src/ControlPlane/Modules/Chats/Bagatka.AiSloth.Chats/Harness/ChatsMeter.cs`.
 
 ## 22. External APIs
 
@@ -1068,6 +1078,7 @@ UserId;System.Guid
     to run sooner exposes `Wake()` and waits for that or its interval instead
     (`Jobs/NookLifecycle.cs` in the Nooks module).
   - Create one context per item, and pass `stoppingToken` everywhere.
+  - Each item worked on is a span of its own; looking for items is not (entry 21).
 - **One failure never stops a job.** Catch per item and per pass, log, and let the next pass retry.
 - **Bounded batches.** Each iteration processes a limited batch.
 - **The active instance runs it.** A job's `ExecuteAsync` returns

@@ -67,7 +67,12 @@ public sealed class PostHogClient : IAsyncDisposable
         _http = new HttpClient(handler, disposeHandler) { Timeout = RequestTimeout };
         _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue(LibraryName, LibraryVersion));
         _batchUrl = new Uri(options.Host, "batch/");
-        _sendingPeriodically = Task.Run(SendPeriodicallyAsync);
+        // Sending is the client's own work, so it carries nothing of the code that made the client,
+        // such as the trace of a request it was made in.
+        using (ExecutionContext.SuppressFlow())
+        {
+            _sendingPeriodically = Task.Run(SendPeriodicallyAsync);
+        }
     }
 
     /// <summary>Captures an event.</summary>
