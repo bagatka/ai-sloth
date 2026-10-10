@@ -339,7 +339,7 @@ function WorkspaceSwitcher() {
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <button className="flex h-10 w-full items-center gap-2.5 rounded-lg px-2 text-left focus-ring press hover:bg-sidebar-accent active:bg-[color-mix(in_oklch,var(--sidebar-accent),var(--foreground)_6%)] aria-expanded:bg-sidebar-accent" />
+          <button className="flex h-10 w-full press items-center gap-2.5 rounded-lg px-2 text-left focus-ring hover:bg-sidebar-accent active:bg-[color-mix(in_oklch,var(--sidebar-accent),var(--foreground)_6%)] aria-expanded:bg-sidebar-accent" />
         }
       >
         <span className="flex size-6 items-center justify-center rounded-md bg-card text-caption font-semibold shadow-raised">
@@ -637,7 +637,7 @@ function Composer({
                     inert={!stopShown}
                     className={cn(
                       "absolute inset-0",
-                      !stopShown && "opacity-0 blur-[2px]"
+                      !stopShown && "scale-90 opacity-0 blur-[2px]"
                     )}
                   />
                 }
@@ -656,7 +656,7 @@ function Composer({
               inert={stopShown}
               className={cn(
                 "absolute inset-0",
-                stopShown && "opacity-0 blur-[2px]"
+                stopShown && "scale-90 opacity-0 blur-[2px]"
               )}
             >
               <ArrowUpIcon weight="bold" />

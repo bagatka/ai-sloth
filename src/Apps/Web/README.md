@@ -33,8 +33,8 @@ It lives in `src/index.css`:
   group. Anything else focused from the keyboard gets the same algae outline from the base styles,
   and mouse focus shows nothing.
 - **Motion:** one curve (`--ease-out`) that every transition uses by default. Hover arrives at once
-  and leaves gently. A press shows at once in the material (pressed in, or darker) and never moves
-  or resizes anything, which would redraw icons and text off the pixel grid. `pop` is for
+  and leaves gently. A press (`press`) gives a little and sinks in its material at once; it scales
+  on its own GPU layer, so icons and text never jump. Nothing else moves on press (lint). `pop` is for
   anything that opens.
 - **Signature:** the algae panel, shown while an agent works.
 

@@ -368,15 +368,18 @@
   }
 }
 
-/* Anything pressable answers the moment it's pressed, without moving: shrinking or shifting redraws
-   icons and text at sub-pixel sizes, which on ordinary screens reads as a jump. The press itself is
-   drawn by each material (pressed in, or darker), at once; letting go eases back. */
+/* Anything pressable gives a little the moment it's pressed, and its material sinks (pressed in, or
+   darker). It keeps its own GPU layer, so the shrink scales one finished image instead of redrawing
+   icons and text at sub-pixel sizes on every frame, which reads as a jump. The color changes at once;
+   the shrink and letting go ease. */
 @utility press {
-  transition-property: color, background-color, border-color, box-shadow, opacity, filter;
+  will-change: scale;
+  transition-property: scale, color, background-color, border-color, box-shadow, opacity, filter;
   transition-duration: 160ms;
   transition-timing-function: var(--ease-out);
   &:active:not(:disabled, [aria-disabled="true"]) {
-    transition-duration: 0ms;
+    scale: 0.97;
+    transition-duration: 160ms, 0ms, 0ms, 0ms, 0ms, 0ms, 0ms;
   }
 }
 

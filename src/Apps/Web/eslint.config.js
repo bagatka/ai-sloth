@@ -5,18 +5,19 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
-// A press shows in the material, never by moving or resizing: that redraws icons and text off the
-// pixel grid, which reads as a jump.
+// A press moves only through the press utility, which keeps the element on its own GPU layer.
+// Moving or resizing anything else on press redraws icons and text off the pixel grid, which reads
+// as a jump.
 const pressNeverMoves = [
   {
     selector: 'Literal[value=/\\bactive:-?(scale|translate|rotate)/]',
     message:
-      'A press never moves or resizes anything. Show it in the material instead (pressed in, or darker).',
+      'Use the press utility for press feedback: it keeps the element on a GPU layer, so it never jumps.',
   },
   {
     selector: 'TemplateElement[value.raw=/\\bactive:-?(scale|translate|rotate)/]',
     message:
-      'A press never moves or resizes anything. Show it in the material instead (pressed in, or darker).',
+      'Use the press utility for press feedback: it keeps the element on a GPU layer, so it never jumps.',
   },
 ]
 
