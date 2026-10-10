@@ -33,7 +33,9 @@ It lives in `src/index.css`:
   group. Anything else focused from the keyboard gets the same algae outline from the base styles,
   and mouse focus shows nothing.
 - **Motion:** one curve (`--ease-out`) that every transition uses by default. Hover arrives at once
-  and leaves gently; `press` gives way on press; `pop` is for anything that opens.
+  and leaves gently. A press shows at once in the material (pressed in, or darker) and never moves
+  or resizes anything, which would redraw icons and text off the pixel grid. `pop` is for
+  anything that opens.
 - **Signature:** the algae panel, shown while an agent works.
 
 `src/components/ui` holds the components shadcn added, with Phosphor icons, restyled to use it. They

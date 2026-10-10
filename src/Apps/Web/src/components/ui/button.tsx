@@ -5,7 +5,7 @@ import { cn } from "cn"
 import { Spinner } from "@/components/ui/spinner"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 press items-center justify-center rounded-lg text-sm font-medium whitespace-nowrap focus-ring outline-none select-none disabled:pointer-events-none aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-lg text-sm font-medium whitespace-nowrap focus-ring press outline-none select-none disabled:pointer-events-none aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -13,12 +13,12 @@ const buttonVariants = cva(
         outline:
           "control-raised disabled:opacity-50 aria-expanded:bg-(--raised-hover)",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_6%)] disabled:opacity-50 aria-expanded:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_6%)]",
+          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_6%)] active:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_11%)] disabled:opacity-50 aria-expanded:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_6%)]",
         ghost:
-          "hover:bg-muted hover:text-foreground disabled:opacity-50 aria-expanded:bg-muted aria-expanded:text-foreground",
+          "hover:bg-muted hover:text-foreground active:bg-[color-mix(in_oklch,var(--muted),var(--foreground)_6%)] disabled:opacity-50 aria-expanded:bg-muted aria-expanded:text-foreground",
         destructive:
-          "bg-destructive/8 font-semibold text-destructive hover:bg-destructive/14 disabled:opacity-50 dark:bg-destructive/14 dark:hover:bg-destructive/22",
-        link: "text-primary underline-offset-4 hover:underline disabled:opacity-50",
+          "bg-destructive/8 font-semibold text-destructive hover:bg-destructive/14 active:bg-destructive/20 disabled:opacity-50 dark:bg-destructive/14 dark:hover:bg-destructive/22",
+        link: "text-primary underline-offset-4 hover:underline active:opacity-75 disabled:opacity-50",
       },
       size: {
         default:

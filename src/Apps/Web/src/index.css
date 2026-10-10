@@ -144,6 +144,8 @@
     --primary-fill: linear-gradient(180deg, #4a8b29 0%, #3f7d20 100%);
     --primary-fill-hover: linear-gradient(180deg, #519430 0%, #448426 100%);
     --primary-edge: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 0 0 1px #346a1a, 0 1px 2px oklch(0.205 0.006 115 / 0.24);
+    --primary-fill-pressed: linear-gradient(180deg, #387119 0%, #3f7d20 100%);
+    --primary-edge-pressed: inset 0 1px 2px rgb(0 0 0 / 0.25), 0 0 0 1px #346a1a;
     --panel: linear-gradient(180deg, #d3e9a8 0%, #8fc25a 42%, #4f8d2b 72%, #2f6316 100%);
 }
 
@@ -189,6 +191,8 @@
     --primary-fill: linear-gradient(180deg, #a9d97a 0%, #9ccf6a 100%);
     --primary-fill-hover: linear-gradient(180deg, #b4e086 0%, #a6d675 100%);
     --primary-edge: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 0 0 1px #84b555, 0 1px 2px rgb(0 0 0 / 0.5);
+    --primary-fill-pressed: linear-gradient(180deg, #8fc25d 0%, #9ccf6a 100%);
+    --primary-edge-pressed: inset 0 1px 2px rgb(0 0 0 / 0.3), 0 0 0 1px #84b555;
     --panel: linear-gradient(180deg, #b7da8b 0%, #78b246 42%, #427f22 72%, #24510f 100%);
 }
 
@@ -305,6 +309,10 @@
       background: var(--primary-fill-hover);
     }
   }
+  &:active:not(:disabled, [aria-disabled="true"]) {
+    background: var(--primary-fill-pressed);
+    box-shadow: var(--primary-edge-pressed);
+  }
   &:disabled {
     background: var(--muted);
     color: var(--muted-foreground);
@@ -322,7 +330,7 @@
       background: var(--raised-hover);
     }
   }
-  &:is([aria-pressed="true"], [data-pressed]):not(:disabled) {
+  &:is([aria-pressed="true"], [data-pressed], :active):not(:disabled, [aria-disabled="true"]) {
     background: var(--muted);
     box-shadow:
       var(--field),
@@ -360,13 +368,15 @@
   }
 }
 
-/* Anything pressable gives way a little the moment it's pressed, and changes color quickly. */
+/* Anything pressable answers the moment it's pressed, without moving: shrinking or shifting redraws
+   icons and text at sub-pixel sizes, which on ordinary screens reads as a jump. The press itself is
+   drawn by each material (pressed in, or darker), at once; letting go eases back. */
 @utility press {
-  transition-property: scale, color, background-color, border-color, opacity, filter;
+  transition-property: color, background-color, border-color, box-shadow, opacity, filter;
   transition-duration: 160ms;
   transition-timing-function: var(--ease-out);
   &:active:not(:disabled, [aria-disabled="true"]) {
-    scale: 0.97;
+    transition-duration: 0ms;
   }
 }
 

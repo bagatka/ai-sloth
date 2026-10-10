@@ -5,6 +5,21 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
+// A press shows in the material, never by moving or resizing: that redraws icons and text off the
+// pixel grid, which reads as a jump.
+const pressNeverMoves = [
+  {
+    selector: 'Literal[value=/\\bactive:-?(scale|translate|rotate)/]',
+    message:
+      'A press never moves or resizes anything. Show it in the material instead (pressed in, or darker).',
+  },
+  {
+    selector: 'TemplateElement[value.raw=/\\bactive:-?(scale|translate|rotate)/]',
+    message:
+      'A press never moves or resizes anything. Show it in the material instead (pressed in, or darker).',
+  },
+]
+
 const noEffects =
   'Effects are not how this app loads data or reacts to things: load data through the router and the query cache, subscribe with useSyncExternalStore, compute derived values while rendering, and act on events in their handlers.'
 
@@ -41,12 +56,19 @@ export default defineConfig([
             "ImportDeclaration[source.value='react'] > ImportSpecifier[imported.name=/^use(Layout)?Effect$/]",
           message: noEffects,
         },
+        ...pressNeverMoves,
       ],
       'no-restricted-properties': [
         'error',
         { object: 'React', property: 'useEffect', message: noEffects },
         { object: 'React', property: 'useLayoutEffect', message: noEffects },
       ],
+    },
+  },
+  {
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': ['error', ...pressNeverMoves],
     },
   },
 ])

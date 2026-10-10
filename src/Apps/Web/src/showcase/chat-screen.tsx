@@ -339,7 +339,7 @@ function WorkspaceSwitcher() {
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <button className="flex h-10 w-full press items-center gap-2.5 rounded-lg px-2 text-left focus-ring hover:bg-sidebar-accent aria-expanded:bg-sidebar-accent" />
+          <button className="flex h-10 w-full items-center gap-2.5 rounded-lg px-2 text-left focus-ring press hover:bg-sidebar-accent active:bg-[color-mix(in_oklch,var(--sidebar-accent),var(--foreground)_6%)] aria-expanded:bg-sidebar-accent" />
         }
       >
         <span className="flex size-6 items-center justify-center rounded-md bg-card text-caption font-semibold shadow-raised">
@@ -507,7 +507,7 @@ function ToolCall({
     <Collapsible>
       <CollapsibleTrigger
         render={
-          <button className="group -mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-left text-label text-muted-foreground focus-ring transition-colors hover:bg-muted/70 hover:text-foreground [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-caption [&_code]:text-foreground/80" />
+          <button className="group -mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-left text-label text-muted-foreground focus-ring transition-colors hover:bg-muted/70 hover:text-foreground active:bg-[color-mix(in_oklch,var(--muted),var(--foreground)_6%)] [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-caption [&_code]:text-foreground/80" />
         }
       >
         <TerminalWindowIcon className="size-4 shrink-0" />
@@ -637,7 +637,7 @@ function Composer({
                     inert={!stopShown}
                     className={cn(
                       "absolute inset-0",
-                      !stopShown && "scale-75 opacity-0 blur-[2px]"
+                      !stopShown && "opacity-0 blur-[2px]"
                     )}
                   />
                 }
@@ -656,7 +656,7 @@ function Composer({
               inert={stopShown}
               className={cn(
                 "absolute inset-0",
-                stopShown && "scale-75 opacity-0 blur-[2px]"
+                stopShown && "opacity-0 blur-[2px]"
               )}
             >
               <ArrowUpIcon weight="bold" />
