@@ -31,11 +31,10 @@ export const codeCSS = `${shadowBasics}
   [data-diffs-header] { box-shadow: 0 -1px 0 var(--border), 0 1px 0 var(--border); }
 `
 // The tree rings the row it last focused even after a click; like everywhere else in the app, the
-// ring shows only for keyboard focus. Selected rows next to each other read as one band.
+// ring shows only for keyboard focus. The selected file reads like the open chat in the sidebar.
 export const treeCSS = `${shadowBasics}
   [data-type="item"]:not(:focus-visible)::before { outline-color: transparent; }
-  [data-item-selected="true"]:has(+ [data-item-selected="true"]) { border-end-start-radius: 0; border-end-end-radius: 0; }
-  [data-item-selected="true"] + [data-item-selected="true"] { border-start-start-radius: 0; border-start-end-radius: 0; }
+  [data-item-selected="true"] { font-weight: 500; }
 `
 
 // How every diff reads: changed lines marked with a bar, changed words tinted, and the unchanged

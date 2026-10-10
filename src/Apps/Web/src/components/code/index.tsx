@@ -16,6 +16,7 @@ export type {
   DiffLayout,
   DiffListHandle,
   DiffListProps,
+  DiffListView,
   DiffProps,
   FileChange,
   FileChangeStatus,

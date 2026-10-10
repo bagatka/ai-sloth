@@ -60,7 +60,7 @@ export function Code() {
           <FileTree
             paths={repositoryPaths}
             changes={treeChanges}
-            selected={[checkout.path]}
+            selected={checkout.path}
             className="h-full"
           />
         </div>

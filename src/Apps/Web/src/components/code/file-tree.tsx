@@ -1,13 +1,13 @@
 import * as React from "react"
 import { FileTree as TreeView, useFileTree } from "@pierre/trees/react"
 
-import { compareFilePaths, comparePaths } from "./order"
+import { comparePaths } from "./order"
 import { treeCSS } from "./setup"
 import type { FileTreeProps } from "./types"
 
 type TreeModel = ReturnType<typeof useFileTree>["model"]
 
-const nothingSelected: readonly string[] = []
+const nothingOnScreen: readonly string[] = []
 
 // The tree library keeps its own model, created once; later props are pushed into it, and its
 // selection is reported to the latest onSelect. Syncing a library model is what effects are for, so
@@ -15,7 +15,8 @@ const nothingSelected: readonly string[] = []
 export default function FileTree({
   paths,
   changes,
-  selected = nothingSelected,
+  selected,
+  onScreen = nothingOnScreen,
   onSelect,
   search = false,
   className,
@@ -24,28 +25,30 @@ export default function FileTree({
   const latestSelected = React.useRef(selected)
   // The model reports every selection change, including the ones made here to show `selected`;
   // only the reader's own picks go to onSelect.
-  const showing = React.useRef(false)
+  const selecting = React.useRef(false)
+  const wrapper = React.useRef<HTMLDivElement>(null)
   const { model } = useFileTree({
     paths,
     gitStatus: changes,
     sort: comparePaths,
     initialExpansion: "open",
-    initialSelectedPaths: selected,
+    initialSelectedPaths: selected ? [selected] : [],
     icons: { set: "standard", colored: false },
     flattenEmptyDirectories: true,
     search,
     unsafeCSS: treeCSS,
     onSelectionChange: (selection) => {
-      if (showing.current) return
+      if (selecting.current) return
       const path = selection.at(-1)
-      if (path && !path.endsWith("/")) latestOnSelect.current?.(path)
-      // The selection belongs to the caller: once the tree finishes its own update, it goes back
-      // to `selected`, which the caller may have just changed.
-      queueMicrotask(() => show(model, latestSelected.current, showing))
+      if (path && !path.endsWith("/")) {
+        latestOnSelect.current?.(path)
+        return
+      }
+      // A click on a folder opens or closes it; the selection stays on the selected file.
+      queueMicrotask(() => select(model, latestSelected.current, selecting))
     },
   })
   const shownPaths = React.useRef(paths)
-  const revealed = React.useRef(selected)
   // Drawing the tree builds a lot of DOM. Its first render is an empty frame and the tree follows
   // in a background render, so whatever opened it paints at once.
   const mounted = React.useDeferredValue(true, false)
@@ -66,60 +69,63 @@ export default function FileTree({
   }, [model, changes])
 
   React.useEffect(() => {
-    show(model, selected, showing)
-    // Keep the selection's leading edge in view: its end while it moves down the tree, its start
-    // while it moves up. The tree scrolls only when that row is out of view.
-    const first = selected[0]
-    const last = selected.at(-1)
-    const previous = revealed.current
-    revealed.current = selected
-    const moved =
-      previous.length !== selected.length ||
-      selected.some((path, index) => previous[index] !== path)
-    if (!first || !last || !moved) return
-    const movedUp =
-      previous[0] !== undefined && compareFilePaths(first, previous[0]) < 0
-    model.scrollToPath(movedUp ? first : last, {
-      offset: "nearest",
-      focus: false,
-    })
+    select(model, selected, selecting)
+    if (selected)
+      model.scrollToPath(selected, { offset: "nearest", focus: false })
   }, [model, selected])
+
+  // The line beside the rows on screen comes from a style of our own in the tree's shadow root: it
+  // marks rows by their paths, which the library's styling has no way to say.
+  React.useEffect(() => {
+    const root = wrapper.current?.firstElementChild?.shadowRoot
+    if (!mounted || !root) return
+    const style = document.createElement("style")
+    style.textContent = onScreenCSS(model, onScreen)
+    root.append(style)
+    return () => style.remove()
+  }, [model, mounted, onScreen])
 
   // The library sets display inline on its own element, so a class like `hidden` would lose there;
   // the caller's classes go on a wrapper the tree fills.
   return (
-    <div className={className}>
+    <div ref={wrapper} className={className}>
       {mounted && <TreeView model={model} className="size-full" />}
     </div>
   )
 }
 
-// Selects the given files as one band: the rows from the first to the last, folders between them
-// included, so a run of files reads as one range.
-function show(
+function select(
   model: TreeModel,
-  files: readonly string[],
-  showing: { current: boolean }
+  path: string | undefined,
+  selecting: { current: boolean }
 ) {
-  const rows =
-    files.length === 0
-      ? []
-      : model.getVisibleRows(0, model.getVisibleCount() - 1)
-  const shown = rows.filter((row) => files.includes(row.path))
-  const first = shown.at(0)?.index ?? 0
-  const last = shown.at(-1)?.index ?? -1
-  const paths = shown.length
-    ? rows
-        .filter((row) => row.index >= first && row.index <= last)
-        .map((row) => row.path)
-    : files
   const current = model.getSelectedPaths()
-  const same =
-    current.length === paths.length &&
-    paths.every((path) => current.includes(path))
-  if (same) return
-  showing.current = true
-  for (const path of current) model.getItem(path)?.deselect()
-  for (const path of paths) model.getItem(path)?.select()
-  showing.current = false
+  const wanted = path ? [path] : []
+  if (current.length === wanted.length && current[0] === wanted[0]) return
+  selecting.current = true
+  for (const selectedPath of current) model.getItem(selectedPath)?.deselect()
+  if (path) model.getItem(path)?.select()
+  selecting.current = false
+}
+
+// A line beside the rows from the first file on screen to the last, folders between them included.
+function onScreenCSS(model: TreeModel, files: readonly string[]): string {
+  if (files.length === 0) return ""
+  const rows = model.getVisibleRows(0, model.getVisibleCount() - 1)
+  const shown = rows.filter((row) => files.includes(row.path))
+  const first = shown.at(0)
+  const last = shown.at(-1)
+  if (!first || !last) return ""
+  const selector = (path: string) => `[data-item-path="${CSS.escape(path)}"]`
+  const run = rows
+    .filter((row) => row.index >= first.index && row.index <= last.index)
+    .map((row) => selector(row.path))
+  return `
+    :is(${run.join(", ")})::after {
+      content: ""; position: absolute; inset-block: 0; inset-inline-start: -7px; width: 3px;
+      background: color-mix(in oklch, var(--foreground) 30%, transparent); pointer-events: none;
+    }
+    ${selector(first.path)}::after { inset-block-start: 6px; border-start-start-radius: 2px; border-start-end-radius: 2px; }
+    ${selector(last.path)}::after { inset-block-end: 6px; border-end-start-radius: 2px; border-end-end-radius: 2px; }
+  `
 }

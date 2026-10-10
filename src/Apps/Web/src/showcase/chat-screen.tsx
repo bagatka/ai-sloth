@@ -32,6 +32,7 @@ import {
   warmUpCode,
   type DiffLayout,
   type DiffListHandle,
+  type DiffListView,
 } from "@/components/code"
 import { Shortcut } from "@/components/shortcut"
 import { ThemeSwitch } from "@/components/theme-switch"
@@ -728,14 +729,15 @@ function EditCall({ change }: { change: SampleChange }) {
 }
 
 // Changes on demand: every changed file's diff in one scroll, beside a tree of the files that
-// marks the ones on screen and jumps to the one picked.
+// selects the one being read, marks the ones on screen, and jumps to the one picked.
 const changedFiles = inTreeOrder(changes)
 
 function ChangesPanel() {
   const list = React.useRef<DiffListHandle>(null)
-  const [inView, setInView] = React.useState<readonly string[]>([
-    changedFiles[0].path,
-  ])
+  const [view, setView] = React.useState<DiffListView>({
+    current: changedFiles[0].path,
+    onScreen: [changedFiles[0].path],
+  })
   const [layout, setLayout] = React.useState<DiffLayout>("unified")
   const totals = changes.reduce(
     (sum, file) => ({
@@ -805,7 +807,8 @@ function ChangesPanel() {
           <FileTree
             paths={changedPaths}
             changes={statuses}
-            selected={inView}
+            selected={view.current}
+            onScreen={view.onScreen}
             onSelect={(path) => list.current?.showFile(path)}
             className="hidden w-60 shrink-0 md:block"
           />
@@ -814,7 +817,7 @@ function ChangesPanel() {
               ref={list}
               files={changedFiles}
               layout={layout}
-              onFilesInView={setInView}
+              onViewChange={setView}
             />
           </div>
         </div>

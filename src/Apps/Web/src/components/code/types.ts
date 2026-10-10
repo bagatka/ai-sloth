@@ -33,14 +33,22 @@ export type DiffListProps = {
   /** The changed files, in the order shown; `inTreeOrder` matches a tree beside them. Paths must be unique. */
   files: readonly FileChange[]
   layout?: DiffLayout
-  /** Called with the files on screen, in order, whenever they change. */
-  onFilesInView?: (paths: readonly string[]) => void
+  /** Called whenever the reader's view changes: scrolling, resizing, or a different layout. */
+  onViewChange?: (view: DiffListView) => void
   ref?: React.Ref<DiffListHandle>
   className?: string
 }
 
+/** What the reader sees in a DiffList. */
+export type DiffListView = {
+  /** The file being read: the one whose header is pinned at the top. */
+  current: string
+  /** Every file on screen, in order, starting with the current one. */
+  onScreen: readonly string[]
+}
+
 export type DiffListHandle = {
-  /** Jumps to a file's diff, as far as the list scrolls, and briefly marks its header. */
+  /** Pins a file's diff at the top. Any file can get there: the list leaves room after the last. */
   showFile: (path: string) => void
 }
 
@@ -57,12 +65,14 @@ export type FileTreeProps = {
   paths: readonly string[]
   /** Files that changed, marked in the tree. */
   changes?: readonly { path: string; status: FileChangeStatus }[]
+  /** The selected file. The tree selects it, and any file the reader picks, and keeps it in view. */
+  selected?: string
   /**
-   * The files shown as selected: a run of files, such as the ones on screen in a list beside the
-   * tree. The tree marks them as one band, folders between them included, and keeps it in view.
+   * A run of files on screen in a list beside the tree, marked by a line along their rows (and the
+   * folders between them), like a scroll thumb.
    */
-  selected?: readonly string[]
-  /** Called when the reader picks a file. To show the pick, the caller changes `selected`. */
+  onScreen?: readonly string[]
+  /** Called when the reader picks a file. */
   onSelect?: (path: string) => void
   /** Show a search field above the tree. */
   search?: boolean

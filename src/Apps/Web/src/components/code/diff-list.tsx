@@ -17,7 +17,7 @@ const seenHeight = 20
 export default function DiffList({
   files,
   layout = "unified",
-  onFilesInView,
+  onViewChange,
   ref,
   className,
 }: DiffListProps) {
@@ -29,6 +29,8 @@ export default function DiffList({
   const reported = React.useRef<string | null>(null)
   // The list's height, kept from resize reports so scrolling never has to measure it.
   const viewportHeight = React.useRef(0)
+  // Room after the last file, so it can be pinned at the top like any other.
+  const [endRoom, setEndRoom] = React.useState(0)
   const items: CodeViewDiffItem[] = files.map((file) => ({
     id: file.path,
     type: "diff",
@@ -38,64 +40,58 @@ export default function DiffList({
   React.useImperativeHandle(ref, () => ({
     showFile(path) {
       view.current?.scrollTo({ type: "item", id: path, behavior: "instant" })
-      // Mark the file's header once the view has drawn it there, so a pick always answers, even
-      // when the file is already on screen and the list can't move.
-      requestAnimationFrame(() => {
-        const header = view.current
-          ?.getInstance()
-          ?.getRenderedItems()
-          .find((item) => item.id === path)
-          ?.element.shadowRoot?.querySelector("[data-diffs-header]")
-        header?.animate(
-          {
-            backgroundColor: [
-              "color-mix(in oklch, var(--card), var(--primary) 14%)",
-              getComputedStyle(header).backgroundColor,
-            ],
-          },
-          { duration: 900, easing: "ease-out" }
-        )
-      })
     },
   }))
 
-  // Reports the files on screen when they change: scrolling, resizing, or a different layout.
-  function reportFilesInView() {
+  function reportView() {
     const viewer = view.current?.getInstance()
-    if (!viewer || !onFilesInView) return
+    if (!viewer || !onViewChange || files.length === 0) return
     const top = viewer.getScrollTop()
     const bottom = top + viewportHeight.current
-    const inView = files.flatMap((file, index) => {
-      const next = files[index + 1]
-      const start = viewer.getTopForItem(file.path) ?? Infinity
-      const end = next
-        ? (viewer.getTopForItem(next.path) ?? Infinity)
-        : Infinity
-      return Math.min(end, bottom) - Math.max(start, top) >= seenHeight
-        ? [file.path]
-        : []
-    })
-    const key = inView.join("\n")
+    const tops = files.map(
+      (file) => viewer.getTopForItem(file.path) ?? Infinity
+    )
+    let current = 0
+    while (current + 1 < files.length && tops[current + 1] <= top + 1) current++
+    const onScreen = [files[current].path]
+    for (let index = current + 1; index < files.length; index++) {
+      if (tops[index] > bottom - seenHeight) break
+      onScreen.push(files[index].path)
+    }
+    const key = onScreen.join("\n")
     if (key === reported.current) return
     reported.current = key
-    onFilesInView(inView)
+    onViewChange({ current: onScreen[0], onScreen })
+  }
+
+  // Leaves exactly enough room after the last file for it to reach the top.
+  function fitEndRoom(content: HTMLElement) {
+    const viewer = view.current?.getInstance()
+    const last = files.at(-1)
+    const lastTop = last && viewer?.getTopForItem(last.path)
+    const footer = viewer?.getFooterElement()
+    if (lastTop === undefined || !footer) return
+    const lastHeight = content.offsetHeight - footer.offsetHeight - lastTop
+    const room = Math.max(0, Math.round(viewportHeight.current - lastHeight))
+    setEndRoom((current) => (Math.abs(current - room) < 2 ? current : room))
   }
 
   return (
     <WorkerPoolContextProvider {...workerPool}>
       {/* The code would paint over the scroller's own focus outline, so this lays the ring on top.
-          It also watches the view's size and its content's height for files coming into view
-          without a scroll. */}
+          It also watches the list's size and its content's height: they decide the room after the
+          last file, and what's on screen can change without a scroll. */}
       <div
         ref={(node) => {
           const content = scroller.current?.firstElementChild
-          if (!mounted || !node || !content) return
+          if (!mounted || !node || !(content instanceof HTMLElement)) return
           const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
               if (entry.target === node)
                 viewportHeight.current = entry.contentRect.height
             }
-            reportFilesInView()
+            fitEndRoom(content)
+            reportView()
           })
           observer.observe(node)
           observer.observe(content)
@@ -138,7 +134,15 @@ export default function DiffList({
                 />
               )
             }
-            onScroll={reportFilesInView}
+            renderCodeViewFooter={() => (
+              <p
+                style={{ minHeight: endRoom }}
+                className="px-4 pt-6 pb-8 text-center text-caption text-muted-foreground"
+              >
+                End of changes
+              </p>
+            )}
+            onScroll={reportView}
             className="size-full overflow-auto rounded-[inherit] outline-none"
           />
         )}
