@@ -27,8 +27,9 @@ computers (Machines, to this module one more provider, `machine`).
 ## Contract
 
 `INooksApi`: people and the control plane create, list, and delete nooks, run and watch processes in
-them, take, list, and download checkpoints, copy files in and out, export a source's changes for
-pushing, see and run their setup, wake them, and sync a folder of a nook with a kept folder.
+them, take, list, and download checkpoints, copy files in and out, show the changes in a nook's
+repositories for review and export a source's changes for pushing, see and run their setup, wake
+them, and sync a folder of a nook with a kept folder.
 `INookDaemonsApi` is the daemon endpoint's side. Every operation wakes a sleeping nook first, and
 every operation on its files puts them in place first, so callers only notice latency.
 
@@ -116,6 +117,9 @@ when people are warned (85%), and how many of a workspace's nooks may be awake (
   (`ScriptOutput`): a small answer is read into memory up to its own limit, such as 64 MiB for a kept
   folder; a checkpoint, download, or export goes to the caller's stream, usually a file, up to
   2 GiB. At most two large and eight small runs hold output at once; others wait.
+- **Changes for review are git's diff,** made with a separate index so the agent's own index stays as
+  it is, and with the repository's git settings unable to change how it looks. A repository's patch
+  stops at 2 MiB, after its last whole file.
 - **Checkpoints are git.** Each place (each repository directly in `/work`, the rest of `/work`, and
   the kept paths) becomes a snapshot commit made with a separate index, so the nook's repositories
   never change, bundled with only what the previous checkpoint lacks; every 32nd checkpoint bundles

@@ -33,8 +33,9 @@ export function nooks(workspaceId: string) {
           params: { path: { workspaceId }, query: { limit: 200 } },
         })
       ),
-    // Not handled: a nook falling asleep or waking without its chat changing shows within half a
-    // minute, rather than at once; it would take a live list of nooks.
+    // Read again whenever the workspace's chats change (router.tsx). Not handled: a nook falling
+    // asleep or waking without its chat changing shows within half a minute, rather than at once;
+    // it would take a live list of nooks.
     refetchInterval: 30_000,
   })
 }
@@ -102,5 +103,20 @@ export function repositories(workspaceId: string) {
           params: { path: { workspaceId } },
         })
       ),
+  })
+}
+
+/**
+ * What the nook's repositories changed, read when someone looks. Asking wakes an asleep nook, so
+ * nothing asks unless someone opens the changes.
+ */
+export function changes(nookId: string) {
+  return queryOptions({
+    queryKey: ["nooks", nookId, "changes"],
+    queryFn: () =>
+      answer(
+        api.GET("/nooks/{id}/changes", { params: { path: { id: nookId } } })
+      ),
+    staleTime: 0,
   })
 }

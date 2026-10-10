@@ -50,7 +50,10 @@ export const diffOptions = {
 } as const
 
 export function parseChange(change: FileChange): FileDiffMetadata {
-  if ("patch" in change) return getSingularPatch(change.patch)
+  // The change's path names it, whatever the patch calls the file, such as a repository's file
+  // shown with the repository's name in front.
+  if ("patch" in change)
+    return { ...getSingularPatch(change.patch), name: change.path }
   return parseDiffFromFile(
     { name: change.path, contents: change.before },
     { name: change.path, contents: change.after }

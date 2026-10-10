@@ -43,6 +43,7 @@ internal static class NooksEndpoints
         nooks.MapGet("/{id:guid}", Get);
         nooks.MapDelete("/{id:guid}", Delete);
         nooks.MapGet("/{id:guid}/download", Download);
+        nooks.MapGet("/{id:guid}/changes", GetChanges);
         nooks.MapGet("/{nookId:guid}/checkpoints", ListCheckpoints);
         nooks.MapGet("/{nookId:guid}/setup", GetSetup);
         nooks.MapPost("/{id:guid}/wake", Wake);
@@ -68,6 +69,22 @@ internal static class NooksEndpoints
     {
         Result<NookSummary> result = await api.CreateAsync(principal.ToActor(), new CreateNook(WorkspaceId.From(workspaceId), request.Provider, Image: null, request.Repositories ?? [], request.CopyOf, request.Checkpoint, KeptPaths: [], FromScratch: false, ReservedFor: null), ct);
         return result.ToCreated(nook => string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Id.Value}"));
+    }
+
+    /// <summary>
+    /// What each of the nook's repositories changed since it was copied in, for review: its commits
+    /// since and what isn't committed, as one patch the way <c>git diff</c> prints it. A patch past
+    /// 2 MiB leaves out its last files and says so (<c>truncated</c>); download the files to see
+    /// them. Anyone who sees the nook may; an asleep nook wakes first.
+    /// </summary>
+    private static async Task<Results<Ok<IReadOnlyList<SourceChanges>>, ProblemHttpResult>> GetChanges(
+        [FromRoute] Guid id,
+        ClaimsPrincipal principal,
+        [FromServices] INooksApi api,
+        CancellationToken ct)
+    {
+        Result<IReadOnlyList<SourceChanges>> result = await api.GetChangesAsync(principal.ToActor(), NookId.From(id), ct);
+        return result.ToOk();
     }
 
     /// <summary>

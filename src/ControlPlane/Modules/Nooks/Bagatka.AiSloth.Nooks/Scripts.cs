@@ -14,6 +14,7 @@ internal static class Scripts
     public static readonly string ConfigureGit = Read("configure-git.sh");
     public static readonly string CopyIn = Read("copy-in.sh");
     public static readonly string CopyOut = Read("copy-out.sh");
+    public static readonly string Diff = Read("diff.sh");
     public static readonly string Export = Read("export.sh");
     public static readonly string FindSetup = Read("find-setup.sh");
     public static readonly string Restore = Read("restore.sh");

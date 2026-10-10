@@ -93,10 +93,22 @@ class WorkspaceChatsStream {
     for (const listener of this.listeners) {
       listener()
     }
+    for (const listener of changeListeners) {
+      listener(this.workspaceId)
+    }
   }
 }
 
 const streams = new Map<string, WorkspaceChatsStream>()
+
+// Who hears of each change to a workspace's chats, such as the cache of its nooks, whose states
+// move when its chats do: a turn starts or ends, or a new chat's nook finished starting.
+const changeListeners = new Set<(workspaceId: string) => void>()
+
+/** Calls `listener` with the workspace each time some of its chats change. */
+export function onChatsChange(listener: (workspaceId: string) => void) {
+  changeListeners.add(listener)
+}
 
 /** A workspace's chats, live while the calling component shows them. */
 export function useWorkspaceChats(

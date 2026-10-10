@@ -1076,6 +1076,39 @@
         }
       }
     },
+    "/nooks/{id}/changes": {
+      "get": {
+        "tags": [
+          "Nooks"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SourceChanges"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/nooks/{nookId}/checkpoints": {
       "get": {
         "tags": [
@@ -4463,6 +4496,44 @@
           }
         },
         "description": "A sign-in in progress: open Url in the person\u0027s browser, then pass the address the\nbrowser returns to on to complete the sign-in before ExpiresAt."
+      },
+      "SourceChanges": {
+        "required": [
+          "source",
+          "repository",
+          "baseBranch",
+          "baseCommit",
+          "patch",
+          "truncated"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "The source, by name: the repository is at \u0060/work/{Source}\u0060."
+          },
+          "repository": {
+            "description": "The workspace\u0027s repository the source is a copy of.",
+            "$ref": "#/components/schemas/RepositoryId"
+          },
+          "baseBranch": {
+            "type": "string",
+            "description": "The branch it was copied in from."
+          },
+          "baseCommit": {
+            "type": "string",
+            "description": "The commit it was copied in at, which the changes are against."
+          },
+          "patch": {
+            "type": "string",
+            "description": "The changes as \u0060git diff\u0060 prints them, one section per changed file, its commits since and\nwhat isn\u0027t committed together, new files included; empty without changes. A binary file\u0027s\nsection says only that it differs."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether the patch leaves out files at its end, because all of them would be more than\nint SourceChanges.MaxPatch bytes; it never ends inside a file."
+          }
+        },
+        "description": "What one of a nook\u0027s repositories changed since it was copied in."
       },
       "StartChatRequest": {
         "required": [

@@ -12,7 +12,8 @@ import { ApiError, isSignedOut } from "./api"
 import { ChatPage } from "./chat/chat-page"
 import { NewChatPage } from "./new-chat"
 import { appBase } from "./host"
-import { me } from "./queries"
+import { me, nooks } from "./queries"
+import { onChatsChange } from "./workspace-chats"
 import { AppShell } from "./shell"
 import { SignInPage } from "./sign-in"
 
@@ -30,6 +31,14 @@ export const queryClient = new QueryClient({
         !(error instanceof ApiError && error.status < 500) && failures < 2,
     },
   },
+})
+
+// A workspace's nooks change state along with its chats, so the list of its nooks is read again
+// whenever its chats change.
+onChatsChange((workspaceId) => {
+  void queryClient.invalidateQueries({
+    queryKey: nooks(workspaceId).queryKey,
+  })
 })
 
 /** Where in the app the browser is, relative to the app's address, for coming back after signing in. */

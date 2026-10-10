@@ -1281,6 +1281,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/nooks/{id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SourceChanges"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/nooks/{nookId}/checkpoints": {
         parameters: {
             query?: never;
@@ -3412,6 +3449,28 @@ export interface components {
              * @description When the sign-in can no longer complete.
              */
             expiresAt: string;
+        };
+        /** @description What one of a nook's repositories changed since it was copied in. */
+        SourceChanges: {
+            /** @description The source, by name: the repository is at `/work/{Source}`. */
+            source: string;
+            /** @description The workspace's repository the source is a copy of. */
+            repository: components["schemas"]["RepositoryId"];
+            /** @description The branch it was copied in from. */
+            baseBranch: string;
+            /** @description The commit it was copied in at, which the changes are against. */
+            baseCommit: string;
+            /**
+             * @description The changes as `git diff` prints them, one section per changed file, its commits since and
+             *     what isn't committed together, new files included; empty without changes. A binary file's
+             *     section says only that it differs.
+             */
+            patch: string;
+            /**
+             * @description Whether the patch leaves out files at its end, because all of them would be more than
+             *     int SourceChanges.MaxPatch bytes; it never ends inside a file.
+             */
+            truncated: boolean;
         };
         StartChatRequest: {
             provider: string;

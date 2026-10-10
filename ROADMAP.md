@@ -13,11 +13,9 @@ machines, and local Docker for development, tests, and single-machine self-hosti
    WebApi always running again (one replica at least, sized from its metrics in PostHog), so nobody
    waits for it to start.
 2. **Apps.** The web app, served by every host, and native iOS and Android apps that connect to any
-   number of hosts. The web app comes in slices, each a whole flow on a real host:
-   1. Review and ship: a chat's changes as diffs, pushed as a branch or pull request, or its files
-      downloaded.
-   2. Set up from the web: connect GitHub and add repositories, add agent accounts and secrets,
-      write instructions, and invite people.
+   number of hosts. The web app's next slice, a whole flow on a real host like those before it, is
+   setting up from the web: connecting GitHub and adding repositories, adding agent accounts and
+   secrets, writing instructions, and inviting people.
 
    Before the web app ships, check its speed where the sample screens couldn't: a bundle-size budget
    in CI with routes split, and icons with only the weight we use (Phosphor ships all six with each

@@ -4,7 +4,8 @@ The web app, in React and TypeScript with [shadcn](https://ui.shadcn.com) compon
 host serves it at its app address, `/app/` on its own address by default. Today people sign in and
 start chats, choosing their repositories, agent, and account. They see their workspace's chats as
 they change, and follow one as its agent works: a message starts the next turn or, sent while the
-agent works, goes into its turn, and Esc stops it.
+agent works, goes into its turn, and Esc stops it. They review what the agent changed in its
+repositories, push it as a branch or a pull request, and download a chat's files.
 
 Run it from `./dev`, which has Node, with AiSloth running (`dotnet aspire run`):
 
@@ -32,6 +33,9 @@ pages show every component and a chat screen with made-up content, to judge the 
   host's problem details. Queries live in `src/app/queries.ts`, and TanStack Query owns their cache.
 - **The session** is a cookie the host sets at sign-in, which no script reads. The app never handles
   a token; a 401 anywhere sends the person to sign in again.
+- **Changes** (`src/app/chat/changes-panel.tsx`) come from the host as one patch per repository, as
+  `git diff` prints it, split into files (`changes.ts`) for the code views. Reading them wakes an
+  asleep nook, so the app asks only when someone opens them.
 - **A chat** streams its events from the host (`src/app/chat/chat-stream.ts`), and the transcript
   is a pure fold of them (`transcript.ts`). Following a chat again picks up after the last event
   the app saw, and the browser reconnects by itself. A workspace's chats stream the same way

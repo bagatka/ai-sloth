@@ -22,7 +22,9 @@ import {
 import { ApiError } from "../api"
 import { chat as chatQuery, harnesses, me, nooks, people } from "../queries"
 import { chatStream, useChat } from "./chat-stream"
+import { ChangesPanel, DownloadFiles } from "./changes-panel"
 import { Composer } from "./composer"
+import { PushMenu } from "./push-menu"
 import { TranscriptView } from "./transcript-view"
 
 // One chat as it happens: who wrote what, what the agent did, and a box to write to it.
@@ -107,7 +109,18 @@ export function ChatPage() {
           <h1 className="truncate text-title">{title}</h1>
           <p className="truncate text-label text-muted-foreground">{agent}</p>
         </div>
-        <NookState state={nookState} />
+        <div className="hidden sm:block">
+          <NookState state={nookState} />
+        </div>
+        {/* Repositories' changes are reviewed and pushed; other files are downloaded. */}
+        {nook && nook.sources.length > 0 ? (
+          <>
+            <ChangesPanel nookId={nook.id} />
+            <PushMenu chatId={chatId} />
+          </>
+        ) : (
+          nook && <DownloadFiles nookId={nook.id} />
+        )}
       </header>
       {state.refused ? (
         <Missing

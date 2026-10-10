@@ -170,6 +170,14 @@ public interface INooksApi
     public Task<Result<Page<CheckpointSummary>>> ListCheckpointsAsync(Actor actor, NookId nookId, PageRequest page, CancellationToken ct);
 
     /// <summary>
+    /// What each of the nook's repositories changed since it was copied in, for people to review:
+    /// its commits since and what isn't committed, as one patch. The sources stay as they are. People
+    /// who can see the nook may; an asleep nook wakes first, which takes a few seconds.
+    /// </summary>
+    /// <returns>The changes, a repository's at a time by name; <see cref="NooksErrors.NotReady"/>; or not found.</returns>
+    public Task<Result<IReadOnlyList<SourceChanges>>> GetChangesAsync(Actor actor, NookId nookId, CancellationToken ct);
+
+    /// <summary>
     /// Commits what a source has that isn't committed, then writes its commits since it was
     /// copied in to <paramref name="destination"/> as a git bundle, for pushing. People with
     /// Write only. A source without commits beyond its start writes nothing.
