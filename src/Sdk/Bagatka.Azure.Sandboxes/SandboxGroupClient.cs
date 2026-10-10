@@ -244,8 +244,11 @@ public class SandboxGroupClient
         ArgumentNullException.ThrowIfNull(options);
         return await Telemetry.TraceAsync("CreateDiskImage", Endpoint, async () =>
         {
+            Wire.RegistryAuthentication? authentication = options.RegistryCredentials is RegistryCredentials credentials
+                ? new Wire.RegistryAuthentication(new Wire.RegistryCredentials(credentials.Username, credentials.Token))
+                : null;
             Wire.CreateDiskImage body = new Wire.CreateDiskImage(
-                new Wire.DiskImageSource("registry", options.ImageReference),
+                new Wire.DiskImageSource("registry", options.ImageReference, authentication),
                 options.Name,
                 options.Labels.Count > 0 ? new Dictionary<string, string>(options.Labels, StringComparer.Ordinal) : null);
             Response<DiskImage> created = await SendAsync(RequestMethod.Post, "/diskimages", labelSelector: null, Serialize(body, SandboxesJsonContext.Default.CreateDiskImage), Created, ReadDiskImage, cancellationToken).ConfigureAwait(false);

@@ -86,6 +86,19 @@ Change `host.env`, then run `./host up` again. Its comments say what each settin
   `PostHog__ProjectToken`. Without them, the host sends nothing anywhere. With them, `sloth` reports
   its commands there too, unless people set `DO_NOT_TRACK=1`.
 
+### Use your own images
+
+To give nooks your company's tools, build images from AiSloth's, push them to your registry under
+the same names and tags, and run `./host up` with `AISLOTH_IMAGES` set to where they are. For a
+private registry, sign in to it first: `./host` pulls the images with your sign-in.
+
+```sh
+docker login registry.example.com
+AISLOTH_IMAGES=registry.example.com/aisloth ./host up
+```
+
+Set `AISLOTH_IMAGES` for each `./host up`.
+
 ### Other commands
 
 `./host` runs any `docker compose` command for AiSloth:
@@ -343,6 +356,20 @@ such as WorkOS or Microsoft Entra ID, add these settings to your deploy command:
 --Parameters:sign-in-provider-issuer=<issuer URL> --Parameters:sign-in-provider-client-id=<client ID> --Parameters:sign-in-provider-client-secret=<client secret> --Parameters:sign-in-provider-name=<name that people see>
 ```
 
+### Optional: start nooks from your own images
+
+To give nooks your company's tools, build images from AiSloth's and push them to an Azure Container
+Registry under the same names and tags. In the deploy command, set
+`--Parameters:nook-image-repository=<registry>.azurecr.io/<path>`. The host pulls the images with
+its own identity, which nooks never get. After the first deploy, give that identity the `AcrPull`
+role in the registry:
+
+```sh
+az role assignment create --role AcrPull --scope $(az acr show --name <registry> --query id --output tsv) --assignee-object-id $(az identity list --resource-group <resource group> --query "[?starts_with(name, 'webapi_identity')].principalId | [0]" --output tsv) --assignee-principal-type ServicePrincipal
+```
+
+Images in other private registries can't be deployed yet.
+
 ### Optional: see errors and usage in PostHog
 
 Do this so that the host sends its errors, logs, traces, metrics, and usage analytics to your own
@@ -390,5 +417,8 @@ deploy again without a push, run the workflow in Actions, or run
 - **A changed setting has no effect**: Aspire remembers your settings in `~/.aspire/deployments`,
   and a remembered value wins over an environment variable. Give the setting in the deploy
   command, after `--`, or change it in that folder.
+- **Nooks do not start, and the host's log says Azure can't pull the image**: for your own images,
+  check that the host's identity has the `AcrPull` role in your registry ("Optional: start nooks
+  from your own images").
 - **Nooks do not start**: the image tag can be wrong. Do step 4 again, and check that the image
   exists at [github.com/bagatka/ai-sloth/pkgs/container/aisloth-nook](https://github.com/bagatka/ai-sloth/pkgs/container/aisloth-nook).

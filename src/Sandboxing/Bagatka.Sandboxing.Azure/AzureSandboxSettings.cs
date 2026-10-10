@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using Bagatka.Azure.Sandboxes;
 
 namespace Bagatka.Sandboxing.Azure;
@@ -23,7 +24,13 @@ public sealed record AzureSandboxSettings
     /// The deployment this provider serves: 1 to 40 lowercase letters, digits, or hyphens. Several
     /// deployments can share one sandbox group because each touches only its own scope.
     /// </param>
-    public AzureSandboxSettings(string subscriptionId, string resourceGroup, string sandboxGroup, string region, string scope)
+    /// <param name="containerRegistries">
+    /// The Azure Container Registries the provider pulls images from with its own credential, by their
+    /// login servers, such as <c>myco.azurecr.io</c>; the credential's identity needs the
+    /// <c>AcrPull</c> role in each. Sandboxes never get it. Images from other registries must be
+    /// public. None unless given.
+    /// </param>
+    public AzureSandboxSettings(string subscriptionId, string resourceGroup, string sandboxGroup, string region, string scope, IReadOnlyList<string>? containerRegistries = null)
     {
         ArgumentNullException.ThrowIfNull(scope);
         if (scope.Length is 0 or > MaxScopeLength || scope.AsSpan().ContainsAnyExcept(ScopeCharacters))
@@ -35,6 +42,7 @@ public sealed record AzureSandboxSettings
         Endpoint = SandboxGroupClient.GetEndpoint(region);
         Region = region;
         Scope = scope;
+        ContainerRegistries = [.. containerRegistries ?? []];
     }
 
     /// <summary>The Azure subscription the sandbox group is in.</summary>
@@ -57,4 +65,7 @@ public sealed record AzureSandboxSettings
 
     /// <summary>The service in the sandbox group's region.</summary>
     public Uri Endpoint { get; }
+
+    /// <summary>The Azure Container Registries the provider pulls images from with its own credential.</summary>
+    public IReadOnlyList<string> ContainerRegistries { get; }
 }

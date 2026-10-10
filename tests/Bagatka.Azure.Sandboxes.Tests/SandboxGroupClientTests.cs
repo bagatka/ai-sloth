@@ -140,9 +140,26 @@ public sealed class SandboxGroupClientTests
         JsonElement sent = JsonElement.Parse(service.Requests[0].Body!);
         Assert.Equal("registry", sent.GetProperty("source").GetProperty("kind").GetString());
         Assert.Equal("registry.k8s.io/pause:3.10", sent.GetProperty("source").GetProperty("imageUrl").GetString());
+        bool signedIn = sent.GetProperty("source").TryGetProperty("authentication", out _);
+        Assert.False(signedIn);
         Assert.Equal(DiskImageState.Ready, created.Value.State);
         Assert.Equal("registry.k8s.io/pause:3.10", created.Value.BaseImage);
         Assert.Equal(2, service.Requests.Count);
+    }
+
+    [Fact]
+    public async Task A_disk_image_from_a_private_registry_signs_in_with_credentials_that_never_show()
+    {
+        using RecordedService service = new RecordedService();
+        service.Then(HttpStatusCode.Created, "diskimage-create");
+        RegistryCredentials credentials = new RegistryCredentials("00000000-0000-0000-0000-000000000000", "refresh-token");
+
+        await service.Client().CreateDiskImageAsync(WaitUntil.Started, new DiskImageCreateOptions("example.azurecr.io/pause:3.10") { RegistryCredentials = credentials }, Ct);
+
+        JsonElement sent = JsonElement.Parse(service.Requests[0].Body!).GetProperty("source").GetProperty("authentication").GetProperty("registryCredentials");
+        Assert.Equal("00000000-0000-0000-0000-000000000000", sent.GetProperty("username").GetString());
+        Assert.Equal("refresh-token", sent.GetProperty("token").GetString());
+        Assert.DoesNotContain("refresh-token", credentials.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

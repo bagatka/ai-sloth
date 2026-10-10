@@ -53,7 +53,11 @@ internal static class Wire
 
     internal sealed record CreateDiskImage(DiskImageSource Source, string? Name, Dictionary<string, string>? Labels);
 
-    internal sealed record DiskImageSource(string Kind, string ImageUrl);
+    internal sealed record DiskImageSource(string Kind, string ImageUrl, RegistryAuthentication? Authentication);
+
+    internal sealed record RegistryAuthentication(RegistryCredentials RegistryCredentials);
+
+    internal sealed record RegistryCredentials(string Username, string Token);
 
     internal sealed record Commit(Dictionary<string, string>? Labels);
 

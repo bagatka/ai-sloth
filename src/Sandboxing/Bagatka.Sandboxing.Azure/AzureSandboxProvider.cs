@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Runtime.CompilerServices;
@@ -21,9 +22,10 @@ namespace Bagatka.Sandboxing.Azure;
 /// <summary>
 /// Runs each sandbox as a microVM in an Azure Container Apps sandbox group. Suspending stops it with
 /// its memory (<see cref="SandboxState.Paused"/>), and snapshots are committed disk images. The
-/// service chooses IDs, so every resource is found by its labels.
+/// service chooses IDs, so every resource is found by its labels. Images come from public registries,
+/// or from Azure Container Registries the provider signs Azure in to (<see cref="ContainerRegistries"/>).
 /// </summary>
-internal sealed class AzureSandboxProvider(SandboxGroupClient client, string scope, TimeProvider time) : ISandboxProvider
+internal sealed class AzureSandboxProvider(SandboxGroupClient client, ContainerRegistries registries, string scope, TimeProvider time) : ISandboxProvider
 {
     private const string ScopeLabel = "sandboxing-scope";
     private const string KeyLabel = "sandboxing-key";
@@ -232,12 +234,17 @@ internal sealed class AzureSandboxProvider(SandboxGroupClient client, string sco
         Operation<DiskImage> making;
         try
         {
+            options.RegistryCredentials = await registries.SignInAsync(image.Reference, ct);
             making = await client.CreateDiskImageAsync(WaitUntil.Completed, options, ct);
+        }
+        catch (HttpRequestException refused) when (refused.StatusCode is not null)
+        {
+            return new Result<string>(Error.Validation("image", "Signing in to the registry of " + image.Reference + " failed with status " + (int)refused.StatusCode + "; the provider's identity must be able to sign in to it."));
         }
         catch (RequestFailedException failed) when (failed.ErrorCode is "ImageNotFound" or "RegistryAuthFailed" or "InvalidRequest")
         {
             // Registries answer a missing repository as one that needs signing in.
-            return new Result<string>(Error.Validation("image", "Azure can't pull the image " + image.Reference + " (" + failed.ErrorCode + "); it must exist and be public."));
+            return new Result<string>(Error.Validation("image", "Azure can't pull the image " + image.Reference + " (" + failed.ErrorCode + "); it must exist, and be public or in a container registry the provider signs in to with the AcrPull role."));
         }
 
         foreach (DiskImage older in made)

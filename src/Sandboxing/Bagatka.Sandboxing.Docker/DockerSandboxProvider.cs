@@ -381,6 +381,10 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope, I
     {
         switch (source.Value)
         {
+            // Not handled: an image in a private registry that isn't here yet, which the engine pulls
+            // without signing in, so creating fails with its refusal; a host on one server pulls its
+            // images first with its own sign-in (docs/self-hosting.md), but a machine doesn't. Handling
+            // it would take sign-ins in DockerSandboxSettings, sent with each pull.
             case SandboxImage image:
                 ImageDetails? pulled = await docker.InspectImageAsync(image.Reference, ct);
                 if (pulled is null)

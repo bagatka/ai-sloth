@@ -18,7 +18,8 @@ public static class AzureSandboxProviderRegistration
     /// <param name="settings">The sandbox group and the deployment's scope.</param>
     /// <param name="credential">
     /// Signs the provider in, such as a managed identity when hosted or the Azure CLI's sign-in in
-    /// development; it needs the <c>Container Apps SandboxGroup Data Owner</c> role on the group.
+    /// development; it needs the <c>Container Apps SandboxGroup Data Owner</c> role on the group, and
+    /// <c>AcrPull</c> in the settings' container registries.
     /// </param>
     public static IServiceCollection AddAzureSandboxProvider(this IServiceCollection services, AzureSandboxSettings settings, TokenCredential credential)
     {
@@ -26,7 +27,9 @@ public static class AzureSandboxProviderRegistration
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(credential);
         SandboxGroupClient client = new SandboxGroupClient(settings.Endpoint, settings.Group, credential);
-        services.AddSingleton<ISandboxProvider>(new AzureSandboxProvider(client, settings.Scope, TimeProvider.System));
+        services.AddSingleton(_ => new ContainerRegistries(credential, settings.ContainerRegistries));
+        services.AddSingleton<ISandboxProvider>(provider =>
+            new AzureSandboxProvider(client, provider.GetRequiredService<ContainerRegistries>(), settings.Scope, TimeProvider.System));
         return services;
     }
 }

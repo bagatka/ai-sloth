@@ -29,8 +29,9 @@ await client.ResumeSandboxAsync(WaitUntil.Completed, sandbox.Value.Id);
   Sandbox groups themselves are Azure Resource Manager resources (`Microsoft.App/sandboxGroups`,
   `2026-07-01`), made with the Azure CLI, Bicep, or the ARM SDK.
 - **Covered:** sandboxes (create, get, list by labels, stop, resume, delete, commit) and disk images
-  (create from a public container image, get, list by labels, delete). Not yet: files, commands,
-  ports, volumes, egress policies, secrets, memory snapshots as resources, and registry credentials.
+  (create from a container image, public or with registry credentials, get, list by labels, delete).
+  Not yet: files, commands, ports, volumes, egress policies, secrets, memory snapshots as resources,
+  and registry sign-in with the group's managed identity.
 - **Sign-in:** any `TokenCredential`, for the scope `https://dynamicsessions.io/.default`. The
   identity needs the `Container Apps SandboxGroup Data Owner` role on the group or its resource group.
 - **Waiting:** changes the service finishes later return an `Operation<T>` that polls the resource
@@ -51,7 +52,9 @@ await client.ResumeSandboxAsync(WaitUntil.Completed, sandbox.Value.Id);
 - A sandbox needs its disk image only to be created; deleting the disk image leaves it working.
 - A disk is at most 20 GiB per core; more fails with `InvalidResourceTier`.
 - A missing image fails with `ImageNotFound`, a missing or private repository with
-  `RegistryAuthFailed`.
+  `RegistryAuthFailed`. `RegistryCredentials` sign in to a private one: an Azure Container Registry
+  takes the refresh token its `/oauth2/exchange` gives for a Microsoft Entra token, with the username
+  `00000000-0000-0000-0000-000000000000`.
 - An ID that isn't a GUID fails with `InvalidRequest`, not `SandboxNotFound`.
 - Stopping a sandbox that isn't running fails with `SandboxNotRunning`, resuming one that isn't
   stopped with `InvalidSandboxState`, and committing one that isn't running with

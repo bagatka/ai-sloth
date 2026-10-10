@@ -4,8 +4,8 @@ using System.Collections.Generic;
 namespace Bagatka.Azure.Sandboxes.Models;
 
 /// <summary>
-/// A disk image to make from a container image in a registry the service can pull from without
-/// credentials, such as a public one on GitHub's or Microsoft's registry.
+/// A disk image to make from a container image: one in a public registry, such as GitHub's or
+/// Microsoft's, or in a private one the service signs in to with <see cref="RegistryCredentials"/>.
 /// </summary>
 public sealed class DiskImageCreateOptions
 {
@@ -25,4 +25,7 @@ public sealed class DiskImageCreateOptions
 
     /// <summary>Labels to find it by.</summary>
     public IDictionary<string, string> Labels { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>What the service signs in to the image's registry with, for a private registry; none for a public one.</summary>
+    public RegistryCredentials? RegistryCredentials { get; set; }
 }

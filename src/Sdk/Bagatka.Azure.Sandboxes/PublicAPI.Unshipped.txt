@@ -14,10 +14,16 @@ Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions.ImageReference.get -> stri
 Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions.Labels.get -> System.Collections.Generic.IDictionary<string!, string!>!
 Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions.Name.get -> string?
 Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions.Name.set -> void
+Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions.RegistryCredentials.get -> Bagatka.Azure.Sandboxes.Models.RegistryCredentials?
+Bagatka.Azure.Sandboxes.Models.DiskImageCreateOptions.RegistryCredentials.set -> void
 Bagatka.Azure.Sandboxes.Models.DiskImageState
 Bagatka.Azure.Sandboxes.Models.DiskImageState.DiskImageState() -> void
 Bagatka.Azure.Sandboxes.Models.DiskImageState.DiskImageState(string! value) -> void
 Bagatka.Azure.Sandboxes.Models.DiskImageState.Equals(Bagatka.Azure.Sandboxes.Models.DiskImageState other) -> bool
+Bagatka.Azure.Sandboxes.Models.RegistryCredentials
+Bagatka.Azure.Sandboxes.Models.RegistryCredentials.RegistryCredentials(string! username, string! token) -> void
+Bagatka.Azure.Sandboxes.Models.RegistryCredentials.Token.get -> string!
+Bagatka.Azure.Sandboxes.Models.RegistryCredentials.Username.get -> string!
 Bagatka.Azure.Sandboxes.Models.Sandbox
 Bagatka.Azure.Sandboxes.Models.Sandbox.CreatedAt.get -> System.DateTimeOffset?
 Bagatka.Azure.Sandboxes.Models.Sandbox.DiskImageId.get -> string?
@@ -78,6 +84,7 @@ const Bagatka.Azure.Sandboxes.SandboxesDiagnostics.Name = "Bagatka.Azure.Sandbox
 override Bagatka.Azure.Sandboxes.Models.DiskImageState.Equals(object? obj) -> bool
 override Bagatka.Azure.Sandboxes.Models.DiskImageState.GetHashCode() -> int
 override Bagatka.Azure.Sandboxes.Models.DiskImageState.ToString() -> string!
+override Bagatka.Azure.Sandboxes.Models.RegistryCredentials.ToString() -> string!
 override Bagatka.Azure.Sandboxes.Models.SandboxState.Equals(object? obj) -> bool
 override Bagatka.Azure.Sandboxes.Models.SandboxState.GetHashCode() -> int
 override Bagatka.Azure.Sandboxes.Models.SandboxState.ToString() -> string!

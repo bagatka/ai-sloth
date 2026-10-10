@@ -84,10 +84,11 @@ if (builder.ExecutionContext.IsPublishMode)
 {
     // Deployed with `dotnet aspire deploy` (docs/self-hosting.md): the WebApi runs in Azure
     // Container Apps, nooks in a sandbox group beside it, and checkpoints are kept in Blob Storage, all
-    // in one resource group. Nooks start from images in a public repository.
+    // in one resource group. Nooks start from images in a public repository, or in an Azure Container
+    // Registry, which the WebApi's identity pulls from once it has the AcrPull role there.
     if (imageRepository is null)
     {
-        throw new InvalidOperationException("Deploying needs nook-image-repository: a public repository with the nook images.");
+        throw new InvalidOperationException("Deploying needs nook-image-repository: a public repository with the nook images, or an Azure Container Registry's.");
     }
 
     builder.AddAzureContainerAppEnvironment("apps");
@@ -130,6 +131,17 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("Host__BehindProxy", "true")
         .WithEnvironment("Sandboxing__Azure__SandboxGroup", NookSandboxGroup.Name)
         .WithEnvironment("Sandboxing__Azure__Scope", sandboxScope)
+        .WithEnvironment(environment =>
+        {
+            // Nook images in an Azure Container Registry are pulled with the WebApi's identity.
+            // Not handled: another private registry, which Azure can't pull from, so nooks fail with
+            // its refusal; handling it would take its credentials as deploy parameters.
+            string imageRegistry = imageRepository.Split('/')[0];
+            if (imageRegistry.EndsWith(".azurecr.io", StringComparison.OrdinalIgnoreCase))
+            {
+                environment.EnvironmentVariables["Sandboxing__Azure__ContainerRegistries__0"] = imageRegistry;
+            }
+        })
         .PublishAsAzureContainerApp((infrastructure, app) =>
         {
             // At most one replica: background work and daemons' connections aren't shared between
