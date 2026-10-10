@@ -5,7 +5,8 @@ host serves it at its app address, `/app/` on its own address by default. Today 
 start chats, choosing their repositories, agent, and account. They see their workspace's chats as
 they change, and follow one as its agent works: a message starts the next turn or, sent while the
 agent works, goes into its turn, and Esc stops it. They review what the agent changed in its
-repositories, push it as a branch or a pull request, and download a chat's files.
+repositories, push it as a branch or a pull request, and download a chat's files. And they set up a
+workspace without sloth: agent accounts, GitHub and repositories, secrets, instructions, and people.
 
 Run it from `./dev`, which has Node, with AiSloth running (`dotnet aspire run`):
 
@@ -25,7 +26,9 @@ pages show every component and a chat screen with made-up content, to judge the 
 ## How it's built
 
 - **Routes** (`src/app/router.tsx`): sign-in, and behind it, once the session checks out, a new chat
-  (`/`) and a chat (`/chats/<id>`), with the workspace's chats beside them.
+  (`/`), a chat (`/chats/<id>`), and the workspace's settings (`/settings`, one section per thing
+  set up, in `src/app/settings`), with the workspace's chats beside them. Settings show everyone
+  what's there, and changes only to those the host lets make them.
 - **A new chat** (`src/app/new-chat.tsx`) starts on the host as soon as someone writes, so its nook
   is ready when they send; the browser remembers each workspace's last choices.
 - **The API** (`src/app/api.ts`): one client whose types are generated from the WebApi's

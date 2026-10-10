@@ -11,7 +11,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { ApiError, answer, api } from "../api"
+import { ApiError, answer, api, messageOf } from "../api"
 import { chatStream } from "./chat-stream"
 import { MessageBox } from "./message-box"
 
@@ -71,8 +71,7 @@ export function Composer({
       toast.add({
         type: "error",
         title: "Not stopped",
-        description:
-          error instanceof ApiError ? error.message : "Can't reach the host.",
+        description: messageOf(error),
       }),
   })
   const wake = useMutation({

@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
 import {
   CaretDownIcon,
   GitBranchIcon,
@@ -14,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { toast } from "@/components/ui/toast"
-import { ApiError, answer, api, type Schemas } from "../api"
+import { ApiError, answer, api, messageOf, type Schemas } from "../api"
 
 // Shipping a chat's changes to GitHub with the person's connection: what isn't committed is
 // committed as them, then each repository's commits go to one branch, their prefix and the chat's
@@ -23,6 +24,7 @@ import { ApiError, answer, api, type Schemas } from "../api"
 type Pushed = Schemas["PushedSource"]
 
 export function PushMenu({ chatId }: { chatId: string }) {
+  const navigate = useNavigate()
   const push = useMutation({
     mutationFn: (pullRequest: boolean) =>
       answer(
@@ -36,13 +38,16 @@ export function PushMenu({ chatId }: { chatId: string }) {
       toast.add({
         type: "error",
         title: "Not pushed",
-        description:
-          error instanceof ApiError
-            ? error.code === "sources.github_not_connected"
-              ? // Until the web app connects GitHub itself.
-                "Connect your GitHub account first, with sloth: sloth github connect"
-              : error.message
-            : "Can't reach the host.",
+        description: messageOf(error),
+        actionProps:
+          error instanceof ApiError &&
+          error.code === "sources.github_not_connected"
+            ? {
+                children: "Connect GitHub",
+                onClick: () =>
+                  void navigate({ to: "/settings", hash: "repositories" }),
+              }
+            : undefined,
       }),
   })
 

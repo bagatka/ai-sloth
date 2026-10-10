@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query"
 
-import { answer, api } from "./api"
+import { ApiError, answer, api } from "./api"
 
 // What the screens read from the host, one definition per thing, so every screen shares one cached
 // copy. A workspace's chats come live instead (workspace-chats.ts).
@@ -118,5 +118,71 @@ export function changes(nookId: string) {
         api.GET("/nooks/{id}/changes", { params: { path: { id: nookId } } })
       ),
     staleTime: 0,
+  })
+}
+
+/** Every kind of agent account, how each is added, and whether this host allows it. */
+export const accountKinds = queryOptions({
+  queryKey: ["agent-account-kinds"],
+  queryFn: () => answer(api.GET("/agent-account-kinds")),
+  staleTime: Infinity,
+})
+
+/** The person's GitHub account, or null when they haven't connected one. */
+export const gitHubAccount = queryOptions({
+  queryKey: ["github", "account"],
+  queryFn: () =>
+    answer(api.GET("/github/account")).catch((error: unknown) => {
+      if (
+        error instanceof ApiError &&
+        error.code === "sources.github_not_connected"
+      ) {
+        return null
+      }
+      throw error
+    }),
+})
+
+/** The repositories the person's GitHub connection reaches, and where to install the app on more. */
+export const availableRepositories = queryOptions({
+  queryKey: ["github", "repositories"],
+  queryFn: () => answer(api.GET("/github/repositories")),
+})
+
+export function secrets(workspaceId: string) {
+  return queryOptions({
+    queryKey: ["workspaces", workspaceId, "secrets"],
+    queryFn: () =>
+      answer(
+        api.GET("/workspaces/{workspaceId}/secrets", {
+          params: { path: { workspaceId } },
+        })
+      ),
+  })
+}
+
+/** The workspace's instructions, and the person's own. */
+export function instructions(workspaceId: string) {
+  return queryOptions({
+    queryKey: ["workspaces", workspaceId, "instructions"],
+    queryFn: () =>
+      answer(
+        api.GET("/workspaces/{workspaceId}/instructions", {
+          params: { path: { workspaceId } },
+        })
+      ),
+  })
+}
+
+/** The people given access to the workspace. */
+export function workspaceAccess(workspaceId: string) {
+  return queryOptions({
+    queryKey: ["workspaces", workspaceId, "access"],
+    queryFn: () =>
+      answer(
+        api.GET("/workspaces/{workspaceId}/access", {
+          params: { path: { workspaceId } },
+        })
+      ),
   })
 }

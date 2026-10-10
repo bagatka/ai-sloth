@@ -116,6 +116,16 @@ const newChat = createRoute({
   component: NewChatPage,
 })
 
+// Settings are opened rarely, so their code loads when they are.
+const settings = createRoute({
+  getParentRoute: () => signedIn,
+  path: "settings",
+  component: lazyRouteComponent(
+    () => import("./settings/settings-page"),
+    "SettingsPage"
+  ),
+})
+
 export const chatRoute = createRoute({
   getParentRoute: () => signedIn,
   path: "chats/$chatId",
@@ -141,7 +151,7 @@ const design = import.meta.env.DEV
 export const router = createRouter({
   routeTree: root.addChildren([
     signIn,
-    signedIn.addChildren([newChat, chatRoute]),
+    signedIn.addChildren([newChat, chatRoute, settings]),
     ...design,
   ]),
   basepath: appBase,

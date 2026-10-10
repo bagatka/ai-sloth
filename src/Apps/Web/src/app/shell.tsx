@@ -4,8 +4,10 @@ import { Link, Outlet, useNavigate } from "@tanstack/react-router"
 import {
   CaretUpDownIcon,
   CheckIcon,
+  GearSixIcon,
   MagnifyingGlassIcon,
   NotePencilIcon,
+  SignInIcon,
   SignOutIcon,
   SquaresFourIcon,
 } from "@phosphor-icons/react"
@@ -21,6 +23,7 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -46,6 +49,7 @@ import {
 import { answer, api } from "./api"
 import { ChatList, useChatItems, useCurrentWorkspace } from "./chat-list"
 import { me, workspaces } from "./queries"
+import { JoinWorkspace } from "./join-workspace"
 import { chooseWorkspace } from "./workspace"
 
 // The signed-in app: the workspace's chats in the sidebar, and the open one beside them.
@@ -149,47 +153,59 @@ function WorkspaceSwitcher({
 }) {
   const all = useQuery(workspaces).data?.items ?? []
   const navigate = useNavigate()
+  const [joining, setJoining] = React.useState(false)
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        disabled={!current}
-        render={
-          <button className="flex h-10 min-w-0 flex-1 press items-center gap-2.5 rounded-lg px-2 text-left focus-ring hover:bg-sidebar-accent active:bg-[color-mix(in_oklch,var(--sidebar-accent),var(--foreground)_6%)] aria-expanded:bg-sidebar-accent" />
-        }
-      >
-        <span className="flex size-6 items-center justify-center rounded-md bg-card text-caption font-semibold shadow-raised">
-          {initials(current?.name ?? "")}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-          {current?.name ?? "No workspace"}
-        </span>
-        <CaretUpDownIcon className="size-4 text-muted-foreground" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
-          {all.map((workspace) => (
-            <DropdownMenuItem
-              key={workspace.id}
-              onClick={() => {
-                chooseWorkspace(workspace.id)
-                if (workspace.id !== current?.id) {
-                  void navigate({ to: "/" })
-                }
-              }}
-            >
-              <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
-              {workspace.id === current?.id && <CheckIcon />}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <JoinWorkspace open={joining} onOpenChange={setJoining} />
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          disabled={!current}
+          render={
+            <button className="flex h-10 min-w-0 flex-1 press items-center gap-2.5 rounded-lg px-2 text-left focus-ring hover:bg-sidebar-accent active:bg-[color-mix(in_oklch,var(--sidebar-accent),var(--foreground)_6%)] aria-expanded:bg-sidebar-accent" />
+          }
+        >
+          <span className="flex size-6 items-center justify-center rounded-md bg-card text-caption font-semibold shadow-raised">
+            {initials(current?.name ?? "")}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+            {current?.name ?? "No workspace"}
+          </span>
+          <CaretUpDownIcon className="size-4 text-muted-foreground" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+            {all.map((workspace) => (
+              <DropdownMenuItem
+                key={workspace.id}
+                onClick={() => {
+                  chooseWorkspace(workspace.id)
+                  if (workspace.id !== current?.id) {
+                    void navigate({ to: "/" })
+                  }
+                }}
+              >
+                <span className="min-w-0 flex-1 truncate">
+                  {workspace.name}
+                </span>
+                {workspace.id === current?.id && <CheckIcon />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setJoining(true)}>
+            <SignInIcon />
+            Join a workspace
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   )
 }
 
 function Person() {
+  const sidebar = useSidebar()
   const person = useQuery(me).data
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -228,6 +244,21 @@ function Person() {
           <TooltipContent>Components</TooltipContent>
         </Tooltip>
       )}
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Link
+              to="/settings"
+              aria-label="Settings"
+              onClick={() => sidebar.setOpenMobile(false)}
+              className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+            />
+          }
+        >
+          <GearSixIcon />
+        </TooltipTrigger>
+        <TooltipContent>Settings</TooltipContent>
+      </Tooltip>
       <ThemeSwitch />
       <Tooltip>
         <TooltipTrigger

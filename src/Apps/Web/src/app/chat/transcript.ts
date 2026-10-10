@@ -1,3 +1,5 @@
+import { seconds } from "../api"
+
 // A chat's transcript as rows to draw, folded from its events one at a time. Folding never changes a
 // row it already made: it replaces it, so React redraws only rows that changed. Events follow the
 // host's ChatEventBody (openapi.json); an agent's updates are Agent Client Protocol session updates
@@ -339,23 +341,6 @@ function findLast(rows: readonly Row[], match: (row: Row) => boolean): number {
     }
   }
   return -1
-}
-
-// A duration as the host writes it, such as "00:01:02.5" or "1.02:00:00".
-function seconds(duration: string | undefined): number | null {
-  const parts = /^-?(?:(\d+)\.)?(\d+):(\d+):(\d+(?:\.\d+)?)$/.exec(
-    duration ?? ""
-  )
-  if (!parts) {
-    return null
-  }
-  const [, days = "0", hours, minutes, rest] = parts
-  return (
-    Number(days) * 86_400 +
-    Number(hours) * 3_600 +
-    Number(minutes) * 60 +
-    Number(rest)
-  )
 }
 
 function gigabytes(bytes: number): string {

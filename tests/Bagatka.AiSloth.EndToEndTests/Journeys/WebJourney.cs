@@ -32,9 +32,6 @@ public sealed partial class WebJourney(ControlPlane app)
     // What the model holds on in this journey; ChatJourney, on the same host, holds on its own.
     private const string Wait = "wait a moment";
 
-    // How long a step may take to show: an agent's turn, from the page's point of view.
-    private static readonly LocatorAssertionsToBeVisibleOptions Shown = new LocatorAssertionsToBeVisibleOptions { Timeout = 60_000 };
-
     [Fact]
     public async Task Someone_starts_follows_and_steers_chats_in_the_web_app()
     {
@@ -46,13 +43,8 @@ public sealed partial class WebJourney(ControlPlane app)
         await acme.SendAsync(chat, "Please write hello.txt for me");
         LinkCode code = await Api.ReadAsync<LinkCode>(aliceApi.SendPostAsync("/users/me/link-codes", new { }), HttpStatusCode.OK);
 
-        using IPlaywright playwright = await Playwright.CreateAsync();
-        await using IBrowser browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
-        {
-            ExecutablePath = Environment.GetEnvironmentVariable("BAGATKA_CHROMIUM") is { Length: > 0 } chromium ? chromium : null,
-        });
-        await using IBrowserContext context = await browser.NewContextAsync(new BrowserNewContextOptions { ViewportSize = new ViewportSize { Width = 1440, Height = 900 } });
-        await context.AddInitScriptAsync("window.violations = []; document.addEventListener('securitypolicyviolation', (event) => window.violations.push(event.violatedDirective + ' ' + event.blockedURI))");
+        await using WebBrowser browser = await WebBrowser.LaunchAsync();
+        await using IBrowserContext context = await browser.NewContextAsync();
         IPage page = await context.NewPageAsync();
 
         try
@@ -72,9 +64,9 @@ public sealed partial class WebJourney(ControlPlane app)
         finally
         {
             // What the page looked like at the end, or where it failed, in both themes.
-            await ShotAsync(page, "end");
+            await WebBrowser.ShotAsync(page, "end");
             await page.EmulateMediaAsync(new PageEmulateMediaOptions { ColorScheme = ColorScheme.Dark });
-            await ShotAsync(page, "end-dark");
+            await WebBrowser.ShotAsync(page, "end-dark");
             app.Model.ReleaseForGood(Wait);
         }
     }
@@ -88,15 +80,15 @@ public sealed partial class WebJourney(ControlPlane app)
         await page.GetByLabel("Code").FillAsync(code);
         await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Sign in", Exact = true }).ClickAsync();
 
-        await Assertions.Expect(page.GetByRole(AriaRole.Searchbox).Or(page.GetByLabel("Search chats"))).ToBeVisibleAsync(Shown);
+        await Assertions.Expect(page.GetByRole(AriaRole.Searchbox).Or(page.GetByLabel("Search chats"))).ToBeVisibleAsync(WebBrowser.Shown);
     }
 
     // The app opens with the person's own workspace, where they added no agent account.
     private static async Task AWorkspaceWithoutAnAccountSaysWhatChatsNeedAsync(IPage page)
     {
-        await Assertions.Expect(page.GetByText("No agent account yet")).ToBeVisibleAsync(Shown);
+        await Assertions.Expect(page.GetByText("No agent account yet")).ToBeVisibleAsync(WebBrowser.Shown);
         await Assertions.Expect(page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Send" })).ToBeDisabledAsync();
-        await ShotAsync(page, "no-account");
+        await WebBrowser.ShotAsync(page, "no-account");
     }
 
     // The chat is in Acme.
@@ -107,10 +99,10 @@ public sealed partial class WebJourney(ControlPlane app)
         await page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Please write hello.txt for me" }).ClickAsync();
 
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Please write hello.txt for me" })).ToBeVisibleAsync();
-        await Assertions.Expect(page.GetByText("Write").First).ToBeVisibleAsync(Shown);
-        await Assertions.Expect(page.GetByText("Done.")).ToBeVisibleAsync(Shown);
-        await Assertions.Expect(page.GetByText(TurnEnded()).First).ToBeVisibleAsync(Shown);
-        await ShotAsync(page, "first-turn");
+        await Assertions.Expect(page.GetByText("Write").First).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(page.GetByText("Done.")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(page.GetByText(TurnEnded()).First).ToBeVisibleAsync(WebBrowser.Shown);
+        await WebBrowser.ShotAsync(page, "first-turn");
     }
 
     // Someone starts a chat from sloth or another browser: the list shows it without a reload.
@@ -119,7 +111,7 @@ public sealed partial class WebJourney(ControlPlane app)
         ChatSummary elsewhere = await acme.StartChatAsync();
         await acme.SendAsync(elsewhere, "hello from the terminal");
 
-        await Assertions.Expect(page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "hello from the terminal" })).ToBeVisibleAsync(Shown);
+        await Assertions.Expect(page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "hello from the terminal" })).ToBeVisibleAsync(WebBrowser.Shown);
     }
 
     // With sloth or, later, the app: their GitHub account, and Acme's repository from it. Returns the
@@ -149,15 +141,15 @@ public sealed partial class WebJourney(ControlPlane app)
         await page.GetByRole(AriaRole.Menuitemcheckbox, new PageGetByRoleOptions { Name = "api" }).ClickAsync();
         await page.Keyboard.PressAsync("Escape");
         await Assertions.Expect(page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "api" })).ToBeVisibleAsync();
-        await ShotAsync(page, "new-chat");
+        await WebBrowser.ShotAsync(page, "new-chat");
 
         await Composer(page).FillAsync("Please write hello.txt in a new chat");
         await page.Keyboard.PressAsync("Enter");
 
-        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Please write hello.txt in a new chat" })).ToBeVisibleAsync(Shown);
-        await Assertions.Expect(page.GetByText("Done.")).ToBeVisibleAsync(Shown);
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Please write hello.txt in a new chat" })).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(page.GetByText("Done.")).ToBeVisibleAsync(WebBrowser.Shown);
         await Assertions.Expect(page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Please write hello.txt in a new chat" })).ToBeVisibleAsync();
-        await ShotAsync(page, "started");
+        await WebBrowser.ShotAsync(page, "started");
         Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(acme.Person.SendGetAsync(acme.Path + "/chats"), HttpStatusCode.OK);
         return chats.Items[0];
     }
@@ -170,17 +162,17 @@ public sealed partial class WebJourney(ControlPlane app)
 
         await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Changes" }).ClickAsync();
         ILocator panel = page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "Changes" });
-        await Assertions.Expect(panel.GetByText("1 file in api")).ToBeVisibleAsync(Shown);
-        await Assertions.Expect(panel.GetByText("hello from the review")).ToBeVisibleAsync(Shown);
-        await ShotAsync(page, "changes");
+        await Assertions.Expect(panel.GetByText("1 file in api")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(panel.GetByText("hello from the review")).ToBeVisibleAsync(WebBrowser.Shown);
+        await WebBrowser.ShotAsync(page, "changes");
         IDownload download = await page.RunAndWaitForDownloadAsync(() => panel.GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = "Download files" }).ClickAsync());
         string archive = await download.PathAsync();
         await page.Keyboard.PressAsync("Escape");
 
         await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Push" }).ClickAsync();
         await page.GetByRole(AriaRole.Menuitem, new PageGetByRoleOptions { Name = "Open a pull request" }).ClickAsync();
-        await Assertions.Expect(page.GetByText("Pushed to aisloth/")).ToBeVisibleAsync(Shown);
-        await ShotAsync(page, "pushed");
+        await Assertions.Expect(page.GetByText("Pushed to aisloth/")).ToBeVisibleAsync(WebBrowser.Shown);
+        await WebBrowser.ShotAsync(page, "pushed");
         string? file = await app.GitHub.ReadAsync(owner, "api", "show", "aisloth/" + chat.Id.Value.ToString("N", CultureInfo.InvariantCulture)[^6..] + ":CHANGE.md");
 
         Assert.EndsWith(".tar.gz", download.SuggestedFilename, StringComparison.Ordinal);
@@ -205,12 +197,12 @@ public sealed partial class WebJourney(ControlPlane app)
         await Composer(page).FillAsync(Wait);
         await page.Keyboard.PressAsync("Enter");
         await app.Model.HeldAsync(Wait);
-        await Assertions.Expect(page.GetByRole(AriaRole.Status).GetByText("is working")).ToBeVisibleAsync(Shown);
+        await Assertions.Expect(page.GetByRole(AriaRole.Status).GetByText("is working")).ToBeVisibleAsync(WebBrowser.Shown);
 
         await Composer(page).FillAsync("and then say hello");
         await page.Keyboard.PressAsync("Enter");
-        await Assertions.Expect(page.GetByText("Sent into the running turn")).ToBeVisibleAsync(Shown);
-        await ShotAsync(page, "steered");
+        await Assertions.Expect(page.GetByText("Sent into the running turn")).ToBeVisibleAsync(WebBrowser.Shown);
+        await WebBrowser.ShotAsync(page, "steered");
         app.Model.Release(Wait);
 
         await Assertions.Expect(page.GetByText(TurnEnded())).ToHaveCountAsync(3, new LocatorAssertionsToHaveCountOptions { Timeout = 60_000 });
@@ -220,11 +212,11 @@ public sealed partial class WebJourney(ControlPlane app)
     {
         await Composer(page).FillAsync(Wait);
         await page.Keyboard.PressAsync("Enter");
-        await Assertions.Expect(page.GetByRole(AriaRole.Status).GetByText("is working")).ToBeVisibleAsync(Shown);
+        await Assertions.Expect(page.GetByRole(AriaRole.Status).GetByText("is working")).ToBeVisibleAsync(WebBrowser.Shown);
 
         await Composer(page).PressAsync("Escape");
 
-        await Assertions.Expect(page.GetByText("The turn was stopped")).ToBeVisibleAsync(Shown);
+        await Assertions.Expect(page.GetByText("The turn was stopped")).ToBeVisibleAsync(WebBrowser.Shown);
         await Assertions.Expect(page.GetByRole(AriaRole.Status).GetByText("is working")).ToBeHiddenAsync();
     }
 
@@ -233,7 +225,7 @@ public sealed partial class WebJourney(ControlPlane app)
         IReadOnlyList<BrowserContextCookiesResult> cookies = await context.CookiesAsync();
         BrowserContextCookiesResult session = Assert.Single(cookies, cookie => string.Equals(cookie.Name, "__Host-aisloth-session", StringComparison.Ordinal));
         string readable = await page.EvaluateAsync<string>("document.cookie");
-        string[] violations = await page.EvaluateAsync<string[]>("window.violations");
+        string[] violations = await WebBrowser.ViolationsAsync(page);
 
         Assert.True(session.HttpOnly);
         Assert.True(session.Secure);
@@ -242,31 +234,19 @@ public sealed partial class WebJourney(ControlPlane app)
         Assert.Empty(violations);
     }
 
-    // The fake provider signs in whoever login_hint names, which the app never sends: the step adds it
-    // to the app's way into sign-in.
-    private async Task ALinkToTheChatSignsInThroughTheProviderAsync(IBrowser browser, ChatSummary chat, string person)
+    private async Task ALinkToTheChatSignsInThroughTheProviderAsync(WebBrowser browser, ChatSummary chat, string person)
     {
-        await using IBrowserContext context = await browser.NewContextAsync(new BrowserNewContextOptions { ViewportSize = new ViewportSize { Width = 1440, Height = 900 } });
+        await using IBrowserContext context = await browser.NewContextAsync();
         IPage page = await context.NewPageAsync();
-        await page.RouteAsync(ProviderSignInStart(), route => route.ContinueAsync(new RouteContinueOptions { Url = route.Request.Url + "&login_hint=" + Uri.EscapeDataString(person) }));
+        await WebBrowser.SignInThroughTheProviderAsAsync(page, person);
 
         await page.GotoAsync(new Uri(app.WebApiUrl, string.Create(CultureInfo.InvariantCulture, $"app/chats/{chat.Id.Value}")).AbsoluteUri);
         await Assertions.Expect(page).ToHaveURLAsync(SignInPage());
         await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Continue with Fake" }).ClickAsync();
 
-        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Please write hello.txt for me" })).ToBeVisibleAsync(Shown);
-        await Assertions.Expect(page.GetByText("The turn was stopped")).ToBeVisibleAsync(Shown);
-        await ShotAsync(page, "provider");
-    }
-
-    // Screenshots for review, beside the test results: TestResults/web. They wait up to two seconds
-    // for what's moving to settle, such as a panel sliding in; some animations never end.
-    private static async Task ShotAsync(IPage page, string name)
-    {
-        string shots = Path.Combine(AppContext.BaseDirectory, "TestResults", "web");
-        Directory.CreateDirectory(shots);
-        await page.EvaluateAsync("() => Promise.race([Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {}))), new Promise(settled => setTimeout(settled, 2000))])");
-        await page.ScreenshotAsync(new PageScreenshotOptions { Path = Path.Combine(shots, name + ".png") });
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Please write hello.txt for me" })).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(page.GetByText("The turn was stopped")).ToBeVisibleAsync(WebBrowser.Shown);
+        await WebBrowser.ShotAsync(page, "provider");
     }
 
     private static ILocator Composer(IPage page)
@@ -279,7 +259,4 @@ public sealed partial class WebJourney(ControlPlane app)
 
     [GeneratedRegex("^Turn ended", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
     private static partial Regex TurnEnded();
-
-    [GeneratedRegex("/sign-in/browser\\?", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
-    private static partial Regex ProviderSignInStart();
 }

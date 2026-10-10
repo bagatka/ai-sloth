@@ -35,7 +35,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { ApiError } from "../api"
+import { messageOf } from "../api"
 import { apiUrl } from "../host"
 import { changes as changesQuery } from "../queries"
 import { changedFiles, type ChangedFile } from "./changes"
@@ -126,11 +126,7 @@ export function ChangesPanel({ nookId }: { nookId: string }) {
           <Empty>
             <EmptyHeader>
               <EmptyTitle>Couldn't read the changes</EmptyTitle>
-              <EmptyDescription>
-                {read.error instanceof ApiError
-                  ? read.error.message
-                  : "Can't reach the host."}
-              </EmptyDescription>
+              <EmptyDescription>{messageOf(read.error)}</EmptyDescription>
             </EmptyHeader>
             <Button
               variant="outline"

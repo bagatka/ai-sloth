@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { useNavigate } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import {
   ArrowUpIcon,
   BookBookmarkIcon,
@@ -9,7 +9,7 @@ import {
 } from "@phosphor-icons/react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -23,7 +23,7 @@ import {
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/components/ui/toast"
-import { ApiError, answer, api, type Schemas } from "./api"
+import { ApiError, answer, api, messageOf, type Schemas } from "./api"
 import { chatStream } from "./chat/chat-stream"
 import { MessageBox } from "./chat/message-box"
 import { useCurrentWorkspace } from "./chat-list"
@@ -160,8 +160,7 @@ function NewChat({ workspace }: { workspace: Workspace }) {
       toast.add({
         type: "error",
         title: "Not sent",
-        description:
-          error instanceof ApiError ? error.message : "Can't reach the host.",
+        description: messageOf(error),
       }),
   })
 
@@ -195,6 +194,20 @@ function NewChat({ workspace }: { workspace: Workspace }) {
               <Skeleton className="ml-1 h-4 w-40" />
             ) : setup ? (
               <>
+                {(repositories.data ?? []).length === 0 &&
+                  workspace.access === "Manage" && (
+                    <Link
+                      to="/settings"
+                      hash="repositories"
+                      className={buttonVariants({
+                        variant: "ghost",
+                        size: "sm",
+                      })}
+                    >
+                      <BookBookmarkIcon />
+                      Add a repository
+                    </Link>
+                  )}
                 {(repositories.data ?? []).length > 0 && (
                   <RepositoriesPicker
                     all={repositories.data ?? []}
@@ -238,10 +251,19 @@ function NewChat({ workspace }: { workspace: Workspace }) {
             <>
               <AlertTitle>No agent account yet</AlertTitle>
               <AlertDescription>
-                Chats in {workspace.name} need an agent account. Add one with
-                sloth:{" "}
-                <code className="whitespace-nowrap">sloth account add</code>
+                Chats in {workspace.name} need one to pay for the agent's work:
+                an API key, or your own plan.
               </AlertDescription>
+              <Link
+                to="/settings"
+                hash="accounts"
+                className={buttonVariants({
+                  size: "sm",
+                  className: "col-start-2 mt-2 w-fit",
+                })}
+              >
+                Add an agent account
+              </Link>
             </>
           ) : (
             <>

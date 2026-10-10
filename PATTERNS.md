@@ -1263,8 +1263,8 @@ A browser must never hold a session a script can read, yet every client uses the
   `answer()` returns the data or throws an `ApiError` with the host's problem details.
 - **Queries are declared once** in `src/app/queries.ts` and read with `useQuery`; TanStack Query
   owns the cache, and nothing fetches in an effect (lint).
-- **Changes** are a `useMutation` where they're made. A failure says what the host said, and puts
-  back what the person wrote.
+- **Changes** are a `useMutation` where they're made. A failure says what the host said
+  (`messageOf`), and puts back what the person wrote.
 - **Live data** is a stream object outside React, read with `useSyncExternalStore`, which folds the
   host's server-sent events into plain state.
 - **Canonical example:** `src/Apps/Web/src/app/chat/composer.tsx` and `chat/chat-stream.ts`.

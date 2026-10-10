@@ -118,7 +118,7 @@ staging environment. Give the AppHost these settings with `dotnet user-secrets s
 | Format | `dotnet format AiSloth.slnx --verify-no-changes` |
 | The web app, in `src/Apps/Web` | `npm run lint`, `npm run format:check`, and `npm run build` |
 
-The journeys serve the web app as last built, so build it before `WebJourney`.
+The journeys serve the web app as last built, so build it before `WebJourney` and `WebSetupJourney`.
 
 On each push to `main`, CI runs all the journeys. Pushes that change only the landing page or the
 docs skip them.

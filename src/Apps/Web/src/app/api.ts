@@ -71,3 +71,25 @@ export async function answer<T>(
 export function isSignedOut(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401
 }
+
+/** A duration as the host writes it, such as "00:01:02.5" or "1.02:00:00", in seconds. */
+export function seconds(duration: string | undefined): number | null {
+  const parts = /^-?(?:(\d+)\.)?(\d+):(\d+):(\d+(?:\.\d+)?)$/.exec(
+    duration ?? ""
+  )
+  if (!parts) {
+    return null
+  }
+  const [, days = "0", hours, minutes, rest] = parts
+  return (
+    Number(days) * 86_400 +
+    Number(hours) * 3_600 +
+    Number(minutes) * 60 +
+    Number(rest)
+  )
+}
+
+/** What went wrong, in words for people: what the host said, or that it couldn't be reached. */
+export function messageOf(error: unknown): string {
+  return error instanceof ApiError ? error.message : "Can't reach the host."
+}
