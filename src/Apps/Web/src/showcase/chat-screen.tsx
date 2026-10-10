@@ -7,6 +7,7 @@ import {
   CheckIcon,
   GitBranchIcon,
   GitDiffIcon,
+  PencilSimpleLineIcon,
   MagnifyingGlassIcon,
   NotePencilIcon,
   PaperclipIcon,
@@ -21,6 +22,14 @@ import {
   NookStateDot,
   type NookStateName,
 } from "@/components/nook-state"
+import {
+  ChangeCounts,
+  Diff,
+  FileTree,
+  preloadCode,
+  warmUpCode,
+  type DiffLayout,
+} from "@/components/code"
 import { Shortcut } from "@/components/shortcut"
 import { ThemeSwitch } from "@/components/theme-switch"
 import { useShortcut } from "@/components/use-shortcut"
@@ -49,6 +58,15 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group"
 import { Marker, MarkerContent } from "@/components/ui/marker"
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { toast } from "@/components/ui/toast"
 import { Message, MessageContent } from "@/components/ui/message"
 import {
@@ -80,6 +98,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { AgentWorking } from "./agent-working"
+import { changes, changedPaths, type SampleChange } from "./sample-code"
+
+// The chat shows agents' edits, so the code views warm up as soon as the page is idle. (The app's
+// route loaders will do this for the screens that show code.)
+warmUpCode()
 
 // The chat screen, composed from the components with made-up content, to judge the look as a
 // whole: the sidebar on the ground, and the chat on one raised panel beside it, as on the landing.
@@ -145,6 +168,7 @@ type Row =
       seconds: number
       output: string
     }
+  | { id: string; kind: "edit"; change: SampleChange }
   | { id: string; kind: "marker"; text: string }
   | { id: string; kind: "working" }
 
@@ -160,6 +184,8 @@ const transcript: Row[] = [
     first: true,
     text: "The test waits for the payment iframe with a fixed 2 second timeout, and CI is slower when its cache is cold. I’ll wait for the iframe’s ready message instead.",
   },
+  { id: "2a", kind: "edit", change: changes[0] },
+  { id: "2b", kind: "edit", change: changes[1] },
   {
     id: "3",
     kind: "tool",
@@ -406,11 +432,7 @@ function ChatHeader({ working }: { working: boolean }) {
       <div className="hidden sm:block">
         <NookState state={working ? "working" : "ready"} />
       </div>
-      <Button variant="outline" size="sm">
-        <GitDiffIcon data-icon="inline-start" />
-        <span className="hidden sm:inline">Changes</span>
-        <span className="text-muted-foreground tabular-nums">4</span>
-      </Button>
+      <ChangesPanel />
       <Button size="sm" loading={pushing} onClick={push}>
         <UploadSimpleIcon data-icon="inline-start" />
         Push
@@ -475,6 +497,8 @@ function TranscriptRow({ row }: { row: Row }) {
           <p className="text-read text-pretty">{row.text}</p>
         </div>
       )
+    case "edit":
+      return <EditCall change={row.change} />
     case "tool":
       return (
         <ToolCall
@@ -665,5 +689,127 @@ function Composer({
         </div>
       </form>
     </div>
+  )
+}
+
+// An edit the agent made: a quiet row with the file and its line counts, opening into the diff.
+function EditCall({ change }: { change: SampleChange }) {
+  return (
+    <Collapsible>
+      <CollapsibleTrigger
+        onPointerEnter={preloadCode}
+        render={
+          <button className="group -mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-left text-label text-muted-foreground focus-ring transition-colors hover:bg-muted/70 hover:text-foreground active:bg-[color-mix(in_oklch,var(--muted),var(--foreground)_6%)] [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-caption [&_code]:text-foreground/80" />
+        }
+      >
+        <PencilSimpleLineIcon className="size-4 shrink-0" />
+        <span className="shrink-0">Edited</span>
+        <code className="min-w-0 truncate">{change.path}</code>
+        <ChangeCounts
+          additions={change.additions}
+          deletions={change.deletions}
+          className="ml-auto"
+        />
+        <CaretRightIcon className="size-3.5 shrink-0 transition-transform duration-200 ease-out group-data-panel-open:rotate-90" />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <Diff
+          path={change.path}
+          before={change.before}
+          after={change.after}
+          className="mt-1.5"
+        />
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+// Changes on demand: the files that changed in a tree, beside the selected file's diff.
+function ChangesPanel() {
+  const [selected, setSelected] = React.useState(changes[0].path)
+  const [layout, setLayout] = React.useState<DiffLayout>("unified")
+  const change =
+    changes.find((candidate) => candidate.path === selected) ?? changes[0]
+  const totals = changes.reduce(
+    (sum, file) => ({
+      additions: sum.additions + file.additions,
+      deletions: sum.deletions + file.deletions,
+    }),
+    { additions: 0, deletions: 0 }
+  )
+  const statuses = changes.map(({ path, status }) => ({ path, status }))
+
+  return (
+    <Sheet>
+      <SheetTrigger
+        onPointerEnter={preloadCode}
+        render={<Button variant="outline" size="sm" />}
+      >
+        <GitDiffIcon data-icon="inline-start" />
+        <span className="hidden sm:inline">Changes</span>
+        <span className="text-muted-foreground tabular-nums">
+          {changes.length}
+        </span>
+      </SheetTrigger>
+      <SheetContent className="gap-0 p-0 data-[side=right]:w-[calc(100%-1.5rem)] data-[side=right]:sm:max-w-5xl">
+        <div className="flex h-16 shrink-0 items-center gap-3 pr-16 pl-5">
+          <div className="min-w-0 flex-1">
+            <SheetTitle className="text-title">Changes</SheetTitle>
+            <SheetDescription className="flex items-center gap-2 text-label">
+              {changes.length} files in acme/web
+              <ChangeCounts
+                additions={totals.additions}
+                deletions={totals.deletions}
+              />
+            </SheetDescription>
+          </div>
+          <ToggleGroup
+            value={[layout]}
+            onValueChange={(value) =>
+              value[0] && setLayout(value[0] as DiffLayout)
+            }
+            variant="outline"
+            spacing={0}
+            size="sm"
+            className="hidden md:flex"
+          >
+            <ToggleGroupItem value="unified">Unified</ToggleGroupItem>
+            <ToggleGroupItem value="split">Split</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+        {/* Phones have no room for the tree or a split view: a list of the files takes the tree's place. */}
+        <NativeSelect
+          aria-label="File"
+          value={selected}
+          onChange={(event) => setSelected(event.target.value)}
+          className="mx-3 mb-3 w-auto md:hidden"
+        >
+          {changes.map((file) => (
+            <NativeSelectOption key={file.path} value={file.path}>
+              {file.path}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+        <div className="flex min-h-0 flex-1 gap-3 px-3 pb-3">
+          <FileTree
+            paths={changedPaths}
+            changes={statuses}
+            selected={selected}
+            onSelect={setSelected}
+            className="hidden w-60 shrink-0 md:block"
+          />
+          <div className="min-w-0 flex-1 overflow-hidden rounded-xl bg-card shadow-raised">
+            <Diff
+              key={change.path}
+              variant="panel"
+              layout={layout}
+              path={change.path}
+              before={change.before}
+              after={change.after}
+            />
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }

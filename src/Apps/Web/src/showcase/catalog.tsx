@@ -1,5 +1,6 @@
 import {
   ArrowLeftIcon,
+  CodeIcon,
   BellIcon,
   StackIcon,
   SquaresFourIcon,
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Actions } from "@/showcase/actions"
 import { Chat } from "@/showcase/chat"
+import { Code } from "@/showcase/code"
 import { Data } from "@/showcase/data"
 import { Feedback } from "@/showcase/feedback"
 import { Forms } from "@/showcase/forms"
@@ -36,6 +38,7 @@ import { Overlays } from "@/showcase/overlays"
 
 const sections = [
   { id: "chat", title: "Chat", icon: ChatCircleIcon },
+  { id: "code", title: "Code", icon: CodeIcon },
   { id: "actions", title: "Actions", icon: CursorClickIcon },
   { id: "forms", title: "Forms", icon: TextboxIcon },
   { id: "overlays", title: "Overlays", icon: StackIcon },
@@ -93,6 +96,7 @@ export default function Catalog() {
         </header>
         <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 p-6 pb-24">
           <Chat />
+          <Code />
           <Actions />
           <Forms />
           <Overlays />

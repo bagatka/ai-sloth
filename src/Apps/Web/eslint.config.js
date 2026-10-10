@@ -48,6 +48,8 @@ export default defineConfig([
       'src/components/ui/**',
       'src/components/theme-provider.tsx',
       'src/components/use-shortcut.ts',
+      // Pushes props into the tree library's own model.
+      'src/components/code/file-tree.tsx',
     ],
     rules: {
       'no-restricted-syntax': [

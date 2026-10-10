@@ -6,6 +6,89 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Code: diffs, files, and file trees (@pierre/diffs and @pierre/trees, drawn in shadow DOM) take
+   their colors, fonts, and spacing from these variables. Syntax colors are a few quiet hues at even
+   lightness, so code reads as text with structure, not as decoration. */
+:root {
+  --diffs-light-bg: var(--card);
+  --diffs-dark-bg: var(--card);
+  --diffs-light: var(--foreground);
+  --diffs-dark: var(--foreground);
+  --diffs-addition-color-override: var(--primary);
+  --diffs-deletion-color-override: var(--destructive);
+  --diffs-modified-color-override: var(--warning);
+  --diffs-bg-context-override: color-mix(in oklch, var(--card), var(--foreground) 2.5%);
+  --diffs-bg-separator-override: color-mix(in oklch, var(--card), var(--foreground) 4%);
+  --diffs-bg-buffer-override: color-mix(in oklch, var(--card), var(--foreground) 5%);
+  --diffs-bg-hover-override: var(--foreground);
+  --diffs-bg-addition-override: color-mix(in oklch, var(--card), var(--primary) 10%);
+  --diffs-bg-deletion-override: color-mix(in oklch, var(--card), var(--destructive) 8%);
+  --diffs-bg-addition-emphasis-override: color-mix(in oklch, transparent, var(--primary) 20%);
+  --diffs-bg-deletion-emphasis-override: color-mix(in oklch, transparent, var(--destructive) 16%);
+  /* Code shows the characters that are in the file: no ligatures turning => into an arrow. */
+  --diffs-font-features: "liga" 0, "calt" 0;
+  --diffs-font-family: var(--font-mono);
+  --diffs-header-font-family: var(--font-sans);
+  --diffs-font-size: 12.5px;
+  --diffs-line-height: 20px;
+  --diffs-foreground: var(--foreground);
+  --diffs-background: var(--card);
+  --diffs-token-comment: oklch(0.58 0.01 115);
+  --diffs-token-punctuation: oklch(0.5 0.01 115);
+  --diffs-token-keyword: oklch(0.48 0.12 330);
+  --diffs-token-string: oklch(0.5 0.12 142);
+  --diffs-token-string-expression: oklch(0.5 0.12 142);
+  --diffs-token-function: oklch(0.48 0.1 240);
+  --diffs-token-constant: oklch(0.54 0.12 62);
+  --diffs-token-parameter: oklch(0.42 0.05 40);
+  --diffs-token-link: oklch(0.48 0.1 240);
+  --diffs-token-inserted: var(--primary);
+  --diffs-token-deleted: var(--destructive);
+  --diffs-token-changed: var(--warning);
+
+  --trees-bg-override: transparent;
+  --trees-fg-override: var(--foreground);
+  --trees-fg-muted-override: var(--muted-foreground);
+  --trees-accent-override: var(--primary);
+  /* Rows highlight like the sidebar's: a tint that shows on whatever surface holds the tree. */
+  --trees-bg-muted-override: var(--sidebar-accent);
+  --trees-selected-bg-override: var(--sidebar-accent);
+  --trees-selected-fg-override: var(--foreground);
+  --trees-selected-focused-border-color-override: var(--ring);
+  --trees-focus-ring-color-override: var(--ring);
+  --trees-focus-ring-width-override: 2px;
+  --trees-focus-ring-offset-override: -2px;
+  --trees-font-family-override: var(--font-sans);
+  --trees-font-size-override: 13px;
+  --trees-border-radius-override: 8px;
+  --trees-item-height: 28px;
+  --trees-padding-inline-override: 8px;
+  --trees-input-bg-override: var(--card);
+  --trees-file-icon-color: var(--muted-foreground);
+  --trees-git-added-color-override: var(--primary);
+  --trees-git-modified-color-override: var(--warning);
+  --trees-git-deleted-color-override: var(--destructive);
+  --trees-git-renamed-color-override: var(--warning);
+  --trees-git-untracked-color-override: var(--primary);
+  --trees-git-ignored-color-override: var(--muted-foreground);
+}
+
+.dark {
+  --diffs-bg-addition-override: color-mix(in oklch, var(--card), var(--primary) 13%);
+  --diffs-bg-deletion-override: color-mix(in oklch, var(--card), var(--destructive) 13%);
+  --diffs-bg-addition-emphasis-override: color-mix(in oklch, transparent, var(--primary) 24%);
+  --diffs-bg-deletion-emphasis-override: color-mix(in oklch, transparent, var(--destructive) 22%);
+  --diffs-token-comment: oklch(0.62 0.01 115);
+  --diffs-token-punctuation: oklch(0.68 0.01 115);
+  --diffs-token-keyword: oklch(0.79 0.1 330);
+  --diffs-token-string: oklch(0.8 0.12 140);
+  --diffs-token-string-expression: oklch(0.8 0.12 140);
+  --diffs-token-function: oklch(0.79 0.08 240);
+  --diffs-token-constant: oklch(0.82 0.1 72);
+  --diffs-token-parameter: oklch(0.82 0.04 50);
+  --diffs-token-link: oklch(0.79 0.08 240);
+}
+
 /* People who ask their system for more contrast get firmer lines and edges. */
 @media (prefers-contrast: more) {
   :root {
@@ -211,6 +294,7 @@
   pre,
   samp {
     font-family: var(--font-mono);
+    font-variant-ligatures: none;
   }
   /* Code within prose: mono, a touch smaller, on a tint of whatever it sits on. */
   :not(pre) > code {

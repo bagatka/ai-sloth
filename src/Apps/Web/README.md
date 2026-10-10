@@ -42,11 +42,23 @@ It lives in `src/index.css`:
 are ours: edit them in place. A component added later with `npx shadcn@latest add <name>` arrives in
 shadcn's own style and needs the same treatment.
 
+## Code views
+
+`src/components/code` shows code: `Diff` (a change inline in a chat or in a panel, unified or
+split), `CodeFile`, and `FileTree` with each file's change. They are built on
+[@pierre/diffs](https://diffs.com) and [@pierre/trees](https://trees.software), which draw in shadow
+DOM and take their colors, fonts, and spacing from the `--diffs-*` and `--trees-*` variables in
+`src/index.css`. Highlighting runs in workers. The views load on first use: a screen likely to show
+code calls `warmUpCode()`, and anything about to open code calls `preloadCode()`, so the first view
+shows at once. Expanding unchanged lines takes a pointer, since the library's expander can't take
+focus. @pierre/trees is a beta, pinned to an exact version.
+
 ## Rules the build enforces
 
-- **No effects in app code.** `useEffect` and `useLayoutEffect` fail lint outside `components/ui`.
-  Data comes through the router and the query cache, subscriptions through `useSyncExternalStore`,
-  derived values are computed while rendering, and events are handled in their handlers. Keyboard
-  shortcuts go through `useShortcut`, the one hook allowed to subscribe to the window.
+- **No effects in app code.** `useEffect` and `useLayoutEffect` fail lint outside `components/ui`
+  and the few files listed in `eslint.config.js`, each syncing something outside React. Data comes
+  through the router and the query cache, subscriptions through `useSyncExternalStore`, derived
+  values are computed while rendering, and events are handled in their handlers. Keyboard shortcuts
+  go through `useShortcut`, the one hook allowed to subscribe to the window.
 - **Memoization is React Compiler's job.** Don't write `useMemo` or `useCallback`.
 - **Only `transform` and `opacity` move.** Anything that animates otherwise repaints every frame.
