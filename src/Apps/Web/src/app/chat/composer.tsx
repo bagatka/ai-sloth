@@ -13,10 +13,11 @@ import {
 } from "@/components/ui/tooltip"
 import { ApiError, answer, api } from "../api"
 import { chatStream } from "./chat-stream"
+import { MessageBox } from "./message-box"
 
-// Writing to the agent: Enter sends, Shift+Enter adds a line. While the agent works, a message goes
-// into its running turn (steering), and Esc or the stop button ends the turn. An asleep nook starts
-// waking as someone starts writing, so it's ready when they send.
+// Writing to the agent in a chat. While the agent works, a message goes into its running turn
+// (steering), and Esc or the stop button ends the turn. An asleep nook starts waking as someone
+// starts writing, so it's ready when they send.
 
 export function Composer({
   chatId,
@@ -98,48 +99,22 @@ export function Composer({
 
   return (
     <div className="shrink-0 px-4 pb-4 md:px-5 md:pb-5">
-      <form
-        className="mx-auto w-full max-w-[44rem] rounded-2xl border focus-field-within border-input bg-card shadow-field transition-[border-color,box-shadow]"
-        onSubmit={(event) => {
-          event.preventDefault()
-          submit()
+      <MessageBox
+        value={draft}
+        onValueChange={setDraft}
+        onSubmit={submit}
+        onEscape={working ? () => stop.mutate() : undefined}
+        onFocus={() => {
+          if (asleep && !wake.isPending) {
+            wake.mutate()
+          }
         }}
-      >
-        <textarea
-          aria-label="Message"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onFocus={() => {
-            if (asleep && !wake.isPending) {
-              wake.mutate()
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && working) {
-              event.preventDefault()
-              stop.mutate()
-              return
-            }
-            // Enter sends; Shift+Enter, or Enter while an input method composes, adds a line.
-            if (
-              event.key !== "Enter" ||
-              event.shiftKey ||
-              event.nativeEvent.isComposing
-            ) {
-              return
-            }
-            event.preventDefault()
-            submit()
-          }}
-          placeholder={placeholder}
-          rows={2}
-          className="block [field-sizing:content] max-h-60 min-h-16 w-full resize-none bg-transparent px-[15px] pt-3.5 pb-1 text-base outline-none md:text-read"
-        />
-        <div className="flex items-center gap-1 px-2 pb-2">
-          {/* One button that follows intent: Stop while the agent works and nothing is typed,
-              Send (which steers a running turn) as soon as there is text. The two cross-fade with a
-              little blur, so they read as one thing changing. */}
-          <div className="relative ml-auto size-8">
+        placeholder={placeholder}
+        action={
+          // One button that follows intent: Stop while the agent works and nothing is typed, Send
+          // (which steers a running turn) as soon as there is text. The two cross-fade with a little
+          // blur, so they read as one thing changing.
+          <div className="relative size-8">
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -177,8 +152,8 @@ export function Composer({
               <ArrowUpIcon weight="bold" />
             </Button>
           </div>
-        </div>
-      </form>
+        }
+      />
     </div>
   )
 }

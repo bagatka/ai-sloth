@@ -1,10 +1,11 @@
 import * as React from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Outlet, useNavigate } from "@tanstack/react-router"
+import { Link, Outlet, useNavigate } from "@tanstack/react-router"
 import {
   CaretUpDownIcon,
   CheckIcon,
   MagnifyingGlassIcon,
+  NotePencilIcon,
   SignOutIcon,
   SquaresFourIcon,
 } from "@phosphor-icons/react"
@@ -34,6 +35,7 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarProvider,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -69,7 +71,10 @@ function AppSidebar({ search }: { search: React.Ref<HTMLInputElement> }) {
   return (
     <Sidebar variant="inset">
       <SidebarHeader className="gap-2.5 pt-3.5">
-        <WorkspaceSwitcher current={workspace} />
+        <div className="flex items-center gap-1">
+          <WorkspaceSwitcher current={workspace} />
+          <NewChatButton />
+        </div>
         <InputGroup className="h-8">
           <InputGroupAddon>
             <MagnifyingGlassIcon />
@@ -115,6 +120,28 @@ function AppSidebar({ search }: { search: React.Ref<HTMLInputElement> }) {
   )
 }
 
+// A new chat starts on the app's first page.
+function NewChatButton() {
+  const sidebar = useSidebar()
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Link
+            to="/"
+            aria-label="New chat"
+            onClick={() => sidebar.setOpenMobile(false)}
+            className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+          />
+        }
+      >
+        <NotePencilIcon />
+      </TooltipTrigger>
+      <TooltipContent>New chat</TooltipContent>
+    </Tooltip>
+  )
+}
+
 function WorkspaceSwitcher({
   current,
 }: {
@@ -128,7 +155,7 @@ function WorkspaceSwitcher({
       <DropdownMenuTrigger
         disabled={!current}
         render={
-          <button className="flex h-10 w-full press items-center gap-2.5 rounded-lg px-2 text-left focus-ring hover:bg-sidebar-accent active:bg-[color-mix(in_oklch,var(--sidebar-accent),var(--foreground)_6%)] aria-expanded:bg-sidebar-accent" />
+          <button className="flex h-10 min-w-0 flex-1 press items-center gap-2.5 rounded-lg px-2 text-left focus-ring hover:bg-sidebar-accent active:bg-[color-mix(in_oklch,var(--sidebar-accent),var(--foreground)_6%)] aria-expanded:bg-sidebar-accent" />
         }
       >
         <span className="flex size-6 items-center justify-center rounded-md bg-card text-caption font-semibold shadow-raised">

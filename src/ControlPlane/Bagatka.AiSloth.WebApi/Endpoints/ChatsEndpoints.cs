@@ -45,6 +45,7 @@ internal static class ChatsEndpoints
         RouteGroupBuilder workspaceChats = app.MapGroup("/workspaces/{workspaceId:guid}/chats").WithTags("Chats");
         workspaceChats.MapPost("/", Start).RequireRateLimiting(RateLimits.Starts).ProducesProblem(StatusCodes.Status429TooManyRequests);
         workspaceChats.MapGet("/", List);
+        workspaceChats.MapGet("/live", WatchList);
 
         RouteGroupBuilder chats = app.MapGroup("/chats").WithTags("Chats");
         chats.MapGet("/{id:guid}", Get);
@@ -101,6 +102,28 @@ internal static class ChatsEndpoints
     {
         Result<Page<ChatSummary>> result = await api.ListAsync(principal.ToActor(), WorkspaceId.From(workspaceId), Paging.Request(cursor, limit), ct);
         return result.ToOk();
+    }
+
+    /// <summary>
+    /// The workspace's chats as lists show them, live, as server-sent events of type <c>chats</c>, each
+    /// a list of chats: first the newest 100 someone wrote in, newest first, then, each time some of
+    /// those change, the ones that changed, such as a chat someone first wrote in or one whose agent
+    /// started or stopped working. Each chat replaces what a client had for it. The stream ends when
+    /// the host hands over, as in a deploy: connect again, which starts with the newest chats again.
+    /// </summary>
+    private static async Task<Results<ServerSentEventsResult<IReadOnlyList<ChatSummary>>, ProblemHttpResult>> WatchList(
+        [FromRoute] Guid workspaceId,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result<IAsyncEnumerable<IReadOnlyList<ChatSummary>>> result = await api.WatchChatsAsync(principal.ToActor(), WorkspaceId.From(workspaceId), ct);
+        if (result.Failed)
+        {
+            return result.Error.ToProblem();
+        }
+
+        return TypedResults.ServerSentEvents(result.Output, "chats");
     }
 
     /// <summary>A chat, and whether its agent is working.</summary>

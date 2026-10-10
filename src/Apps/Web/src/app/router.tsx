@@ -10,7 +10,7 @@ import {
 
 import { ApiError, isSignedOut } from "./api"
 import { ChatPage } from "./chat/chat-page"
-import { ChatsHome } from "./home"
+import { NewChatPage } from "./new-chat"
 import { appBase } from "./host"
 import { me } from "./queries"
 import { AppShell } from "./shell"
@@ -101,10 +101,10 @@ const signedIn = createRoute({
   component: AppShell,
 })
 
-const home = createRoute({
+const newChat = createRoute({
   getParentRoute: () => signedIn,
   path: "/",
-  component: ChatsHome,
+  component: NewChatPage,
 })
 
 export const chatRoute = createRoute({
@@ -132,7 +132,7 @@ const design = import.meta.env.DEV
 export const router = createRouter({
   routeTree: root.addChildren([
     signIn,
-    signedIn.addChildren([home, chatRoute]),
+    signedIn.addChildren([newChat, chatRoute]),
     ...design,
   ]),
   basepath: appBase,

@@ -1,4 +1,3 @@
-import { useSyncExternalStore } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Link, useParams } from "@tanstack/react-router"
 import { cn } from "cn"
@@ -6,9 +5,9 @@ import { cn } from "cn"
 import { NookStateDot, type NookStateName } from "@/components/nook-state"
 import { useSidebar } from "@/components/ui/sidebar"
 import type { Schemas } from "./api"
-import { chats, chat as chatQuery, nooks, workspaces } from "./queries"
+import { chat as chatQuery, nooks, workspaces } from "./queries"
 import { useChosenWorkspace } from "./workspace"
-import { chatStream } from "./chat/chat-stream"
+import { useWorkspaceChats } from "./workspace-chats"
 
 // The person's chats in one workspace, grouped the way people look for them: the ones an agent is
 // working on, then today's, then the rest, newest first in each.
@@ -42,7 +41,7 @@ export function useChatItems(workspaceId: string | undefined): {
   items: ChatItem[]
   loading: boolean
 } {
-  const list = useQuery({ ...chats(workspaceId ?? ""), enabled: !!workspaceId })
+  const list = useWorkspaceChats(workspaceId)
   const nookList = useQuery({
     ...nooks(workspaceId ?? ""),
     enabled: !!workspaceId,
@@ -53,15 +52,8 @@ export function useChatItems(workspaceId: string | undefined): {
   const startOfToday = new Date()
   startOfToday.setHours(0, 0, 0, 0)
 
-  const { chatId } = useParams({ strict: false })
-  const openWorking = useOpenChatWorking(chatId)
-
-  const items = (list.data?.items ?? []).map((summary): ChatItem => {
-    // The open chat's own stream knows sooner than the list whether its agent works.
-    const working =
-      summary.id === chatId && openWorking !== null
-        ? openWorking
-        : summary.working
+  const items = list.chats.map((summary): ChatItem => {
+    const working = summary.working
     const started = new Date(summary.startedAt)
     return {
       id: summary.id,
@@ -75,7 +67,7 @@ export function useChatItems(workspaceId: string | undefined): {
           : "Earlier",
     }
   })
-  return { items, loading: list.isPending }
+  return { items, loading: !list.loaded }
 }
 
 export function ChatList({
@@ -136,20 +128,6 @@ export function ChatList({
       ))}
     </nav>
   )
-}
-
-const noChat = {
-  subscribe: () => () => {},
-  getSnapshot: () => null,
-}
-
-// Whether the open chat's agent works, as its stream says, once the stream has caught up.
-function useOpenChatWorking(chatId: string | undefined): boolean | null {
-  const stream = chatId ? chatStream(chatId) : noChat
-  const state = useSyncExternalStore(stream.subscribe, stream.getSnapshot)
-  return state && state.transcript.sequence > 0
-    ? state.transcript.working
-    : null
 }
 
 function stateOf(status: Schemas["NookStatus"] | undefined): NookStateName {

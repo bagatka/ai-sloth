@@ -3,8 +3,7 @@ import { queryOptions } from "@tanstack/react-query"
 import { answer, api } from "./api"
 
 // What the screens read from the host, one definition per thing, so every screen shares one cached
-// copy. Lists the host doesn't push yet are read again while the page is visible.
-const listsRefresh = 10_000
+// copy. A workspace's chats come live instead (workspace-chats.ts).
 
 export const discovery = queryOptions({
   queryKey: ["discovery"],
@@ -25,19 +24,6 @@ export const workspaces = queryOptions({
   staleTime: 60_000,
 })
 
-export function chats(workspaceId: string) {
-  return queryOptions({
-    queryKey: ["workspaces", workspaceId, "chats"],
-    queryFn: () =>
-      answer(
-        api.GET("/workspaces/{workspaceId}/chats", {
-          params: { path: { workspaceId }, query: { limit: 100 } },
-        })
-      ),
-    refetchInterval: listsRefresh,
-  })
-}
-
 export function nooks(workspaceId: string) {
   return queryOptions({
     queryKey: ["workspaces", workspaceId, "nooks"],
@@ -47,7 +33,9 @@ export function nooks(workspaceId: string) {
           params: { path: { workspaceId }, query: { limit: 200 } },
         })
       ),
-    refetchInterval: listsRefresh,
+    // Not handled: a nook falling asleep or waking without its chat changing shows within half a
+    // minute, rather than at once; it would take a live list of nooks.
+    refetchInterval: 30_000,
   })
 }
 
@@ -77,3 +65,42 @@ export const harnesses = queryOptions({
   queryFn: () => answer(api.GET("/harnesses")),
   staleTime: Infinity,
 })
+
+/** The agent accounts people in the workspace may run chats on: the workspace's and their own. */
+export function agentAccounts(workspaceId: string) {
+  return queryOptions({
+    queryKey: ["workspaces", workspaceId, "agent-accounts"],
+    queryFn: () =>
+      answer(
+        api.GET("/workspaces/{workspaceId}/agent-accounts", {
+          params: { path: { workspaceId } },
+        })
+      ),
+  })
+}
+
+/** Where the workspace's nooks can run, and whether each can start one now. */
+export function providers(workspaceId: string) {
+  return queryOptions({
+    queryKey: ["workspaces", workspaceId, "providers"],
+    queryFn: () =>
+      answer(
+        api.GET("/workspaces/{workspaceId}/providers", {
+          params: { path: { workspaceId } },
+        })
+      ),
+  })
+}
+
+/** The repositories the workspace connected, which its chats can start with. */
+export function repositories(workspaceId: string) {
+  return queryOptions({
+    queryKey: ["workspaces", workspaceId, "repositories"],
+    queryFn: () =>
+      answer(
+        api.GET("/workspaces/{workspaceId}/repositories", {
+          params: { path: { workspaceId } },
+        })
+      ),
+  })
+}

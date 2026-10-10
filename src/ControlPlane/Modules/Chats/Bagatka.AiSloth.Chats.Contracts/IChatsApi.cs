@@ -31,7 +31,7 @@ public interface IChatsApi
     /// <remarks>
     /// Apps start a chat as someone starts writing its first message, so it is ready when they send it.
     /// Until its first message the chat is a draft: it isn't listed, it goes with its nook after the
-    /// draft lifetime (15 minutes unless the host says otherwise), and a person keeps at most two in a
+    /// draft lifetime (30 minutes unless the host says otherwise), and a person keeps at most two in a
     /// workspace, the oldest going when they start another.
     /// </remarks>
     /// <returns>
@@ -46,6 +46,20 @@ public interface IChatsApi
 
     /// <summary>The workspace's chats someone wrote in, newest first. Not found for anyone without access to the workspace, such as a nook's guest.</summary>
     public Task<Result<Page<ChatSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, PageRequest page, CancellationToken ct);
+
+    /// <summary>
+    /// Streams the workspace's chats as lists show them: first its newest 100 chats someone wrote in,
+    /// newest first, then, each time some of those change, the ones that changed, such as a chat
+    /// someone first wrote in, or one whose agent started or stopped working. Not found for anyone
+    /// without access to the workspace.
+    /// </summary>
+    /// <remarks>
+    /// Cancelling <paramref name="ct"/> ends the watch. It also ends when the actor loses access to the
+    /// workspace, and when the control-plane instance serving it hands over, as in a deploy: watch
+    /// again, which starts with the newest chats again. Not handled: older chats that change, which
+    /// show in <see cref="ListAsync"/> only.
+    /// </remarks>
+    public Task<Result<IAsyncEnumerable<IReadOnlyList<ChatSummary>>>> WatchChatsAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct);
 
     /// <summary>
     /// Sends a message; it needs Write on the chat's nook. The message reaches the agent when the

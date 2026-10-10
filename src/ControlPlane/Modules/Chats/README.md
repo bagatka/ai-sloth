@@ -15,8 +15,8 @@ chat (`src/Harnesses`).
   harness and account a chat may run on, how a message reaches the agent (a new turn, steered into
   the running one, or cancelled by a stop), that every turn ends with a checkpoint, when a new agent
   takes over a conversation, and which instructions and harness state an agent gets.
-- **Runtime state:** each busy chat's runner and the signals that wake watchers, in the active
-  instance's memory.
+- **Runtime state:** each busy chat's runner and the signals that wake watchers of a chat or of a
+  workspace's list, in the active instance's memory.
 
 ## Does not own
 
@@ -28,7 +28,8 @@ folders).
 ## Contract
 
 `IChatsApi`: members list the harnesses, start chats (each creating its nook, with the workspace's
-repositories or another chat's files, now or at a checkpoint), list chats, send messages and send
+repositories or another chat's files, now or at a checkpoint), list chats or watch the list as it
+changes, send messages and send
 proposals on, stop the agent, watch a chat's events from any sequence number, set and read the
 instructions every agent gets, and list and forget their harness state. `IChatHarnessesApi` is the
 model gateway's side.
@@ -100,5 +101,8 @@ minutes unless given).
 - **A chat on a personal account reserves its nook for the account's owner,** as whoever runs
   something in a nook can use what its agent can, the account's token among it. Others watch and
   propose.
+- **A list watch wakes only when what lists show changes:** a message saved, or a turn started or
+  ended, never for an agent's streamed updates. It then reads the newest 100 chats again and sends
+  the ones that differ, so a watcher costs one query per change and holds 100 summaries at most.
 - **How long people wait is measured:** `aisloth.chats.first_action`, from a message sent to the
   agent's first action for it.

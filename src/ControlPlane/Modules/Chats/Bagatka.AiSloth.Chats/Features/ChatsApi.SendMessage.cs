@@ -72,6 +72,7 @@ internal sealed partial class ChatsApi
         }));
 
         runners.Wake(command.ChatId);
+        signals.Notify(chat.WorkspaceId);
         return new Result<ChatMessage>(message.ToContract());
     }
 }

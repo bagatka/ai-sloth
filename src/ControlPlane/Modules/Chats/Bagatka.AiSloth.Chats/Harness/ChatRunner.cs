@@ -12,10 +12,12 @@ using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Chats.Data;
 using Bagatka.AiSloth.Chats.Model;
 using Bagatka.AiSloth.Nooks.Contracts;
+using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.Harnesses;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.Logging;
 
 namespace Bagatka.AiSloth.Chats.Harness;
@@ -902,6 +904,13 @@ internal sealed class ChatRunner(
     private async Task SaveAsync(ChatsDbContext db, CancellationToken ct)
     {
         bool recorded = db.ChangeTracker.Entries<StoredEvent>().Any(entry => entry.State == EntityState.Added);
+
+        // Lists show whether the agent works: whether a turn runs, or messages wait for one.
+        EntityEntry<Chat>? chat = db.ChangeTracker.Entries<Chat>().SingleOrDefault();
+        WorkspaceId? listChanged = chat is not null
+            && (chat.Property(found => found.TurnMessageId).IsModified || db.ChangeTracker.Entries<Message>().Any(entry => entry.State is EntityState.Added or EntityState.Modified))
+            ? chat.Entity.WorkspaceId
+            : null;
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)
         {
@@ -912,6 +921,11 @@ internal sealed class ChatRunner(
         if (recorded)
         {
             signals.Notify(chatId);
+        }
+
+        if (listChanged is WorkspaceId workspace)
+        {
+            signals.Notify(workspace);
         }
     }
 

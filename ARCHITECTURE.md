@@ -97,7 +97,7 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 | Sdk | `Bagatka.Sdk.<Vendor>`, `Bagatka.Azure.Sandboxes`, `Bagatka.PostHog` | Clients for vendor APIs without a usable official .NET SDK | Docker Engine, Sign in with ChatGPT, GitHub, Azure Container Apps Sandboxes, PostHog |
 | Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration and the Azure deployment; defaults every service host shares | Built |
 | One server | `host`, `hosting/` (shell and Compose, not .NET) | Runs a host on one server or computer from main's published images: PostgreSQL, the WebApi, and Caddy for HTTPS, with nooks on its Docker | Built |
-| Web app | `src/Apps/Web` (React and TypeScript, not .NET) | The web app every host serves, over the same public HTTP API as the CLI | Started: signing in, a workspace's chats, and following and steering one live, on its own design system |
+| Web app | `src/Apps/Web` (React and TypeScript, not .NET) | The web app every host serves, over the same public HTTP API as the CLI | Started: signing in, starting chats, a workspace's chats live, and following and steering one, on its own design system |
 | Site | `site/` (Astro, not .NET) | The landing page at aisloth.dev and `install.sh`, which installs or updates sloth, published to GitHub Pages from main | Built |
 
 The mobile apps are not in this repository. They will use the same public HTTP API as the CLI.

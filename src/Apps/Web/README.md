@@ -1,9 +1,10 @@
 # Web app
 
 The web app, in React and TypeScript with [shadcn](https://ui.shadcn.com) components on Base UI. A
-host serves it at its app address, `/app/` on its own address by default. Today people sign in, see
-their workspace's chats, and follow one as its agent works: a message starts the next turn or, sent
-while the agent works, goes into its turn, and Esc stops it.
+host serves it at its app address, `/app/` on its own address by default. Today people sign in and
+start chats, choosing their repositories, agent, and account. They see their workspace's chats as
+they change, and follow one as its agent works: a message starts the next turn or, sent while the
+agent works, goes into its turn, and Esc stops it.
 
 Run it from `./dev`, which has Node, with AiSloth running (`dotnet aspire run`):
 
@@ -22,8 +23,10 @@ pages show every component and a chat screen with made-up content, to judge the 
 
 ## How it's built
 
-- **Routes** (`src/app/router.tsx`): sign-in, and behind it, once the session checks out, the
-  chats of a workspace (`/`) and a chat (`/chats/<id>`).
+- **Routes** (`src/app/router.tsx`): sign-in, and behind it, once the session checks out, a new chat
+  (`/`) and a chat (`/chats/<id>`), with the workspace's chats beside them.
+- **A new chat** (`src/app/new-chat.tsx`) starts on the host as soon as someone writes, so its nook
+  is ready when they send; the browser remembers each workspace's last choices.
 - **The API** (`src/app/api.ts`): one client whose types are generated from the WebApi's
   OpenAPI document, so a changed API fails the type check. Failures arrive as `ApiError`, with the
   host's problem details. Queries live in `src/app/queries.ts`, and TanStack Query owns their cache.
@@ -31,7 +34,8 @@ pages show every component and a chat screen with made-up content, to judge the 
   a token; a 401 anywhere sends the person to sign in again.
 - **A chat** streams its events from the host (`src/app/chat/chat-stream.ts`), and the transcript
   is a pure fold of them (`transcript.ts`). Following a chat again picks up after the last event
-  the app saw, and the browser reconnects by itself.
+  the app saw, and the browser reconnects by itself. A workspace's chats stream the same way
+  (`src/app/workspace-chats.ts`).
 
 ## The look
 

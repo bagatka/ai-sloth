@@ -25,15 +25,26 @@ internal sealed partial class ChatsApi
             return new Result<Page<ChatSummary>>(WorkspacesErrors.NotFound);
         }
 
-        Result<IQueryable<Chat>> paged = db.Chats.AsNoTracking()
-            .Where(chat => chat.WorkspaceId == workspaceId && !db.Drafts.Any(draft => draft.ChatId == chat.Id))
-            .TakePage(chat => chat.Id, KeysetOrder.NewestFirst, page);
+        Result<IQueryable<Chat>> paged = Listed(db, workspaceId).TakePage(chat => chat.Id, KeysetOrder.NewestFirst, page);
         if (paged.Failed)
         {
             return new Result<Page<ChatSummary>>(paged.Error);
         }
 
         List<Chat> chats = await paged.Output.ToListAsync(ct);
+        List<ChatSummary> fetched = await SummariesAsync(db, chats, ct);
+        return new Result<Page<ChatSummary>>(Keyset.ToPage(fetched, page, chat => chat.Id.Value));
+    }
+
+    // The workspace's chats lists show: those someone wrote in, so no draft.
+    private static IQueryable<Chat> Listed(ChatsDbContext db, WorkspaceId workspaceId)
+    {
+        return db.Chats.AsNoTracking().Where(chat => chat.WorkspaceId == workspaceId && !db.Drafts.Any(draft => draft.ChatId == chat.Id));
+    }
+
+    // The chats as lists show them, in their order: whether messages wait for each, and its first.
+    private static async Task<List<ChatSummary>> SummariesAsync(ChatsDbContext db, List<Chat> chats, CancellationToken ct)
+    {
         List<ChatId> ids = [.. chats.Select(chat => chat.Id)];
         List<ChatId> waitingChats = await db.Messages
             .Where(message => ids.Contains(message.ChatId)
@@ -51,7 +62,6 @@ internal sealed partial class ChatsApi
                 Text = chatMessages.OrderBy(message => message.SentAt).ThenBy(message => message.Id).Select(message => message.Text.Substring(0, FirstMessageStart)).First(),
             })
             .ToDictionaryAsync(first => first.ChatId, first => first.Text, ct);
-        List<ChatSummary> fetched = [.. chats.Select(chat => chat.ToSummary(waiting.Contains(chat.Id), firstMessages.GetValueOrDefault(chat.Id)))];
-        return new Result<Page<ChatSummary>>(Keyset.ToPage(fetched, page, chat => chat.Id.Value));
+        return [.. chats.Select(chat => chat.ToSummary(waiting.Contains(chat.Id), firstMessages.GetValueOrDefault(chat.Id)))];
     }
 }
