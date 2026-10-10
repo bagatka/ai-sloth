@@ -1,18 +1,14 @@
-import {
-  File,
-  Virtualizer,
-  WorkerPoolContextProvider,
-} from "@pierre/diffs/react"
+import { File, Virtualizer, WorkerPoolContext } from "@pierre/diffs/react"
 import { cn } from "cn"
 
-import { codeCSS, codeTheme, workerPool } from "./setup"
+import { codeCSS, codeTheme, highlightingPool } from "./setup"
 import type { CodeFileProps } from "./types"
 
 // A file's contents, highlighted, with its header kept in view and only the lines on screen drawn.
 // The code would paint over the scroller's own focus outline, so a wrapper lays the ring on top.
 export default function CodeFile({ path, contents, className }: CodeFileProps) {
   return (
-    <WorkerPoolContextProvider {...workerPool}>
+    <WorkerPoolContext value={highlightingPool()}>
       <div
         className={cn("focus-ring-over size-full rounded-[inherit]", className)}
       >
@@ -28,6 +24,6 @@ export default function CodeFile({ path, contents, className }: CodeFileProps) {
           />
         </Virtualizer>
       </div>
-    </WorkerPoolContextProvider>
+    </WorkerPoolContext>
   )
 }

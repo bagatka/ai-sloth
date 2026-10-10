@@ -1,9 +1,9 @@
 import * as React from "react"
-import { FileDiff, WorkerPoolContextProvider } from "@pierre/diffs/react"
+import { FileDiff, WorkerPoolContext } from "@pierre/diffs/react"
 import { cn } from "cn"
 
 import { Button } from "@/components/ui/button"
-import { diffOptions, parseChange, workerPool } from "./setup"
+import { diffOptions, highlightingPool, parseChange } from "./setup"
 import type { DiffProps } from "./types"
 
 // A diff longer than this starts folded, so one big edit doesn't bury a conversation.
@@ -20,7 +20,7 @@ export default function Diff({
   const folded = !unfolded && diff.unifiedLineCount > foldedLines
 
   return (
-    <WorkerPoolContextProvider {...workerPool}>
+    <WorkerPoolContext value={highlightingPool()}>
       <div
         className={cn(
           "relative overflow-hidden rounded-xl bg-card py-1 shadow-raised",
@@ -53,6 +53,6 @@ export default function Diff({
           </div>
         )}
       </div>
-    </WorkerPoolContextProvider>
+    </WorkerPoolContext>
   )
 }

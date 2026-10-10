@@ -57,7 +57,7 @@ export function preloadCode() {
   void loadDiff()
   void loadDiffList()
   void loadFileTree()
-  void import("./setup").then((setup) => setup.startHighlighting())
+  void import("./setup").then((setup) => setup.highlightingPool())
 }
 
 /** Preloads the code views once the page is idle, so warming up never competes with the page itself. */

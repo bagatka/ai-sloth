@@ -2,13 +2,13 @@ import * as React from "react"
 import type { CodeViewDiffItem } from "@pierre/diffs"
 import {
   CodeView,
-  WorkerPoolContextProvider,
+  WorkerPoolContext,
   type CodeViewHandle,
 } from "@pierre/diffs/react"
 import { cn } from "cn"
 
 import { ChangeCounts } from "./change-counts"
-import { diffOptions, parseChange, workerPool } from "./setup"
+import { diffOptions, highlightingPool, parseChange } from "./setup"
 import type { DiffListProps } from "./types"
 
 // A file counts as on screen once at least a line of it shows (the line height of code views).
@@ -138,7 +138,7 @@ export default function DiffList({
   }
 
   return (
-    <WorkerPoolContextProvider {...workerPool}>
+    <WorkerPoolContext value={highlightingPool()}>
       {/* The code would paint over the scroller's own focus outline, so this lays the ring on top.
           It also watches the list's size and its content's height: what's on screen, and the file
           being read, can change without a scroll. */}
@@ -212,6 +212,6 @@ export default function DiffList({
           />
         )}
       </div>
-    </WorkerPoolContextProvider>
+    </WorkerPoolContext>
   )
 }

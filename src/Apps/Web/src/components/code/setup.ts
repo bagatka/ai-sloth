@@ -57,20 +57,19 @@ export function parseChange(change: FileChange): FileDiffMetadata {
   )
 }
 
-// Highlighting runs in a small pool of workers, off the main thread. The pool is created with the
-// first code view and lives as long as the page; more than a few workers only costs memory.
-export const workerPool = {
-  poolOptions: {
-    workerFactory: () => new HighlightWorker(),
-    poolSize: Math.max(
-      1,
-      Math.min(3, (navigator.hardwareConcurrency || 2) - 1)
-    ),
-  },
-  highlighterOptions: { theme: codeTheme },
-}
+// Highlighting runs in a small pool of workers, off the main thread. The pool belongs to the page:
+// created by the first code view (or ahead of it) and never ended, so reopening code never waits
+// for workers to start again. Views get it through the library's context directly; its own
+// provider ends the pool whenever the last code view on the page closes. More than a few workers
+// only costs memory.
+const poolSize = Math.max(
+  1,
+  Math.min(3, (navigator.hardwareConcurrency || 2) - 1)
+)
 
-// Starts the workers ahead of the first code view, so it shows at once instead of waiting for them.
-export function startHighlighting() {
-  getOrCreateWorkerPoolSingleton(workerPool)
+export function highlightingPool() {
+  return getOrCreateWorkerPoolSingleton({
+    poolOptions: { workerFactory: () => new HighlightWorker(), poolSize },
+    highlighterOptions: { theme: codeTheme },
+  })
 }
