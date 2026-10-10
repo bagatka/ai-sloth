@@ -57,6 +57,9 @@ export default function DiffList({
   // file being read would be off near their end.
   const viewportHeight = React.useRef(0)
   const contentHeight = React.useRef(0)
+  // The element holding the view's content. The view makes a new one whenever it's set up again
+  // (React's development mode sets it up twice), and its height must come from the live one.
+  const [content, setContent] = React.useState<Element | null>(null)
   // A file the reader picked that no scroll position can make the one being read (when the whole
   // list fits on screen). It stays picked until the list scrolls.
   const picked = React.useRef<{ path: string; scrollTop: number } | null>(null)
@@ -143,8 +146,7 @@ export default function DiffList({
       <div
         data-diff-list={listId}
         ref={(node) => {
-          const content = scroller.current?.firstElementChild
-          if (!mounted || !node || !(content instanceof HTMLElement)) return
+          if (!node || !content) return
           const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
               if (entry.target === node)
@@ -165,6 +167,7 @@ export default function DiffList({
             ref={view}
             containerRef={(node) => {
               scroller.current = node
+              setContent(node?.firstElementChild ?? null)
               // The view takes its scroller out of the tab order; put it back, so the keyboard
               // can scroll it.
               if (!node) return
