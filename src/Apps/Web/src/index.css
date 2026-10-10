@@ -31,6 +31,8 @@
   --diffs-header-font-family: var(--font-sans);
   --diffs-font-size: 12.5px;
   --diffs-line-height: 20px;
+  /* Line numbers keep room for four digits, so code starts at the same place in every file. */
+  --diffs-min-number-column-width: 4ch;
   --diffs-foreground: var(--foreground);
   --diffs-background: var(--card);
   --diffs-token-comment: oklch(0.58 0.01 115);
@@ -449,6 +451,23 @@
   }
   &:has([aria-invalid="true"]:focus-visible) {
     outline-color: var(--destructive);
+  }
+}
+
+/* A scroll area whose content paints over outlines (the code views) shows its focus as a ring laid
+   on top, inside its edge. */
+@utility focus-ring-over {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  &:has(:focus-visible)::after {
+    box-shadow: inset 0 0 0 2px var(--ring);
   }
 }
 

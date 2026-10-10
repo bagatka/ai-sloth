@@ -25,10 +25,13 @@ import {
 import {
   ChangeCounts,
   Diff,
+  DiffList,
   FileTree,
+  inTreeOrder,
   preloadCode,
   warmUpCode,
   type DiffLayout,
+  type DiffListHandle,
 } from "@/components/code"
 import { Shortcut } from "@/components/shortcut"
 import { ThemeSwitch } from "@/components/theme-switch"
@@ -724,12 +727,14 @@ function EditCall({ change }: { change: SampleChange }) {
   )
 }
 
-// Changes on demand: the files that changed in a tree, beside the selected file's diff.
+// Changes on demand: every changed file's diff in one scroll, beside a tree of the files that
+// follows along and jumps to the one picked.
+const changedFiles = inTreeOrder(changes)
+
 function ChangesPanel() {
-  const [selected, setSelected] = React.useState(changes[0].path)
+  const list = React.useRef<DiffListHandle>(null)
+  const [current, setCurrent] = React.useState(changedFiles[0].path)
   const [layout, setLayout] = React.useState<DiffLayout>("unified")
-  const change =
-    changes.find((candidate) => candidate.path === selected) ?? changes[0]
   const totals = changes.reduce(
     (sum, file) => ({
       additions: sum.additions + file.additions,
@@ -738,6 +743,11 @@ function ChangesPanel() {
     { additions: 0, deletions: 0 }
   )
   const statuses = changes.map(({ path, status }) => ({ path, status }))
+
+  function show(path: string) {
+    setCurrent(path)
+    list.current?.showFile(path)
+  }
 
   return (
     <Sheet>
@@ -780,11 +790,11 @@ function ChangesPanel() {
         {/* Phones have no room for the tree or a split view: a list of the files takes the tree's place. */}
         <NativeSelect
           aria-label="File"
-          value={selected}
-          onChange={(event) => setSelected(event.target.value)}
+          value={current}
+          onChange={(event) => show(event.target.value)}
           className="mx-3 mb-3 w-auto md:hidden"
         >
-          {changes.map((file) => (
+          {changedFiles.map((file) => (
             <NativeSelectOption key={file.path} value={file.path}>
               {file.path}
             </NativeSelectOption>
@@ -794,18 +804,16 @@ function ChangesPanel() {
           <FileTree
             paths={changedPaths}
             changes={statuses}
-            selected={selected}
-            onSelect={setSelected}
+            selected={current}
+            onSelect={show}
             className="hidden w-60 shrink-0 md:block"
           />
           <div className="min-w-0 flex-1 overflow-hidden rounded-xl bg-card shadow-raised">
-            <Diff
-              key={change.path}
-              variant="panel"
+            <DiffList
+              ref={list}
+              files={changedFiles}
               layout={layout}
-              path={change.path}
-              before={change.before}
-              after={change.after}
+              onFileInView={setCurrent}
             />
           </div>
         </div>

@@ -30,8 +30,9 @@ It lives in `src/index.css`:
   and floating surfaces (`shadow-float`), all lit from above.
 - **Focus:** one look and one owner. `focus-ring` is for things you press, and `focus-field` is
   for text fields. A borderless field inside a group (`focus-field-within`) leaves focus to the
-  group. Anything else focused from the keyboard gets the same algae outline from the base styles,
-  and mouse focus shows nothing.
+  group, and a scroll area whose content paints over outlines, like the code views, uses
+  `focus-ring-over`. Anything else focused from the keyboard gets the same algae outline from the
+  base styles, and mouse focus shows nothing.
 - **Motion:** one curve (`--ease-out`) that every transition uses by default. Hover arrives at once
   and leaves gently. A press (`press`) gives a little and sinks in its material at once; it scales
   on its own GPU layer, so icons and text never jump. Nothing else moves on press (lint). `pop` is for
@@ -44,8 +45,10 @@ shadcn's own style and needs the same treatment.
 
 ## Code views
 
-`src/components/code` shows code: `Diff` (a change inline in a chat or in a panel, unified or
-split), `CodeFile`, and `FileTree` with each file's change. They are built on
+`src/components/code` shows code: `Diff` (one change, inline in a conversation), `DiffList` (many
+changes in one scroll, unified or split), `CodeFile`, and `FileTree` with each file's change. A list
+beside a tree takes its files through `inTreeOrder`, follows the tree with `showFile`, and reports
+the file in view with `onFileInView`, so the two move together. They are built on
 [@pierre/diffs](https://diffs.com) and [@pierre/trees](https://trees.software), which draw in shadow
 DOM and take their colors, fonts, and spacing from the `--diffs-*` and `--trees-*` variables in
 `src/index.css`. Highlighting runs in workers. The views load on first use: a screen likely to show

@@ -1,14 +1,10 @@
+import type * as React from "react"
+
 /** How a diff lays out its two sides: one column of changes, or before and after side by side. */
 export type DiffLayout = "unified" | "split"
 
-/**
- * Where a diff sits. Inline, in a conversation: no file header, long lines wrap, and a long diff
- * starts folded. Panel, filling a side panel or a page: the file header stays at the top, long lines
- * scroll sideways, and only the lines on screen are drawn.
- */
-export type DiffVariant = "inline" | "panel"
-
-export type DiffProps = (
+/** One file's change: its text before and after, or its unified diff as git prints it. */
+export type FileChange =
   | {
       /** The file's path, which also picks the language. */
       path: string
@@ -16,13 +12,36 @@ export type DiffProps = (
       after: string
     }
   | {
-      /** One file's unified diff, as git prints it. */
+      path: string
       patch: string
     }
-) & {
-  variant?: DiffVariant
+
+/**
+ * One change, inline in a conversation: no file header, long lines wrap, and a long diff starts
+ * folded until asked.
+ */
+export type DiffProps = FileChange & {
   layout?: DiffLayout
   className?: string
+}
+
+/**
+ * Many changes in one scroll, filling a panel or a page: each file's header stays at the top while
+ * its diff is in view, long lines scroll sideways, and only the lines on screen are drawn.
+ */
+export type DiffListProps = {
+  /** The changed files, in the order shown; `inTreeOrder` matches a tree beside them. Paths must be unique. */
+  files: readonly FileChange[]
+  layout?: DiffLayout
+  /** Called when the reader scrolls a different file into view. */
+  onFileInView?: (path: string) => void
+  ref?: React.Ref<DiffListHandle>
+  className?: string
+}
+
+export type DiffListHandle = {
+  /** Jumps to a file's diff. It counts as the file in view, without calling onFileInView. */
+  showFile: (path: string) => void
 }
 
 export type CodeFileProps = {
@@ -38,7 +57,9 @@ export type FileTreeProps = {
   paths: readonly string[]
   /** Files that changed, marked in the tree. */
   changes?: readonly { path: string; status: FileChangeStatus }[]
+  /** The selected file. The tree follows it when it changes, and scrolls it into view. */
   selected?: string
+  /** Called when the reader picks a file, not when `selected` changes. */
   onSelect?: (path: string) => void
   /** Show a search field above the tree. */
   search?: boolean

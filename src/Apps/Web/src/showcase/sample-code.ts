@@ -236,3 +236,30 @@ export function largeChange(lines: number): SampleChange {
     deletions: 0,
   }
 }
+
+// Many small edited files across a few folders, to feel how a big change set scrolls.
+export function manyChanges(count: number): SampleChange[] {
+  const folders = ["src/api", "src/cart", "src/orders", "src/shop", "tests"]
+  return Array.from({ length: count }, (_, index) => {
+    const lines = Array.from(
+      { length: 24 + (index % 5) * 9 },
+      (_, line) => `export const setting${line} = ${line * index}`
+    )
+    const before = lines.join("\n") + "\n"
+    const changed = index % lines.length
+    lines[changed] = `export const setting${changed} = "changed"`
+    lines.splice(
+      12,
+      0,
+      `// Added while moving setting${index} to the new store.`
+    )
+    return {
+      path: `${folders[index % folders.length]}/module-${index}.ts`,
+      status: "modified",
+      before,
+      after: lines.join("\n") + "\n",
+      additions: 2,
+      deletions: 1,
+    }
+  })
+}

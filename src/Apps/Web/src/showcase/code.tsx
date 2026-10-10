@@ -1,10 +1,17 @@
 import * as React from "react"
 
-import { CodeFile, Diff, FileTree } from "@/components/code"
+import {
+  CodeFile,
+  Diff,
+  DiffList,
+  FileTree,
+  inTreeOrder,
+} from "@/components/code"
 import { Button } from "@/components/ui/button"
 import {
   changes,
   largeChange,
+  manyChanges,
   repositoryPaths,
   type SampleChange,
 } from "./sample-code"
@@ -12,6 +19,7 @@ import { Section, Specimen } from "./section"
 
 const [fixture, checkout] = changes
 const treeChanges = changes.map(({ path, status }) => ({ path, status }))
+const listed = inTreeOrder(changes)
 
 export function Code() {
   return (
@@ -32,25 +40,14 @@ export function Code() {
           className="w-full"
         />
       </Specimen>
-      <Specimen name="Panel diff, unified" wide>
+      <Specimen name="Diff list: every change in one scroll" wide>
         <div className="h-96 w-full overflow-hidden rounded-xl bg-card shadow-raised">
-          <Diff
-            variant="panel"
-            path={checkout.path}
-            before={checkout.before}
-            after={checkout.after}
-          />
+          <DiffList files={listed} />
         </div>
       </Specimen>
-      <Specimen name="Panel diff, split" wide>
+      <Specimen name="Diff list, split" wide>
         <div className="h-96 w-full overflow-hidden rounded-xl bg-card shadow-raised">
-          <Diff
-            variant="panel"
-            layout="split"
-            path={checkout.path}
-            before={checkout.before}
-            after={checkout.after}
-          />
+          <DiffList files={listed} layout="split" />
         </div>
       </Specimen>
       <Specimen name="File">
@@ -68,32 +65,32 @@ export function Code() {
           />
         </div>
       </Specimen>
-      <Specimen name="Large diff: 3,000 lines" wide>
-        <LargeDiff />
+      <Specimen name="A big change: 61 files, one of 3,000 lines" wide>
+        <BigChange />
       </Specimen>
     </Section>
   )
 }
 
-function LargeDiff() {
-  const [change, setChange] = React.useState<SampleChange | null>(null)
+function BigChange() {
+  const [files, setFiles] = React.useState<SampleChange[] | null>(null)
 
-  if (!change) {
+  if (!files) {
     return (
-      <Button variant="outline" onClick={() => setChange(largeChange(3000))}>
-        Open a 3,000-line diff
+      <Button
+        variant="outline"
+        onClick={() =>
+          setFiles(inTreeOrder([largeChange(3000), ...manyChanges(60)]))
+        }
+      >
+        Open the big change
       </Button>
     )
   }
 
   return (
     <div className="h-[28rem] w-full overflow-hidden rounded-xl bg-card shadow-raised">
-      <Diff
-        variant="panel"
-        path={change.path}
-        before={change.before}
-        after={change.after}
-      />
+      <DiffList files={files} />
     </div>
   )
 }
