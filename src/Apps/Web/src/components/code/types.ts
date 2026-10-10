@@ -41,14 +41,21 @@ export type DiffListProps = {
 
 /** What the reader sees in a DiffList. */
 export type DiffListView = {
-  /** The file being read: the one whose header is pinned at the top. */
+  /**
+   * The file being read: the one pinned at the top, except over the last screenful of the list,
+   * where the reading point slides down so the last files, too short to reach the top, each get a
+   * turn.
+   */
   current: string
-  /** Every file on screen, in order, starting with the current one. */
+  /** Every file on screen, in order. */
   onScreen: readonly string[]
 }
 
 export type DiffListHandle = {
-  /** Pins a file's diff at the top. Any file can get there: the list leaves room after the last. */
+  /**
+   * Makes a file the one being read: pins it at the top, or for the last few files, scrolls as far
+   * as it can while they're the one being read.
+   */
   showFile: (path: string) => void
 }
 
