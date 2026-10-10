@@ -66,7 +66,7 @@ function tiles(): string {
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/hanken-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin />
-    <meta name="theme-color" content="#f4f4f1" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#f3f4f0" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#111210" media="(prefers-color-scheme: dark)" />
   </head>
   <body>
@@ -367,13 +367,14 @@ function tiles(): string {
     font-display: swap;
   }
 
-  /* Algae is the brand's one color. --algae is the tone for text and buttons on each ground, at
+  /* The greys share one hue (OKLCH 115) with the web app's, so both read as one material. Algae is
+     the brand's one color. --algae is the tone for text and buttons on each ground, at
      least 4.5:1 against it; the panel shows the whole range. */
   :root {
-    --ground: #f4f4f1;
-    --ink: #161715;
-    --soft: #5b5d57;
-    --line: #dcddd7;
+    --ground: oklch(0.966 0.005 115);
+    --ink: oklch(0.205 0.006 115);
+    --soft: oklch(0.475 0.01 115);
+    --line: oklch(0.895 0.008 115);
     --algae: #3f7d20;
     --pen: #3f7d20;
     --slop: #9333ea;
@@ -383,10 +384,10 @@ function tiles(): string {
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --ground: #111210;
-      --ink: #ecede8;
-      --soft: #a2a49d;
-      --line: #2a2c28;
+      --ground: oklch(0.18 0.004 115);
+      --ink: oklch(0.944 0.006 115);
+      --soft: oklch(0.715 0.01 115);
+      --line: oklch(0.29 0.008 115);
       --algae: #9ccf6a;
       --pen: #9ccf6a;
       --slop: #c084fc;
