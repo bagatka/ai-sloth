@@ -1,0 +1,469 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./shadcn.css";
+@import "@fontsource-variable/hanken-grotesk";
+@import "@fontsource-variable/jetbrains-mono";
+
+@custom-variant dark (&:is(.dark *));
+
+/* People who ask their system for more contrast get firmer lines and edges. */
+@media (prefers-contrast: more) {
+  :root {
+    --border: oklch(0.205 0.006 115 / 0.28);
+    --input: oklch(0.205 0.006 115 / 0.4);
+    --muted-foreground: #45473f;
+  }
+  .dark {
+    --border: oklch(0.944 0.006 115 / 0.28);
+    --input: oklch(0.944 0.006 115 / 0.4);
+    --muted-foreground: #c4c6bf;
+  }
+}
+
+@theme inline {
+    --font-sans: 'Hanken Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-heading: var(--font-sans);
+    --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+    /* What people read, an agent's replies above all, is a step larger than the interface around it. */
+    --text-read: 0.9375rem;
+    --text-read--line-height: 1.6;
+    /* The one curve for interface motion: fast out of the gate, gentle at the end. */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+    --shadow-float: var(--float);
+    --shadow-raised: var(--raised);
+    --shadow-panel: var(--panel-shadow);
+    --color-warning: var(--warning);
+    /* Type roles: caption (times, markers), label (secondary lines), the default 14px, read (what
+       people read: messages), and title (a screen's own name). */
+    --text-caption: 0.75rem;
+    --text-caption--line-height: 1rem;
+    --text-caption--letter-spacing: 0.01em;
+    --text-label: 0.8125rem;
+    --text-label--line-height: 1.125rem;
+    --text-label--letter-spacing: 0.004em;
+    --text-title: 0.9375rem;
+    --text-title--line-height: 1.25rem;
+    --text-title--letter-spacing: -0.012em;
+    --text-title--font-weight: 600;
+    /* Every transition uses the one curve unless it says otherwise. */
+    --default-transition-duration: 160ms;
+    --default-transition-timing-function: var(--ease-out);
+    --shadow-field: var(--field);
+    /* Small text gets a touch more room between letters; large text gets less (titles use tracking-tight). */
+    --text-xs--letter-spacing: 0.01em;
+    --text-sm--letter-spacing: 0.002em;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    /* A radius per kind of thing, as on the landing page: small marks (badges, checkboxes),
+       rows inside floating surfaces, controls, surfaces (cards, popovers, the composer), and
+       panels (dialogs, sheets). */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 10px;
+    --radius-xl: 14px;
+    --radius-2xl: 18px;
+    --radius-3xl: 22px;
+    --radius-4xl: 26px;
+}
+
+/* The landing page's colors (site/src/pages/index.astro): warm grey grounds and ink, and algae, the
+   brand's one color, for primary actions, focus, and charts. Algae is at least 4.5:1 against the
+   ground in both themes. */
+:root {
+    color-scheme: light;
+    --background: oklch(0.966 0.005 115);
+    --foreground: oklch(0.205 0.006 115);
+    --card: oklch(0.99 0.003 115);
+    --card-foreground: oklch(0.205 0.006 115);
+    --popover: oklch(0.99 0.003 115);
+    --popover-foreground: oklch(0.205 0.006 115);
+    --primary: #3f7d20;
+    --primary-foreground: #ffffff;
+    --secondary: oklch(0.936 0.007 115);
+    --secondary-foreground: oklch(0.205 0.006 115);
+    --muted: oklch(0.936 0.007 115);
+    --muted-foreground: oklch(0.475 0.01 115);
+    --accent: oklch(0.936 0.007 115);
+    --accent-foreground: oklch(0.205 0.006 115);
+    --destructive: #c2361f;
+    --warning: oklch(0.56 0.12 68);
+    --border: oklch(0.205 0.006 115 / 0.09);
+    --input: oklch(0.205 0.006 115 / 0.14);
+    --ring: #3f7d20;
+    --chart-1: #3f7d20;
+    --chart-2: #8fc25a;
+    --chart-3: #2f6316;
+    --chart-4: #b7da8b;
+    --chart-5: #5b5d57;
+    --radius: 0.625rem;
+    --sidebar: oklch(0.966 0.005 115);
+    --sidebar-foreground: oklch(0.205 0.006 115);
+    --sidebar-primary: #3f7d20;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: oklch(0.205 0.006 115 / 0.06);
+    --sidebar-accent-foreground: oklch(0.205 0.006 115);
+    --sidebar-border: oklch(0.205 0.006 115 / 0.09);
+    --sidebar-ring: #3f7d20;
+    /* One light, from above. Raised things (buttons, cards, the main panel) sit on the ground with a
+       hairline edge and a short shadow; floating things (menus, dialogs) cast a long one. */
+    --raised: 0 0 0 1px oklch(0.205 0.006 115 / 0.07), 0 1px 1px oklch(0.205 0.006 115 / 0.04), 0 2px 4px -2px oklch(0.205 0.006 115 / 0.1);
+    --panel-shadow: 0 0 0 1px oklch(0.205 0.006 115 / 0.06), 0 1px 2px oklch(0.205 0.006 115 / 0.04), 0 12px 32px -18px oklch(0.205 0.006 115 / 0.2);
+    --raised-hover: oklch(0.976 0.004 115);
+    --field: inset 0 1px 1px oklch(0.205 0.006 115 / 0.04);
+    --float: 0 0 0 1px oklch(0.205 0.006 115 / 0.06), 0 2px 4px oklch(0.205 0.006 115 / 0.04), 0 16px 40px -12px oklch(0.205 0.006 115 / 0.24);
+    --primary-fill: linear-gradient(180deg, #4a8b29 0%, #3f7d20 100%);
+    --primary-fill-hover: linear-gradient(180deg, #519430 0%, #448426 100%);
+    --primary-edge: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 0 0 1px #346a1a, 0 1px 2px oklch(0.205 0.006 115 / 0.24);
+    --panel: linear-gradient(180deg, #d3e9a8 0%, #8fc25a 42%, #4f8d2b 72%, #2f6316 100%);
+}
+
+.dark {
+    color-scheme: dark;
+    --background: oklch(0.18 0.004 115);
+    --foreground: oklch(0.944 0.006 115);
+    --card: oklch(0.212 0.005 115);
+    --card-foreground: oklch(0.944 0.006 115);
+    --popover: oklch(0.226 0.005 115);
+    --popover-foreground: oklch(0.944 0.006 115);
+    --primary: #9ccf6a;
+    --primary-foreground: #10140f;
+    --secondary: oklch(0.25 0.007 115);
+    --secondary-foreground: oklch(0.944 0.006 115);
+    --muted: oklch(0.25 0.007 115);
+    --muted-foreground: oklch(0.715 0.01 115);
+    --accent: oklch(0.262 0.007 115);
+    --accent-foreground: oklch(0.944 0.006 115);
+    --destructive: #f0806b;
+    --warning: oklch(0.82 0.12 78);
+    --border: oklch(0.944 0.006 115 / 0.08);
+    --input: oklch(0.944 0.006 115 / 0.12);
+    --ring: #9ccf6a;
+    --chart-1: #9ccf6a;
+    --chart-2: #4f8d2b;
+    --chart-3: #b7da8b;
+    --chart-4: #78b246;
+    --chart-5: #a2a49d;
+    --sidebar: oklch(0.18 0.004 115);
+    --sidebar-foreground: oklch(0.944 0.006 115);
+    --sidebar-primary: #9ccf6a;
+    --sidebar-primary-foreground: #10140f;
+    --sidebar-accent: oklch(0.944 0.006 115 / 0.06);
+    --sidebar-accent-foreground: oklch(0.944 0.006 115);
+    --sidebar-border: oklch(0.944 0.006 115 / 0.08);
+    --sidebar-ring: #9ccf6a;
+    --raised: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 0 0 1px oklch(0.944 0.006 115 / 0.08), 0 1px 2px rgb(0 0 0 / 0.4);
+    --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 0 0 1px oklch(0.944 0.006 115 / 0.07), 0 12px 32px -18px rgb(0 0 0 / 0.6);
+    --raised-hover: oklch(0.235 0.005 115);
+    --field: inset 0 1px 1px rgb(0 0 0 / 0.2);
+    --float: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 0 0 1px oklch(0.944 0.006 115 / 0.09), 0 18px 44px -10px rgb(0 0 0 / 0.75);
+    --primary-fill: linear-gradient(180deg, #a9d97a 0%, #9ccf6a 100%);
+    --primary-fill-hover: linear-gradient(180deg, #b4e086 0%, #a6d675 100%);
+    --primary-edge: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 0 0 1px #84b555, 0 1px 2px rgb(0 0 0 / 0.5);
+    --panel: linear-gradient(180deg, #b7da8b 0%, #78b246 42%, #427f22 72%, #24510f 100%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  code,
+  pre,
+  samp {
+    font-family: var(--font-mono);
+  }
+  /* Code within prose: mono, a touch smaller, on a tint of whatever it sits on. */
+  :not(pre) > code {
+    font-size: 0.84em;
+    padding: 0.12em 0.36em;
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklch, currentColor 9%, transparent);
+  }
+  /* Focus has one look and one owner. Anything focused from the keyboard shows the algae outline
+     unless it draws its own; focus from the mouse or from code shows nothing; phones never flash a
+     grey box on tap. */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  :focus:not(:focus-visible),
+  [tabindex="-1"]:focus-visible {
+    outline: none;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 20%, transparent) transparent;
+  }
+  :where(button, [role="button"], [role="tab"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="switch"], [role="checkbox"], [role="radio"], summary, label[for], a[href]):not(:disabled, [aria-disabled="true"], [data-disabled]) {
+    cursor: pointer;
+  }
+  /* The text caret is algae, like focus; placeholders sit back further than hints. */
+  input,
+  textarea,
+  [contenteditable] {
+    caret-color: var(--primary);
+  }
+  ::placeholder {
+    color: color-mix(in oklch, var(--muted-foreground) 80%, transparent);
+  }
+  /* Hover arrives at once and leaves gently: the interface answers the pointer immediately. Anything
+     that sets its own duration keeps it. */
+  @media (hover: hover) {
+    :where(a, button, [role="button"], [role="menuitem"], [role="option"], [role="tab"], summary):hover {
+      --tw-duration: 0ms;
+    }
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 28%, transparent);
+  }
+}
+
+/* Keyboard focus looks the same everywhere: the landing page's algae outline, set off the element. */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  &[aria-invalid="true"]:focus-visible {
+    outline-color: var(--destructive);
+  }
+}
+
+/* Text fields take focus in their border, with a soft halo: typing is where the eye already is. A
+   borderless field inside a group (search with its icon, the composer) leaves focus to the group. */
+@utility focus-field {
+  &:focus-visible:not(.focus-field-within *) {
+    outline: none;
+    border-color: var(--ring);
+    box-shadow:
+      var(--field),
+      0 0 0 3px color-mix(in oklch, var(--ring) 22%, transparent);
+  }
+  &[aria-invalid="true"]:focus-visible:not(.focus-field-within *) {
+    border-color: var(--destructive);
+    box-shadow:
+      var(--field),
+      0 0 0 3px color-mix(in oklch, var(--destructive) 22%, transparent);
+  }
+}
+
+@utility focus-field-within {
+  &:has(:focus-visible) {
+    border-color: var(--ring);
+    box-shadow:
+      var(--field),
+      0 0 0 3px color-mix(in oklch, var(--ring) 22%, transparent);
+  }
+}
+
+/* The primary action's material: algae with a little light on its top edge. */
+@utility control-primary {
+  background: var(--primary-fill);
+  color: var(--primary-foreground);
+  box-shadow: var(--primary-edge);
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      background: var(--primary-fill-hover);
+    }
+  }
+  &:disabled {
+    background: var(--muted);
+    color: var(--muted-foreground);
+    box-shadow: none;
+  }
+}
+
+/* Everything else you press: a raised neutral surface. A toggle that is on sits pressed in, sunken
+   like a field, and stays so under the pointer. */
+@utility control-raised {
+  background: var(--card);
+  box-shadow: var(--raised);
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      background: var(--raised-hover);
+    }
+  }
+  &:is([aria-pressed="true"], [data-pressed]):not(:disabled) {
+    background: var(--muted);
+    box-shadow:
+      var(--field),
+      0 0 0 1px var(--border);
+  }
+}
+
+/* Loading placeholders: a slow sheen across, not a pulse. */
+@utility skeleton {
+  background: linear-gradient(90deg, var(--muted) 30%, color-mix(in oklch, var(--muted), var(--card) 70%) 50%, var(--muted) 70%);
+  background-size: 300% 100%;
+  animation: sheen 1.8s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes sheen {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+/* The same outline around a group (an input with its buttons, chips, a choice) whose control has it. */
+@utility focus-ring-within {
+  &:has(:focus-visible) {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  &:has([aria-invalid="true"]:focus-visible) {
+    outline-color: var(--destructive);
+  }
+}
+
+/* Anything pressable gives way a little the moment it's pressed, and changes color quickly. */
+@utility press {
+  transition-property: scale, color, background-color, border-color, opacity, filter;
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-out);
+  &:active:not(:disabled, [aria-disabled="true"]) {
+    scale: 0.97;
+  }
+}
+
+/* Floating surfaces grow from what opened them (Base UI's --transform-origin; centered when nothing
+   did) and leave faster than they arrive. Tooltips after the first one open at once. */
+@utility pop {
+  transform-origin: var(--transform-origin, center);
+  transition:
+    opacity 160ms var(--ease-out),
+    scale 160ms var(--ease-out);
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+    scale: 0.96;
+  }
+  &[data-ending-style] {
+    transition-duration: 110ms;
+  }
+  &[data-instant] {
+    transition-duration: 0ms;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &[data-starting-style],
+    &[data-ending-style] {
+      scale: 1;
+    }
+  }
+}
+
+@utility fade {
+  transition: opacity 160ms var(--ease-out);
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+  }
+}
+
+/* The landing page's algae panel, with its fine grain: the one bold surface in the app. The gradient
+   and the grain are painted once into their own layer; drifting only moves that layer, so the GPU
+   does it without repainting anything. */
+@utility algae-panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.22'/%3E%3C/svg%3E"),
+      var(--panel);
+    background-size:
+      160px 160px,
+      100% 100%;
+    background-blend-mode: soft-light, normal;
+  }
+}
+
+/* While an agent works, its algae drifts slowly; still when motion is reduced. */
+@utility algae-alive {
+  &::before {
+    inset: 0 0 auto;
+    height: 260%;
+    will-change: translate;
+    animation: algae-drift 7s ease-in-out infinite alternate;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &::before {
+      animation: none;
+    }
+  }
+}
+
+@keyframes algae-drift {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 0 -61.5%;
+  }
+}
+
+@keyframes halo {
+  from {
+    scale: 1;
+    opacity: 0.5;
+  }
+  to {
+    scale: 2.8;
+    opacity: 0;
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+

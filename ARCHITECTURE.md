@@ -97,9 +97,10 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 | Sdk | `Bagatka.Sdk.<Vendor>`, `Bagatka.Azure.Sandboxes`, `Bagatka.PostHog` | Clients for vendor APIs without a usable official .NET SDK | Docker Engine, Sign in with ChatGPT, GitHub, Azure Container Apps Sandboxes, PostHog |
 | Aspire | `Bagatka.AiSloth.AppHost`, `Bagatka.ServiceDefaults` | Local orchestration and the Azure deployment; defaults every service host shares | Built |
 | One server | `host`, `hosting/` (shell and Compose, not .NET) | Runs a host on one server or computer from main's published images: PostgreSQL, the WebApi, and Caddy for HTTPS, with nooks on its Docker | Built |
+| Web app | `src/Apps/Web` (React and TypeScript, not .NET) | The web app every host will serve, over the same public HTTP API as the CLI | Started: its design system (every shadcn component, restyled to the landing page's look), a component catalog, and a chat screen with made-up content |
 | Site | `site/` (Astro, not .NET) | The landing page at aisloth.dev and `install.sh`, which installs or updates sloth, published to GitHub Pages from main | Built |
 
-The web and mobile apps are not in this repository. They use the same public HTTP API as the CLI.
+The mobile apps are not in this repository. They will use the same public HTTP API as the CLI.
 
 ## Solution layout
 
@@ -117,6 +118,8 @@ site/                              the landing page (Astro) and install.sh
 analyzers/
   Bagatka.Analyzers/               our own code-shape rules, run on every project (PATTERNS.md, entry 26)
 src/
+  Apps/
+    Web/                           the web app (React, shadcn on Base UI)
   Aspire/
     Bagatka.AiSloth.AppHost/       local orchestration and the Azure deployment
     Bagatka.ServiceDefaults/       OpenTelemetry, health, service discovery
