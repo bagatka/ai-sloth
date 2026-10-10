@@ -13,7 +13,22 @@ machines, and local Docker for development, tests, and single-machine self-hosti
    WebApi always running again (one replica at least, sized from its metrics in PostHog), so nobody
    waits for it to start.
 2. **Apps.** The web app, served by every host, and native iOS and Android apps that connect to any
-   number of hosts.
+   number of hosts. The web app comes in slices, each a whole flow on a real host:
+   1. Follow and steer: sign in from a browser, see your chats, open one, and follow, message,
+      steer, and stop its agent live.
+   2. Start chats: pick repositories, harness, and agent account, the nook starting while the first
+      message is typed; the chat list updates live.
+   3. Review and ship: a chat's changes as diffs, pushed as a branch or pull request, or its files
+      downloaded.
+   4. Set up from the web: connect GitHub and add repositories, add agent accounts and secrets,
+      write instructions, and invite people.
+
+   Before the web app ships, check its speed where the sample screens couldn't: a bundle-size budget
+   in CI with routes split, and icons with only the weight we use (Phosphor ships all six with each
+   icon, a tenth of today's first load); long chats with real event streams; a real mid-range
+   Android phone and iPhone, not CPU throttling; and the diff library's limits, raised upstream
+   (flinging through 60 or more changed files drops to about 30 frames a second on a slow CPU, and a
+   page's first colored code waits about 165 ms).
 3. **Working together.** A chat brings in another chat's changes; agents use AiSloth's own API
    (MCP); and projects: groups of chats with members, shared instructions, and a project chat whose
    agent coordinates the others.
