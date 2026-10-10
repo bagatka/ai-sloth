@@ -306,15 +306,19 @@ internal sealed class NookLifecycle(
         }
     }
 
-    // Creates the sandbox unless it exists, from the ready copy matching the nook's files, with its
-    // setup's work done, or from its image; resumes one its provider suspended. The daemon connecting
-    // then makes the nook Ready.
+    // Creates the sandbox unless it exists, and resumes one its provider suspended. A sandbox that ran
+    // the nook's files and failed since, such as one that couldn't start again as the nook woke, is
+    // replaced from the nook's latest checkpoint, like the one it took as it fell asleep; a new one
+    // that failed fails the nook, as its image can't run. The daemon connecting then makes the nook Ready.
     private async Task EnsureSandboxAsync(NooksDbContext db, ISandboxProvider provider, Nook nook, CancellationToken ct)
     {
         SandboxKey key = SandboxKey.From(nook.Id.Value);
         SandboxObservation? sandbox = await provider.ObserveAsync(key, ct);
         switch (sandbox?.State)
         {
+            case SandboxState.Failed when nook.SourcesReady:
+                await ReplaceSandboxAsync(db, provider, nook, ct);
+                return;
             case SandboxState.Failed:
                 await FailAsync(db, nook, sandbox.Reason ?? "The provider reports the sandbox failed.", ct);
                 return;
@@ -326,6 +330,13 @@ internal sealed class NookLifecycle(
                 return;
         }
 
+        await CreateSandboxAsync(db, provider, nook, ct);
+    }
+
+    // Creates the nook's sandbox, from the ready copy matching its files, with its setup's work done,
+    // or from its image.
+    private async Task CreateSandboxAsync(NooksDbContext db, ISandboxProvider provider, Nook nook, CancellationToken ct)
+    {
         // An image the deployment stopped offering has nothing to start from.
         string? image = settings.ImageOf(nook.Image);
         if (image is null)

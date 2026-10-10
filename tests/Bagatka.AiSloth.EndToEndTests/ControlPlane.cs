@@ -290,6 +290,34 @@ public sealed partial class ControlPlane : IAsyncLifetime
     }
 
     /// <summary>
+    /// Fails a nook's sandbox on the docker provider behind the app's back, as when Sysbox refuses for
+    /// good to start its container again: a sandbox under its key whose daemon has no settings, and so
+    /// exits at once, takes the place of its own.
+    /// </summary>
+    internal async Task FailSandboxAsync(Guid nookId)
+    {
+        ServiceCollection services = new ServiceCollection();
+        services.AddDockerSandboxProvider(new DockerSandboxSettings(DockerEndpoint, Scope));
+        await using ServiceProvider provider = services.BuildServiceProvider();
+        ISandboxProvider sandboxes = provider.GetRequiredService<ISandboxProvider>();
+        SandboxKey key = SandboxKey.From(nookId);
+        await sandboxes.DeleteAsync(key, TestContext.Current.CancellationToken);
+        SandboxSpec spec = new SandboxSpec(key, new SandboxSource(new SandboxImage("aisloth-nook:dev")), new SandboxResources(500, 256), new Dictionary<string, string>(StringComparer.Ordinal), Location: null);
+        Result<SandboxObservation> created = await sandboxes.CreateAsync(spec, TestContext.Current.CancellationToken);
+        Assert.False(created.Failed, created.Failed ? created.Error.Message : null);
+
+        long started = TimeProvider.System.GetTimestamp();
+        SandboxObservation? sandbox = await sandboxes.ObserveAsync(key, TestContext.Current.CancellationToken);
+        while (sandbox?.State != SandboxState.Failed && TimeProvider.System.GetElapsedTime(started) < TimeSpan.FromMinutes(1))
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
+            sandbox = await sandboxes.ObserveAsync(key, TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal(SandboxState.Failed, sandbox?.State);
+    }
+
+    /// <summary>
     /// Leaves a sandbox in the app's scope that no nook records, as a database reset would; returns
     /// its key.
     /// </summary>

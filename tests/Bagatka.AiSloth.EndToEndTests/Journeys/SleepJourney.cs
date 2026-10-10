@@ -16,8 +16,9 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// Journey: nooks nobody uses fall asleep and come back when used, with their files and an agent that
 /// remembers. A busy nook stays awake beside an idle one that sleeps and wakes for its next message; a
 /// nook wakes early on request; one asleep for long is evicted and comes back from its latest
-/// checkpoint, through a ready copy when its setup left one; and one whose container is lost comes back
-/// too; and one stays awake while someone watches its process. On the sleepy app, whose nooks sleep
+/// checkpoint, through a ready copy when its setup left one; one whose container is lost comes back
+/// too, as does one whose container can't start again as it wakes; and one stays awake while someone
+/// watches its process. On the sleepy app, whose nooks sleep
 /// after 8 idle seconds and are evicted after 20 asleep; the parts wait on those clocks, so they run at
 /// the same time, each as someone else.
 /// </summary>
@@ -41,6 +42,7 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
             ANookAsleepForLongIsEvictedAndComesBackFromItsLatestCheckpointAsync(app),
             AnEvictedNookComesBackThroughTheReadyCopyItsSlowSetupLeftAsync(app),
             ANookWhoseContainerIsLostComesBackFromItsCheckpointAsync(app),
+            AnAsleepNookWhoseContainerFailedComesBackFromItsCheckpointAsync(app),
             ANookStaysAwakeWhileSomeoneWatchesItsProcessAsync(app),
             AWorkspaceHasAtMostTwoNooksAwakeAsync(app));
     }
@@ -227,6 +229,28 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
         await watch.NextAsync("turn-ended");
 
         await app.LoseSandboxAsync(chat.NookId.Value);
+        await acme.SendAsync(chat, "What was my first message?");
+        JsonElement restarted = await watch.NextAsync("agent-restarted", Recovery);
+        await watch.NextAsync("turn-ended");
+        int? restored = await acme.RunAsync(chat.NookId, "grep -q 'hi from the fake model' /work/hello.txt");
+
+        Assert.True(restarted.GetProperty("remembers").GetBoolean());
+        Assert.Equal(0, restored);
+    }
+
+    // Sysbox can refuse for good to start a container again, which leaves it failed as its nook wakes:
+    // the nook comes back from the checkpoint it took as it fell asleep, its agent remembering.
+    private static async Task AnAsleepNookWhoseContainerFailedComesBackFromItsCheckpointAsync(ControlPlane app)
+    {
+        using HttpClient heidi = app.ClientFor("heidi-" + Guid.CreateVersion7());
+        TestWorkspace acme = await TestWorkspace.CreateAsync(app, heidi);
+        ChatSummary chat = await acme.StartChatAsync();
+        await using ChatWatch watch = await ChatWatch.OpenAsync(heidi, chat);
+        await acme.SendAsync(chat, "Please write hello.txt for me");
+        await watch.NextAsync("turn-ended");
+        await acme.StatusAsync(chat.NookId, status => status is NookStatus.Asleep, SleepyControlPlane.Sleep);
+
+        await app.FailSandboxAsync(chat.NookId.Value);
         await acme.SendAsync(chat, "What was my first message?");
         JsonElement restarted = await watch.NextAsync("agent-restarted", Recovery);
         await watch.NextAsync("turn-ended");

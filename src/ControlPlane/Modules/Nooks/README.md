@@ -46,16 +46,17 @@ process's environment), Sources (copying repositories in, as the nook's creator)
 ```
 Starting ──daemon connects──▶ Ready ──nobody uses it──▶ Asleep ──any use──▶ Starting
    ▲                            │                         │
-   └──── sandbox lost ──────────┤                         └─ asleep for long: its sandbox is deleted,
+   └─ sandbox lost or failed ───┤                         └─ asleep for long: its sandbox is deleted,
                                 └─ daemon away, provider     and it comes back from its latest checkpoint
                                    can't be asked ──▶ Offline ──daemon connects──▶ Ready
-any ──provider reports failure──▶ Failed      any ──deleted──▶ Deleting ──▶ (gone)
+Starting ──a new sandbox fails──▶ Failed      any ──deleted──▶ Deleting ──▶ (gone)
 ```
 
 One job, `Jobs/NookLifecycle.cs`, makes each sandbox match its record, every 10 seconds and at once
 after a change, one piece of work per nook at a time (`NookWork`), so a slow provider holds up only
-its own nooks. It creates sandboxes, from a matching ready copy when there is one; replaces lost ones
-from the latest checkpoint; puts nooks nobody used for the sleep period (two minutes) to sleep after
+its own nooks. It creates sandboxes, from a matching ready copy when there is one; replaces lost ones,
+and failed ones that had run the nook's files, such as one that can't start again as it wakes, from
+the latest checkpoint; puts nooks nobody used for the sleep period (two minutes) to sleep after
 keeping their changed files as a checkpoint; deletes the sandboxes of nooks asleep for the eviction
 period (a day); deletes deleted nooks; and hourly the ready copies nobody used for a week and the
 sandboxes no nook records, such as those a reset database left. Providers keep a sleeping nook's

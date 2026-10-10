@@ -327,14 +327,15 @@ internal sealed class DockerSandboxProvider(DockerClient docker, string scope, I
     {
         return status switch
         {
-            "created" => SandboxState.Stopped,
+            "created" when exitCode == 0 => SandboxState.Stopped,
             "restarting" => SandboxState.Starting,
             "running" => SandboxState.Running,
             "paused" => SandboxState.Paused,
             "exited" when exitCode == 0 => SandboxState.Stopped,
             "removing" => SandboxState.Deleting,
 
-            // "exited" otherwise, "dead", or a status this provider doesn't know: the entry point isn't running.
+            // "exited" or "created" otherwise, as a container the engine refused to start is left,
+            // "dead", or a status this provider doesn't know: the entry point isn't running.
             _ => SandboxState.Failed,
         };
     }
