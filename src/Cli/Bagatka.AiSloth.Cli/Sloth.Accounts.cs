@@ -94,7 +94,7 @@ internal sealed partial class Sloth
         bool parsed = Uri.TryCreate(endpointText, UriKind.Absolute, out Uri? endpoint);
         if (parsed != (endpointText is not null) || endpoint?.Scheme is not (null or "https" or "http"))
         {
-            await terminal.FailAsync("An endpoint is the API's base URL, such as https://openrouter.ai/api/v1.");
+            await terminal.FailAsync(kind.Endpoint is null ? "Only an API key names an endpoint." : "An endpoint is the API's base URL, such as " + kind.Endpoint + ".");
             return 2;
         }
 

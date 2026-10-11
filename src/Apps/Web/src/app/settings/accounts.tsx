@@ -50,38 +50,39 @@ const kindNames: Record<
     name: string
     description: string
     secret: string | null
-    endpoint: boolean
+    /** Another endpoint that speaks its API, for the kinds that take one. */
+    endpoint: string | null
   }
 > = {
   AnthropicApiKey: {
     name: "Anthropic API key",
     description: "Anthropic's API, or any endpoint that speaks it",
     secret: "API key",
-    endpoint: true,
+    endpoint: "https://openrouter.ai/api",
   },
   OpenAIApiKey: {
     name: "OpenAI API key",
     description: "OpenAI's API, or any endpoint that speaks it",
     secret: "API key",
-    endpoint: true,
+    endpoint: "https://openrouter.ai/api/v1",
   },
   ChatGptPlan: {
     name: "ChatGPT plan",
     description: "ChatGPT Plus or Pro",
     secret: null,
-    endpoint: false,
+    endpoint: null,
   },
   ClaudePlan: {
     name: "Claude plan",
     description: "Claude Pro or Max",
     secret: "Token from claude setup-token",
-    endpoint: false,
+    endpoint: null,
   },
   CopilotPlan: {
     name: "Copilot plan",
     description: "GitHub Copilot",
     secret: "GitHub token with the Copilot Requests permission",
-    endpoint: false,
+    endpoint: null,
   },
 }
 
@@ -353,7 +354,7 @@ function AccountForm({
                   id="account-endpoint"
                   type="url"
                   value={endpoint}
-                  placeholder="https://openrouter.ai/api/v1"
+                  placeholder={names.endpoint}
                   onChange={(event) => setEndpoint(event.target.value)}
                   aria-invalid={!!error?.fields.endpoint || undefined}
                 />
