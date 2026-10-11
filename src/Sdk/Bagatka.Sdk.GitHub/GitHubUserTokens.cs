@@ -4,8 +4,8 @@ using System;
 namespace Bagatka.Sdk.GitHub;
 
 /// <summary>
-/// A user access token of a GitHub App, which acts as the person within the repositories the app is
-/// installed on. Never log it; its text form leaves the tokens out.
+/// A user access token: a GitHub App's, which acts as the person within the repositories the app is
+/// installed on, or an OAuth app's, within its scopes. Never log it; its text form leaves the tokens out.
 /// </summary>
 /// <param name="AccessToken">Calls GitHub as the person: <c>Authorization: Bearer</c>, and git's password over HTTPS.</param>
 /// <param name="ExpiresIn">How long it works, or <see langword="null"/> when the app's tokens never expire.</param>

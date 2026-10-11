@@ -26,6 +26,7 @@ internal sealed partial class AgentAccountsApi(
     OpenAIModelsClient openAI,
     AnthropicModelsClient anthropic,
     CopilotModelsClient copilot,
+    GitHubClient github,
     OpenRouterClient openRouter,
     IProductEvents productEvents,
     TimeProvider time,

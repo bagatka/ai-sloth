@@ -31,6 +31,7 @@ this client keeps to them, with source-generated JSON.
   off, tokens never expire and come without a refresh token.
 - A user access token reaches only repositories both the person and the app's installations can.
 - An app's bot is the user `<slug>[bot]`; its ID makes the no-reply address commits credit it by.
-- The device flow must be turned on in the app's settings; the manifest flow can't.
+- The device flow must be turned on in the app's settings; the manifest flow can't. It works the same
+  for an OAuth app, whose tokens come without an expiry or a refresh token.
 - Copilot's `/models` is undocumented. It lists embedding models and models the plan's policy turns
   off too; only chat models enabled in the model picker are offered.

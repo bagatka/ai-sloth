@@ -17,9 +17,9 @@ internal static class KindRules
     {
         return kind switch
         {
-            AgentAccountKind.ChatGptPlan => true,
+            AgentAccountKind.ChatGptPlan or AgentAccountKind.CopilotPlan => true,
             AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey
-                or AgentAccountKind.ClaudePlan or AgentAccountKind.CopilotPlan => false,
+                or AgentAccountKind.ClaudePlan => false,
         };
     }
 
@@ -33,14 +33,22 @@ internal static class KindRules
         };
     }
 
-    // Plans a vendor allows hosted apps only with its permission are off until the deployment says so.
+    // Plans a vendor allows hosted apps only with its permission are off until the deployment says so;
+    // Copilot plans need the GitHub app people sign in to.
     public static bool Allowed(AgentAccountKind kind, AgentAccountsSettings settings)
     {
         return kind switch
         {
             AgentAccountKind.ClaudePlan => settings.AllowClaudePlans,
             AgentAccountKind.ChatGptPlan => settings.AllowChatGptPlans,
-            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey or AgentAccountKind.CopilotPlan => true,
+            AgentAccountKind.CopilotPlan => settings.CopilotClientId is not null,
+            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey => true,
         };
+    }
+
+    // Sign-ins with a code, entered at the vendor, rather than in a browser that returns to the caller.
+    public static bool SignsInWithCode(AgentAccountKind kind)
+    {
+        return kind == AgentAccountKind.CopilotPlan;
     }
 }

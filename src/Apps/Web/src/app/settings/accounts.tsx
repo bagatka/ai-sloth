@@ -33,11 +33,12 @@ import { toast } from "@/components/ui/toast"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { ApiError, answer, api, messageOf, type Schemas } from "../api"
 import { accountKinds, agentAccounts, me } from "../queries"
+import { aborted, CodeSteps, waitForCode } from "./code-sign-in"
 import { NoRows, RemoveButton, Row, Rows, Section } from "./section"
 
 // Agent accounts: what pays for the agents' work. A workspace's account is for everyone who works
 // there; someone's own is for their chats alone. Most are added with a secret; a ChatGPT plan by
-// signing in with ChatGPT.
+// signing in with ChatGPT, and a Copilot plan with a code entered at GitHub.
 
 type Workspace = Schemas["WorkspaceSummary"]
 type Kind = Schemas["AgentAccountKind"]
@@ -87,7 +88,7 @@ const kindNames: Record<
   CopilotPlan: {
     name: "Copilot plan",
     description: "GitHub Copilot",
-    secret: "GitHub token with the Copilot Requests permission",
+    secret: null,
     endpoint: null,
   },
 }
@@ -178,8 +179,20 @@ function AddAccount({
   manager: boolean
 }) {
   const [open, setOpen] = React.useState(false)
+  // Closing the dialog stops waiting for a code's approval.
+  const closed = React.useRef(new AbortController())
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(opening) => {
+        setOpen(opening)
+        if (opening) {
+          closed.current = new AbortController()
+        } else {
+          closed.current.abort()
+        }
+      }}
+    >
       <DialogTrigger render={<Button variant="outline" size="sm" />}>
         <PlusIcon data-icon="inline-start" />
         Add
@@ -190,6 +203,7 @@ function AddAccount({
           <AccountForm
             workspace={workspace}
             manager={manager}
+            closed={closed}
             onAdded={() => setOpen(false)}
           />
         )}
@@ -201,10 +215,13 @@ function AddAccount({
 function AccountForm({
   workspace,
   manager,
+  closed,
   onAdded,
 }: {
   workspace: Workspace
   manager: boolean
+  /** Aborts when the dialog closes. */
+  closed: React.RefObject<AbortController>
   onAdded: () => void
 }) {
   const queryClient = useQueryClient()
@@ -261,8 +278,9 @@ function AccountForm({
       <DialogHeader>
         <DialogTitle>Add an agent account</DialogTitle>
         <DialogDescription>
-          It's kept on the host, sealed, and never shown again; agents reach
-          their model through the host, so no nook holds it.
+          {chosen.kind === "CopilotPlan"
+            ? "Its token is kept on the host, sealed, and reaches only your Copilot; agents use it in their nooks."
+            : "It's kept on the host, sealed, and never shown again; agents reach their model through the host, so no nook holds it."}
         </DialogDescription>
       </DialogHeader>
       <FieldGroup>
@@ -326,7 +344,13 @@ function AccountForm({
           )}
         </Field>
       </FieldGroup>
-      {chosen.addedBySignIn ? (
+      {chosen.kind === "CopilotPlan" ? (
+        <CopilotSignIn
+          name={name.trim() || names.name}
+          closed={closed}
+          onAdded={added}
+        />
+      ) : chosen.addedBySignIn ? (
         <ChatGptSignIn name={name.trim() || names.name} onAdded={added} />
       ) : (
         <form
@@ -426,7 +450,7 @@ function ChatGptSignIn({
           body: { returnedTo: returned.trim() },
         })
       ),
-    onSuccess: onAdded,
+    onSuccess: (progress) => progress.account && onAdded(progress.account),
   })
 
   if (!start.data) {
@@ -512,4 +536,86 @@ function ChatGptSignIn({
       </DialogFooter>
     </form>
   )
+}
+
+// Adding a Copilot plan: the host gets a code from GitHub, and the person enters it there and
+// approves, while the dialog asks the host whether they have, until the plan is added, the code
+// expires, or the dialog closes.
+function CopilotSignIn({
+  name,
+  closed,
+  onAdded,
+}: {
+  name: string
+  closed: React.RefObject<AbortController>
+  onAdded: (account: Schemas["AgentAccountSummary"]) => void
+}) {
+  const start = useMutation({
+    mutationFn: () =>
+      answer(
+        api.POST("/agent-accounts/sign-ins", {
+          body: { kind: "CopilotPlan", name },
+        })
+      ),
+    onSuccess: (started) => approve.mutate(started),
+  })
+  const approve = useMutation({
+    mutationFn: (started: Schemas["SignInStarted"]) =>
+      waitForCode(
+        started,
+        () =>
+          answer(
+            api.POST("/agent-accounts/sign-ins/{id}/complete", {
+              params: { path: { id: started.id } },
+            })
+          ),
+        closed.current.signal
+      ),
+    onSuccess: (account) => account && onAdded(account),
+  })
+
+  if (start.isError || (approve.isError && !aborted(approve.error))) {
+    return (
+      <>
+        <Alert variant="destructive">
+          <AlertDescription>
+            {messageOf(start.error ?? approve.error)}
+          </AlertDescription>
+        </Alert>
+        <DialogFooter>
+          <Button
+            onClick={() => {
+              approve.reset()
+              start.mutate()
+            }}
+          >
+            Start again
+          </Button>
+        </DialogFooter>
+      </>
+    )
+  }
+  if (!start.data?.userCode || approve.data === null) {
+    return (
+      <>
+        {approve.data === null && (
+          <p className="text-label text-muted-foreground">
+            The code expired before it was approved.
+          </p>
+        )}
+        <DialogFooter>
+          <Button
+            loading={start.isPending}
+            onClick={() => {
+              approve.reset()
+              start.mutate()
+            }}
+          >
+            {approve.data === null ? "Get a new code" : "Sign in with GitHub"}
+          </Button>
+        </DialogFooter>
+      </>
+    )
+  }
+  return <CodeSteps code={start.data.userCode} url={start.data.url} />
 }

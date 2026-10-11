@@ -36,6 +36,12 @@ internal sealed class FakeGitHub : IAsyncDisposable
 
     public const string AppSlug = "aisloth-e2e";
 
+    /// <summary>
+    /// The OAuth app people sign in to for their Copilot plans: it asks for no scopes, and its tokens
+    /// never expire.
+    /// </summary>
+    public const string CopilotClientId = "Ov23copilote2e";
+
     /// <summary>The app's bot, which commits credit as their co-author.</summary>
     public const long BotId = 4242;
 
@@ -202,13 +208,14 @@ internal sealed class FakeGitHub : IAsyncDisposable
     private async Task<IResult> StartDeviceAsync(HttpRequest request)
     {
         IFormCollection form = await request.ReadFormAsync(request.HttpContext.RequestAborted);
-        if (!string.Equals(form["client_id"], ClientId, StringComparison.Ordinal))
+        string clientId = form["client_id"].ToString();
+        if (clientId is not (ClientId or CopilotClientId))
         {
             return Results.Json(new JsonObject { ["error"] = "unauthorized_client" });
         }
 
         string userCode = Convert.ToHexString(RandomNumberGenerator.GetBytes(4));
-        DeviceCode device = new DeviceCode(Random("device-"), userCode);
+        DeviceCode device = new DeviceCode(Random("device-"), userCode, clientId);
         lock (_lock)
         {
             _devices[device.Code] = device;
@@ -240,6 +247,7 @@ internal sealed class FakeGitHub : IAsyncDisposable
     {
         IFormCollection form = await request.ReadFormAsync(request.HttpContext.RequestAborted);
         string? login;
+        string clientId = form["client_id"].ToString();
         lock (_lock)
         {
             if (string.Equals(form["grant_type"], "refresh_token", StringComparison.Ordinal))
@@ -260,7 +268,24 @@ internal sealed class FakeGitHub : IAsyncDisposable
             }
         }
 
-        return login is null ? Results.Json(new JsonObject { ["error"] = "bad_refresh_token" }) : Results.Json(IssueTokens(login));
+        if (login is null)
+        {
+            return Results.Json(new JsonObject { ["error"] = "bad_refresh_token" });
+        }
+
+        return Results.Json(string.Equals(clientId, CopilotClientId, StringComparison.Ordinal) ? IssueCopilotToken(login) : IssueTokens(login));
+    }
+
+    // An OAuth app's token, which never expires.
+    private JsonObject IssueCopilotToken(string login)
+    {
+        string access = Random("gho_");
+        lock (_lock)
+        {
+            _tokens[access] = login;
+        }
+
+        return new JsonObject { ["access_token"] = access, ["scope"] = string.Empty, ["token_type"] = "bearer" };
     }
 
     private JsonObject IssueTokens(string login)
@@ -532,11 +557,13 @@ internal sealed class FakeGitHub : IAsyncDisposable
 
     private sealed record Release(string Repository, string Tag, IReadOnlyDictionary<string, byte[]> Files, bool WrongDigests);
 
-    private sealed class DeviceCode(string code, string userCode)
+    private sealed class DeviceCode(string code, string userCode, string clientId)
     {
         public string Code { get; } = code;
 
         public string UserCode { get; } = userCode;
+
+        public string ClientId { get; } = clientId;
 
         public string? ApprovedBy { get; set; }
     }

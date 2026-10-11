@@ -14,7 +14,10 @@ namespace Bagatka.AiSloth.AgentAccounts;
 /// </summary>
 public static class AgentAccountsModule
 {
-    /// <summary>Registers the module. The host also registers a <see cref="System.TimeProvider"/> and the Workspaces module.</summary>
+    /// <summary>
+    /// Registers the module. The host also registers a <see cref="System.TimeProvider"/>, the Workspaces
+    /// module, and a <see cref="GitHubClient"/> (<c>AddGitHubClient</c>), which Copilot plans sign in through.
+    /// </summary>
     public static IServiceCollection AddAgentAccountsModule(this IServiceCollection services, AgentAccountsSettings settings, EncryptionSettings encryption)
     {
         services.AddSingleton(settings);

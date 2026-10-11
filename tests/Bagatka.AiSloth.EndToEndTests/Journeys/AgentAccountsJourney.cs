@@ -73,16 +73,22 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Empty(remaining);
     }
 
-    // An own account serves its owner in every workspace; a plan is only ever someone's own, and a
-    // Copilot plan lists the chat models of Copilot's picker that the plan allows.
+    // An own account serves its owner in every workspace; a plan is only ever someone's own. A Copilot
+    // plan is added with a code the person approves at GitHub, and lists the chat models of Copilot's
+    // picker that the plan allows.
     private async Task OwnAccountsServeTheirOwnerInEveryWorkspaceAndPlansStayPersonalAsync()
     {
         WorkspaceSummary acme = await Api.ReadAsync<WorkspaceSummary>(_alice.SendPostAsync("/workspaces", new { name = "Acme" }), HttpStatusCode.Created);
         WorkspaceSummary personal = await Api.ReadAsync<WorkspaceSummary>(_alice.SendPostAsync("/workspaces", new { name = "Mine" }), HttpStatusCode.Created);
         WorkspaceSummary bobs = await Api.ReadAsync<WorkspaceSummary>(_bob.SendPostAsync("/workspaces", new { name = "Bob's" }), HttpStatusCode.Created);
 
-        AgentAccountSummary own = await Api.ReadAsync<AgentAccountSummary>(
-            _alice.SendPostAsync("/agent-accounts", new { kind = "CopilotPlan", name = "My Copilot", secret = "github_pat_example" }), HttpStatusCode.Created);
+        SignInStarted started = await Api.ReadAsync<SignInStarted>(_alice.SendPostAsync("/agent-accounts/sign-ins", new { kind = "CopilotPlan", name = "My Copilot" }), HttpStatusCode.OK);
+        SignInProgress pending = await Api.ReadAsync<SignInProgress>(_alice.SendPostAsync(Paths.SignIn(started.Id) + "/complete", new { }), HttpStatusCode.OK);
+        app.GitHub.Approve(started.UserCode!, "alice-gh");
+        SignInProgress approved = await Api.ReadAsync<SignInProgress>(_alice.SendPostAsync(Paths.SignIn(started.Id) + "/complete", new { }), HttpStatusCode.OK);
+        AgentAccountSummary own = approved.Account!;
+        Problem withToken = await Api.ProblemAsync(
+            _alice.SendPostAsync("/agent-accounts", new { kind = "CopilotPlan", name = "My Copilot", secret = "github_pat_example" }), HttpStatusCode.BadRequest);
         IReadOnlyList<AgentAccountSummary> inAcme = await ListAsync(_alice, acme.Id);
         IReadOnlyList<AgentAccountSummary> inPersonal = await ListAsync(_alice, personal.Id);
         IReadOnlyList<AgentAccountSummary> inBobs = await ListAsync(_bob, bobs.Id);
@@ -94,6 +100,9 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Problem claudePlan = await Api.ProblemAsync(
             _alice.SendPostAsync("/agent-accounts", new { kind = "ClaudePlan", name = "Mine", secret = "sk-ant-oat-example" }), HttpStatusCode.BadRequest);
 
+        Assert.Null(pending.Account);
+        Assert.Equal(("My Copilot", AgentAccountKind.CopilotPlan), (own.Name, own.Kind));
+        Assert.True(withToken.Errors?.ContainsKey("kind"));
         Assert.Contains(inAcme, found => found.Id == own.Id);
         Assert.Contains(inPersonal, found => found.Id == own.Id);
         Assert.DoesNotContain(inBobs, found => found.Id == own.Id);
@@ -102,7 +111,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.True(claudePlan.Errors?.ContainsKey("kind"));
     }
 
-    // Erin finds a model by name for pi on her OpenRouter key, and saves the choice as a preset.
+    // Erin finds a model by name for pi on her OpenRouter key, and saves the choice as a preset. Her
+    // Copilot plan she adds with the code sloth shows, which her browser approves at GitHub.
     private async Task SlothListsEachKindByANameThatCantBeConfusedAndSavesAPresetAsync()
     {
         await using SlothCli sloth = new SlothCli("erin-" + Guid.CreateVersion7());
@@ -115,15 +125,20 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         string models = sloth.Output;
         int saved = await sloth.RunAsync("preset", "add", "--harness", "pi", "--account", "OpenRouter", "--model", FakeModel.OpenRouterModel, "--name", "Luna");
         int presetsListed = await sloth.RunAsync("preset", "list");
+        string presets = sloth.Output;
+        int copilotAdded = await sloth.RunAsync("account", "add", "copilot-plan");
+        string copilot = sloth.Output;
 
-        Assert.Equal((0, 0, 0, 0, 0), (listed, added, found, saved, presetsListed));
+        Assert.Equal((0, 0, 0, 0, 0, 0), (listed, added, found, saved, presetsListed, copilotAdded));
+        Assert.Matches("copilot-plan +GitHub Copilot +sign in with GitHub", kinds);
+        Assert.Matches("^Open http\\S+ and enter [0-9A-F]+ to add your Copilot plan\\.\nAdded \"Copilot plan\": yours\\.", copilot);
         Assert.Matches("chatgpt-plan +ChatGPT Plus or Pro +sign in with ChatGPT +Codex, pi", kinds);
         Assert.Matches("claude-plan +Claude Pro or Max +not allowed on ", kinds);
         Assert.Matches("anthropic-api-key +Anthropic's API.+Claude Code, pi", kinds);
         Assert.Matches("openrouter-api-key +Many vendors' models with one key +API key +Claude Code, pi", kinds);
         Assert.Matches(FakeModel.OpenRouterModel + " +OpenAI: GPT-6 Luna", models);
         Assert.DoesNotContain(FakeModel.OpenRouterClaude, models, StringComparison.Ordinal);
-        Assert.Matches("Luna +pi · " + FakeModel.OpenRouterModel + " · medium · OpenRouter", sloth.Output);
+        Assert.Matches("Luna +pi · " + FakeModel.OpenRouterModel + " · medium · OpenRouter", presets);
     }
 
     // OpenAI's list of models holds every model its API serves; only those an agent can run on are
@@ -227,7 +242,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
             _alice.SendPostAsync(CompletePath(declinedStart), new { returnedTo = Callback + "?error=access_denied&state=" + state }), HttpStatusCode.BadRequest);
         SignInStarted started = await StartSignInAsync();
         Uri returnedTo = await FakeChatGpt.FollowAsync(started.Url);
-        AgentAccountSummary plan = await Api.ReadAsync<AgentAccountSummary>(_alice.SendPostAsync(CompletePath(started), new { returnedTo }), HttpStatusCode.Created);
+        SignInProgress signedIn = await Api.ReadAsync<SignInProgress>(_alice.SendPostAsync(CompletePath(started), new { returnedTo }), HttpStatusCode.OK);
+        AgentAccountSummary plan = signedIn.Account!;
         Problem again = await Api.ProblemAsync(_alice.SendPostAsync(CompletePath(started), new { returnedTo }), HttpStatusCode.NotFound);
         int renewalsBefore = app.ChatGpt.Renewals;
 
@@ -259,7 +275,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
 
     private static string CompletePath(SignInStarted started)
     {
-        return string.Create(CultureInfo.InvariantCulture, $"/agent-accounts/sign-ins/{started.Id.Value}/complete");
+        return Paths.SignIn(started.Id) + "/complete";
     }
 
     private static async Task<IReadOnlyList<AgentAccountSummary>> ListAsync(HttpClient client, WorkspaceId workspace)

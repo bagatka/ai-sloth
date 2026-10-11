@@ -10,7 +10,7 @@ public enum CredentialKind
     /// <summary>Anthropic's Messages API, through a model gateway: an Anthropic API key, or another endpoint speaking it.</summary>
     AnthropicApi = 1,
 
-    /// <summary>A GitHub fine-grained personal access token with the Copilot Requests permission, drawing on a Copilot plan; it goes to the harness.</summary>
+    /// <summary>A GitHub token that reaches its owner's Copilot plan; it goes to the harness.</summary>
     GitHubToken = 2,
 
     /// <summary>A Claude subscription's OAuth token, as <c>claude setup-token</c> prints it, drawing on a Claude plan; it goes to the harness.</summary>

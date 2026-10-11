@@ -6,6 +6,7 @@ using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
+using Bagatka.Sdk.GitHub;
 using Bagatka.Sdk.OpenAI;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,26 +14,42 @@ namespace Bagatka.AiSloth.AgentAccounts;
 
 internal sealed partial class AgentAccountsApi
 {
-    public async Task<Result<AgentAccountSummary>> CompleteSignInAsync(Actor actor, CompleteSignIn command, CancellationToken ct)
+    public async Task<Result<SignInProgress>> CompleteSignInAsync(Actor actor, CompleteSignIn command, CancellationToken ct)
     {
         await using AgentAccountsDbContext db = await databases.CreateDbContextAsync(ct);
 
         if (actor is not UserActor user)
         {
-            return new Result<AgentAccountSummary>(AgentAccountsErrors.SignInNotFound);
+            return new Result<SignInProgress>(AgentAccountsErrors.SignInNotFound);
         }
 
-        SignIn? signIn = await db.SignIns.SingleOrDefaultAsync(found => found.Id == command.Id && found.UserId == user.UserId, ct);
         DateTimeOffset now = time.GetUtcNow();
-        if (signIn is null || signIn.ExpiredAt(now))
+        SignIn? signIn = await db.SignIns.SingleOrDefaultAsync(found => found.Id == command.Id && found.UserId == user.UserId, ct);
+        if (signIn is not null && !signIn.ExpiredAt(now))
         {
-            return new Result<AgentAccountSummary>(AgentAccountsErrors.SignInNotFound);
+            return await CompleteChatGptSignInAsync(db, user, signIn, command.ReturnedTo, now, ct);
         }
 
-        Result<SignInAnswer> answer = signIn.Read(command.ReturnedTo);
+        CodeSignIn? codeSignIn = await db.CodeSignIns.SingleOrDefaultAsync(found => found.Id == command.Id && found.UserId == user.UserId, ct);
+        if (codeSignIn is null || codeSignIn.ExpiredAt(now))
+        {
+            return new Result<SignInProgress>(AgentAccountsErrors.SignInNotFound);
+        }
+
+        return await CompleteCodeSignInAsync(db, user, codeSignIn, now, ct);
+    }
+
+    private async Task<Result<SignInProgress>> CompleteChatGptSignInAsync(AgentAccountsDbContext db, UserActor user, SignIn signIn, Uri? returnedTo, DateTimeOffset now, CancellationToken ct)
+    {
+        if (returnedTo is null)
+        {
+            return new Result<SignInProgress>(Error.Validation("returnedTo", "Give the address ChatGPT sent the browser to."));
+        }
+
+        Result<SignInAnswer> answer = signIn.Read(returnedTo);
         if (answer.Failed)
         {
-            return new Result<AgentAccountSummary>(answer.Error);
+            return new Result<SignInProgress>(answer.Error);
         }
 
         // A code works once: whatever happens next, this attempt is over (it expires on its own).
@@ -40,32 +57,90 @@ internal sealed partial class AgentAccountsApi
         Result<ChatGptTokens> exchanged = await chatGpt.ExchangeCodeAsync(clientId, answer.Output.Code, signIn.OpenVerifier(box), signIn.Callback, ct);
         if (exchanged.Failed)
         {
-            return new Result<AgentAccountSummary>(Error.Validation("returnedTo", "ChatGPT refused the sign-in (" + exchanged.Error.Message + "); start again."));
+            return new Result<SignInProgress>(Error.Validation("returnedTo", "ChatGPT refused the sign-in (" + exchanged.Error.Message + "); start again."));
         }
 
         ChatGptTokens tokens = exchanged.Output;
         if (!tokens.AllowsPlanUse)
         {
-            return new Result<AgentAccountSummary>(Error.Validation("returnedTo", "ChatGPT didn't allow using your plan; sign in again and allow it."));
+            return new Result<SignInProgress>(Error.Validation("returnedTo", "ChatGPT didn't allow using your plan; sign in again and allow it."));
         }
 
         ChatGptIdToken? identity = tokens.IdToken is null ? null : ChatGptSignInClient.ReadIdToken(tokens.IdToken);
         if (!signIn.IssuedFor(identity, clientId, settings.ChatGptAuthority, now))
         {
-            return new Result<AgentAccountSummary>(Error.Validation("returnedTo", "ChatGPT's answer didn't check out; start again."));
+            return new Result<SignInProgress>(Error.Validation("returnedTo", "ChatGPT's answer didn't check out; start again."));
         }
 
         PlanSession session = PlanSession.Start(clientId, identity, tokens, now);
         AgentAccount account = AgentAccount.SignedIn(user.UserId, signIn.Kind, signIn.Name, session, box, time);
         db.Accounts.Add(account);
         db.SignIns.Remove(signIn);
+        return await AddedAsync(db, user, account, ct);
+    }
+
+    // Asks GitHub whether the person approved the code, as often as it allows. The token reaches only
+    // their Copilot, so it becomes the plan's secret, which goes to its agent.
+    private async Task<Result<SignInProgress>> CompleteCodeSignInAsync(AgentAccountsDbContext db, UserActor user, CodeSignIn signIn, DateTimeOffset now, CancellationToken ct)
+    {
+        TimeSpan wait = signIn.WaitAt(now);
+        if (wait > TimeSpan.Zero)
+        {
+            return new Result<SignInProgress>(new SignInProgress(Account: null, wait));
+        }
+
+        GitHubDevicePoll poll = await github.PollDeviceAsync(settings.CopilotClientId!, signIn.DeviceCode(box), ct);
+        if (poll.Tokens is null)
+        {
+            return await NotYetAsync(db, signIn, poll, now, ct);
+        }
+
+        // An agent holds the token for as long as it runs, so one that expires would stop it midway.
+        db.CodeSignIns.Remove(signIn);
+        if (poll.Tokens.ExpiresIn is not null)
+        {
+            _ = await db.SaveAsync(ct);
+            return new Result<SignInProgress>(Error.Conflict("agent_accounts.copilot_token_expires", "GitHub gave a token that expires, which an agent could outlive: this host's Copilot app must be an OAuth app."));
+        }
+
+        Result<AgentAccount> added = AgentAccount.Add(workspaceId: null, user.UserId, signIn.Kind, signIn.Name, poll.Tokens.AccessToken, endpoint: null, box, time);
+        if (added.Failed)
+        {
+            return new Result<SignInProgress>(added.Error);
+        }
+
+        db.Accounts.Add(added.Output);
+        return await AddedAsync(db, user, added.Output, ct);
+    }
+
+    // Waiting for the person, or over: expired, declined, or anything else GitHub says.
+    private static async Task<Result<SignInProgress>> NotYetAsync(AgentAccountsDbContext db, CodeSignIn signIn, GitHubDevicePoll poll, DateTimeOffset now, CancellationToken ct)
+    {
+        bool waiting = poll.Error is "authorization_pending" or "slow_down";
+        if (waiting)
+        {
+            signIn.Polled(poll.Interval, now);
+        }
+        else
+        {
+            db.CodeSignIns.Remove(signIn);
+        }
+
+        _ = await db.SaveAsync(ct);
+        return waiting
+            ? new Result<SignInProgress>(new SignInProgress(Account: null, signIn.Interval))
+            : new Result<SignInProgress>(AgentAccountsErrors.SignInNotFound);
+    }
+
+    private async Task<Result<SignInProgress>> AddedAsync(AgentAccountsDbContext db, UserActor user, AgentAccount account, CancellationToken ct)
+    {
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)
         {
-            return new Result<AgentAccountSummary>(saved.Error);
+            return new Result<SignInProgress>(saved.Error);
         }
 
         CaptureAdded(user.UserId, account);
-        return new Result<AgentAccountSummary>(account.ToSummary());
+        return new Result<SignInProgress>(new SignInProgress(account.ToSummary(), TimeSpan.Zero));
     }
 }

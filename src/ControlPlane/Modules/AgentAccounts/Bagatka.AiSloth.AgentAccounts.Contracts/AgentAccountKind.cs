@@ -11,7 +11,7 @@ public enum AgentAccountKind
     /// </summary>
     AnthropicApiKey = 1,
 
-    /// <summary>A GitHub fine-grained personal access token with the Copilot Requests permission, drawing on its owner's Copilot plan. Personal only.</summary>
+    /// <summary>A GitHub Copilot plan, added by signing in at GitHub with a code; its token reaches only the owner's Copilot. Personal only.</summary>
     CopilotPlan = 2,
 
     /// <summary>

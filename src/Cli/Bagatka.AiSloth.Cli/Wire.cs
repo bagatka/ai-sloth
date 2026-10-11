@@ -41,11 +41,13 @@ internal static class Wire
 
     internal sealed record AddAccount(string Kind, string Name, string Secret, Uri? Endpoint);
 
-    internal sealed record StartAccountSignIn(string Kind, string Name, Uri Callback);
+    internal sealed record StartAccountSignIn(string Kind, string Name, Uri? Callback);
 
-    internal sealed record AccountSignInStarted(Guid Id, Uri Url, DateTimeOffset ExpiresAt);
+    internal sealed record AccountSignInStarted(Guid Id, Uri Url, string? UserCode, DateTimeOffset ExpiresAt, TimeSpan Interval);
 
-    internal sealed record CompleteAccountSignIn(Uri ReturnedTo);
+    internal sealed record CompleteAccountSignIn(Uri? ReturnedTo);
+
+    internal sealed record AccountSignInProgress(Account? Account, TimeSpan RetryAfter);
 
     internal sealed record Harness(string Id, string Name, IReadOnlyList<string> Accepts, IReadOnlyList<string> ThinkingLevels, string DefaultThinking);
 

@@ -20,9 +20,9 @@ internal static class AgentAccountsEndpoints
 {
     internal sealed record AddAgentAccountRequest(AgentAccountKind Kind, string Name, string Secret, Uri? Endpoint = null);
 
-    internal sealed record StartSignInRequest(AgentAccountKind Kind, string Name, Uri Callback);
+    internal sealed record StartSignInRequest(AgentAccountKind Kind, string Name, Uri? Callback = null);
 
-    internal sealed record CompleteSignInRequest(Uri ReturnedTo);
+    internal sealed record CompleteSignInRequest(Uri? ReturnedTo = null);
 
     public static RouteGroupBuilder MapAgentAccountsEndpoints(this IEndpointRouteBuilder app)
     {
@@ -72,9 +72,9 @@ internal static class AgentAccountsEndpoints
     }
 
     /// <summary>
-    /// Adds the caller's own account at an agent vendor with its secret, such as an API key or a Copilot
-    /// token; only the caller can run agents on it. The secret is never shown again. A ChatGPT plan is
-    /// added by signing in instead (<c>POST /agent-accounts/sign-ins</c>).
+    /// Adds the caller's own account at an agent vendor with its secret, such as an API key or a Claude
+    /// plan's token; only the caller can run agents on it. The secret is never shown again. ChatGPT and
+    /// Copilot plans are added by signing in instead (<c>POST /agent-accounts/sign-ins</c>).
     /// </summary>
     private static async Task<Results<Created<AgentAccountSummary>, ProblemHttpResult>> AddOwn(
         [FromBody] AddAgentAccountRequest request,
@@ -110,10 +110,11 @@ internal static class AgentAccountsEndpoints
     }
 
     /// <summary>
-    /// Starts adding the caller's own ChatGPT plan by signing in with ChatGPT. Listen on the callback,
-    /// an <c>http://127.0.0.1:&lt;port&gt;/auth/callback</c> address on the caller's computer, open the
-    /// returned URL in a browser, then complete the sign-in with the address the browser came back to,
-    /// within ten minutes.
+    /// Starts adding the caller's own plan by signing in at its vendor. A ChatGPT plan: listen on the
+    /// callback, an <c>http://127.0.0.1:&lt;port&gt;/auth/callback</c> address on the caller's computer,
+    /// open the returned URL in a browser, then complete the sign-in with the address the browser came
+    /// back to, within ten minutes. A Copilot plan, without a callback: the person enters the returned
+    /// code at the returned URL, GitHub's, while the caller completes the sign-in every interval.
     /// </summary>
     private static async Task<Results<Ok<SignInStarted>, ProblemHttpResult>> StartSignIn(
         [FromBody] StartSignInRequest request,
@@ -127,19 +128,20 @@ internal static class AgentAccountsEndpoints
     }
 
     /// <summary>
-    /// Completes a sign-in with the whole address the browser came back to, and adds the account. A
-    /// failed or expired sign-in starts again.
+    /// Completes a sign-in, adding the account: with the whole address the browser came back to, or,
+    /// for a sign-in with a code and without a body, once the person approved it; until then, the
+    /// progress says when to ask again. A failed or expired sign-in starts again.
     /// </summary>
-    private static async Task<Results<Created<AgentAccountSummary>, ProblemHttpResult>> CompleteSignIn(
+    private static async Task<Results<Ok<SignInProgress>, ProblemHttpResult>> CompleteSignIn(
         [FromRoute] Guid id,
-        [FromBody] CompleteSignInRequest request,
+        [FromBody] CompleteSignInRequest? request,
         ClaimsPrincipal principal,
         [FromServices] IAgentAccountsApi api,
         CancellationToken ct)
     {
-        CompleteSignIn command = new CompleteSignIn(SignInId.From(id), request.ReturnedTo);
-        Result<AgentAccountSummary> result = await api.CompleteSignInAsync(principal.ToActor(), command, ct);
-        return result.ToCreated(PathOf);
+        CompleteSignIn command = new CompleteSignIn(SignInId.From(id), request?.ReturnedTo);
+        Result<SignInProgress> result = await api.CompleteSignInAsync(principal.ToActor(), command, ct);
+        return result.ToOk();
     }
 
     private static string PathOf(AgentAccountSummary account)

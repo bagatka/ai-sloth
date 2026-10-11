@@ -1601,19 +1601,25 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CompleteSignInRequest"
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CompleteSignInRequest"
+                  }
+                ]
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
-          "201": {
-            "description": "Created",
+          "200": {
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AgentAccountSummary"
+                  "$ref": "#/components/schemas/SignInProgress"
                 }
               }
             }
@@ -3332,13 +3338,13 @@
         "description": "Who commits in a person\u0027s nooks name: the author and the committer, and the co-author line added to\nevery message, if any."
       },
       "CompleteSignInRequest": {
-        "required": [
-          "returnedTo"
-        ],
         "type": "object",
         "properties": {
           "returnedTo": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uri"
           }
         }
@@ -5041,11 +5047,39 @@
           }
         }
       },
+      "SignInProgress": {
+        "required": [
+          "account",
+          "retryAfter"
+        ],
+        "type": "object",
+        "properties": {
+          "account": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The account, once added.",
+                "$ref": "#/components/schemas/AgentAccountSummary"
+              }
+            ]
+          },
+          "retryAfter": {
+            "pattern": "^-?(\\d\u002B\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": "string",
+            "description": "How long to wait before completing it again, while there is no account."
+          }
+        },
+        "description": "How a sign-in stands: the account, once added; until then, the person hasn\u0027t approved its code yet,\nand the caller completes it again after RetryAfter."
+      },
       "SignInStarted": {
         "required": [
           "id",
           "url",
-          "expiresAt"
+          "userCode",
+          "expiresAt",
+          "interval"
         ],
         "type": "object",
         "properties": {
@@ -5058,13 +5092,25 @@
             "description": "The vendor\u0027s sign-in page.",
             "format": "uri"
           },
+          "userCode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the person enters there, such as \u0060WDJB-MJHT\u0060, for a sign-in with a code."
+          },
           "expiresAt": {
             "type": "string",
             "description": "When the sign-in can no longer complete.",
             "format": "date-time"
+          },
+          "interval": {
+            "pattern": "^-?(\\d\u002B\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": "string",
+            "description": "How long to wait before completing a sign-in with a code; zero otherwise."
           }
         },
-        "description": "A sign-in in progress: open Url in the person\u0027s browser, then pass the address the\nbrowser returns to on to complete the sign-in before ExpiresAt."
+        "description": "A sign-in in progress, until ExpiresAt: the person opens Url.\nWith a UserCode (a Copilot plan, at GitHub), they enter it there and approve,\nwhile the caller completes the sign-in every Interval until it is done. Without one\n(a ChatGPT plan), the caller completes it once, with the address the browser returned to."
       },
       "SourceChanges": {
         "required": [
@@ -5199,8 +5245,7 @@
       "StartSignInRequest": {
         "required": [
           "kind",
-          "name",
-          "callback"
+          "name"
         ],
         "type": "object",
         "properties": {
@@ -5211,7 +5256,10 @@
             "type": "string"
           },
           "callback": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uri"
           }
         }

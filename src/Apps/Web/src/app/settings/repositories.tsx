@@ -19,22 +19,15 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Spinner } from "@/components/ui/spinner"
 import { toast } from "@/components/ui/toast"
-import { answer, api, messageOf, seconds, type Schemas } from "../api"
+import { answer, api, messageOf, type Schemas } from "../api"
 import {
   availableRepositories,
   gitHubAccount,
   repositories as repositoriesQuery,
 } from "../queries"
-import {
-  CopyableCode,
-  NoRows,
-  RemoveButton,
-  Row,
-  Rows,
-  Section,
-} from "./section"
+import { aborted, CodeSteps, waitForCode } from "./code-sign-in"
+import { NoRows, RemoveButton, Row, Rows, Section } from "./section"
 
 // Repositories: the GitHub repositories a workspace's chats can start with. Each person connects
 // their own GitHub account, through the host's GitHub App: managers add the repositories it
@@ -172,7 +165,23 @@ function ConnectGitHub() {
     },
   })
   const approve = useMutation({
-    mutationFn: waitForApproval,
+    mutationFn: ({
+      started,
+      signal,
+    }: {
+      started: Schemas["GitHubConnectionStarted"]
+      signal: AbortSignal
+    }) =>
+      waitForCode(
+        started,
+        () =>
+          answer(
+            api.POST("/github/connections/{id}/complete", {
+              params: { path: { id: started.id } },
+            })
+          ),
+        signal
+      ),
     onSuccess: (account) => {
       if (!account) {
         return
@@ -234,70 +243,14 @@ function ConnectGitHub() {
             </Button>
           </>
         ) : (
-          <>
-            <CopyableCode code={start.data.userCode} />
-            <a
-              href={start.data.verificationUri}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonVariants({ className: "w-full" })}
-            >
-              Open GitHub
-              <ArrowSquareOutIcon data-icon="inline-end" />
-            </a>
-            <p
-              role="status"
-              className="flex items-center gap-2 text-label text-muted-foreground"
-            >
-              <Spinner className="size-3.5" />
-              Waiting for you to approve it at GitHub
-            </p>
-          </>
+          <CodeSteps
+            code={start.data.userCode}
+            url={start.data.verificationUri}
+          />
         )}
       </DialogContent>
     </Dialog>
   )
-}
-
-type Started = Schemas["GitHubConnectionStarted"]
-
-async function waitForApproval({
-  started,
-  signal,
-}: {
-  started: Started
-  signal: AbortSignal
-}): Promise<Schemas["GitHubAccount"] | null> {
-  // GitHub says how often to ask; never more than once a second.
-  let wait = Math.max(1, seconds(started.interval) ?? 5)
-  while (Date.now() < Date.parse(started.expiresAt)) {
-    await delay(wait * 1000, signal)
-    const progress = await answer(
-      api.POST("/github/connections/{id}/complete", {
-        params: { path: { id: started.id } },
-      })
-    )
-    if (progress.account) {
-      return progress.account
-    }
-    wait = Math.max(1, seconds(progress.retryAfter) ?? wait)
-  }
-  // The code expired before anyone approved it.
-  return null
-}
-
-function delay(milliseconds: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(resolve, milliseconds)
-    signal.addEventListener("abort", () => {
-      window.clearTimeout(timer)
-      reject(signal.reason)
-    })
-  })
-}
-
-function aborted(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError"
 }
 
 // Adding repositories the person's GitHub connection reaches. One that isn't listed needs the

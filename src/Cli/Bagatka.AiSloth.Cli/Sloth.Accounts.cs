@@ -162,9 +162,14 @@ internal sealed partial class Sloth
     }
 
     // A plan added by signing in at its vendor in the person's browser, which comes back to sloth;
-    // the host finishes the sign-in with the address it came back to.
+    // the host finishes the sign-in with the address it came back to. Or with a code, entered there.
     private async Task<Wire.Account?> SignInAccountAsync(HostApi api, AccountKinds.Kind kind, string name, CancellationToken ct)
     {
+        if (kind.WithCode)
+        {
+            return await SignInWithCodeAsync(api, kind, name, ct);
+        }
+
         using LoopbackCallback callback = LoopbackCallback.Start();
         Wire.AccountSignInStarted started = await api.SendAsync(
             HttpMethod.Post,
@@ -179,13 +184,51 @@ internal sealed partial class Sloth
             return null;
         }
 
-        return await api.SendAsync(
+        Wire.AccountSignInProgress progress = await api.SendAsync(
             HttpMethod.Post,
             "/agent-accounts/sign-ins/" + started.Id + "/complete",
             new Wire.CompleteAccountSignIn(returned),
             CliJsonContext.Default.CompleteAccountSignIn,
-            CliJsonContext.Default.Account,
+            CliJsonContext.Default.AccountSignInProgress,
             ct);
+        return progress.Account;
+    }
+
+    // A plan added by signing in with a code: the person enters it at the vendor's page, while sloth
+    // asks the host whether they have, as often as the vendor allows.
+    private async Task<Wire.Account?> SignInWithCodeAsync(HostApi api, AccountKinds.Kind kind, string name, CancellationToken ct)
+    {
+        Wire.AccountSignInStarted started = await api.SendAsync(
+            HttpMethod.Post,
+            "/agent-accounts/sign-ins",
+            new Wire.StartAccountSignIn(kind.HostKind, name, Callback: null),
+            CliJsonContext.Default.StartAccountSignIn,
+            CliJsonContext.Default.AccountSignInStarted,
+            ct);
+        await terminal.WriteLineAsync("Open " + started.Url + " and enter " + started.UserCode + " to add your " + kind.Name + ".");
+        await openBrowser(started.Url, ct);
+
+        TimeSpan wait = started.Interval;
+        while (time.GetUtcNow() < started.ExpiresAt)
+        {
+            await Task.Delay(wait > MinPollWait ? wait : MinPollWait, time, ct);
+            Wire.AccountSignInProgress progress = await api.SendAsync(
+                HttpMethod.Post,
+                "/agent-accounts/sign-ins/" + started.Id + "/complete",
+                new Wire.CompleteAccountSignIn(ReturnedTo: null),
+                CliJsonContext.Default.CompleteAccountSignIn,
+                CliJsonContext.Default.AccountSignInProgress,
+                ct);
+            if (progress.Account is not null)
+            {
+                return progress.Account;
+            }
+
+            wait = progress.RetryAfter;
+        }
+
+        await terminal.FailAsync("The code expired before " + kind.SignsInWith + " said you approved. Start again: sloth account add " + kind.Id);
+        return null;
     }
 
     private async Task<int> RemoveAccountAsync(string name, CancellationToken ct)

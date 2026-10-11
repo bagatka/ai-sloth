@@ -1804,19 +1804,19 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody: {
+            requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["CompleteSignInRequest"];
+                    "application/json": null | components["schemas"]["CompleteSignInRequest"];
                 };
             };
             responses: {
-                /** @description Created */
-                201: {
+                /** @description OK */
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AgentAccountSummary"];
+                        "application/json": components["schemas"]["SignInProgress"];
                     };
                 };
             };
@@ -3177,7 +3177,7 @@ export interface components {
         };
         CompleteSignInRequest: {
             /** Format: uri */
-            returnedTo: string;
+            returnedTo?: null | string;
         };
         CreateInviteRequest: {
             access: components["schemas"]["AccessLevel"];
@@ -3858,8 +3858,19 @@ export interface components {
             inviteSignUp: boolean;
         };
         /**
-         * @description A sign-in in progress: open Url in the person's browser, then pass the address the
-         *     browser returns to on to complete the sign-in before ExpiresAt.
+         * @description How a sign-in stands: the account, once added; until then, the person hasn't approved its code yet,
+         *     and the caller completes it again after RetryAfter.
+         */
+        SignInProgress: {
+            account: null | components["schemas"]["AgentAccountSummary"];
+            /** @description How long to wait before completing it again, while there is no account. */
+            retryAfter: string;
+        };
+        /**
+         * @description A sign-in in progress, until ExpiresAt: the person opens Url.
+         *     With a UserCode (a Copilot plan, at GitHub), they enter it there and approve,
+         *     while the caller completes the sign-in every Interval until it is done. Without one
+         *     (a ChatGPT plan), the caller completes it once, with the address the browser returned to.
          */
         SignInStarted: {
             /** @description The sign-in. */
@@ -3869,11 +3880,15 @@ export interface components {
              * @description The vendor's sign-in page.
              */
             url: string;
+            /** @description What the person enters there, such as `WDJB-MJHT`, for a sign-in with a code. */
+            userCode: null | string;
             /**
              * Format: date-time
              * @description When the sign-in can no longer complete.
              */
             expiresAt: string;
+            /** @description How long to wait before completing a sign-in with a code; zero otherwise. */
+            interval: string;
         };
         /** @description What one of a nook's repositories changed since it was copied in. */
         SourceChanges: {
@@ -3922,7 +3937,7 @@ export interface components {
             kind: components["schemas"]["AgentAccountKind"];
             name: string;
             /** Format: uri */
-            callback: string;
+            callback?: null | string;
         };
         TokenRequest: {
             code: string;

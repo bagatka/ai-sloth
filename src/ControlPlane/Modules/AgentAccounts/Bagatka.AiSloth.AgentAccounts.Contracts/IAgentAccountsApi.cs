@@ -19,8 +19,8 @@ public interface IAgentAccountsApi
 
     /// <summary>
     /// Adds an account with its secret: to a workspace, by one of its managers, or as the actor's own.
-    /// Plans are personal only. An API key may name another endpoint than its vendor's. A ChatGPT plan
-    /// is added by signing in instead (<see cref="StartSignInAsync"/>).
+    /// Plans are personal only. An API key may name another endpoint than its vendor's. ChatGPT and
+    /// Copilot plans are added by signing in instead (<see cref="StartSignInAsync"/>).
     /// </summary>
     /// <returns>
     /// The account; a validation error for an invalid name, secret, or endpoint, or a kind that can't be
@@ -30,25 +30,31 @@ public interface IAgentAccountsApi
     public Task<Result<AgentAccountSummary>> AddAsync(Actor actor, AddAgentAccount command, CancellationToken ct);
 
     /// <summary>
-    /// Starts adding the actor's own account by signing in at its vendor, for kinds added this way: a
-    /// ChatGPT plan. Open the answer's URL in the person's browser; the vendor sends it back to the
-    /// callback, and <see cref="CompleteSignInAsync"/> finishes. A sign-in expires after ten minutes.
+    /// Starts adding the actor's own account by signing in at its vendor, for kinds added this way. A
+    /// ChatGPT plan: open the answer's URL in the person's browser; ChatGPT sends it back to the
+    /// callback, and <see cref="CompleteSignInAsync"/> finishes, within ten minutes. A Copilot plan: the
+    /// person enters the answer's code at GitHub's URL, while <see cref="CompleteSignInAsync"/> asks
+    /// whether they have, until the code expires. Asks GitHub for the code.
     /// </summary>
     /// <returns>
-    /// The sign-in; a validation error for an invalid name, a callback the vendor can't return to, or a
-    /// kind added with its secret or that this deployment doesn't allow; forbidden for anyone but a person.
+    /// The sign-in; a validation error for an invalid name, a callback the vendor can't return to (or
+    /// any, for a sign-in with a code), or a kind added with its secret or that this deployment doesn't
+    /// allow; forbidden for anyone but a person.
     /// </returns>
     public Task<Result<SignInStarted>> StartSignInAsync(Actor actor, StartSignIn command, CancellationToken ct);
 
     /// <summary>
-    /// Finishes a sign-in with the address the person's browser returned to, and adds the account. The
-    /// vendor's answer is used once: a failed sign-in starts again.
+    /// Finishes a sign-in and adds the account: with the address the person's browser returned to, or,
+    /// with a code, once they approved it at GitHub; until then the progress says when to ask again,
+    /// and asking sooner waits until then. The vendor's answer is used once: a failed sign-in starts
+    /// again.
     /// </summary>
     /// <returns>
-    /// The account; a validation error when the person declined, didn't allow the app to use their plan,
-    /// or the vendor refused the answer; or <see cref="AgentAccountsErrors.SignInNotFound"/>.
+    /// The progress; a validation error when the person declined, didn't allow the app to use their
+    /// plan, or the vendor refused the answer; or <see cref="AgentAccountsErrors.SignInNotFound"/>,
+    /// also once a code expired or was declined.
     /// </returns>
-    public Task<Result<AgentAccountSummary>> CompleteSignInAsync(Actor actor, CompleteSignIn command, CancellationToken ct);
+    public Task<Result<SignInProgress>> CompleteSignInAsync(Actor actor, CompleteSignIn command, CancellationToken ct);
 
     /// <summary>
     /// The accounts the actor can use in the workspace: the workspace's, for people with Write on it,

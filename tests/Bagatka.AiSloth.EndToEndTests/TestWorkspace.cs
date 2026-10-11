@@ -47,6 +47,19 @@ internal sealed class TestWorkspace
     }
 
     /// <summary>
+    /// The person's own Copilot plan, added by signing in with a code, which they approve at GitHub as
+    /// <paramref name="login"/>.
+    /// </summary>
+    public static async Task<AgentAccountSummary> AddCopilotPlanAsync(ControlPlane app, HttpClient person, string login)
+    {
+        SignInStarted started = await Api.ReadAsync<SignInStarted>(person.SendPostAsync("/agent-accounts/sign-ins", new { kind = "CopilotPlan", name = "My Copilot" }), HttpStatusCode.OK);
+        app.GitHub.Approve(started.UserCode!, login);
+        SignInProgress progress = await Api.ReadAsync<SignInProgress>(person.SendPostAsync(Paths.SignIn(started.Id) + "/complete", new { }), HttpStatusCode.OK);
+        Assert.NotNull(progress.Account);
+        return progress.Account;
+    }
+
+    /// <summary>
     /// A chat in a nook of its own: with the repository, or a copy of another chat's files, on the model
     /// given or else <see cref="AnyModel"/>, thinking <see cref="AnyThinking"/>.
     /// </summary>

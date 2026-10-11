@@ -51,7 +51,7 @@ public sealed class GitHubClient : IDisposable
         return new Uri(Settings.WebUrl, "apps/" + Uri.EscapeDataString(appSlug) + "/installations/new");
     }
 
-    /// <summary>Starts a device flow sign-in for the app (its "Enable Device Flow" setting must be on).</summary>
+    /// <summary>Starts a device flow sign-in for the app, a GitHub App or an OAuth app (its "Enable Device Flow" setting must be on).</summary>
     public async Task<GitHubDeviceCode> RequestDeviceCodeAsync(string clientId, CancellationToken ct)
     {
         using HttpResponseMessage response = await PostFormAsync("login/device/code", new Dictionary<string, string>(StringComparer.Ordinal) { ["client_id"] = clientId }, ct).ConfigureAwait(false);

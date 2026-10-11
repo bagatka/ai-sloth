@@ -26,6 +26,7 @@ namespace Bagatka.AiSloth.Cli;
 [JsonSerializable(typeof(Wire.StartAccountSignIn))]
 [JsonSerializable(typeof(Wire.AccountSignInStarted))]
 [JsonSerializable(typeof(Wire.CompleteAccountSignIn))]
+[JsonSerializable(typeof(Wire.AccountSignInProgress))]
 [JsonSerializable(typeof(IReadOnlyList<Wire.Harness>))]
 [JsonSerializable(typeof(IReadOnlyList<Wire.Provider>))]
 [JsonSerializable(typeof(IReadOnlyList<Wire.Secret>))]

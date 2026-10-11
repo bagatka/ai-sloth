@@ -36,6 +36,7 @@ public sealed class WebSetupJourney(ControlPlane app)
         {
             await SignsInForTheFirstTimeAndIsAskedForAnAgentAccountAsync(page, erin);
             await AddsAnAgentAccountForTheirWorkspaceAsync(page);
+            await AddsTheirCopilotPlanWithACodeAsync(page, erin);
             await ConnectsGitHubAndAddsARepositoryAsync(page, erin, owner);
             await SetsASecretAsync(page);
             await WritesInstructionsForEveryAgentAsync(page);
@@ -77,6 +78,27 @@ public sealed class WebSetupJourney(ControlPlane app)
 
         await Assertions.Expect(accounts.GetByText("Team key")).ToBeVisibleAsync(WebBrowser.Shown);
         await Assertions.Expect(accounts.GetByText("Anthropic API key")).ToBeVisibleAsync();
+    }
+
+    // A Copilot plan of their own, with GitHub's device flow: the dialog shows the code, which they
+    // approve at GitHub.
+    private async Task AddsTheirCopilotPlanWithACodeAsync(IPage page, string login)
+    {
+        ILocator accounts = Section(page, "Agent accounts");
+        await accounts.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Add" }).ClickAsync();
+        ILocator dialog = page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "Add an agent account" });
+        await dialog.GetByRole(AriaRole.Combobox, new LocatorGetByRoleOptions { Name = "Kind" }).ClickAsync();
+        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "Copilot plan" }).ClickAsync();
+        await dialog.GetByLabel("Name").FillAsync("My Copilot");
+        await dialog.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Sign in with GitHub" }).ClickAsync();
+        ILocator code = dialog.Locator("code");
+        await Assertions.Expect(code).ToBeVisibleAsync(WebBrowser.Shown);
+        await WebBrowser.ShotAsync(page, "setup-copilot-code");
+        string shown = await code.InnerTextAsync();
+        app.GitHub.Approve(shown, login);
+
+        await Assertions.Expect(accounts.GetByText("My Copilot")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(dialog).ToBeHiddenAsync();
     }
 
     // GitHub's device flow: the page shows the code, which the person approves at GitHub.

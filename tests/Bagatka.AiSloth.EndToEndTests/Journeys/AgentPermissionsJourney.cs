@@ -127,8 +127,7 @@ public sealed class AgentPermissionsJourney(ControlPlane app) : IDisposable
 
     private async Task ARefusedTokenEndsTheTurnWithTheReasonAsync(TestWorkspace acme)
     {
-        AgentAccountSummary copilot = await Api.ReadAsync<AgentAccountSummary>(
-            _alice.SendPostAsync("/agent-accounts", new { kind = "CopilotPlan", name = "My Copilot", secret = "github_pat_not_a_real_token" }), HttpStatusCode.Created);
+        AgentAccountSummary copilot = await TestWorkspace.AddCopilotPlanAsync(app, _alice, "alice-gh");
         ChatSummary chat = await acme.StartChatAsync("copilot", copilot.Id);
         await using ChatWatch watch = await ChatWatch.OpenAsync(_alice, chat);
 

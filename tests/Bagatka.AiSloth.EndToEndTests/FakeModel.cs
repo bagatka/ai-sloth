@@ -307,7 +307,7 @@ internal sealed class FakeModel : IAsyncDisposable
     private static IResult CopilotModels(HttpContext context)
     {
         string? authorization = context.Request.Headers.Authorization.FirstOrDefault();
-        if (authorization?.StartsWith("Bearer github_pat_", StringComparison.Ordinal) != true || !context.Request.Headers.ContainsKey("Copilot-Integration-Id"))
+        if (authorization?.StartsWith("Bearer gho_", StringComparison.Ordinal) != true || !context.Request.Headers.ContainsKey("Copilot-Integration-Id"))
         {
             return Results.Unauthorized();
         }

@@ -213,6 +213,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
             .WithEnvironment("Modules__AgentAccounts__ChatGptApi", Model.OpenAIUrl.AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__OpenRouterApi", Model.Url.AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__CopilotApi", new Uri(Model.Url, "copilot").AbsoluteUri)
+            .WithEnvironment("Modules__AgentAccounts__CopilotClientId", FakeGitHub.CopilotClientId)
             .WithEnvironment("GitHub__ApiUrl", GitHub.ApiUrl.AbsoluteUri)
             .WithEnvironment("GitHub__WebUrl", GitHub.Url.AbsoluteUri);
         foreach ((string name, string value) in _environment)

@@ -8,6 +8,7 @@ using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
+using Bagatka.Sdk.GitHub;
 using Bagatka.Sdk.OpenAI;
 using Microsoft.EntityFrameworkCore;
 
@@ -51,17 +52,27 @@ internal sealed partial class AgentAccountsApi
             return new Result<SignInStarted>(name.Error);
         }
 
-        bool returnsThere = command.Callback.AbsoluteUri.Length <= SignIn.MaxCallbackLength && ChatGptSignInClient.AcceptsRedirect(command.Callback);
-        if (!returnsThere)
+        // Maintenance, without rules: the person's sign-ins that can no longer complete.
+        DateTimeOffset now = time.GetUtcNow();
+        await db.SignIns.Where(old => old.UserId == user.UserId && old.ExpiresAt <= now).ExecuteDeleteAsync(ct);
+        await db.CodeSignIns.Where(old => old.UserId == user.UserId && old.ExpiresAt <= now).ExecuteDeleteAsync(ct);
+
+        if (KindRules.SignsInWithCode(command.Kind))
+        {
+            return await StartCodeSignInAsync(db, user, command, name.Output, ct);
+        }
+
+        return await StartChatGptSignInAsync(db, user, command, name.Output, ct);
+    }
+
+    private async Task<Result<SignInStarted>> StartChatGptSignInAsync(AgentAccountsDbContext db, UserActor user, StartSignIn command, AgentAccountName name, CancellationToken ct)
+    {
+        if (command.Callback is not Uri callback || callback.AbsoluteUri.Length > SignIn.MaxCallbackLength || !ChatGptSignInClient.AcceptsRedirect(callback))
         {
             return new Result<SignInStarted>(Error.Validation("callback", "ChatGPT returns only to http://127.0.0.1:<port>/auth/callback."));
         }
 
-        // Maintenance, without rules: the person's sign-ins that can no longer complete.
-        DateTimeOffset now = time.GetUtcNow();
-        await db.SignIns.Where(old => old.UserId == user.UserId && old.ExpiresAt <= now).ExecuteDeleteAsync(ct);
-
-        SignIn signIn = SignIn.Start(user.UserId, command.Kind, name.Output, command.Callback, box, time);
+        SignIn signIn = SignIn.Start(user.UserId, command.Kind, name, callback, box, time);
         db.SignIns.Add(signIn);
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)
@@ -72,6 +83,27 @@ internal sealed partial class AgentAccountsApi
         // OpenAI identifies each installation; this deployment's ID derives from its encryption key.
         string hostId = "urn:uuid:" + box.DeriveId("openai-agent-host").ToString("D", CultureInfo.InvariantCulture);
         Uri url = chatGpt.AuthorizationUrl(signIn.Authorization(AppName, hostId, box));
-        return new Result<SignInStarted>(new SignInStarted(signIn.Id, url, signIn.ExpiresAt));
+        return new Result<SignInStarted>(new SignInStarted(signIn.Id, url, UserCode: null, signIn.ExpiresAt, TimeSpan.Zero));
+    }
+
+    // A Copilot plan: the person enters GitHub's code for the host's Copilot app (Allowed means it has
+    // one) at GitHub.
+    private async Task<Result<SignInStarted>> StartCodeSignInAsync(AgentAccountsDbContext db, UserActor user, StartSignIn command, AgentAccountName name, CancellationToken ct)
+    {
+        if (command.Callback is not null)
+        {
+            return new Result<SignInStarted>(Error.Validation("callback", "A Copilot plan signs in with a code, which returns nowhere."));
+        }
+
+        GitHubDeviceCode code = await github.RequestDeviceCodeAsync(settings.CopilotClientId!, ct);
+        CodeSignIn signIn = CodeSignIn.Start(user.UserId, command.Kind, name, code, box, time);
+        db.CodeSignIns.Add(signIn);
+        Result saved = await db.SaveAsync(ct);
+        if (saved.Failed)
+        {
+            return new Result<SignInStarted>(saved.Error);
+        }
+
+        return new Result<SignInStarted>(signIn.ToStarted(code));
     }
 }

@@ -3,7 +3,7 @@
 Agent accounts are accounts at agent vendors that pay for agents' work: an API key for OpenAI's or
 Anthropic's API (at the vendor or at another endpoint that speaks it, such as a company's gateway),
 an OpenRouter key for many vendors' models, a ChatGPT plan added by signing in with ChatGPT, a
-Copilot plan, or a Claude plan. A workspace's
+Copilot plan added with a code entered at GitHub, or a Claude plan. A workspace's
 account serves everyone with Write on it; a personal account serves its owner, wherever they work.
 Secrets are encrypted at rest and never shown again, and the keys and plans of model APIs never enter
 a nook: the model gateway adds them to each call.
@@ -14,11 +14,12 @@ a nook: the model gateway adds them to each call.
   endpoint, when a sign-in ended, and the sealed secret; and sign-ins in progress.
 - **Rules:** who may add and remove them (Manage on the workspace, or the person), who may use them
   (Write on the workspace, or the person; the control plane's own processes, any), which kinds are
-  personal only (plans), which are added by signing in (ChatGPT plans), and which kinds this
+  personal only (plans), which are added by signing in (ChatGPT and Copilot plans), and which kinds this
   deployment allows. What each kind is at its vendor: where its calls go and which headers pay for
   them, or that its token goes to its harness.
 - **Integrations:** Sign in with ChatGPT, through `Bagatka.Sdk.OpenAI`: registering, exchanging the
-  code, renewing a plan's access token, and ending its session on removal. The vendors' lists of
+  code, renewing a plan's access token, and ending its session on removal. GitHub's device flow for
+  the host's Copilot app, through `Bagatka.Sdk.GitHub`. The vendors' lists of
   models: OpenAI's through `Bagatka.Sdk.OpenAI`, Anthropic's through `Bagatka.Sdk.Anthropic`,
   Copilot's through `Bagatka.Sdk.GitHub`, and OpenRouter's catalog through `Bagatka.Sdk.OpenRouter`.
 
@@ -43,7 +44,11 @@ Result<IReadOnlyList<AgentModel>> models = await accounts.ListModelsAsync(owner,
 
 // A ChatGPT plan: the caller listens on the callback and opens the URL in the person's browser.
 Result<SignInStarted> started = await accounts.StartSignInAsync(owner, new StartSignIn(AgentAccountKind.ChatGptPlan, "My ChatGPT", new Uri("http://127.0.0.1:1455/auth/callback")), ct);
-Result<AgentAccountSummary> plan = await accounts.CompleteSignInAsync(owner, new CompleteSignIn(started.Output.Id, returnedTo), ct);
+Result<SignInProgress> plan = await accounts.CompleteSignInAsync(owner, new CompleteSignIn(started.Output.Id, returnedTo), ct);
+
+// A Copilot plan: the person enters started.Output.UserCode at started.Output.Url, GitHub's; the
+// caller completes without an address every interval until plan.Output.Account is there.
+Result<SignInStarted> code = await accounts.StartSignInAsync(owner, new StartSignIn(AgentAccountKind.CopilotPlan, "My Copilot", Callback: null), ct);
 
 Result<AgentAccountCredential> used = await accounts.UseAsync(SystemActors.Harness, plan.Output.Id, workspaceId, ct);
 if (used.Failed)
@@ -76,6 +81,8 @@ Schema `agent_accounts`. Table `accounts` (kind, name, workspace or owner — a 
 exactly one — when it was added, an API key's endpoint, when a sign-in ended, and the sealed
 secret: a key or token as given, or a plan's session as JSON). Table `sign_ins` (who, the account's
 kind and name, the callback, the state and nonce, when it expires, and the sealed PKCE verifier).
+Table `code_sign_ins` (who, the account's kind and name, the sealed device code, when it expires,
+and when GitHub may be asked next).
 
 ## Background work
 
@@ -91,8 +98,10 @@ None. A plan's access token is renewed when it is used and due, never in the bac
 - `AllowChatGptPlans`, off: OpenAI lets open-source and self-hosted deployments use Sign in with
   ChatGPT; a hosted service for other people needs OpenAI's approval first. The AppHost turns it on,
   since a local run is self-hosted;
-- `ChatGptAuthority`, `ChatGptApi`, and `OpenRouterApi`, the vendors' own by default; tests point
-  them at fakes.
+- `CopilotClientId`, the GitHub OAuth app people sign in to for their Copilot plans; without it,
+  Copilot plans can't be added;
+- `ChatGptAuthority`, `ChatGptApi`, `OpenRouterApi`, and `CopilotApi`, the vendors' own by
+  default; tests point them at fakes. GitHub itself is the host's `GitHubClient`'s.
 
 ## Decisions and constraints
 
@@ -122,6 +131,12 @@ None. A plan's access token is renewed when it is used and due, never in the bac
   so its claims are checked (issuer, audience, nonce, expiry) without its signature, as OpenID Connect
   allows. The person must allow the app to use their plan; a sign-in without it adds nothing. OpenAI
   identifies each installation: this deployment's ID derives from its encryption key.
+- **Copilot plans sign in to an app of their own.** Copilot's token goes into the nook, to the
+  agent, so it must reach nothing else. The host's GitHub App can write to the person's
+  repositories, and its tokens expire within eight hours, which a running agent can outlive. So
+  Copilot plans sign in, with GitHub's device flow, to a GitHub OAuth app that asks for no scopes:
+  its token reaches the person's Copilot and public data only, and never expires. Its client ID is
+  public, so every host can use the same app; a token that expires anyway is refused.
 - **One renewal at a time per account.** A plan's access token lasts an hour; it is renewed when
   OpenAI asks (`earliest_refresh_at`), or shortly before it expires, on the next use. Every renewal
   replaces the refresh token and OpenAI refuses one used twice, so the renewal locks the account's

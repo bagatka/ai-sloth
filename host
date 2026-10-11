@@ -219,6 +219,11 @@ Modules__AgentAccounts__AllowChatGptPlans=true
 #Modules__Sources__GitHubApp__ClientSecret=
 #Modules__Sources__GitHubApp__Slug=
 
+# Copilot plans as agent accounts, which people add with a code at GitHub: the client ID of a GitHub
+# OAuth app (github.com/settings/applications/new) with Enable Device Flow on. It asks for no scopes,
+# so its tokens reach only people's Copilot; any callback URL will do, as nothing returns to it.
+#Modules__AgentAccounts__CopilotClientId=
+
 # Agent accounts whose model runs on this computer or its network, such as with Ollama: the host
 # forwards agents' model calls only to public addresses unless this is true.
 #ModelGateway__AllowPrivateNetworks=true
