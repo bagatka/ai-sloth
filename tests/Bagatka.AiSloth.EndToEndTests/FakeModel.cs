@@ -60,6 +60,7 @@ internal sealed class FakeModel : IAsyncDisposable
 
     private readonly WebApplication _app;
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan StreamLinger = TimeSpan.FromSeconds(1);
 
     private readonly ConcurrentDictionary<string, Hold> _holds = new ConcurrentDictionary<string, Hold>(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, byte> _refusedCopilot = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
@@ -315,6 +316,11 @@ internal sealed class FakeModel : IAsyncDisposable
 
         context.Response.ContentType = "text/event-stream";
         await context.Response.WriteAsync(EventStream(events), context.RequestAborted);
+
+        // The stream stays open a moment after its last event, so an agent that goes as soon as it
+        // has that event, as Codex does, goes before the stream ends.
+        await context.Response.Body.FlushAsync(context.RequestAborted);
+        await Task.WhenAny(Task.Delay(StreamLinger, context.RequestAborted));
     }
 
     // A ChatGPT plan's token, which the fake ChatGPT issues, gets the plan's catalog; any other caller

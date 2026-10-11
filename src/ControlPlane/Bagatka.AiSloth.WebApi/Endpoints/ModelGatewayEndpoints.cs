@@ -95,7 +95,11 @@ internal static class ModelGatewayEndpoints
         }
 
         // The agent has the whole answer before the call is recorded, which can't hold it up.
-        await context.Response.CompleteAsync();
+        if (!context.RequestAborted.IsCancellationRequested)
+        {
+            await context.Response.CompleteAsync();
+        }
+
         using CancellationTokenSource recording = new CancellationTokenSource(RecordingTimeout);
         Result recorded = await chats.RecordModelCallAsync(Actor.Anonymous, token, usage, headers, startedAt, recording.Token);
         if (recorded.Failed)
@@ -126,7 +130,9 @@ internal static class ModelGatewayEndpoints
         return headers;
     }
 
-    // Passes the answer to the agent as it comes, reading a successful one's usage on the way.
+    // Passes the answer to the agent as it comes, reading a successful one's usage on the way. An agent
+    // may go as soon as it has what it needs, as Codex does at the last event of a stream: what the
+    // answer reported until then is its usage all the same.
     private static async Task<ModelCallUsage?> RelayAsync(HttpContext context, HttpResponseMessage response)
     {
         bool streamed = string.Equals(response.Content.Headers.ContentType?.MediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase);
@@ -143,9 +149,13 @@ internal static class ModelGatewayEndpoints
                     break;
                 }
 
-                await context.Response.Body.WriteAsync(buffer.AsMemory(0, read), context.RequestAborted);
                 reader.Read(buffer.AsSpan(0, read));
+                await context.Response.Body.WriteAsync(buffer.AsMemory(0, read), context.RequestAborted);
             }
+        }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // The agent went; the answer it had is recorded below.
         }
         finally
         {
