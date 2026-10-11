@@ -10,9 +10,9 @@ chat (`src/Harnesses`).
 ## Owns
 
 - **Data:** chats, their messages and proposals, every event of every chat, workspaces' and people's
-  instructions, and drafts.
+  instructions, drafts, and people's presets.
 - **Rules:** who may read and write (the nook's access levels), whose messages reach the agent, which
-  harness and account a chat may run on, how a message reaches the agent (a new turn, steered into
+  harness, account, and model a chat may run on, how a message reaches the agent (a new turn, steered into
   the running one, or cancelled by a stop), that every turn ends with a checkpoint, when a new agent
   takes over a conversation, and which instructions and harness state an agent gets.
 - **Runtime state:** each busy chat's runner and the signals that wake watchers of a chat or of a
@@ -27,15 +27,15 @@ folders).
 
 ## Contract
 
-`IChatsApi`: members list the harnesses, start chats (each creating its nook, with the workspace's
-repositories or another chat's files, now or at a checkpoint), list chats or watch the list as it
-changes, send messages and send
-proposals on, stop the agent, watch a chat's events from any sequence number, set and read the
-instructions every agent gets, and list and forget their harness state. `IChatHarnessesApi` is the
+`IChatsApi`: members list the harnesses and the models each can run on with an account, start chats
+(each creating its nook, with the workspace's repositories or another chat's files, now or at a
+checkpoint, on a model or the harness's default), list chats or watch the list as it changes, send
+messages and send proposals on, stop the agent, watch a chat's events from any sequence number, set
+and read the instructions every agent gets, list and forget their harness state, and keep presets. `IChatHarnessesApi` is the
 model gateway's side.
 
 ```csharp
-Result<ChatSummary> started = await chats.StartAsync(alice, new StartChat(workspaceId, "docker", "codex", accountId, [new NookRepository(apiRepositoryId)], CopyOf: null, Checkpoint: null), ct);
+Result<ChatSummary> started = await chats.StartAsync(alice, new StartChat(workspaceId, "docker", "pi", openRouterKeyId, "openai/gpt-6-luna", [new NookRepository(apiRepositoryId)], CopyOf: null, Checkpoint: null), ct);
 Result<ChatMessage> sent = await chats.SendAsync(alice, new SendMessage(started.Output.Id, "Add a README", Proposal: null), ct);
 Result<IAsyncEnumerable<ChatEvent>> watch = await chats.WatchAsync(bob, new WatchChat(started.Output.Id, AfterSequence: 0), ct);
 // SetupStarted, SetupEnded, MessageSent, TurnStarted, AgentUpdate (ACP's session/update), ...,
@@ -50,10 +50,11 @@ AgentAccounts (the account a chat runs on, and who may use it).
 
 ## Data
 
-Schema `chats`: `chats` (one per nook; the agent's process, session, and how far its output is read;
-the turn in progress; `xmin` as concurrency token), `messages`, `events` (sequence numbers per chat;
-an agent update is stored as the agent sent it), `drafts`, `workspace_instructions`, and
-`personal_instructions`.
+Schema `chats`: `chats` (one per nook; its harness, account, and model; the agent's process, session,
+and how far its output is read; the turn in progress; `xmin` as concurrency token), `messages`,
+`events` (sequence numbers per chat; an agent update is stored as the agent sent it), `drafts`,
+`workspace_instructions`, `personal_instructions`, and `presets` (a person's harness, account, and
+model, each once).
 
 ## Background work
 
@@ -80,6 +81,14 @@ minutes unless given).
   seconds; the agent keeps working.
 - **The agent acts without asking inside its nook,** as `system:chats.harness`: its permission
   requests get their broadest allow.
+- **A model is the vendor's ID.** A chat runs on a model as its account's vendor names it, such as
+  `openai/gpt-6-luna` at OpenRouter, or on its harness's default. Only harnesses whose start script
+  takes one get it (`HarnessProfile.TakesModel`: Claude Code and pi). The models offered are the
+  vendor's that can call tools; a chat's model isn't checked against them, so a model the vendor
+  doesn't know fails its turns with the vendor's answer.
+- **Presets are personal.** A preset is someone's saved harness, account, and model, offered first
+  when they start a chat. It shows wherever its account works, and hides once the account is removed.
+  A person keeps at most 20.
 - **No model key or plan in a nook.** An agent gets the model gateway's URL and a token for its chat;
   the gateway forwards each call with the headers that pay for it. A plan's token tied to one harness,
   such as Copilot's, goes to the harness itself.

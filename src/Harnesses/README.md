@@ -14,20 +14,24 @@ speak. Nothing here knows AiSloth; Chats is its caller.
   load one, the file it reads its user's standing instructions from (`InstructionsPath`), and where
   it keeps what it writes for itself to use later (`StatePaths`: Claude Code's memory, which its start
   script puts in `~/.claude/memory` whatever folder it works in; never credentials, nor what its start
-  script writes).
+  script writes), and whether its start script runs it on a model it is given (`TakesModel`).
 - **Every harness starts the same way.** Its image provides `harness` (`HarnessProfile.Command`), its
-  start script from `start/<id>.sh`, and the host starts it with the same three variables
+  start script from `start/<id>.sh`, and the host starts it with the same variables
   (`HarnessProfile.EnvironmentFor`):
 
   | Variable | Value |
   |---|---|
-  | `HARNESS_CREDENTIAL` | `openai`, `anthropic`, `github-token`, or `claude-oauth-token` |
-  | `HARNESS_MODEL_URL` | the model gateway's URL, for `openai` and `anthropic` |
+  | `HARNESS_CREDENTIAL` | `openai`, `anthropic`, `openrouter`, `github-token`, or `claude-oauth-token` |
+  | `HARNESS_MODEL_URL` | the model gateway's URL, for `openai`, `anthropic`, and `openrouter` |
   | `HARNESS_TOKEN` | the gateway's token, or the harness's own token |
+  | `HARNESS_MODEL` | the model's ID as its vendor names it, when one was chosen (`IsModelId`) |
 
   The script translates them into its harness's own configuration (environment variables, a file,
   or its adapter's gateway sign-in) and runs it. A model API always goes through a model gateway, so
   the key or plan behind it never reaches the harness; only a token tied to one harness goes to it.
+  OpenRouter is one credential for two APIs: Claude Code calls its Anthropic API at the gateway's
+  root, with OpenRouter's newest Claude models behind its aliases, and pi its OpenAI chat API at
+  `/v1`. pi also runs on a Copilot plan, through its own GitHub Copilot provider.
 - `Acp` builds the messages a client sends and reads what a harness writes into an `AcpEvent`: an
   update, a request to answer, or the answer to one of the client's requests, already matched to it.
   A prompt or steer carries the caller's key, and its answer comes back with it. The request IDs

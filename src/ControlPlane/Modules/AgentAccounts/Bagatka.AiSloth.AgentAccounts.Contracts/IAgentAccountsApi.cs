@@ -58,6 +58,15 @@ public interface IAgentAccountsApi
     public Task<Result<IReadOnlyList<AgentAccountSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct);
 
     /// <summary>
+    /// The models the account's vendor offers, for choosing one per chat, newest first: OpenRouter's
+    /// catalog, without its batch variants. Other kinds list none yet, and their agents start on their
+    /// harness's default model. Reads the vendor's catalog each time, which throws when it can't be
+    /// reached; try again later.
+    /// </summary>
+    /// <returns>The models; or not found for anyone who may not use the account in the workspace.</returns>
+    public Task<Result<IReadOnlyList<AgentModel>>> ListModelsAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct);
+
+    /// <summary>
     /// Removes an account: a personal one by its owner, a workspace's by its managers. Agents already
     /// running with a token they hold keep it until they stop; calls through the model gateway stop at
     /// once. A sign-in's session at the vendor ends too, when the vendor can be reached.

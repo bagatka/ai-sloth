@@ -137,7 +137,11 @@ public sealed class ChatJourney(ControlPlane app) : IDisposable
         Assert.Equal([2, 1], listed.Items.Select(checkpoint => checkpoint.Number));
         Assert.Equal("Please write hello.txt for me", listed.Items[1].Note);
         Assert.Equal(("hi from the fake model\n", "changed\n"), (then, now));
-        Assert.All(app.Model.Credentials, credentials => Assert.Equal((FakeModel.ApiKey, (string?)null), (credentials.ApiKey, credentials.Authorization)));
+        // The gateway swaps a chat's token for its account's key: an Anthropic key here, or another
+        // journey's OpenRouter key on the same fake.
+        Assert.All(app.Model.Credentials, credentials => Assert.True(
+            credentials == (FakeModel.ApiKey, null) || credentials == (null, "Bearer " + FakeModel.OpenRouterKey),
+            "A model call carried " + (credentials.ApiKey ?? credentials.Authorization)));
     }
 
     private async Task AMessageSentWhileTheAgentWorksJoinsItsTurnAsync(TestWorkspace acme, ChatSummary chat, ChatWatch watch)

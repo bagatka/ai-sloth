@@ -7,6 +7,7 @@ using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.Sdk.OpenAI;
+using Bagatka.Sdk.OpenRouter;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -20,6 +21,7 @@ internal sealed partial class AgentAccountsApi(
     [FromKeyedServices(AgentAccountsDbContext.Schema)] SecretBox box,
     AgentAccountsSettings settings,
     ChatGptSignInClient chatGpt,
+    OpenRouterClient openRouter,
     IProductEvents productEvents,
     TimeProvider time,
     ILogger<AgentAccountsApi> logger) : IAgentAccountsApi

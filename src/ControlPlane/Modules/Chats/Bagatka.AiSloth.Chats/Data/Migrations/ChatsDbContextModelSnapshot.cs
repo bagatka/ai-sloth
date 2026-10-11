@@ -16,7 +16,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261008091529_Initial";
+    public override string LastMigrationId => "20261011083806_ChatModelsAndPresets";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -63,6 +63,11 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.Property<bool>("LoadingSession")
                     .HasColumnType("boolean")
                     .HasColumnName("loading_session");
+
+                b.Property<string>("Model")
+                    .HasMaxLength(200)
+                    .HasColumnType("character varying(200)")
+                    .HasColumnName("model");
 
                 b.Property<Guid>("NookId")
                     .HasColumnType("uuid")
@@ -235,6 +240,53 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasName("pk_personal_instructions");
 
                 b.ToTable("personal_instructions", "chats");
+            });
+
+        modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.Preset", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("uuid")
+                    .HasColumnName("id");
+
+                b.Property<DateTimeOffset>("AddedAt")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("added_at");
+
+                b.Property<Guid>("AgentAccountId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("agent_account_id");
+
+                b.Property<string>("Harness")
+                    .IsRequired()
+                    .HasMaxLength(32)
+                    .HasColumnType("character varying(32)")
+                    .HasColumnName("harness");
+
+                b.Property<string>("Model")
+                    .HasMaxLength(200)
+                    .HasColumnType("character varying(200)")
+                    .HasColumnName("model");
+
+                b.Property<string>("Name")
+                    .IsRequired()
+                    .HasMaxLength(64)
+                    .HasColumnType("character varying(64)")
+                    .HasColumnName("name");
+
+                b.Property<Guid>("OwnerId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("owner_id");
+
+                b.HasKey("Id")
+                    .HasName("pk_presets");
+
+                var index = b.HasIndex("OwnerId", "Harness", "AgentAccountId", "Model")
+                    .IsUnique()
+                    .HasDatabaseName("ix_presets_owner_id_harness_agent_account_id_model");
+
+                NpgsqlIndexBuilderExtensions.AreNullsDistinct(index, false);
+
+                b.ToTable("presets", "chats");
             });
 
         modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.StoredEvent", b =>

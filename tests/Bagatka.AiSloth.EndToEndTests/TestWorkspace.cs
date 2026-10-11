@@ -46,14 +46,14 @@ internal sealed class TestWorkspace
         return new TestWorkspace(app, person, workspace.Id, added.Id);
     }
 
-    /// <summary>A chat in a nook of its own: with the repository, or a copy of another chat's files, when given.</summary>
+    /// <summary>A chat in a nook of its own: with the repository, or a copy of another chat's files, and on the model, when given.</summary>
     public async Task<ChatSummary> StartChatAsync(
-        string harness = "claude-code", AgentAccountId? account = null, ChatId? copyOf = null, RepositoryId? repository = null, string provider = "docker")
+        string harness = "claude-code", AgentAccountId? account = null, ChatId? copyOf = null, RepositoryId? repository = null, string provider = "docker", string? model = null)
     {
         AgentAccountId paying = account ?? Account;
         object body = repository is RepositoryId chosen
-            ? new { provider, harness, account = paying, copyOf, repositories = new[] { new { repository = chosen } } }
-            : new { provider, harness, account = paying, copyOf };
+            ? new { provider, harness, account = paying, model, copyOf, repositories = new[] { new { repository = chosen } } }
+            : new { provider, harness, account = paying, model, copyOf };
         return await Api.ReadAsync<ChatSummary>(Person.SendPostAsync(Path + "/chats", body), HttpStatusCode.Created);
     }
 

@@ -54,7 +54,8 @@ internal sealed class AgentAccount
 
     public bool NeedsSignIn => SignInEndedAt is not null;
 
-    // An account added with its secret. Only API keys name an endpoint.
+    // An account added with its secret. Only Anthropic and OpenAI API keys name an endpoint: an
+    // OpenRouter key's is OpenRouter's.
     public static Result<AgentAccount> Add(WorkspaceId? workspaceId, UserId? ownerId, AgentAccountKind kind, AgentAccountName name, string? secret, ApiEndpoint? endpoint, SecretBox box, TimeProvider time)
     {
         string trimmed = (secret ?? string.Empty).Trim();
@@ -64,10 +65,10 @@ internal sealed class AgentAccount
             return new Result<AgentAccount>(Error.Validation("secret", message));
         }
 
-        bool isApiKey = kind is AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey;
-        if (endpoint is not null && !isApiKey)
+        bool namesEndpoint = kind is AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey;
+        if (endpoint is not null && !namesEndpoint)
         {
-            return new Result<AgentAccount>(Error.Validation("endpoint", "Only an API key names an endpoint."));
+            return new Result<AgentAccount>(Error.Validation("endpoint", "Only an Anthropic or OpenAI API key names an endpoint."));
         }
 
         AgentAccount account = new AgentAccount(AgentAccountId.New(), kind, name, workspaceId, ownerId, time.GetUtcNow(), endpoint);
@@ -117,16 +118,18 @@ internal sealed class AgentAccount
     }
 
     // What running an agent on the account takes. Model APIs are reached through the model gateway,
-    // which adds these headers; plan tokens tied to one harness go to it.
+    // which adds these headers; plan tokens tied to one harness go to it. OpenRouter's root serves
+    // Anthropic's Messages API at /v1/messages and OpenAI's at /v1, so each harness picks its own.
     // Not handled: Claude plans through the gateway; moving their token there needs a test against
     // Anthropic.
-    public AgentAccountCredential ToCredential(SecretBox box, Uri chatGptApi)
+    public AgentAccountCredential ToCredential(SecretBox box, AgentAccountsSettings settings)
     {
         AgentAccountAccess access = Kind switch
         {
             AgentAccountKind.AnthropicApiKey => Through(Endpoint?.Value ?? AnthropicApi, "x-api-key", OpenSecret(box)),
             AgentAccountKind.OpenAIApiKey => Through(Endpoint?.Value ?? OpenAIApi, "Authorization", "Bearer " + OpenSecret(box)),
-            AgentAccountKind.ChatGptPlan => Through(chatGptApi, "Authorization", "Bearer " + OpenSession(box).AccessToken),
+            AgentAccountKind.OpenRouterApiKey => Through(settings.OpenRouterApi, "Authorization", "Bearer " + OpenSecret(box)),
+            AgentAccountKind.ChatGptPlan => Through(settings.ChatGptApi, "Authorization", "Bearer " + OpenSession(box).AccessToken),
             AgentAccountKind.CopilotPlan or AgentAccountKind.ClaudePlan => new AgentAccountAccess(new HarnessToken(OpenSecret(box))),
         };
         return new AgentAccountCredential(Id, Kind, OwnerId, access);

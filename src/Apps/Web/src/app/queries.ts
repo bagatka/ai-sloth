@@ -80,6 +80,37 @@ export function agentAccounts(workspaceId: string) {
   })
 }
 
+/**
+ * The models a chat's agent can run on with the harness and the account, newest first; empty when
+ * the harness picks its own. The host reads the vendor's catalog each time, which changes rarely
+ * within a session.
+ */
+export function models(workspaceId: string, harness: string, account: string) {
+  return queryOptions({
+    queryKey: ["workspaces", workspaceId, "models", harness, account],
+    queryFn: () =>
+      answer(
+        api.GET("/workspaces/{workspaceId}/models", {
+          params: { path: { workspaceId }, query: { harness, account } },
+        })
+      ),
+    staleTime: 30 * 60_000,
+  })
+}
+
+/** Your presets that can start chats in the workspace, oldest first. */
+export function presets(workspaceId: string) {
+  return queryOptions({
+    queryKey: ["workspaces", workspaceId, "presets"],
+    queryFn: () =>
+      answer(
+        api.GET("/workspaces/{workspaceId}/presets", {
+          params: { path: { workspaceId } },
+        })
+      ),
+  })
+}
+
 /** Where the workspace's nooks can run, and whether each can start one now. */
 export function providers(workspaceId: string) {
   return queryOptions({

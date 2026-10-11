@@ -1,7 +1,8 @@
 # CLI
 
 `sloth`, a Native AOT command line over a host's public HTTP API: sign in to hosts, add agent
-accounts and secrets, connect GitHub and add repositories, start, follow, and steer chats, see
+accounts and secrets, keep presets and find models, connect GitHub and add repositories, start,
+follow, and steer chats, see
 and prepare the setup of their files, push their changes or download their files, now or at any
 checkpoint, start chats from another's checkpoint, set the instructions every agent gets, and see
 or forget harness state. Its machine mode runs a workspace's nooks on the computer it runs on. It

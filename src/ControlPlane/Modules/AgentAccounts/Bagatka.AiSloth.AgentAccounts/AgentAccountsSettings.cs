@@ -1,5 +1,6 @@
 using System;
 using Bagatka.Sdk.OpenAI;
+using Bagatka.Sdk.OpenRouter;
 
 namespace Bagatka.AiSloth.AgentAccounts;
 
@@ -19,17 +20,20 @@ public sealed record AgentAccountsSettings
     /// </param>
     /// <param name="chatGptAuthority">OpenAI's authorization server; <see langword="null"/> for <c>https://auth.openai.com</c>. Tests change it.</param>
     /// <param name="chatGptApi">The API a ChatGPT plan's calls go to; <see langword="null"/> for <c>https://api.openai.com/v1</c>. Tests change it.</param>
+    /// <param name="openRouterApi">OpenRouter's API, its models' calls and catalog; <see langword="null"/> for <c>https://openrouter.ai/api</c>. Tests change it.</param>
     public AgentAccountsSettings(
         bool allowClaudePlans = false,
         bool allowChatGptPlans = false,
         Uri? chatGptAuthority = null,
-        Uri? chatGptApi = null)
+        Uri? chatGptApi = null,
+        Uri? openRouterApi = null)
     {
         AllowClaudePlans = allowClaudePlans;
         AllowChatGptPlans = allowChatGptPlans;
         ChatGptAuthority = chatGptAuthority ?? new Uri("https://auth.openai.com");
         ChatGptApi = chatGptApi ?? ChatGptSignInClient.Resource;
         ChatGptSignIn = new ChatGptSignInSettings(ChatGptAuthority);
+        OpenRouterApi = openRouterApi ?? OpenRouterSettings.Public.ApiUrl;
     }
 
     /// <summary>Whether people may add Claude plans.</summary>
@@ -46,4 +50,7 @@ public sealed record AgentAccountsSettings
 
     /// <summary>The Sign in with ChatGPT client's settings.</summary>
     public ChatGptSignInSettings ChatGptSignIn { get; }
+
+    /// <summary>OpenRouter's API: where an OpenRouter key's calls go, and its catalog of models.</summary>
+    public Uri OpenRouterApi { get; }
 }

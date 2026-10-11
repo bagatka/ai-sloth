@@ -18,8 +18,9 @@ internal static class AccountKinds
         new Kind("chatgpt-plan", "ChatGptPlan", IsPlan: true, "ChatGPT plan", "ChatGPT Plus or Pro", SecretPrompt: null, SignsInWith: "ChatGPT", Endpoint: null),
         new Kind("claude-plan", "ClaudePlan", IsPlan: true, "Claude plan", "Claude Pro or Max", "Token from claude setup-token", SignsInWith: null, Endpoint: null),
         new Kind("copilot-plan", "CopilotPlan", IsPlan: true, "Copilot plan", "GitHub Copilot", "GitHub token with the Copilot Requests permission", SignsInWith: null, Endpoint: null),
-        new Kind("openai-api-key", "OpenAIApiKey", IsPlan: false, "OpenAI API key", "OpenAI's API, or any endpoint that speaks it", "API key", SignsInWith: null, "https://openrouter.ai/api/v1"),
-        new Kind("anthropic-api-key", "AnthropicApiKey", IsPlan: false, "Anthropic API key", "Anthropic's API, or any endpoint that speaks it", "API key", SignsInWith: null, "https://openrouter.ai/api"),
+        new Kind("openai-api-key", "OpenAIApiKey", IsPlan: false, "OpenAI API key", "OpenAI's API, or any endpoint that speaks it", "API key", SignsInWith: null, "https://gateway.example.com/v1"),
+        new Kind("anthropic-api-key", "AnthropicApiKey", IsPlan: false, "Anthropic API key", "Anthropic's API, or any endpoint that speaks it", "API key", SignsInWith: null, "https://gateway.example.com"),
+        new Kind("openrouter-api-key", "OpenRouterApiKey", IsPlan: false, "OpenRouter API key", "Many vendors' models with one key", "API key", SignsInWith: null, Endpoint: null),
     ];
 
     public static Kind? Find(string id)

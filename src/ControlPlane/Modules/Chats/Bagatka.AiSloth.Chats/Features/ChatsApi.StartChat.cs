@@ -35,17 +35,13 @@ internal sealed partial class ChatsApi
             return new Result<ChatSummary>(Error.Forbidden);
         }
 
-        HarnessProfile? harness = HarnessProfiles.Find(command.Harness);
-        if (harness is null)
+        Result<(HarnessProfile Harness, AgentAccountCredential Account)> runsWith = await RunsWithAsync(actor, command, ct);
+        if (runsWith.Failed)
         {
-            return new Result<ChatSummary>(Error.Validation("harness", "Unknown harness; see GET /harnesses."));
+            return new Result<ChatSummary>(runsWith.Error);
         }
 
-        Result<AgentAccountCredential> account = await UsableAccountAsync(actor, command, harness, ct);
-        if (account.Failed)
-        {
-            return new Result<ChatSummary>(account.Error);
-        }
+        (HarnessProfile harness, AgentAccountCredential account) = runsWith.Output;
 
         // A copy of another chat is of its nook's files; Nooks decides whether the actor may see them.
         NookId? copyOf = await db.Chats.AsNoTracking().Where(found => found.Id == command.CopyOf).Select(found => (NookId?)found.NookId).SingleOrDefaultAsync(ct);
@@ -59,14 +55,14 @@ internal sealed partial class ChatsApi
         // checkpoints keep the agent's sessions, so a new agent can continue the conversation. Whoever
         // operates the nook can use what its agent can, so on a personal account it is reserved for
         // the account's owner.
-        CreateNook nook = new CreateNook(command.WorkspaceId, command.Provider, harness.Id, command.Repositories, copyOf, command.Checkpoint, harness.SessionPaths, FromScratch: false, ReservedFor: account.Output.OwnerId);
+        CreateNook nook = new CreateNook(command.WorkspaceId, command.Provider, harness.Id, command.Repositories, copyOf, command.Checkpoint, harness.SessionPaths, FromScratch: false, ReservedFor: account.OwnerId);
         Result<NookSummary> created = await nooks.CreateAsync(actor, nook, ct);
         if (created.Failed)
         {
             return new Result<ChatSummary>(created.Error);
         }
 
-        Chat chat = Chat.Start(created.Output.Id, command.WorkspaceId, user.UserId, harness.Id, account.Output, time);
+        Chat chat = Chat.Start(created.Output.Id, command.WorkspaceId, user.UserId, harness.Id, command.Model, account, time);
         db.Chats.Add(chat);
         db.Drafts.Add(Draft.Of(chat));
         Result saved = await db.SaveAsync(ct);
@@ -75,20 +71,33 @@ internal sealed partial class ChatsApi
             return new Result<ChatSummary>(saved.Error);
         }
 
-        CaptureStarted(user, command, harness, account.Output.Kind);
+        CaptureStarted(user, command, harness, account.Kind);
 
         // The agent starts now, after the nook's setup, while people write their first message.
         runners.Wake(chat.Id);
         return new Result<ChatSummary>(chat.ToSummary(messagesWaiting: false, firstMessage: null));
     }
 
-    // The account the chat's agent runs on, when the actor may use it and the harness takes its kind.
-    private async Task<Result<AgentAccountCredential>> UsableAccountAsync(Actor actor, StartChat command, HarnessProfile harness, CancellationToken ct)
+    // What the chat's agent runs with: its harness (HarnessWith), and the account, when the actor may
+    // use it and the harness takes its kind.
+    private async Task<Result<(HarnessProfile Harness, AgentAccountCredential Account)>> RunsWithAsync(Actor actor, StartChat command, CancellationToken ct)
     {
-        Error unusable = Error.Validation("account", "Use the workspace's account or your own, of a kind the harness takes.");
+        Result<HarnessProfile> harness = HarnessWith(command.Harness, command.Model);
+        if (harness.Failed)
+        {
+            return new Result<(HarnessProfile, AgentAccountCredential)>(harness.Error);
+        }
+
         Result<AgentAccountCredential> account = await accounts.UseAsync(actor, command.Account, command.WorkspaceId, ct);
-        bool usable = !account.Failed && harness.Accepts(AccountCredentials.KindOf(account.Output.Kind));
-        return usable ? account : new Result<AgentAccountCredential>(unusable);
+        if (account.Failed)
+        {
+            return new Result<(HarnessProfile, AgentAccountCredential)>(UnusableAccount);
+        }
+
+        bool takes = harness.Output.Accepts(AccountCredentials.KindOf(account.Output.Kind));
+        return takes
+            ? new Result<(HarnessProfile, AgentAccountCredential)>((harness.Output, account.Output))
+            : new Result<(HarnessProfile, AgentAccountCredential)>(UnusableAccount);
     }
 
     // A chat started, for product analytics. It has no message yet: people who leave before writing
@@ -98,6 +107,7 @@ internal sealed partial class ChatsApi
         productEvents.Capture(new ProductEvent("chat_started", user.UserId, command.WorkspaceId.Value, new Dictionary<string, ProductFact>(StringComparer.Ordinal)
         {
             ["harness"] = new ProductFact(harness.Id),
+            ["model_chosen"] = new ProductFact(command.Model is not null),
             ["provider"] = new ProductFact(command.Provider),
             ["account_kind"] = new ProductFact(accountKind.ToString()),
             ["repositories"] = new ProductFact(command.Repositories.Count),

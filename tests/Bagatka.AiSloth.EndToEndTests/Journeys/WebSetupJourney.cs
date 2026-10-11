@@ -12,9 +12,9 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// <summary>
 /// Journey: someone new sets up their workspace from the browser alone. Signed in through the host's
 /// provider for the first time, they find their chats need an agent account and add one, connect
-/// GitHub and add a repository, set a secret, write instructions for every agent, and invite someone,
-/// who joins from their own browser. Then a chat can start with the repository. Only the model and
-/// GitHub are fake.
+/// GitHub and add a repository, set a secret, write instructions for every agent, save a preset of pi
+/// on a model from OpenRouter's catalog, and invite someone, who joins from their own browser. Then a
+/// chat can start with the repository and the preset. Only the model, OpenRouter, and GitHub are fake.
 /// </summary>
 public sealed class WebSetupJourney(ControlPlane app)
 {
@@ -39,6 +39,7 @@ public sealed class WebSetupJourney(ControlPlane app)
             await ConnectsGitHubAndAddsARepositoryAsync(page, erin, owner);
             await SetsASecretAsync(page);
             await WritesInstructionsForEveryAgentAsync(page);
+            await SavesAPresetOfPiOnAModelFromOpenRouterAsync(page);
             string code = await InvitesSomeoneAsync(page);
             await TheyJoinFromTheirOwnBrowserAsync(browser, frank, code);
             await AChatCanStartWithTheRepositoryAsync(page);
@@ -123,6 +124,36 @@ public sealed class WebSetupJourney(ControlPlane app)
         await WebBrowser.ShotAsync(page, "setup-settings");
     }
 
+    // An OpenRouter key beside the Anthropic one, then a preset that runs pi on it with a model found by
+    // name in OpenRouter's catalog.
+    private static async Task SavesAPresetOfPiOnAModelFromOpenRouterAsync(IPage page)
+    {
+        ILocator accounts = Section(page, "Agent accounts");
+        await accounts.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Add" }).ClickAsync();
+        ILocator adding = page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "Add an agent account" });
+        await adding.GetByRole(AriaRole.Combobox, new LocatorGetByRoleOptions { Name = "Kind" }).ClickAsync();
+        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "OpenRouter API key" }).ClickAsync();
+        await adding.GetByLabel("Name").FillAsync("OpenRouter");
+        await adding.GetByLabel("API key").FillAsync(FakeModel.OpenRouterKey);
+        await adding.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Add account" }).ClickAsync();
+        await Assertions.Expect(accounts.GetByText("OpenRouter API key")).ToBeVisibleAsync(WebBrowser.Shown);
+
+        ILocator presets = Section(page, "Presets");
+        await presets.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Add" }).ClickAsync();
+        ILocator dialog = page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "Add a preset" });
+        await dialog.GetByRole(AriaRole.Combobox, new LocatorGetByRoleOptions { Name = "Agent" }).ClickAsync();
+        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "pi", Exact = true }).ClickAsync();
+        await dialog.GetByRole(AriaRole.Combobox, new LocatorGetByRoleOptions { Name = "Paid by" }).ClickAsync();
+        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "OpenRouter" }).ClickAsync();
+        await dialog.GetByRole(AriaRole.Combobox, new LocatorGetByRoleOptions { Name = "Model" }).FillAsync("luna");
+        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "OpenAI: GPT-6 Luna" }).ClickAsync();
+        await WebBrowser.ShotAsync(page, "setup-preset");
+        await dialog.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Save preset" }).ClickAsync();
+
+        await Assertions.Expect(presets.GetByText("pi · GPT-6 Luna")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(presets.GetByText("pi, " + FakeModel.OpenRouterModel + ", OpenRouter")).ToBeVisibleAsync();
+    }
+
     private static async Task<string> InvitesSomeoneAsync(IPage page)
     {
         ILocator people = Section(page, "People");
@@ -154,13 +185,20 @@ public sealed class WebSetupJourney(ControlPlane app)
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "What should Claude Code work on?" })).ToBeVisibleAsync(WebBrowser.Shown);
     }
 
-    // The new chat page offers the account's agent and the repository.
+    // The new chat page offers the preset first, and the repository.
     private static async Task AChatCanStartWithTheRepositoryAsync(IPage page)
     {
         await page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "New chat" }).ClickAsync();
 
-        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "What should Claude Code work on?" })).ToBeVisibleAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "What should pi work on?" })).ToBeVisibleAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "No repository" })).ToBeVisibleAsync();
+        await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "pi · GPT-6 Luna" }).ClickAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Menuitemradio, new PageGetByRoleOptions { Name = "pi · GPT-6 Luna" })).ToBeVisibleAsync();
+        await WebBrowser.ShotAsync(page, "setup-new-chat-presets");
+        await page.GetByRole(AriaRole.Menuitem, new PageGetByRoleOptions { Name = "Another agent or model…" }).ClickAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "Choose an agent" })).ToBeVisibleAsync();
+        await WebBrowser.ShotAsync(page, "setup-choose-agent");
+        await page.Keyboard.PressAsync("Escape");
     }
 
     private static ILocator Section(IPage page, string title)

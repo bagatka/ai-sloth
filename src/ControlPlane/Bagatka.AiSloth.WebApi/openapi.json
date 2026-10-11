@@ -2366,6 +2366,190 @@
           }
         }
       }
+    },
+    "/workspaces/{workspaceId}/models": {
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "harness",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "account",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AgentModel"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspaceId}/presets": {
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PresetSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPresetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/presets/{id}/name": {
+      "put": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresetNameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/presets/{id}": {
+      "delete": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2426,6 +2610,33 @@
           }
         }
       },
+      "AddPresetRequest": {
+        "required": [
+          "harness",
+          "account"
+        ],
+        "type": "object",
+        "properties": {
+          "harness": {
+            "type": "string"
+          },
+          "account": {
+            "$ref": "#/components/schemas/AgentAccountId"
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "AddRepositoryRequest": {
         "required": [
           "fullName"
@@ -2448,7 +2659,8 @@
           "CopilotPlan",
           "ClaudePlan",
           "OpenAIApiKey",
-          "ChatGptPlan"
+          "ChatGptPlan",
+          "OpenRouterApiKey"
         ],
         "description": "What an agent account is at its vendor, and so which harnesses can use it."
       },
@@ -2546,6 +2758,29 @@
           }
         },
         "description": "An agent account as people see it; its secret is never shown. A workspace\u0027s account has a\nWorkspaceId; a person\u0027s own has an OwnerId."
+      },
+      "AgentModel": {
+        "required": [
+          "id",
+          "name",
+          "usesTools"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Its ID at the vendor, such as \u0060openai/gpt-6-luna\u0060 at OpenRouter."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name for people, as the vendor gives it, such as \u0060OpenAI: GPT-6 Luna\u0060."
+          },
+          "usesTools": {
+            "type": "boolean",
+            "description": "Whether it can call tools, which every coding agent needs."
+          }
+        },
+        "description": "A model an account\u0027s vendor offers, which a chat\u0027s agent can run on."
       },
       "AgentRestarted": {
         "required": [
@@ -2728,6 +2963,7 @@
           "startedAt",
           "working",
           "harness",
+          "model",
           "account",
           "accountOwner",
           "title"
@@ -2762,6 +2998,13 @@
           "harness": {
             "type": "string",
             "description": "The harness that runs its agent."
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The model its agent runs on; \u0060null\u0060 for the harness\u0027s default."
           },
           "account": {
             "description": "The agent account that pays for its work.",
@@ -3880,6 +4123,64 @@
           }
         }
       },
+      "PresetId": {
+        "type": "string",
+        "description": "Identifies a preset.",
+        "format": "uuid"
+      },
+      "PresetNameRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "PresetSummary": {
+        "required": [
+          "id",
+          "name",
+          "harness",
+          "account",
+          "model",
+          "addedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The preset.",
+            "$ref": "#/components/schemas/PresetId"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name for people, such as \u0060pi \u00B7 GPT-6 Luna\u0060."
+          },
+          "harness": {
+            "type": "string",
+            "description": "The harness that runs the agent."
+          },
+          "account": {
+            "description": "The agent account that pays for its work.",
+            "$ref": "#/components/schemas/AgentAccountId"
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The model its agent runs on; \u0060null\u0060 for the harness\u0027s default."
+          },
+          "addedAt": {
+            "type": "string",
+            "description": "When it was saved.",
+            "format": "date-time"
+          }
+        },
+        "description": "A person\u0027s saved choice of how a chat runs, which they pick when they start one: a harness, the\nagent account that pays, and the model."
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -4551,6 +4852,12 @@
           },
           "account": {
             "$ref": "#/components/schemas/AgentAccountId"
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "repositories": {
             "type": [

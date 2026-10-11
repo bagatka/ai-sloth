@@ -67,7 +67,8 @@ internal sealed partial class Sloth(
           sloth git branch-prefix <prefix>
 
         Chats
-          sloth chat ["<message>"] [--harness <id>] [--account <name>] [--on cloud|<machine>]
+          sloth chat ["<message>"] [--harness <id>] [--account <name>] [--model <id>]
+                     [--preset <name>] [--on cloud|<machine>]
                      [--repo <name>[@<branch>]]... [--from <chat>[@<checkpoint>]]
                                      Start a chat in a nook of its own, and follow it: with the
                                      workspace's repositories, or a copy of a chat's files, as
@@ -98,6 +99,14 @@ internal sealed partial class Sloth(
                                      workspace's, from chats on its accounts
           sloth harness state forget <harness> [--shared]
           Ctrl+C only leaves a chat: the agent keeps working.
+
+        Presets: the agents you start chats with most, each with its account and model
+          sloth preset list
+          sloth preset add [--harness <id>] [--account <name>] [--model <id>] [--name <name>]
+          sloth preset rename <name> "<new name>"
+          sloth preset remove <name>
+          sloth model list [<search>] [--harness <id>] [--account <name>]
+                                     The models a harness can run on with an account
 
         Machines
           sloth machine connect <url> <code>
@@ -182,6 +191,11 @@ internal sealed partial class Sloth(
             ["account", "add"] => ListAccountKindsAsync(ct),
             ["account", "add", string kind, .. string[] rest] => AddAccountAsync(kind, rest, ct),
             ["account", "remove", string name] => RemoveAccountAsync(name, ct),
+            ["preset"] or ["preset", "list"] => ListPresetsAsync(ct),
+            ["preset", "add", .. string[] rest] => AddPresetAsync(rest, ct),
+            ["preset", "rename", string named, string name] => RenamePresetAsync(named, name, ct),
+            ["preset", "remove", string named] => RemovePresetAsync(named, ct),
+            ["model", "list", .. string[] rest] => ListModelsAsync(rest, ct),
             ["secret"] or ["secret", "list"] => ListSecretsAsync(ct),
             ["secret", "set", string name] => SetSecretAsync(name, ct),
             ["secret", "remove", string name] => RemoveSecretAsync(name, ct),

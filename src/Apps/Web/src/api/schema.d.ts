@@ -2588,6 +2588,184 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{workspaceId}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    harness: string;
+                    account: string;
+                };
+                header?: never;
+                path: {
+                    workspaceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AgentModel"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{workspaceId}/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    workspaceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PresetSummary"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    workspaceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AddPresetRequest"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PresetSummary"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/presets/{id}/name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PresetNameRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PresetSummary"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/presets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2612,6 +2790,12 @@ export interface components {
         AddMachineRequest: {
             name: string;
         };
+        AddPresetRequest: {
+            harness: string;
+            account: components["schemas"]["AgentAccountId"];
+            model?: null | string;
+            name?: null | string;
+        };
         AddRepositoryRequest: {
             fullName: string;
         };
@@ -2624,7 +2808,7 @@ export interface components {
          * @description What an agent account is at its vendor, and so which harnesses can use it.
          * @enum {unknown}
          */
-        AgentAccountKind: "AnthropicApiKey" | "CopilotPlan" | "ClaudePlan" | "OpenAIApiKey" | "ChatGptPlan";
+        AgentAccountKind: "AnthropicApiKey" | "CopilotPlan" | "ClaudePlan" | "OpenAIApiKey" | "ChatGptPlan" | "OpenRouterApiKey";
         /** @description A kind of account as this host offers it. */
         AgentAccountKindSummary: {
             /** @description The kind. */
@@ -2664,6 +2848,15 @@ export interface components {
              *     ChatGPT: it runs no agents until it is removed and added again.
              */
             needsSignIn: boolean;
+        };
+        /** @description A model an account's vendor offers, which a chat's agent can run on. */
+        AgentModel: {
+            /** @description Its ID at the vendor, such as `openai/gpt-6-luna` at OpenRouter. */
+            id: string;
+            /** @description Its name for people, as the vendor gives it, such as `OpenAI: GPT-6 Luna`. */
+            name: string;
+            /** @description Whether it can call tools, which every coding agent needs. */
+            usesTools: boolean;
         };
         AgentRestarted: {
             remembers: boolean;
@@ -2749,6 +2942,8 @@ export interface components {
             working: boolean;
             /** @description The harness that runs its agent. */
             harness: string;
+            /** @description The model its agent runs on; `null` for the harness's default. */
+            model: null | string;
             /** @description The agent account that pays for its work. */
             account: components["schemas"]["AgentAccountId"];
             accountOwner: null | components["schemas"]["UserId"];
@@ -3190,6 +3385,35 @@ export interface components {
             host: string;
             projectToken: string;
         };
+        /**
+         * Format: uuid
+         * @description Identifies a preset.
+         */
+        PresetId: string;
+        PresetNameRequest: {
+            name: string;
+        };
+        /**
+         * @description A person's saved choice of how a chat runs, which they pick when they start one: a harness, the
+         *     agent account that pays, and the model.
+         */
+        PresetSummary: {
+            /** @description The preset. */
+            id: components["schemas"]["PresetId"];
+            /** @description Its name for people, such as `pi · GPT-6 Luna`. */
+            name: string;
+            /** @description The harness that runs the agent. */
+            harness: string;
+            /** @description The agent account that pays for its work. */
+            account: components["schemas"]["AgentAccountId"];
+            /** @description The model its agent runs on; `null` for the harness's default. */
+            model: null | string;
+            /**
+             * Format: date-time
+             * @description When it was saved.
+             */
+            addedAt: string;
+        };
         ProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -3476,6 +3700,7 @@ export interface components {
             provider: string;
             harness: string;
             account: components["schemas"]["AgentAccountId"];
+            model?: null | string;
             repositories?: null | components["schemas"]["NookRepository"][];
             /** Format: uuid */
             copyOf?: string;

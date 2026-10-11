@@ -18,4 +18,10 @@ public enum CredentialKind
 
     /// <summary>OpenAI's Responses API, through a model gateway: an OpenAI API key, a ChatGPT plan, or another endpoint speaking it.</summary>
     OpenAIApi = 4,
+
+    /// <summary>
+    /// OpenRouter, through a model gateway at its API's root: Anthropic's Messages API at
+    /// <c>/v1/messages</c> and OpenAI's chat API at <c>/v1</c>, each with OpenRouter's names for models.
+    /// </summary>
+    OpenRouterApi = 5,
 }

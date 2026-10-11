@@ -26,6 +26,8 @@ internal sealed class ChatsDbContext(DbContextOptions<ChatsDbContext> options) :
 
     public DbSet<PersonalInstructions> PersonalInstructions => Set<PersonalInstructions>();
 
+    public DbSet<Preset> Presets => Set<Preset>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -35,6 +37,7 @@ internal sealed class ChatsDbContext(DbContextOptions<ChatsDbContext> options) :
         modelBuilder.ApplyConfiguration(new DraftConfiguration());
         modelBuilder.ApplyConfiguration<WorkspaceInstructions>(new InstructionsConfiguration());
         modelBuilder.ApplyConfiguration<PersonalInstructions>(new InstructionsConfiguration());
+        modelBuilder.ApplyConfiguration(new PresetConfiguration());
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
@@ -43,6 +46,7 @@ internal sealed class ChatsDbContext(DbContextOptions<ChatsDbContext> options) :
         configurationBuilder.Properties<ChatId>().HaveConversion<TypedIdConverter<ChatId>>();
         configurationBuilder.Properties<MessageId>().HaveConversion<TypedIdConverter<MessageId>>();
         configurationBuilder.Properties<NookId>().HaveConversion<TypedIdConverter<NookId>>();
+        configurationBuilder.Properties<PresetId>().HaveConversion<TypedIdConverter<PresetId>>();
         configurationBuilder.Properties<ProcessId>().HaveConversion<TypedIdConverter<ProcessId>>();
         configurationBuilder.Properties<WorkspaceId>().HaveConversion<TypedIdConverter<WorkspaceId>>();
         configurationBuilder.Properties<UserId>().HaveConversion<TypedIdConverter<UserId>>();

@@ -27,6 +27,7 @@ internal sealed partial class Sloth
         "workspace list", "workspace use", "workspace invite", "workspace join",
         "account list", "account add", "account remove",
         "secret list", "secret set", "secret remove",
+        "preset list", "preset add", "preset rename", "preset remove", "model list",
         "chat list", "chat open", "chat send", "chat stop", "chat push", "chat download", "chat checkpoints", "chat setup", "chat prepare",
         "harness state", "instructions set", "instructions clear",
         "github connect", "github disconnect",
@@ -36,7 +37,7 @@ internal sealed partial class Sloth
 
     private static readonly FrozenSet<string> FirstWords = FrozenSet.Create(
         StringComparer.Ordinal,
-        "help", "host", "workspace", "account", "secret", "chat", "harness", "instructions", "github", "repo", "git", "machine", "version", "update");
+        "help", "host", "workspace", "account", "secret", "preset", "model", "chat", "harness", "instructions", "github", "repo", "git", "machine", "version", "update");
 
     // A command's name, such as "chat open", or "chat" for one that starts a chat with a message.
     private static string CommandName(string[] args)

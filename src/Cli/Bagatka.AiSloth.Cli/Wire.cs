@@ -55,7 +55,15 @@ internal static class Wire
 
     internal sealed record SetSecret(string Value);
 
-    internal sealed record Chat(Guid Id, Guid NookId, Guid StartedBy, DateTimeOffset StartedAt, bool Working, string Harness, Guid Account);
+    internal sealed record Chat(Guid Id, Guid NookId, Guid StartedBy, DateTimeOffset StartedAt, bool Working, string Harness, string? Model, Guid Account);
+
+    internal sealed record Model(string Id, string Name, bool UsesTools);
+
+    internal sealed record Preset(Guid Id, string Name, string Harness, Guid Account, string? Model, DateTimeOffset AddedAt);
+
+    internal sealed record AddPreset(string Harness, Guid Account, string? Model, string? Name);
+
+    internal sealed record PresetName(string Name);
 
     internal sealed record Nook(Guid Id, string Status, IReadOnlyList<NookSource> Sources);
 
@@ -106,7 +114,7 @@ internal static class Wire
 
     internal sealed record ProcessExit(int ExitCode);
 
-    internal sealed record StartChat(string Provider, string Harness, Guid Account, IReadOnlyList<NookRepository> Repositories, Guid? CopyOf, int? Checkpoint);
+    internal sealed record StartChat(string Provider, string Harness, Guid Account, string? Model, IReadOnlyList<NookRepository> Repositories, Guid? CopyOf, int? Checkpoint);
 
     internal sealed record SendMessage(string Text);
 

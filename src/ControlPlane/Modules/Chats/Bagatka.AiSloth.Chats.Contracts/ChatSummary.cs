@@ -16,6 +16,7 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <param name="StartedAt">When it started.</param>
 /// <param name="Working">Whether the agent is working on a turn, or messages wait for it.</param>
 /// <param name="Harness">The harness that runs its agent.</param>
+/// <param name="Model">The model its agent runs on; <see langword="null"/> for the harness's default.</param>
 /// <param name="Account">The agent account that pays for its work.</param>
 /// <param name="AccountOwner">
 /// The owner of the personal account it runs on, whose messages alone reach the agent: everyone
@@ -34,6 +35,7 @@ public sealed record ChatSummary(
     DateTimeOffset StartedAt,
     bool Working,
     string Harness,
+    string? Model,
     AgentAccountId Account,
     UserId? AccountOwner,
     string? Title);

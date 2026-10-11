@@ -12,6 +12,11 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <param name="Provider">Where the nook runs, such as <c>docker</c> (<c>INooksApi.ListProvidersAsync</c>).</param>
 /// <param name="Harness">The harness that runs the agent, one of <see cref="IChatsApi.ListHarnessesAsync"/>, such as <c>codex</c>.</param>
 /// <param name="Account">The agent account that pays for its work: the workspace's, or the actor's own.</param>
+/// <param name="Model">
+/// The model its agent runs on, as the account's vendor names it, such as <c>openai/gpt-6-luna</c>
+/// (<see cref="IChatsApi.ListModelsAsync"/>); or <see langword="null"/> for the harness's default.
+/// Only for harnesses that take one, such as Claude Code and pi.
+/// </param>
 /// <param name="Repositories">The workspace's repositories its nook starts with, each at <c>/work/&lt;name&gt;</c>; empty for none.</param>
 /// <param name="CopyOf">
 /// Another chat of the workspace whose nook's files its nook starts with, with its repositories; or
@@ -26,6 +31,7 @@ public sealed record StartChat(
     string Provider,
     string Harness,
     AgentAccountId Account,
+    string? Model,
     IReadOnlyList<NookRepository> Repositories,
     ChatId? CopyOf,
     int? Checkpoint);

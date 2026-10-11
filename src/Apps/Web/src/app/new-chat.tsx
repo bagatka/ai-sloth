@@ -15,9 +15,11 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -27,26 +29,31 @@ import { ApiError, answer, api, messageOf, type Schemas } from "./api"
 import { chatStream } from "./chat/chat-stream"
 import { MessageBox } from "./chat/message-box"
 import { useCurrentWorkspace } from "./chat-list"
+import { agentLabel, ChooseAgentDialog, type Choice } from "./choose-agent"
 import {
   agentAccounts,
   harnesses as harnessesQuery,
+  presets as presetsQuery,
   providers as providersQuery,
   repositories as repositoriesQuery,
 } from "./queries"
 
-// Starting a chat: what it runs with (its repositories, its agent and the account that pays, and,
-// where there's a choice, where its nook runs), and its first message. The chat and its nook start
-// as soon as someone writes, so the agent is ready by the time they send; until then it's a draft,
-// which the host lets go after a while. The browser remembers each workspace's last choices.
+// Starting a chat: what it runs with (its repositories, its agent with the account that pays and its
+// model, picked from the person's presets or chosen anew, and, where there's a choice, where its nook
+// runs), and its first message. The chat and its nook start as soon as someone writes, so the agent
+// is ready by the time they send; until then it's a draft, which the host lets go after a while. The
+// browser remembers each workspace's last choices.
 
 type Workspace = Schemas["WorkspaceSummary"]
 type Account = Schemas["AgentAccountSummary"]
 type Harness = Schemas["HarnessSummary"]
 type ChatSummary = Schemas["ChatSummary"]
+type Preset = Schemas["PresetSummary"]
 
 type Setup = {
   account: string
   harness: string
+  model: string | null
   provider: string
   repositories: readonly string[]
 }
@@ -72,18 +79,30 @@ function NewChat({ workspace }: { workspace: Workspace }) {
   const harnesses = useQuery(harnessesQuery)
   const providers = useQuery(providersQuery(workspace.id))
   const repositories = useQuery(repositoriesQuery(workspace.id))
+  const presets = useQuery(presetsQuery(workspace.id))
   const [chosen, setChosen] = React.useState<Setup | null>(() =>
     remembered(workspace.id)
   )
   const [draft, setDraft] = React.useState("")
+  const [choosing, setChoosing] = React.useState(false)
 
   const usable = (accounts.data ?? []).filter((account) => !account.needsSignIn)
   const agents = agentsOf(usable, harnesses.data ?? [])
+  const offeredPresets = (presets.data ?? []).filter((preset) =>
+    runs(agents, preset)
+  )
   const places = (providers.data ?? []).filter((place) => place.available)
-  const setup = resolve(chosen, agents, places, repositories.data ?? [])
+  const setup = resolve(
+    chosen,
+    agents,
+    offeredPresets,
+    places,
+    repositories.data ?? []
+  )
   const loading =
     accounts.isPending ||
     harnesses.isPending ||
+    presets.isPending ||
     providers.isPending ||
     repositories.isPending
   const agentName =
@@ -103,6 +122,7 @@ function NewChat({ workspace }: { workspace: Workspace }) {
           body: {
             account: of.account,
             harness: of.harness,
+            model: of.model,
             provider: of.provider,
             repositories: of.repositories.map((repository) => ({
               repository,
@@ -219,8 +239,18 @@ function NewChat({ workspace }: { workspace: Workspace }) {
                 )}
                 <AgentPicker
                   agents={agents}
+                  presets={offeredPresets}
                   setup={setup}
-                  onChange={(account, harness) => choose({ account, harness })}
+                  onChange={(choice) => choose(choice)}
+                  onChooseAnother={() => setChoosing(true)}
+                />
+                <ChooseAgentDialog
+                  workspace={workspace}
+                  open={choosing}
+                  onOpenChange={setChoosing}
+                  purpose="use"
+                  initial={setup}
+                  onChosen={(choice) => choose(choice)}
                 />
                 {places.length > 1 && (
                   <PlacePicker
@@ -348,6 +378,18 @@ function RepositoriesPicker({
 
 type Agent = { account: Account; harnesses: readonly Harness[] }
 
+// Whether a choice, such as a preset, can run here: its account is usable, and its harness takes it.
+function runs(
+  agents: readonly Agent[],
+  choice: { account: string; harness: string }
+) {
+  return agents.some(
+    (agent) =>
+      agent.account.id === choice.account &&
+      agent.harnesses.some((harness) => harness.id === choice.harness)
+  )
+}
+
 // The agents a chat can run: each account, with the harnesses that take its kind.
 function agentsOf(
   accounts: readonly Account[],
@@ -363,26 +405,41 @@ function agentsOf(
     .filter((agent) => agent.harnesses.length > 0)
 }
 
+// The person's presets when they have some, otherwise every agent each account can run on its
+// default model; anything else, such as another model, is chosen in a dialog.
 function AgentPicker({
   agents,
+  presets,
   setup,
   onChange,
+  onChooseAnother,
 }: {
   agents: readonly Agent[]
+  presets: readonly Preset[]
   setup: Setup
-  onChange: (account: string, harness: string) => void
+  onChange: (choice: Choice) => void
+  onChooseAnother: () => void
 }) {
   const agent = agents.find((found) => found.account.id === setup.account)
   const harness = agent?.harnesses.find((found) => found.id === setup.harness)
-  const value = `${setup.account}/${setup.harness}`
+  const preset = presets.find(
+    (found) =>
+      found.harness === setup.harness &&
+      found.account === setup.account &&
+      found.model === setup.model
+  )
+  const accountName = (id: string) =>
+    agents.find((found) => found.account.id === id)?.account.name
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={<Button variant="ghost" size="sm" className="min-w-0" />}
       >
-        <span className="truncate">{harness?.name}</span>
-        {agents.length > 1 && (
+        <span className="truncate">
+          {preset?.name ?? agentLabel(harness?.name ?? "", setup.model)}
+        </span>
+        {!preset && agents.length > 1 && (
           <span className="truncate font-normal text-muted-foreground">
             {agent?.account.name}
           </span>
@@ -390,33 +447,65 @@ function AgentPicker({
         <CaretDownIcon className="text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-auto min-w-56">
-        <DropdownMenuRadioGroup
-          value={value}
-          onValueChange={(chosen: string) => {
-            const [account, harnessId] = chosen.split("/")
-            onChange(account!, harnessId!)
-          }}
-        >
-          {agents.map(({ account, harnesses }) => (
-            <DropdownMenuGroup key={account.id}>
-              <DropdownMenuLabel>
-                {account.name}
-                <span className="font-normal">
-                  {account.ownerId ? ", your own" : ", the workspace's"}
-                </span>
-              </DropdownMenuLabel>
-              {harnesses.map((offered) => (
+        {presets.length > 0 ? (
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Your presets</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={preset?.id ?? ""}
+              onValueChange={(id: string) => {
+                const picked = presets.find((found) => found.id === id)
+                if (picked) {
+                  onChange(picked)
+                }
+              }}
+            >
+              {presets.map((offered) => (
                 <DropdownMenuRadioItem
                   key={offered.id}
-                  value={`${account.id}/${offered.id}`}
+                  value={offered.id}
                   closeOnClick
                 >
-                  {offered.name}
+                  <span className="truncate">{offered.name}</span>
+                  <span className="ml-auto truncate pl-3 text-xs text-muted-foreground">
+                    {accountName(offered.account)}
+                  </span>
                 </DropdownMenuRadioItem>
               ))}
-            </DropdownMenuGroup>
-          ))}
-        </DropdownMenuRadioGroup>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuGroup>
+        ) : (
+          <DropdownMenuRadioGroup
+            value={setup.model ? "" : `${setup.account}/${setup.harness}`}
+            onValueChange={(chosen: string) => {
+              const [account, harnessId] = chosen.split("/")
+              onChange({ account: account!, harness: harnessId!, model: null })
+            }}
+          >
+            {agents.map(({ account, harnesses }) => (
+              <DropdownMenuGroup key={account.id}>
+                <DropdownMenuLabel>
+                  {account.name}
+                  <span className="font-normal">
+                    {account.ownerId ? ", your own" : ", the workspace's"}
+                  </span>
+                </DropdownMenuLabel>
+                {harnesses.map((offered) => (
+                  <DropdownMenuRadioItem
+                    key={offered.id}
+                    value={`${account.id}/${offered.id}`}
+                    closeOnClick
+                  >
+                    {offered.name}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuGroup>
+            ))}
+          </DropdownMenuRadioGroup>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onChooseAnother}>
+          Another agent or model…
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -466,26 +555,41 @@ function PlacePicker({
 }
 
 // The choices as they can be made now: each one kept while it's still offered, otherwise the first
-// that is. Null when there's no agent to run or nowhere to run it.
+// preset, or the first agent on its default model. Null when there's no agent to run or nowhere to
+// run it.
 function resolve(
   chosen: Setup | null,
   agents: readonly Agent[],
+  presets: readonly Preset[],
   places: readonly Schemas["ProviderSummary"][],
   repositories: readonly Schemas["RepositorySummary"][]
 ): Setup | null {
-  const agent =
-    agents.find((found) => found.account.id === chosen?.account) ?? agents[0]
   const place =
     places.find((found) => found.id === chosen?.provider) ?? places[0]
+  const kept =
+    chosen && runs(agents, chosen)
+      ? {
+          account: chosen.account,
+          harness: chosen.harness,
+          model: chosen.model,
+        }
+      : null
+  const first = agents[0]
+  const agent =
+    kept ??
+    presets[0] ??
+    (first && {
+      account: first.account.id,
+      harness: first.harnesses[0]!.id,
+      model: null,
+    })
   if (!agent || !place) {
     return null
   }
-  const harness =
-    agent.harnesses.find((found) => found.id === chosen?.harness) ??
-    agent.harnesses[0]!
   return {
-    account: agent.account.id,
-    harness: harness.id,
+    account: agent.account,
+    harness: agent.harness,
+    model: agent.model,
     provider: place.id,
     repositories: (chosen?.repositories ?? []).filter((id) =>
       repositories.some((repository) => repository.id === id)
@@ -504,7 +608,7 @@ function remembered(workspaceId: string): Setup | null {
       typeof saved.harness === "string" &&
       typeof saved.provider === "string" &&
       Array.isArray(saved.repositories)
-      ? (saved as Setup)
+      ? { ...(saved as Setup), model: saved.model ?? null }
       : null
   } catch {
     return null

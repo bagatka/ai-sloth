@@ -3,12 +3,14 @@ import { useCurrentWorkspace } from "../chat-list"
 import { AccountsSection } from "./accounts"
 import { InstructionsSection } from "./instructions"
 import { PeopleSection } from "./people"
+import { PresetsSection } from "./presets"
 import { RepositoriesSection } from "./repositories"
 import { SecretsSection } from "./secrets"
 
-// Setting up a workspace: what pays for its agents, the repositories its chats start with, the
-// secrets its nooks get, the instructions its agents follow, and who has access. Each section shows
-// everyone what's there, and its changes to those who may make them.
+// Setting up a workspace: what pays for its agents, your presets of agent and model, the
+// repositories its chats start with, the secrets its nooks get, the instructions its agents follow,
+// and who has access. Each section shows everyone what's there, and its changes to those who may
+// make them.
 export function SettingsPage() {
   const workspace = useCurrentWorkspace()
   return (
@@ -33,6 +35,7 @@ export function SettingsPage() {
             className="mx-auto flex max-w-[44rem] flex-col gap-12 px-4 pt-6 pb-16 md:px-5"
           >
             <AccountsSection workspace={workspace} />
+            <PresetsSection workspace={workspace} />
             <RepositoriesSection workspace={workspace} />
             <SecretsSection workspace={workspace} />
             <InstructionsSection workspace={workspace} />

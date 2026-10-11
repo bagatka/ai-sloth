@@ -540,11 +540,11 @@ internal sealed class ChatRunner(
         IReadOnlyDictionary<string, string> environment;
         if (account.Access is HarnessToken token)
         {
-            environment = HarnessProfile.EnvironmentFor(kind, token.Value, gateway: null);
+            environment = HarnessProfile.EnvironmentFor(kind, token.Value, gateway: null, chat.Model);
         }
         else
         {
-            environment = HarnessProfile.EnvironmentFor(kind, chat.IssueHarnessToken(), settings.ModelGatewayUrl);
+            environment = HarnessProfile.EnvironmentFor(kind, chat.IssueHarnessToken(), settings.ModelGatewayUrl, chat.Model);
         }
 
         await SaveAsync(db, ct);

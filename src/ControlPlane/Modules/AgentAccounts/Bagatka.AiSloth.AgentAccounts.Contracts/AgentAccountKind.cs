@@ -23,7 +23,7 @@ public enum AgentAccountKind
 
     /// <summary>
     /// An OpenAI API key, billed per token to its owner, or a key for another endpoint that speaks
-    /// OpenAI's Responses API, such as OpenRouter's. It never enters a nook.
+    /// OpenAI's Responses API. It never enters a nook.
     /// </summary>
     OpenAIApiKey = 4,
 
@@ -34,4 +34,10 @@ public enum AgentAccountKind
     /// enters a nook.
     /// </summary>
     ChatGptPlan = 5,
+
+    /// <summary>
+    /// An OpenRouter API key, billed per token to its owner: one key for many vendors' models, through
+    /// Anthropic's Messages API or OpenAI's APIs at OpenRouter. It never enters a nook.
+    /// </summary>
+    OpenRouterApiKey = 6,
 }

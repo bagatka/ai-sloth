@@ -24,6 +24,11 @@ internal static class Paths
         return string.Create(CultureInfo.InvariantCulture, $"/agent-accounts/{account.Value}");
     }
 
+    public static string Preset(PresetId preset)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"/presets/{preset.Value}");
+    }
+
     public static string Nook(NookId nook)
     {
         return string.Create(CultureInfo.InvariantCulture, $"/nooks/{nook.Value}");

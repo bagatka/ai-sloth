@@ -1,8 +1,9 @@
 # AgentAccounts
 
 Agent accounts are accounts at agent vendors that pay for agents' work: an API key for OpenAI's or
-Anthropic's API (at the vendor or at another endpoint that speaks it, such as OpenRouter), a ChatGPT
-plan added by signing in with ChatGPT, a Copilot plan, or a Claude plan. A workspace's
+Anthropic's API (at the vendor or at another endpoint that speaks it, such as a company's gateway),
+an OpenRouter key for many vendors' models, a ChatGPT plan added by signing in with ChatGPT, a
+Copilot plan, or a Claude plan. A workspace's
 account serves everyone with Write on it; a personal account serves its owner, wherever they work.
 Secrets are encrypted at rest and never shown again, and the keys and plans of model APIs never enter
 a nook: the model gateway adds them to each call.
@@ -17,7 +18,8 @@ a nook: the model gateway adds them to each call.
   deployment allows. What each kind is at its vendor: where its calls go and which headers pay for
   them, or that its token goes to its harness.
 - **Integrations:** Sign in with ChatGPT, through `Bagatka.Sdk.OpenAI`: registering, exchanging the
-  code, renewing a plan's access token, and ending its session on removal.
+  code, renewing a plan's access token, and ending its session on removal. OpenRouter's catalog of
+  models, through `Bagatka.Sdk.OpenRouter`.
 
 ## Does not own
 
@@ -30,12 +32,13 @@ a nook: the model gateway adds them to each call.
 
 `IAgentAccountsApi` in `Bagatka.AiSloth.AgentAccounts.Contracts`: people add accounts to a workspace
 or as their own, with their secret or by signing in at the vendor, list the ones they can use in a
-workspace, and remove them; `ListKindsAsync` says, for every kind, how it is added, whether it is
+workspace and the models each one's vendor offers, and remove them; `ListKindsAsync` says, for every kind, how it is added, whether it is
 personal only, and whether this host allows it. `UseAsync` hands whoever runs an agent what it takes, renewing a plan's
 token when it is due; it is for module callers only, never a route.
 
 ```csharp
-Result<AgentAccountSummary> added = await accounts.AddAsync(owner, new AddAgentAccount(workspaceId, AgentAccountKind.OpenAIApiKey, "OpenRouter", key, new Uri("https://openrouter.ai/api/v1")), ct);
+Result<AgentAccountSummary> added = await accounts.AddAsync(owner, new AddAgentAccount(workspaceId, AgentAccountKind.OpenRouterApiKey, "OpenRouter", key, Endpoint: null), ct);
+Result<IReadOnlyList<AgentModel>> models = await accounts.ListModelsAsync(owner, added.Output.Id, workspaceId, ct); // openai/gpt-6-luna, …
 
 // A ChatGPT plan: the caller listens on the callback and opens the URL in the person's browser.
 Result<SignInStarted> started = await accounts.StartSignInAsync(owner, new StartSignIn(AgentAccountKind.ChatGptPlan, "My ChatGPT", new Uri("http://127.0.0.1:1455/auth/callback")), ct);
@@ -87,9 +90,18 @@ None. A plan's access token is renewed when it is used and due, never in the bac
 - `AllowChatGptPlans`, off: OpenAI lets open-source and self-hosted deployments use Sign in with
   ChatGPT; a hosted service for other people needs OpenAI's approval first. The AppHost turns it on,
   since a local run is self-hosted;
-- `ChatGptAuthority` and `ChatGptApi`, OpenAI's by default; tests point them at fakes.
+- `ChatGptAuthority`, `ChatGptApi`, and `OpenRouterApi`, the vendors' own by default; tests point
+  them at fakes.
 
 ## Decisions and constraints
+
+- **One OpenRouter key, both APIs.** OpenRouter serves Anthropic's Messages API at its root
+  (`/v1/messages`) and OpenAI's at `/v1`, so an OpenRouter key's endpoint is OpenRouter's root, with
+  its key as a bearer token, and each harness calls the API it speaks. Only Anthropic and OpenAI API
+  keys name an endpoint of their own.
+- **Models are listed for OpenRouter only.** Its catalog is public and read on each call, about 60 ms
+  for 750 KB, without its batch variants; other kinds list none yet, and their agents start on their
+  harness's default model.
 
 - **Secrets at rest** are sealed with AES-256-GCM under the deployment's encryption key, bound to
   their row's ID (`PATTERNS.md`, entry 13). They leave the module only through `UseAsync`, in records

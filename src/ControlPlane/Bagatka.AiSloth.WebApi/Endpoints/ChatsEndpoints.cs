@@ -24,7 +24,11 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class ChatsEndpoints
 {
-    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account, IReadOnlyList<NookRepository>? Repositories = null, ChatId? CopyOf = null, int? Checkpoint = null);
+    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account, string? Model = null, IReadOnlyList<NookRepository>? Repositories = null, ChatId? CopyOf = null, int? Checkpoint = null);
+
+    internal sealed record AddPresetRequest(string Harness, AgentAccountId Account, string? Model = null, string? Name = null);
+
+    internal sealed record PresetNameRequest(string Name);
 
     internal sealed record PushRequest(IReadOnlyList<string>? Sources = null, string? Branch = null, bool PullRequest = false, string? Message = null);
 
@@ -60,6 +64,13 @@ internal static class ChatsEndpoints
         workspaces.MapGet("/instructions", GetInstructions);
         workspaces.MapPut("/instructions", SetWorkspaceInstructions);
         app.MapPut("/instructions", SetPersonalInstructions).WithTags("Chats");
+        workspaces.MapGet("/models", ListModels);
+        workspaces.MapGet("/presets", ListPresets);
+        workspaces.MapPost("/presets", AddPreset);
+
+        RouteGroupBuilder presets = app.MapGroup("/presets").WithTags("Chats");
+        presets.MapPut("/{id:guid}/name", RenamePreset);
+        presets.MapDelete("/{id:guid}", RemovePreset);
         return chats;
     }
 
@@ -76,8 +87,10 @@ internal static class ChatsEndpoints
     /// <summary>
     /// Starts a chat with a coding agent, and creates the nook it works in: on a provider from
     /// <c>GET /workspaces/{id}/providers</c>, with a harness from <c>GET /harnesses</c>, on an agent
-    /// account (the workspace's, or the caller's own). One chat per nook, so agents never work on each
-    /// other's files. The agent starts with the first message; others join through the nook's access.
+    /// account (the workspace's, or the caller's own), and with a model from
+    /// <c>GET /workspaces/{id}/models</c> or the harness's default. One chat per nook, so agents never
+    /// work on each other's files. The agent starts with the first message; others join through the
+    /// nook's access.
     /// </summary>
     private static async Task<Results<Created<ChatSummary>, ProblemHttpResult>> Start(
         [FromRoute] Guid workspaceId,
@@ -86,9 +99,79 @@ internal static class ChatsEndpoints
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        StartChat command = new StartChat(WorkspaceId.From(workspaceId), request.Provider, request.Harness, request.Account, request.Repositories ?? [], request.CopyOf, request.Checkpoint);
+        StartChat command = new StartChat(WorkspaceId.From(workspaceId), request.Provider, request.Harness, request.Account, request.Model, request.Repositories ?? [], request.CopyOf, request.Checkpoint);
         Result<ChatSummary> result = await api.StartAsync(principal.ToActor(), command, ct);
         return result.ToCreated(chat => string.Create(CultureInfo.InvariantCulture, $"/chats/{chat.Id.Value}"));
+    }
+
+    /// <summary>
+    /// The models a chat's agent can run on with the harness and the agent account, newest first, for
+    /// <c>model</c> when starting a chat: those of the account's vendor that can call tools. Empty when
+    /// the harness runs on its own default model, or the vendor's models aren't listed yet.
+    /// </summary>
+    private static async Task<Results<Ok<IReadOnlyList<AgentModel>>, ProblemHttpResult>> ListModels(
+        [FromRoute] Guid workspaceId,
+        [FromQuery] string harness,
+        [FromQuery] Guid account,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result<IReadOnlyList<AgentModel>> result = await api.ListModelsAsync(principal.ToActor(), WorkspaceId.From(workspaceId), harness, AgentAccountId.From(account), ct);
+        return result.ToOk();
+    }
+
+    /// <summary>
+    /// Your presets that start chats in the workspace, oldest first: on its accounts, or your own.
+    /// </summary>
+    private static async Task<Results<Ok<IReadOnlyList<PresetSummary>>, ProblemHttpResult>> ListPresets(
+        [FromRoute] Guid workspaceId,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result<IReadOnlyList<PresetSummary>> result = await api.ListPresetsAsync(principal.ToActor(), WorkspaceId.From(workspaceId), ct);
+        return result.ToOk();
+    }
+
+    /// <summary>
+    /// Saves a preset of yours: a harness, an agent account of the workspace's or your own that it
+    /// takes, and a model for a harness that takes one. Without a name, it is named after its harness
+    /// and model. At most 20, each harness, account, and model once.
+    /// </summary>
+    private static async Task<Results<Created<PresetSummary>, ProblemHttpResult>> AddPreset(
+        [FromRoute] Guid workspaceId,
+        [FromBody] AddPresetRequest request,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        AddPreset command = new AddPreset(WorkspaceId.From(workspaceId), request.Harness, request.Account, request.Model, request.Name);
+        Result<PresetSummary> result = await api.AddPresetAsync(principal.ToActor(), command, ct);
+        return result.ToCreated(preset => string.Create(CultureInfo.InvariantCulture, $"/presets/{preset.Id.Value}"));
+    }
+
+    /// <summary>Renames a preset of yours.</summary>
+    private static async Task<Results<Ok<PresetSummary>, ProblemHttpResult>> RenamePreset(
+        [FromRoute] Guid id,
+        [FromBody] PresetNameRequest request,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result<PresetSummary> result = await api.RenamePresetAsync(principal.ToActor(), PresetId.From(id), request.Name, ct);
+        return result.ToOk();
+    }
+
+    /// <summary>Removes a preset of yours. Chats started from it keep running as they are.</summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> RemovePreset(
+        [FromRoute] Guid id,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result result = await api.RemovePresetAsync(principal.ToActor(), PresetId.From(id), ct);
+        return result.ToNoContent();
     }
 
     /// <summary>The workspace's chats, newest first, and whether each agent is working.</summary>

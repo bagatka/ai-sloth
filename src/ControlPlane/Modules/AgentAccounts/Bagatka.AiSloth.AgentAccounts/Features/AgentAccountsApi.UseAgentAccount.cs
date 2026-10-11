@@ -49,7 +49,7 @@ internal sealed partial class AgentAccountsApi
             account = renewed.Output;
         }
 
-        return new Result<AgentAccountCredential>(account.ToCredential(box, settings.ChatGptApi));
+        return new Result<AgentAccountCredential>(account.ToCredential(box, settings));
     }
 
     public async Task<bool?> MayUseAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct)

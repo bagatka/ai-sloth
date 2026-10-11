@@ -9,8 +9,8 @@ internal static class KindRules
 {
     public static bool Known(AgentAccountKind kind)
     {
-        return kind is AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.ChatGptPlan
-            or AgentAccountKind.ClaudePlan or AgentAccountKind.CopilotPlan;
+        return kind is AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey
+            or AgentAccountKind.ChatGptPlan or AgentAccountKind.ClaudePlan or AgentAccountKind.CopilotPlan;
     }
 
     public static bool AddedBySignIn(AgentAccountKind kind)
@@ -18,7 +18,8 @@ internal static class KindRules
         return kind switch
         {
             AgentAccountKind.ChatGptPlan => true,
-            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.ClaudePlan or AgentAccountKind.CopilotPlan => false,
+            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey
+                or AgentAccountKind.ClaudePlan or AgentAccountKind.CopilotPlan => false,
         };
     }
 
@@ -28,7 +29,7 @@ internal static class KindRules
         return kind switch
         {
             AgentAccountKind.ChatGptPlan or AgentAccountKind.ClaudePlan or AgentAccountKind.CopilotPlan => true,
-            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey => false,
+            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey => false,
         };
     }
 
@@ -39,7 +40,7 @@ internal static class KindRules
         {
             AgentAccountKind.ClaudePlan => settings.AllowClaudePlans,
             AgentAccountKind.ChatGptPlan => settings.AllowChatGptPlans,
-            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.CopilotPlan => true,
+            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey or AgentAccountKind.CopilotPlan => true,
         };
     }
 }

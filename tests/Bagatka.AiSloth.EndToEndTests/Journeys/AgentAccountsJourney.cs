@@ -18,8 +18,9 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// <summary>
 /// Journey: Alice pays for agents. Her workspace's API key is never shown again, her own accounts serve
 /// only her, in every workspace, plans are personal and Claude's are off, a ChatGPT plan is added by
-/// signing in; Codex and pi answer through the model gateway on an OpenAI key, a ChatGPT plan is renewed
-/// one call at a time, and a plan whose sign-in ended says why.
+/// signing in; Codex and pi answer through the model gateway on an OpenAI key, one OpenRouter key runs
+/// pi and Claude Code each on the model chosen from OpenRouter's catalog, and she saves that choice as a
+/// preset; a ChatGPT plan is renewed one call at a time, and a plan whose sign-in ended says why.
 /// </summary>
 public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
 {
@@ -36,8 +37,10 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
     {
         await AWorkspacesKeyIsNeverShownAgainAndOnlyItsMembersSeeItAsync();
         await OwnAccountsServeTheirOwnerInEveryWorkspaceAndPlansStayPersonalAsync();
-        await SlothListsEachKindByANameThatCantBeConfusedAsync();
+        await SlothListsEachKindByANameThatCantBeConfusedAndSavesAPresetAsync();
         await CodexAndPiAnswerThroughTheGatewayOnAnOpenAIKeyAsync();
+        await OneOpenRouterKeyRunsEachAgentOnTheModelChosenForItsChatAsync();
+        await AChoiceOfHarnessAccountAndModelIsSavedAsAPresetAsync();
         await AChatGptPlanIsAddedBySigningInAndRenewedOneCallAtATimeAsync();
     }
 
@@ -93,17 +96,28 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.True(claudePlan.Errors?.ContainsKey("kind"));
     }
 
-    private async Task SlothListsEachKindByANameThatCantBeConfusedAsync()
+    // Erin finds a model by name for pi on her OpenRouter key, and saves the choice as a preset.
+    private async Task SlothListsEachKindByANameThatCantBeConfusedAndSavesAPresetAsync()
     {
         await using SlothCli sloth = new SlothCli("erin-" + Guid.CreateVersion7());
         await sloth.RunAsync("host", "add", app.WebApiUrl.AbsoluteUri);
 
         int listed = await sloth.RunAsync("account", "add");
+        string kinds = sloth.Output;
+        int added = await sloth.RunWithInputAsync(FakeModel.OpenRouterKey + "\n", "account", "add", "openrouter-api-key", "--name", "OpenRouter");
+        int found = await sloth.RunAsync("model", "list", "luna", "--harness", "pi", "--account", "OpenRouter");
+        string models = sloth.Output;
+        int saved = await sloth.RunAsync("preset", "add", "--harness", "pi", "--account", "OpenRouter", "--model", FakeModel.OpenRouterModel, "--name", "Luna");
+        int presetsListed = await sloth.RunAsync("preset", "list");
 
-        Assert.Equal(0, listed);
-        Assert.Matches("chatgpt-plan +ChatGPT Plus or Pro +sign in with ChatGPT +Codex, pi", sloth.Output);
-        Assert.Matches("claude-plan +Claude Pro or Max +not allowed on ", sloth.Output);
-        Assert.Matches("anthropic-api-key +Anthropic's API.+Claude Code, pi", sloth.Output);
+        Assert.Equal((0, 0, 0, 0, 0), (listed, added, found, saved, presetsListed));
+        Assert.Matches("chatgpt-plan +ChatGPT Plus or Pro +sign in with ChatGPT +Codex, pi", kinds);
+        Assert.Matches("claude-plan +Claude Pro or Max +not allowed on ", kinds);
+        Assert.Matches("anthropic-api-key +Anthropic's API.+Claude Code, pi", kinds);
+        Assert.Matches("openrouter-api-key +Many vendors' models with one key +API key +Claude Code, pi", kinds);
+        Assert.Matches(FakeModel.OpenRouterModel + " +OpenAI: GPT-6 Luna", models);
+        Assert.DoesNotContain(FakeModel.OpenRouterClaude, models, StringComparison.Ordinal);
+        Assert.Matches("Luna +pi · " + FakeModel.OpenRouterModel + " · OpenRouter", sloth.Output);
     }
 
     private async Task CodexAndPiAnswerThroughTheGatewayOnAnOpenAIKeyAsync()
@@ -114,6 +128,59 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
 
         Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
         Assert.Contains(app.Model.OpenAIAuthorizations, authorization => string.Equals(authorization, "Bearer " + FakeModel.ApiKey, StringComparison.Ordinal));
+    }
+
+    // OpenRouter speaks Anthropic's API for Claude Code and OpenAI's chat API for pi, at one address and
+    // with one key, under its own names for models; models that can't call tools or are only for batches
+    // aren't offered.
+    private async Task OneOpenRouterKeyRunsEachAgentOnTheModelChosenForItsChatAsync()
+    {
+        TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice);
+        AgentAccountSummary key = await Api.ReadAsync<AgentAccountSummary>(
+            _alice.SendPostAsync(workspace.Path + "/agent-accounts", new { kind = "OpenRouterApiKey", name = "OpenRouter", secret = FakeModel.OpenRouterKey }), HttpStatusCode.Created);
+        IReadOnlyList<AgentModel> models = await Api.ReadAsync<IReadOnlyList<AgentModel>>(_alice.SendGetAsync(ModelsPath(workspace, "pi", key.Id)), HttpStatusCode.OK);
+        Problem codex = await Api.ProblemAsync(_alice.SendGetAsync(ModelsPath(workspace, "codex", key.Id)), HttpStatusCode.BadRequest);
+        Problem copilotModel = await Api.ProblemAsync(
+            _alice.SendPostAsync(workspace.Path + "/chats", new { provider = "docker", harness = "copilot", account = key.Id, model = FakeModel.OpenRouterModel }), HttpStatusCode.BadRequest);
+
+        JsonElement[] ended = await Task.WhenAll(
+            TurnAsync(workspace, "pi", key.Id, FakeModel.OpenRouterModel),
+            TurnAsync(workspace, "claude-code", key.Id, FakeModel.OpenRouterClaude));
+
+        Assert.Equal([FakeModel.OpenRouterModel, FakeModel.OpenRouterClaude], models.Select(model => model.Id), StringComparer.Ordinal);
+        Assert.True(codex.Errors?.ContainsKey("account"));
+        Assert.True(copilotModel.Errors?.ContainsKey("model"));
+        Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
+        Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.OpenRouterModel + "\"", StringComparison.Ordinal) && body.Contains("\"messages\"", StringComparison.Ordinal));
+        Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.OpenRouterClaude + "\"", StringComparison.Ordinal));
+        Assert.Contains(app.Model.OpenAIAuthorizations, authorization => string.Equals(authorization, "Bearer " + FakeModel.OpenRouterKey, StringComparison.Ordinal));
+        Assert.Contains(app.Model.Credentials, credentials => string.Equals(credentials.Authorization, "Bearer " + FakeModel.OpenRouterKey, StringComparison.Ordinal));
+    }
+
+    // A preset is checked as a chat's start is, kept once, and only by its owner.
+    private async Task AChoiceOfHarnessAccountAndModelIsSavedAsAPresetAsync()
+    {
+        TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice);
+        AgentAccountSummary key = await Api.ReadAsync<AgentAccountSummary>(
+            _alice.SendPostAsync(workspace.Path + "/agent-accounts", new { kind = "OpenRouterApiKey", name = "OpenRouter", secret = FakeModel.OpenRouterKey }), HttpStatusCode.Created);
+        string presets = workspace.Path + "/presets";
+
+        PresetSummary saved = await Api.ReadAsync<PresetSummary>(_alice.SendPostAsync(presets, new { harness = "pi", account = key.Id, model = FakeModel.OpenRouterModel }), HttpStatusCode.Created);
+        PresetSummary onDefault = await Api.ReadAsync<PresetSummary>(_alice.SendPostAsync(presets, new { harness = "claude-code", account = workspace.Account }), HttpStatusCode.Created);
+        Problem again = await Api.ProblemAsync(_alice.SendPostAsync(presets, new { harness = "pi", account = key.Id, model = FakeModel.OpenRouterModel }), HttpStatusCode.Conflict);
+        Problem codex = await Api.ProblemAsync(_alice.SendPostAsync(presets, new { harness = "codex", account = key.Id }), HttpStatusCode.BadRequest);
+        PresetSummary renamed = await Api.ReadAsync<PresetSummary>(_alice.SendPutAsync(Paths.Preset(saved.Id) + "/name", new { name = "Luna" }), HttpStatusCode.OK);
+        await Api.ProblemAsync(_bob.DeleteAsync(new Uri(Paths.Preset(saved.Id), UriKind.Relative), Ct), HttpStatusCode.NotFound);
+        IReadOnlyList<PresetSummary> listed = await Api.ReadAsync<IReadOnlyList<PresetSummary>>(_alice.SendGetAsync(presets), HttpStatusCode.OK);
+        await Api.ExpectAsync(_alice.DeleteAsync(new Uri(Paths.Preset(onDefault.Id), UriKind.Relative), Ct), HttpStatusCode.NoContent);
+        IReadOnlyList<PresetSummary> left = await Api.ReadAsync<IReadOnlyList<PresetSummary>>(_alice.SendGetAsync(presets), HttpStatusCode.OK);
+
+        Assert.Equal("pi · " + FakeModel.OpenRouterModel, saved.Name);
+        Assert.Equal(("Claude Code", null), (onDefault.Name, onDefault.Model));
+        Assert.Equal(ChatsErrors.PresetExists.Code, again.Code);
+        Assert.True(codex.Errors?.ContainsKey("account"));
+        Assert.Equal(["Luna", "Claude Code"], listed.Select(preset => preset.Name), StringComparer.Ordinal);
+        Assert.Equal([renamed], left);
     }
 
     // Every token set the fake ChatGPT issues asks to be renewed at once, so each model call renews:
@@ -165,10 +232,15 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         return await Api.ReadAsync<IReadOnlyList<AgentAccountSummary>>(client.SendGetAsync(Paths.Workspace(workspace) + "/agent-accounts"), HttpStatusCode.OK);
     }
 
-    // A chat of the harness on the account, and how its first turn ended.
-    private static async Task<JsonElement> TurnAsync(TestWorkspace workspace, string harness, AgentAccountId account)
+    private static string ModelsPath(TestWorkspace workspace, string harness, AgentAccountId account)
     {
-        ChatSummary chat = await workspace.StartChatAsync(harness, account);
+        return string.Create(CultureInfo.InvariantCulture, $"{workspace.Path}/models?harness={harness}&account={account.Value}");
+    }
+
+    // A chat of the harness on the account, on the model when given, and how its first turn ended.
+    private static async Task<JsonElement> TurnAsync(TestWorkspace workspace, string harness, AgentAccountId account, string? model = null)
+    {
+        ChatSummary chat = await workspace.StartChatAsync(harness, account, model: model);
         await using ChatWatch watch = await ChatWatch.OpenAsync(workspace.Person, chat);
         await workspace.SendAsync(chat, "say hello");
         return await watch.NextAsync("turn-ended");

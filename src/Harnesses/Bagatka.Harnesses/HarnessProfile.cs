@@ -26,16 +26,24 @@ namespace Bagatka.Harnesses;
 /// absolute paths; empty when it keeps nothing of the kind. Never its sessions, credentials, or what
 /// its start script writes.
 /// </param>
+/// <param name="TakesModel">
+/// Whether its start script runs it on the model it is given (<c>HARNESS_MODEL</c>); otherwise it runs
+/// on its own default model.
+/// </param>
 public sealed record HarnessProfile(
     string Id,
     string Name,
     IReadOnlyList<CredentialKind> Credentials,
     IReadOnlyList<string> SessionPaths,
     string InstructionsPath,
-    IReadOnlyList<string> StatePaths)
+    IReadOnlyList<string> StatePaths,
+    bool TakesModel)
 {
     /// <summary>The program, on the PATH of the harness's image, that starts it.</summary>
     public const string Command = "harness";
+
+    /// <summary>The longest model ID a harness takes.</summary>
+    public const int MaxModelLength = 200;
 
     /// <summary>Whether the harness takes this kind of credential.</summary>
     public bool Accepts(CredentialKind kind)
@@ -44,19 +52,41 @@ public sealed record HarnessProfile(
     }
 
     /// <summary>
-    /// The variables every harness starts with: <c>HARNESS_CREDENTIAL</c>, the kind
-    /// (<c>openai</c>, <c>anthropic</c>, <c>github-token</c>, or <c>claude-oauth-token</c>);
-    /// <c>HARNESS_TOKEN</c>; and for a model API <c>HARNESS_MODEL_URL</c>. A model API always goes
-    /// through a model gateway, so <paramref name="token"/> is the gateway's token and
-    /// <paramref name="gateway"/> its URL; a token tied to one harness goes to it, with no gateway.
+    /// Whether a model's ID can go to a harness: 1 to <see cref="MaxModelLength"/> letters, digits, and
+    /// <c>. _ - : / ~ @ +</c>, as vendors write them, such as <c>openai/gpt-6-luna</c>; nothing a start
+    /// script would have to quote.
     /// </summary>
-    public static IReadOnlyDictionary<string, string> EnvironmentFor(CredentialKind kind, string token, Uri? gateway)
+    public static bool IsModelId(string? model)
+    {
+        return model is { Length: > 0 and <= MaxModelLength }
+            && model.All(character => char.IsAsciiLetterOrDigit(character) || character is '.' or '_' or '-' or ':' or '/' or '~' or '@' or '+');
+    }
+
+    /// <summary>
+    /// The variables every harness starts with: <c>HARNESS_CREDENTIAL</c>, the kind
+    /// (<c>openai</c>, <c>anthropic</c>, <c>openrouter</c>, <c>github-token</c>, or
+    /// <c>claude-oauth-token</c>); <c>HARNESS_TOKEN</c>; for a model API <c>HARNESS_MODEL_URL</c>; and
+    /// <c>HARNESS_MODEL</c> when it runs on a chosen model. A model API always goes through a model
+    /// gateway, so <paramref name="token"/> is the gateway's token and <paramref name="gateway"/> its
+    /// URL; a token tied to one harness goes to it, with no gateway.
+    /// </summary>
+    /// <param name="kind">What it pays with.</param>
+    /// <param name="token">The gateway's token, or the harness's own.</param>
+    /// <param name="gateway">The gateway's URL, for a model API.</param>
+    /// <param name="model">The model's ID (<see cref="IsModelId"/>), or <see langword="null"/> for the harness's default.</param>
+    public static IReadOnlyDictionary<string, string> EnvironmentFor(CredentialKind kind, string token, Uri? gateway, string? model)
     {
         ArgumentException.ThrowIfNullOrEmpty(token);
+        if (model is not null && !IsModelId(model))
+        {
+            throw new ArgumentException("A model's ID takes letters, digits, and . _ - : / ~ @ + only.", nameof(model));
+        }
+
         (string name, bool modelApi) = kind switch
         {
             CredentialKind.OpenAIApi => ("openai", true),
             CredentialKind.AnthropicApi => ("anthropic", true),
+            CredentialKind.OpenRouterApi => ("openrouter", true),
             CredentialKind.GitHubToken => ("github-token", false),
             CredentialKind.ClaudeOAuthToken => ("claude-oauth-token", false),
         };
@@ -73,6 +103,11 @@ public sealed record HarnessProfile(
         if (gateway is not null)
         {
             environment["HARNESS_MODEL_URL"] = gateway.AbsoluteUri.TrimEnd('/');
+        }
+
+        if (model is not null)
+        {
+            environment["HARNESS_MODEL"] = model;
         }
 
         return environment;

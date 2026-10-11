@@ -85,7 +85,9 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Kept folder | A folder AiSloth keeps outside every nook, by name, which nooks sync a folder of theirs with: what each changed comes together, a text file both changed keeping the lines of both | Nooks | synced folder, volume, shared folder |
 | Agent account | An account at an agent vendor that pays for agents' work, such as an OpenAI API key or a ChatGPT plan: a workspace's, which every member uses, or a person's own | AgentAccounts | subscription (for API keys), credential, account (alone) |
 | Secret | An environment variable a workspace gives to every process in its nooks, agents included, such as `GH_TOKEN`; readable by everyone who may write in a nook | Secrets | env var (alone), credential, key |
-| Endpoint | The base URL of the API an API key is for, when it isn't the vendor's own, such as OpenRouter's for OpenAI's API | AgentAccounts | base URL, provider, upstream |
+| Endpoint | The base URL of the API an Anthropic or OpenAI API key is for, when it isn't the vendor's own, such as a company's gateway | AgentAccounts | base URL, provider, upstream |
+| Model | What a chat's agent runs on, as its account's vendor names it, such as `openai/gpt-6-luna` at OpenRouter; its harness's default when none is chosen | Chats, AgentAccounts | LLM, engine |
+| Preset | A person's saved harness, agent account, and model, which they pick when they start a chat | Chats | template, profile, favorite |
 | Plan | A person's subscription at a vendor that pays for agents' work, such as a ChatGPT, Claude, or Copilot plan; always personal | AgentAccounts | subscription (for API keys), seat |
 | Sign-in | Proving who you are in a browser or with a code: to a host, which starts a session (Users), or at a plan's vendor, which adds the plan, finished with the address the browser returns to (AgentAccounts) | Users, AgentAccounts | OAuth flow, login, connect |
 | Account kind | What an agent account is at its vendor, named so vendors can't be confused: `chatgpt-plan`, `claude-plan`, `copilot-plan`, `openai-api-key`, `anthropic-api-key` | AgentAccounts | provider, type |

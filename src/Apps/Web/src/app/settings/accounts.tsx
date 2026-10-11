@@ -58,13 +58,19 @@ const kindNames: Record<
     name: "Anthropic API key",
     description: "Anthropic's API, or any endpoint that speaks it",
     secret: "API key",
-    endpoint: "https://openrouter.ai/api",
+    endpoint: "https://gateway.example.com",
   },
   OpenAIApiKey: {
     name: "OpenAI API key",
     description: "OpenAI's API, or any endpoint that speaks it",
     secret: "API key",
-    endpoint: "https://openrouter.ai/api/v1",
+    endpoint: "https://gateway.example.com/v1",
+  },
+  OpenRouterApiKey: {
+    name: "OpenRouter API key",
+    description: "Many vendors' models with one key, for Claude Code and pi",
+    secret: "API key",
+    endpoint: null,
   },
   ChatGptPlan: {
     name: "ChatGPT plan",
@@ -90,9 +96,11 @@ const kindNames: Record<
 // listens, so the person brings the address back themselves.
 const chatGptCallback = "http://127.0.0.1:1456/auth/callback"
 
-// Own accounts show in every workspace, so any account change reads them all again.
+// Own accounts show in every workspace, and presets where their account works, so any account
+// change reads them all again.
 const isAccountList = (query: { queryKey: readonly unknown[] }) =>
-  query.queryKey[0] === "workspaces" && query.queryKey[2] === "agent-accounts"
+  query.queryKey[0] === "workspaces" &&
+  (query.queryKey[2] === "agent-accounts" || query.queryKey[2] === "presets")
 
 export function AccountsSection({ workspace }: { workspace: Workspace }) {
   const queryClient = useQueryClient()

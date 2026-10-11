@@ -90,6 +90,7 @@
     <Project Path="src/Sdk/Bagatka.Sdk.Docker/Bagatka.Sdk.Docker.csproj" />
     <Project Path="src/Sdk/Bagatka.Sdk.GitHub/Bagatka.Sdk.GitHub.csproj" />
     <Project Path="src/Sdk/Bagatka.Sdk.OpenAI/Bagatka.Sdk.OpenAI.csproj" />
+    <Project Path="src/Sdk/Bagatka.Sdk.OpenRouter/Bagatka.Sdk.OpenRouter.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Bagatka.AiSloth.ArchitectureTests/Bagatka.AiSloth.ArchitectureTests.csproj" />

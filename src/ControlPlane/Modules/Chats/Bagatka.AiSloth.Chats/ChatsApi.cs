@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +12,7 @@ using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
+using Bagatka.Harnesses;
 using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Chats;
@@ -83,6 +85,42 @@ internal sealed partial class ChatsApi(
         }
 
         return access < needed ? new Result<UserId>(Error.Forbidden) : new Result<UserId>(user.UserId);
+    }
+
+    private static readonly Error UnusableAccount = Error.Validation("account", "Use the workspace's account or your own, of a kind the harness takes.");
+
+    // The account, when the actor may use it in the workspace and the harness takes its kind.
+    private async Task<Result<AgentAccountSummary>> AccountForAsync(Actor actor, WorkspaceId workspaceId, AgentAccountId id, HarnessProfile harness, CancellationToken ct)
+    {
+        Result<IReadOnlyList<AgentAccountSummary>> usable = await accounts.ListAsync(actor, workspaceId, ct);
+        if (usable.Failed)
+        {
+            return new Result<AgentAccountSummary>(usable.Error);
+        }
+
+        AgentAccountSummary? account = usable.Output.FirstOrDefault(found => found.Id == id && harness.Accepts(AccountCredentials.KindOf(found.Kind)));
+        return account is null ? new Result<AgentAccountSummary>(UnusableAccount) : new Result<AgentAccountSummary>(account);
+    }
+
+    // The harness a chat runs, with a model only for a harness that takes one, and only an ID a
+    // harness can be given.
+    private static Result<HarnessProfile> HarnessWith(string id, string? model)
+    {
+        HarnessProfile? harness = HarnessProfiles.Find(id);
+        if (harness is null)
+        {
+            return new Result<HarnessProfile>(Error.Validation("harness", "Unknown harness; see GET /harnesses."));
+        }
+
+        if (model is not null && !harness.TakesModel)
+        {
+            return new Result<HarnessProfile>(Error.Validation("model", harness.Name + " runs on its own default model."));
+        }
+
+        bool valid = model is null || HarnessProfile.IsModelId(model);
+        return valid
+            ? new Result<HarnessProfile>(harness)
+            : new Result<HarnessProfile>(Error.Validation("model", "Must be a model's ID as its vendor writes it, such as openai/gpt-6-luna: letters, digits, and . _ - : / ~ @ + only."));
     }
 
     // Enough of a first message for its first line's title.

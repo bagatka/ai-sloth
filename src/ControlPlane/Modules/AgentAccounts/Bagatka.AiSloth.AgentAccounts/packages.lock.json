@@ -93,6 +93,12 @@
           "Bagatka.Foundation": "[1.0.0, )"
         }
       },
+      "bagatka.sdk.openrouter": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
       "EFCore.NamingConventions": {
         "type": "CentralTransitive",
         "requested": "[10.0.1, )",

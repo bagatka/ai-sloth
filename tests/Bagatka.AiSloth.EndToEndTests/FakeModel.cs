@@ -28,12 +28,23 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// (<c>/opt/by-hand</c>), a phrase a test holds on (<see cref="HoldOn"/>) holds the answer until the
 /// test releases it, "first message" answers with the conversation's first message, and anything else
 /// gets a short text. It speaks
-/// OpenAI's Responses API well enough for Codex and pi, answering every call with a short text.
+/// OpenAI's Responses API well enough for Codex and pi, answering every call with a short text. It
+/// stands in for OpenRouter too: its catalog of models, and OpenAI's chat API, which pi calls there,
+/// answering every call with a short text.
 /// </summary>
 internal sealed class FakeModel : IAsyncDisposable
 {
     /// <summary>The key tests give workspaces' Anthropic accounts; the gateway forwards it.</summary>
     public const string ApiKey = "e2e-model-key";
+
+    /// <summary>The key tests give OpenRouter accounts; the gateway forwards it as a bearer token.</summary>
+    public const string OpenRouterKey = "sk-or-e2e";
+
+    /// <summary>A model in its OpenRouter catalog that can call tools, as a chat's model.</summary>
+    public const string OpenRouterModel = "openai/gpt-6-luna";
+
+    /// <summary>Another model in its OpenRouter catalog that can call tools.</summary>
+    public const string OpenRouterClaude = "anthropic/claude-opus-5.5";
 
     private readonly WebApplication _app;
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
@@ -103,6 +114,8 @@ internal sealed class FakeModel : IAsyncDisposable
         app.MapPost("/v1/messages/count_tokens", () => Results.Json(new { input_tokens = 10 }));
         app.MapPost("/v1/messages", model.MessagesAsync);
         app.MapPost("/v1/responses", model.ResponsesAsync);
+        app.MapPost("/v1/chat/completions", model.ChatCompletionsAsync);
+        app.MapGet("/v1/models", OpenRouterCatalog);
         await app.StartAsync();
         IServerAddressesFeature? addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
         if (addresses is null)
@@ -259,6 +272,87 @@ internal sealed class FakeModel : IAsyncDisposable
         ];
         context.Response.ContentType = "text/event-stream";
         await context.Response.WriteAsync(EventStream(events), context.RequestAborted);
+    }
+
+    // OpenRouter's catalog, as it lists models: two that can call tools, one only for batches, and one
+    // that can't call tools.
+    private static IResult OpenRouterCatalog()
+    {
+        JsonObject catalog = new JsonObject
+        {
+            ["data"] = new JsonArray(
+                CatalogModel(OpenRouterModel, "OpenAI: GPT-6 Luna", "tools", "max_tokens"),
+                CatalogModel(OpenRouterModel + ":batch", "OpenAI: GPT-6 Luna (batch)", "tools", "max_tokens"),
+                CatalogModel(OpenRouterClaude, "Anthropic: Claude Opus 5.5", "tools", "max_tokens"),
+                CatalogModel("example/writer", "Example: Writer", "max_tokens")),
+        };
+        return Results.Text(catalog.ToJsonString(), "application/json");
+    }
+
+    private static JsonObject CatalogModel(string id, string name, params string[] parameters)
+    {
+        return new JsonObject
+        {
+            ["id"] = id,
+            ["name"] = name,
+            ["supported_parameters"] = new JsonArray([.. parameters.Select(parameter => (JsonNode)parameter)]),
+        };
+    }
+
+    // OpenAI's chat API, as pi calls it at OpenRouter: every call gets a short text, streamed or not.
+    private async Task ChatCompletionsAsync(HttpContext context)
+    {
+        OpenAIAuthorizations.Enqueue(context.Request.Headers.Authorization.FirstOrDefault());
+        JsonNode? request = await JsonNode.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted);
+        Requests.Enqueue(request?.ToJsonString() ?? string.Empty);
+        string? modelName = (string?)request?["model"];
+        JsonObject usage = new JsonObject { ["prompt_tokens"] = 10, ["completion_tokens"] = 3, ["total_tokens"] = 13 };
+        if ((bool?)request?["stream"] != true)
+        {
+            JsonObject message = new JsonObject { ["role"] = "assistant", ["content"] = "Hello." };
+            JsonObject completion = new JsonObject
+            {
+                ["id"] = "chatcmpl_e2e",
+                ["object"] = "chat.completion",
+                ["created"] = 0,
+                ["model"] = modelName,
+                ["choices"] = new JsonArray(new JsonObject { ["index"] = 0, ["message"] = message, ["finish_reason"] = "stop" }),
+                ["usage"] = usage,
+            };
+            await context.Response.WriteAsJsonAsync(completion, context.RequestAborted);
+            return;
+        }
+
+        JsonObject[] chunks =
+        [
+            Chunk(modelName, new JsonObject { ["role"] = "assistant", ["content"] = string.Empty }, finish: null, used: null),
+            Chunk(modelName, new JsonObject { ["content"] = "Hello." }, finish: null, used: null),
+            Chunk(modelName, new JsonObject(), "stop", used: null),
+            Chunk(modelName, delta: null, finish: null, usage),
+        ];
+        StringBuilder stream = new StringBuilder();
+        foreach (JsonObject chunk in chunks)
+        {
+            stream.Append("data: ").Append(chunk.ToJsonString()).Append("\n\n");
+        }
+
+        stream.Append("data: [DONE]\n\n");
+        context.Response.ContentType = "text/event-stream";
+        await context.Response.WriteAsync(stream.ToString(), context.RequestAborted);
+    }
+
+    // A piece of a streamed chat answer: some of the message, how it finished, or what it used.
+    private static JsonObject Chunk(string? model, JsonObject? delta, string? finish, JsonObject? used)
+    {
+        return new JsonObject
+        {
+            ["id"] = "chatcmpl_e2e",
+            ["object"] = "chat.completion.chunk",
+            ["created"] = 0,
+            ["model"] = model,
+            ["choices"] = delta is null ? new JsonArray() : new JsonArray(new JsonObject { ["index"] = 0, ["delta"] = delta, ["finish_reason"] = finish }),
+            ["usage"] = used,
+        };
     }
 
     private static JsonObject Text(string text)

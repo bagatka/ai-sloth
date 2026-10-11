@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 
@@ -40,6 +41,46 @@ public interface IChatsApi
     /// when the actor has no access to it.
     /// </returns>
     public Task<Result<ChatSummary>> StartAsync(Actor actor, StartChat command, CancellationToken ct);
+
+    /// <summary>
+    /// The models a chat's agent can run on with the harness and the account (<see cref="StartChat.Model"/>):
+    /// those of the account's vendor that can call tools, newest first. Empty when the harness runs on
+    /// its own default model, or the vendor's models aren't listed (<c>IAgentAccountsApi.ListModelsAsync</c>).
+    /// Reads the vendor's catalog each time, which throws when it can't be reached; try again later.
+    /// </summary>
+    /// <returns>
+    /// The models; a validation error for an unknown harness, or an account the actor can't use or the
+    /// harness doesn't take; or not found when the actor has no access to the workspace.
+    /// </returns>
+    public Task<Result<IReadOnlyList<AgentModel>>> ListModelsAsync(Actor actor, WorkspaceId workspaceId, string harness, AgentAccountId account, CancellationToken ct);
+
+    /// <summary>
+    /// The actor's presets that can start chats in the workspace, oldest first: those on the
+    /// workspace's accounts, for people with Write on it, and those on their own accounts. A preset on
+    /// an account that was removed isn't listed.
+    /// </summary>
+    /// <returns>The presets; forbidden for anyone but a person; or not found when the actor has no access to the workspace.</returns>
+    public Task<Result<IReadOnlyList<PresetSummary>>> ListPresetsAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct);
+
+    /// <summary>
+    /// Saves a preset of the actor's, checked as a chat's start is: a harness, an account the actor may
+    /// use in the workspace of a kind the harness takes, and a model only for a harness that takes one.
+    /// A person keeps at most 20, each harness, account, and model once.
+    /// </summary>
+    /// <returns>
+    /// The preset; a validation error for its harness, account, model, or name; <see cref="ChatsErrors.PresetExists"/>;
+    /// <see cref="ChatsErrors.TooManyPresets"/>; forbidden for anyone but a person; or not found when
+    /// the actor has no access to the workspace.
+    /// </returns>
+    public Task<Result<PresetSummary>> AddPresetAsync(Actor actor, AddPreset command, CancellationToken ct);
+
+    /// <summary>Renames one of the actor's presets: 1 to 64 characters.</summary>
+    /// <returns>The preset; a validation error for the name; or <see cref="ChatsErrors.PresetNotFound"/>.</returns>
+    public Task<Result<PresetSummary>> RenamePresetAsync(Actor actor, PresetId id, string name, CancellationToken ct);
+
+    /// <summary>Removes one of the actor's presets. Chats started from it keep running as they are.</summary>
+    /// <returns>Success; or <see cref="ChatsErrors.PresetNotFound"/>.</returns>
+    public Task<Result> RemovePresetAsync(Actor actor, PresetId id, CancellationToken ct);
 
     /// <summary>The chat. Not found when it doesn't exist or the actor has no access to its nook.</summary>
     public Task<Result<ChatSummary>> GetAsync(Actor actor, ChatId id, CancellationToken ct);

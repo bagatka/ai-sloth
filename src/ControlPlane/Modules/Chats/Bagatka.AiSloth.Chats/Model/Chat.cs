@@ -21,7 +21,7 @@ internal sealed class Chat
     public const int MaxHarnessLength = 32;
 
     // Used by Start and by EF: parameter names match property names.
-    private Chat(ChatId id, NookId nookId, WorkspaceId workspaceId, UserId startedBy, DateTimeOffset startedAt, string harness, AgentAccountId agentAccountId, UserId? accountOwnerId)
+    private Chat(ChatId id, NookId nookId, WorkspaceId workspaceId, UserId startedBy, DateTimeOffset startedAt, string harness, string? model, AgentAccountId agentAccountId, UserId? accountOwnerId)
     {
         Id = id;
         NookId = nookId;
@@ -29,6 +29,7 @@ internal sealed class Chat
         StartedBy = startedBy;
         StartedAt = startedAt;
         Harness = harness;
+        Model = model;
         AgentAccountId = agentAccountId;
         AccountOwnerId = accountOwnerId;
     }
@@ -44,6 +45,9 @@ internal sealed class Chat
     public DateTimeOffset StartedAt { get; private set; }
 
     public string Harness { get; private set; }
+
+    // The model its agent runs on, as the account's vendor names it; null for the harness's default.
+    public string? Model { get; private set; }
 
     public AgentAccountId AgentAccountId { get; private set; }
 
@@ -90,9 +94,9 @@ internal sealed class Chat
     // PostgreSQL's xmin: a second writer conflicts instead of overwriting.
     public uint Version { get; private set; }
 
-    public static Chat Start(NookId nookId, WorkspaceId workspaceId, UserId startedBy, string harness, AgentAccountCredential account, TimeProvider time)
+    public static Chat Start(NookId nookId, WorkspaceId workspaceId, UserId startedBy, string harness, string? model, AgentAccountCredential account, TimeProvider time)
     {
-        return new Chat(ChatId.New(), nookId, workspaceId, startedBy, time.GetUtcNow(), harness, account.Id, account.OwnerId) { StartsAgent = true };
+        return new Chat(ChatId.New(), nookId, workspaceId, startedBy, time.GetUtcNow(), harness, model, account.Id, account.OwnerId) { StartsAgent = true };
     }
 
     public static byte[] HashToken(string token)
@@ -220,7 +224,7 @@ internal sealed class Chat
     /// <param name="firstMessage">The start of its first message, if anyone wrote in it.</param>
     public ChatSummary ToSummary(bool messagesWaiting, string? firstMessage)
     {
-        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, AgentAccountId, AccountOwnerId, TitleFrom(firstMessage));
+        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, Model, AgentAccountId, AccountOwnerId, TitleFrom(firstMessage));
     }
 
     // A title is the first line with words in it, its spaces collapsed, cut at a word near 80 characters.
