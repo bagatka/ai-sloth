@@ -122,18 +122,36 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
     }
 
     // OpenAI's list of models holds every model its API serves; only those an agent can run on are
-    // offered.
+    // offered. Codex switches to one mid-chat: the next turn's agent runs on it, and remembers.
     private async Task CodexAndPiAnswerThroughTheGatewayOnAnOpenAIKeyAsync()
     {
         TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice, openAI: true);
         IReadOnlyList<AgentModel> models = await Api.ReadAsync<IReadOnlyList<AgentModel>>(_alice.SendGetAsync(ModelsPath(workspace, "codex", workspace.Account)), HttpStatusCode.OK);
+        AgentAccountSummary own = await Api.ReadAsync<AgentAccountSummary>(
+            _alice.SendPostAsync("/agent-accounts", new { kind = "OpenAIApiKey", name = "Mine", secret = FakeModel.ApiKey, endpoint = app.Model.OpenAIUrl }), HttpStatusCode.Created);
+        ChatSummary codex = await workspace.StartChatAsync("codex", workspace.Account);
+        await using ChatWatch watch = await ChatWatch.OpenAsync(workspace.Person, codex);
+        Task<JsonElement> pi = TurnAsync(workspace, "pi", workspace.Account);
 
-        JsonElement[] ended = await Task.WhenAll(TurnAsync(workspace, "codex", workspace.Account, FakeModel.OpenAIModel), TurnAsync(workspace, "pi", workspace.Account));
+        await workspace.SendAsync(codex, "say hello");
+        JsonElement first = await watch.NextAsync("turn-ended");
+        ChatSummary switched = await Api.ReadAsync<ChatSummary>(
+            _alice.SendPutAsync(Paths.Chat(codex) + "/model", new { account = workspace.Account, model = FakeModel.OpenAIModel }), HttpStatusCode.OK);
+        JsonElement changed = await watch.NextAsync("model-changed");
+        Problem toOwn = await Api.ProblemAsync(_alice.SendPutAsync(Paths.Chat(codex) + "/model", new { account = own.Id }), HttpStatusCode.BadRequest);
+        await workspace.SendAsync(codex, "say hello again");
+        JsonElement restarted = await watch.NextAsync("agent-restarted");
+        JsonElement second = await watch.NextAsync("turn-ended");
+        JsonElement piEnded = await pi;
 
         Assert.Equal([FakeModel.OpenAIModel], models.Select(model => model.Id), StringComparer.Ordinal);
-        Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
+        Assert.All([first, second, piEnded], turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
+        Assert.Equal(FakeModel.OpenAIModel, switched.Model);
+        Assert.Equal(FakeModel.OpenAIModel, changed.GetProperty("model").GetString());
+        Assert.True(toOwn.Errors?.ContainsKey("account"));
+        Assert.True(restarted.GetProperty("remembers").GetBoolean());
         Assert.Contains(app.Model.OpenAIAuthorizations, authorization => string.Equals(authorization, "Bearer " + FakeModel.ApiKey, StringComparison.Ordinal));
-        Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.OpenAIModel + "\"", StringComparison.Ordinal));
+        Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.OpenAIModel + "\"", StringComparison.Ordinal) && body.Contains("say hello again", StringComparison.Ordinal));
     }
 
     // OpenRouter speaks Anthropic's API for Claude Code and OpenAI's chat API for pi, at one address and

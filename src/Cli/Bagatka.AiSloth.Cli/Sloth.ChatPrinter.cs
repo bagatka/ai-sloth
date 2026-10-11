@@ -80,6 +80,10 @@ internal sealed partial class Sloth
                 case "setup-started" or "setup-ended":
                     await PrintSetupAsync(type, body);
                     break;
+                case "model-changed":
+                    string? model = body.GetProperty("model").GetString();
+                    await LineAsync(model is null ? "  (switched to the agent's default model, from the next turn)" : "  (switched to " + model + ", from the next turn)");
+                    break;
                 case "agent-restarted":
                     bool remembers = body.GetProperty("remembers").GetBoolean();
                     await LineAsync(remembers ? "  (the agent started again, and remembers the conversation)" : "  (the agent started again, without the earlier conversation)");

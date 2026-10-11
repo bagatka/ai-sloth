@@ -87,7 +87,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Secret | An environment variable a workspace gives to every process in its nooks, agents included, such as `GH_TOKEN`; readable by everyone who may write in a nook | Secrets | env var (alone), credential, key |
 | Endpoint | The base URL of the API an Anthropic or OpenAI API key is for, when it isn't the vendor's own, such as a company's gateway | AgentAccounts | base URL, provider, upstream |
 | Model | What a chat's agent runs on, as its account's vendor names it, such as `openai/gpt-6-luna` at OpenRouter; its harness's default when none is chosen | Chats, AgentAccounts | LLM, engine |
-| Preset | A person's saved harness, agent account, and model, which they pick when they start a chat | Chats | template, profile, favorite |
+| Preset | A person's saved harness, agent account, and model, a shortcut at the top of the model picker; any model stays a click away | Chats | template, profile, favorite |
 | Plan | A person's subscription at a vendor that pays for agents' work, such as a ChatGPT, Claude, or Copilot plan; always personal | AgentAccounts | subscription (for API keys), seat |
 | Sign-in | Proving who you are in a browser or with a code: to a host, which starts a session (Users), or at a plan's vendor, which adds the plan, finished with the address the browser returns to (AgentAccounts) | Users, AgentAccounts | OAuth flow, login, connect |
 | Account kind | What an agent account is at its vendor, named so vendors can't be confused: `chatgpt-plan`, `claude-plan`, `copilot-plan`, `openai-api-key`, `anthropic-api-key` | AgentAccounts | provider, type |

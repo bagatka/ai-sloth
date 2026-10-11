@@ -37,6 +37,7 @@ namespace Bagatka.AiSloth.Cli;
 [JsonSerializable(typeof(Wire.Preset))]
 [JsonSerializable(typeof(Wire.AddPreset))]
 [JsonSerializable(typeof(Wire.PresetName))]
+[JsonSerializable(typeof(Wire.ChangeModel))]
 [JsonSerializable(typeof(Wire.ChatPage))]
 [JsonSerializable(typeof(Wire.CheckpointPage))]
 [JsonSerializable(typeof(IReadOnlyList<Wire.HarnessState>))]

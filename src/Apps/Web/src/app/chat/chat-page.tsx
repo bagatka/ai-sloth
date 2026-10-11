@@ -20,7 +20,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { ApiError } from "../api"
-import { agentLabel } from "../choose-agent"
+import { agentLabel } from "../model-picker"
 import { chat as chatQuery, harnesses, me, nooks, people } from "../queries"
 import { chatStream, useChat } from "./chat-stream"
 import { ChangesPanel, DownloadFiles } from "./changes-panel"
@@ -141,7 +141,8 @@ export function ChatPage() {
       )}
       <Composer
         key={chatId}
-        chatId={chatId}
+        chat={chat.data}
+        harness={agents?.find((harness) => harness.id === chat.data.harness)}
         nookId={chat.data.nookId}
         asleep={nook?.status === "Asleep"}
         working={working}

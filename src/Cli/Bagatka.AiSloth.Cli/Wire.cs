@@ -65,6 +65,8 @@ internal static class Wire
 
     internal sealed record PresetName(string Name);
 
+    internal sealed record ChangeModel(Guid Account, string? Model);
+
     internal sealed record Nook(Guid Id, string Status, IReadOnlyList<NookSource> Sources);
 
     internal sealed record NookPage(IReadOnlyList<Nook> Items, string? NextCursor);

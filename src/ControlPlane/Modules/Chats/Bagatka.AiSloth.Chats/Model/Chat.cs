@@ -49,6 +49,14 @@ internal sealed class Chat
     // The model its agent runs on, as the account's vendor names it; null for the harness's default.
     public string? Model { get; private set; }
 
+    // Another account and model someone chose while an agent ran, which the next agent runs on: the
+    // running agent's model calls stay on its own account until it stops, between turns.
+    public bool AgentChangeWaiting { get; private set; }
+
+    public AgentAccountId? NextAgentAccountId { get; private set; }
+
+    public string? NextModel { get; private set; }
+
     public AgentAccountId AgentAccountId { get; private set; }
 
     // The personal account's owner; null for the workspace's account.
@@ -102,6 +110,46 @@ internal sealed class Chat
     public static byte[] HashToken(string token)
     {
         return SHA256.HashData(Encoding.UTF8.GetBytes(token));
+    }
+
+    // The account and model from the next turn on: at once without a running agent, otherwise once it
+    // stops. Returns whether that changes anything.
+    public bool ChangeAgent(AgentAccountId account, string? model)
+    {
+        AgentAccountId upcoming = AgentChangeWaiting ? NextAgentAccountId!.Value : AgentAccountId;
+        string? upcomingModel = AgentChangeWaiting ? NextModel : Model;
+        if (upcoming == account && string.Equals(upcomingModel, model, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        bool running = HarnessProcessId is not null;
+        AgentChangeWaiting = running && (account != AgentAccountId || !string.Equals(model, Model, StringComparison.Ordinal));
+        NextAgentAccountId = AgentChangeWaiting ? account : null;
+        NextModel = AgentChangeWaiting ? model : null;
+        if (!running)
+        {
+            AgentAccountId = account;
+            Model = model;
+        }
+
+        return true;
+    }
+
+    // The agent stopped: the next one runs on the account and model chosen meanwhile, and starts now.
+    public void ApplyAgentChange()
+    {
+        if (!AgentChangeWaiting)
+        {
+            return;
+        }
+
+        AgentAccountId = NextAgentAccountId!.Value;
+        Model = NextModel;
+        AgentChangeWaiting = false;
+        NextAgentAccountId = null;
+        NextModel = null;
+        StartsAgent = true;
     }
 
     // A new token for an agent about to start; it replaces the last agent's.
@@ -224,7 +272,7 @@ internal sealed class Chat
     /// <param name="firstMessage">The start of its first message, if anyone wrote in it.</param>
     public ChatSummary ToSummary(bool messagesWaiting, string? firstMessage)
     {
-        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, Model, AgentAccountId, AccountOwnerId, TitleFrom(firstMessage));
+        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, AgentChangeWaiting ? NextModel : Model, AgentChangeWaiting ? NextAgentAccountId!.Value : AgentAccountId, AccountOwnerId, TitleFrom(firstMessage));
     }
 
     // A title is the first line with words in it, its spaces collapsed, cut at a word near 80 characters.

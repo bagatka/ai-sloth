@@ -2371,6 +2371,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chats/{id}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ChangeModelRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChatSummary"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/chats/{id}/events": {
         parameters: {
             query?: never;
@@ -2884,15 +2925,20 @@ export interface components {
             /** @description Whether only people given access see it. */
             private: boolean;
         };
+        ChangeModelRequest: {
+            account: components["schemas"]["AgentAccountId"];
+            model?: null | string;
+        };
         /**
          * @description What happened in a chat. A message is sent, then either starts a turn, goes into the running
          *     turn (steered), or is cancelled. A turn shows the agent's updates and ends with a stop reason,
          *     then a checkpoint of the nook's files. A proposal stays with the people in the chat until the
          *     account's owner sends it on. An agent that had to be started again says whether it remembers.
+         *     Someone may change the agent's model or account, from the next turn on.
          *     The nook's setup, when its files have one, starts and ends before its agent starts; a setup the
          *     agent wrote is tested in a fresh nook after its turn.
          */
-        ChatEventBody: components["schemas"]["MessageSent"] | components["schemas"]["MessageProposed"] | components["schemas"]["TurnStarted"] | components["schemas"]["MessageSteered"] | components["schemas"]["MessageCancelled"] | components["schemas"]["AgentUpdate"] | components["schemas"]["TurnEnded"] | components["schemas"]["CheckpointSaved"] | components["schemas"]["CheckpointFailed"] | components["schemas"]["AgentRestarted"] | components["schemas"]["SetupStarted"] | components["schemas"]["SetupEnded"] | components["schemas"]["DiskNearlyFull"];
+        ChatEventBody: components["schemas"]["MessageSent"] | components["schemas"]["MessageProposed"] | components["schemas"]["TurnStarted"] | components["schemas"]["MessageSteered"] | components["schemas"]["MessageCancelled"] | components["schemas"]["AgentUpdate"] | components["schemas"]["TurnEnded"] | components["schemas"]["CheckpointSaved"] | components["schemas"]["CheckpointFailed"] | components["schemas"]["AgentRestarted"] | components["schemas"]["ModelChanged"] | components["schemas"]["SetupStarted"] | components["schemas"]["SetupEnded"] | components["schemas"]["DiskNearlyFull"];
         ChatEventData: {
             /** Format: int64 */
             sequence: number;
@@ -2942,9 +2988,9 @@ export interface components {
             working: boolean;
             /** @description The harness that runs its agent. */
             harness: string;
-            /** @description The model its agent runs on; `null` for the harness's default. */
+            /** @description The model its agent runs on from its next turn; `null` for the harness's default. */
             model: null | string;
-            /** @description The agent account that pays for its work. */
+            /** @description The agent account that pays for its work from its next turn. */
             account: components["schemas"]["AgentAccountId"];
             accountOwner: null | components["schemas"]["UserId"];
             /**
@@ -3227,6 +3273,11 @@ export interface components {
         };
         MessageSteered: {
             messageId: components["schemas"]["MessageId"];
+        };
+        ModelChanged: {
+            account: components["schemas"]["AgentAccountId"];
+            model: null | string;
+            changedBy: components["schemas"]["UserId"];
         };
         /**
          * Format: uuid

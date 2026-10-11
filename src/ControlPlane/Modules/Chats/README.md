@@ -30,7 +30,7 @@ folders).
 `IChatsApi`: members list the harnesses and the models each can run on with an account, start chats
 (each creating its nook, with the workspace's repositories or another chat's files, now or at a
 checkpoint, on a model or the harness's default), list chats or watch the list as it changes, send
-messages and send proposals on, stop the agent, watch a chat's events from any sequence number, set
+messages and send proposals on, change the model and account a chat runs on, stop the agent, watch a chat's events from any sequence number, set
 and read the instructions every agent gets, list and forget their harness state, and keep presets. `IChatHarnessesApi` is the
 model gateway's side.
 
@@ -50,7 +50,8 @@ AgentAccounts (the account a chat runs on, and who may use it).
 
 ## Data
 
-Schema `chats`: `chats` (one per nook; its harness, account, and model; the agent's process, session,
+Schema `chats`: `chats` (one per nook; its harness, account, and model, and another account and
+model chosen while an agent ran; the agent's process, session,
 and how far its output is read; the turn in progress; `xmin` as concurrency token), `messages`,
 `events` (sequence numbers per chat; an agent update is stored as the agent sent it), `drafts`,
 `workspace_instructions`, `personal_instructions`, and `presets` (a person's harness, account, and
@@ -86,8 +87,13 @@ minutes unless given).
   takes one get it (`HarnessProfile.TakesModel`: Claude Code, Codex, and pi). The models offered are the
   vendor's that can call tools; a chat's model isn't checked against them, so a model the vendor
   doesn't know fails its turns with the vendor's answer.
+- **A chat's model changes between turns.** Its harness stays, since its nook runs it, but whoever
+  may use the chat's account picks another model, or another account of the same owner's, for the
+  next turn (`ModelChanged`). A running agent finishes its turn on its own account, so its calls never
+  reach another vendor under the old model's name; then it stops, and the next agent starts on the
+  new ones and loads the conversation.
 - **Presets are personal.** A preset is someone's saved harness, account, and model, offered first
-  when they start a chat. It shows wherever its account works, and hides once the account is removed.
+  in the model picker. It shows wherever its account works, and hides once the account is removed.
   A person keeps at most 20.
 - **No model key or plan in a nook.** An agent gets the model gateway's URL and a token for its chat;
   the gateway forwards each call with the headers that pay for it. A plan's token tied to one harness,

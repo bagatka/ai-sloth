@@ -65,6 +65,9 @@ internal sealed class ChatRunner(
     private bool _agentFinishedTurn;
     private int _stopRequested;
 
+    // The agent stopped for another account or model chosen meanwhile, until its exit arrives.
+    private ProcessId? _stoppedForChange;
+
     // The trace of the turn the chat works on, from when a message waits for the agent, its start
     // included, to the turn's end: a trace of its own, current only in the steps that work on the
     // turn, so the runner's background reading and waiting stay out of it. The step that ends the
@@ -272,22 +275,10 @@ internal sealed class ChatRunner(
             _turn?.SetTag("harness", chat.Harness);
         }
 
-        if (chat.HarnessProcessId is null && (queued.Count > 0 || chat.TurnMessageId is not null || chat.StartsAgent))
-        {
-            bool setUp = await SetUpAsync(db, chat, queued.FirstOrDefault(), waits, ct);
-            if (setUp)
-            {
-                await StartHarnessAsync(db, chat, queued.FirstOrDefault(), outgoing, ct);
-            }
-        }
-        else if (chat.SessionId is not null)
-        {
-            await DeliverAsync(db, chat, chat.SessionId, queued, outgoing, ct);
-        }
-
+        await DriveAgentAsync(db, chat, queued, waits, outgoing, ct);
         await SaveAsync(db, ct);
         await SendAsync(chat, outgoing, ct);
-        bool idle = chat.TurnMessageId is null && !waiting.Any(message => message.Waiting) && !chat.StartsAgent
+        bool idle = chat.TurnMessageId is null && !waiting.Any(message => message.Waiting) && !chat.StartsAgent && !chat.AgentChangeWaiting
             && (chat.HarnessProcessId is null || chat.SessionId is not null);
         if (!idle)
         {
@@ -302,6 +293,34 @@ internal sealed class ChatRunner(
         CloseEndedTurnTrace();
 
         return new Progress(chat.NookId, chat.HarnessProcessId, chat.OutputOffset, idle);
+    }
+
+    // Starts the agent when there's work for it, stops it between turns when another account or model
+    // was chosen, and otherwise hands it what waits.
+    private async Task DriveAgentAsync(ChatsDbContext db, Chat chat, List<Message> queued, Waits waits, List<string> outgoing, CancellationToken ct)
+    {
+        if (chat.HarnessProcessId is null && (queued.Count > 0 || chat.TurnMessageId is not null || chat.StartsAgent))
+        {
+            bool setUp = await SetUpAsync(db, chat, queued.FirstOrDefault(), waits, ct);
+            if (setUp)
+            {
+                await StartHarnessAsync(db, chat, queued.FirstOrDefault(), outgoing, ct);
+            }
+        }
+        else if (chat.AgentChangeWaiting && chat.TurnMessageId is null && chat.HarnessProcessId is ProcessId running)
+        {
+            // When the stopped agent's exit arrives, the next one starts on the account and model chosen,
+            // and continues the conversation.
+            if (_stoppedForChange != running)
+            {
+                _stoppedForChange = running;
+                await StopHarnessAsync(chat, ct);
+            }
+        }
+        else if (chat.SessionId is not null)
+        {
+            await DeliverAsync(db, chat, chat.SessionId, queued, outgoing, ct);
+        }
     }
 
     // A chat with work keeps its nook from falling asleep, and wakes it when it sleeps. A nook that can't
@@ -815,7 +834,7 @@ internal sealed class ChatRunner(
             message.Queue();
         }
 
-        // The next agent loads this one's session when it can.
+        // The next agent loads this one's session when it can, on the account and model chosen meanwhile.
         if (lost)
         {
             chat.HarnessLost();
@@ -825,6 +844,8 @@ internal sealed class ChatRunner(
             chat.HarnessStopped();
         }
 
+        chat.ApplyAgentChange();
+        _stoppedForChange = null;
         _agentFinishedTurn = false;
     }
 

@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowUpIcon, StopIcon } from "@phosphor-icons/react"
 import { cn } from "cn"
 
@@ -11,23 +11,28 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { ApiError, answer, api, messageOf } from "../api"
+import { ApiError, answer, api, messageOf, type Schemas } from "../api"
+import { ModelPicker, type Choice } from "../model-picker"
+import { chat as chatQuery, presets as presetsQuery } from "../queries"
 import { chatStream } from "./chat-stream"
 import { MessageBox } from "./message-box"
 
 // Writing to the agent in a chat. While the agent works, a message goes into its running turn
 // (steering), and Esc or the stop button ends the turn. An asleep nook starts waking as someone
-// starts writing, so it's ready when they send.
+// starts writing, so it's ready when they send. Whoever may use the chat's account picks its model,
+// for the next turn on.
 
 export function Composer({
-  chatId,
+  chat,
+  harness,
   nookId,
   asleep,
   working,
   agent,
   proposing,
 }: {
-  chatId: string
+  chat: Schemas["ChatSummary"]
+  harness: Schemas["HarnessSummary"] | undefined
   nookId: string
   asleep: boolean
   working: boolean
@@ -35,6 +40,7 @@ export function Composer({
   /** Whose account the agent runs on, when the signed-in person's messages are only proposals. */
   proposing: string | null
 }) {
+  const chatId = chat.id
   const [draft, setDraft] = React.useState("")
   const empty = draft.trim() === ""
   const stopShown = working && empty
@@ -109,6 +115,9 @@ export function Composer({
           }
         }}
         placeholder={placeholder}
+        controls={
+          harness && !proposing && <ChatModel chat={chat} harness={harness} />
+        }
         action={
           // One button that follows intent: Stop while the agent works and nothing is typed, Send
           // (which steers a running turn) as soon as there is text. The two cross-fade with a little
@@ -154,5 +163,53 @@ export function Composer({
         }
       />
     </div>
+  )
+}
+
+// The chat's model and account, changed for its next turn. Its agent stays: its nook runs it. The
+// accounts offered are the owner's whose the chat's is, the workspace's or the person's own.
+function ChatModel({
+  chat,
+  harness,
+}: {
+  chat: Schemas["ChatSummary"]
+  harness: Schemas["HarnessSummary"]
+}) {
+  const queryClient = useQueryClient()
+  const presets = useQuery(presetsQuery(chat.workspaceId)).data ?? []
+  const change = useMutation({
+    mutationFn: (choice: Choice) =>
+      answer(
+        api.PUT("/chats/{id}/model", {
+          params: { path: { id: chat.id } },
+          body: { account: choice.account, model: choice.model },
+        })
+      ),
+    onSuccess: (changed) =>
+      queryClient.setQueryData(chatQuery(chat.id).queryKey, changed),
+    onError: (error) =>
+      toast.add({
+        type: "error",
+        title: "Model not changed",
+        description: messageOf(error),
+      }),
+  })
+  const pending = change.isPending ? change.variables : null
+
+  return (
+    <ModelPicker
+      workspaceId={chat.workspaceId}
+      harness={harness}
+      value={
+        pending ?? {
+          harness: chat.harness,
+          account: chat.account,
+          model: chat.model,
+        }
+      }
+      owner={chat.accountOwner ?? null}
+      presets={presets}
+      onChange={(choice) => change.mutate(choice)}
+    />
   )
 }

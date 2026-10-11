@@ -30,6 +30,8 @@ internal static class ChatsEndpoints
 
     internal sealed record PresetNameRequest(string Name);
 
+    internal sealed record ChangeModelRequest(AgentAccountId Account, string? Model = null);
+
     internal sealed record PushRequest(IReadOnlyList<string>? Sources = null, string? Branch = null, bool PullRequest = false, string? Message = null);
 
     internal sealed record SendMessageRequest(string Text, MessageId? Proposal = null);
@@ -55,6 +57,7 @@ internal static class ChatsEndpoints
         chats.MapGet("/{id:guid}", Get);
         chats.MapPost("/{id:guid}/messages", Send);
         chats.MapPost("/{id:guid}/stop", Stop);
+        chats.MapPut("/{id:guid}/model", ChangeModel);
         chats.MapGet("/{id:guid}/events", Watch);
         chats.MapPost("/{id:guid}/push", Push);
 
@@ -207,6 +210,22 @@ internal static class ChatsEndpoints
         }
 
         return TypedResults.ServerSentEvents(result.Output, "chats");
+    }
+
+    /// <summary>
+    /// Runs the chat's agent on another model, or on another account of the same owner's (the
+    /// workspace's, or the chat's owner's own), from its next turn: an agent working on a turn finishes
+    /// it, and a new one continues the conversation. Without a model, the harness picks its default.
+    /// </summary>
+    private static async Task<Results<Ok<ChatSummary>, ProblemHttpResult>> ChangeModel(
+        [FromRoute] Guid id,
+        [FromBody] ChangeModelRequest request,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result<ChatSummary> result = await api.ChangeModelAsync(principal.ToActor(), new ChangeModel(ChatId.From(id), request.Account, request.Model), ct);
+        return result.ToOk();
     }
 
     /// <summary>A chat, and whether its agent is working.</summary>

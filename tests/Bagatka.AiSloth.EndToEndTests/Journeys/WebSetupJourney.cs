@@ -143,10 +143,9 @@ public sealed class WebSetupJourney(ControlPlane app)
         ILocator dialog = page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "Add a preset" });
         await dialog.GetByRole(AriaRole.Combobox, new LocatorGetByRoleOptions { Name = "Agent" }).ClickAsync();
         await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "pi", Exact = true }).ClickAsync();
-        await dialog.GetByRole(AriaRole.Combobox, new LocatorGetByRoleOptions { Name = "Paid by" }).ClickAsync();
-        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "OpenRouter" }).ClickAsync();
-        await dialog.GetByRole(AriaRole.Combobox, new LocatorGetByRoleOptions { Name = "Model" }).FillAsync("luna");
-        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "OpenAI: GPT-6 Luna" }).ClickAsync();
+        await dialog.GetByRole(AriaRole.Combobox, new LocatorGetByRoleOptions { Name = "Model", Exact = true }).ClickAsync();
+        await page.GetByLabel("Search models").FillAsync("luna");
+        await OpenRouterGroup(page).GetByRole(AriaRole.Option, new LocatorGetByRoleOptions { Name = "OpenAI: GPT-6 Luna" }).ClickAsync();
         await WebBrowser.ShotAsync(page, "setup-preset");
         await dialog.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Save preset" }).ClickAsync();
 
@@ -192,13 +191,21 @@ public sealed class WebSetupJourney(ControlPlane app)
 
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "What should pi work on?" })).ToBeVisibleAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "No repository" })).ToBeVisibleAsync();
-        await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "pi · GPT-6 Luna" }).ClickAsync();
-        await Assertions.Expect(page.GetByRole(AriaRole.Menuitemradio, new PageGetByRoleOptions { Name = "pi · GPT-6 Luna" })).ToBeVisibleAsync();
-        await WebBrowser.ShotAsync(page, "setup-new-chat-presets");
-        await page.GetByRole(AriaRole.Menuitem, new PageGetByRoleOptions { Name = "Another agent or model…" }).ClickAsync();
-        await Assertions.Expect(page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "Choose an agent" })).ToBeVisibleAsync();
-        await WebBrowser.ShotAsync(page, "setup-choose-agent");
-        await page.Keyboard.PressAsync("Escape");
+        ILocator model = page.GetByRole(AriaRole.Combobox, new PageGetByRoleOptions { Name = "Model", Exact = true });
+        await Assertions.Expect(model).ToContainTextAsync("gpt-6-luna");
+        await model.ClickAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "pi · GPT-6 Luna" })).ToBeVisibleAsync();
+        await WebBrowser.ShotAsync(page, "setup-new-chat-models");
+        await page.GetByLabel("Search models").FillAsync("terra");
+        await OpenRouterGroup(page).GetByRole(AriaRole.Option, new LocatorGetByRoleOptions { Name = "OpenAI: GPT-5.6 Terra" }).ClickAsync();
+        await Assertions.Expect(model).ToContainTextAsync("gpt-5.6-terra");
+    }
+
+    // The model picker's models on the OpenRouter key; the fake's one catalog lists them for the
+    // Anthropic key too.
+    private static ILocator OpenRouterGroup(IPage page)
+    {
+        return page.GetByRole(AriaRole.Group, new PageGetByRoleOptions { Name = "OpenRouter", Exact = true });
     }
 
     private static ILocator Section(IPage page, string title)

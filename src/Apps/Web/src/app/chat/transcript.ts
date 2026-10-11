@@ -69,6 +69,8 @@ export type Row =
       key: string
       tone: "info" | "warning"
       text: string
+      /** Someone chose another model; the agent that takes over next is part of that. */
+      switched?: boolean
     }
 
 export type Transcript = {
@@ -167,7 +169,23 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
       }
       return index >= 0 ? replace(next, index, ended) : append(next, ended)
     }
-    case "agent-restarted":
+    case "model-changed":
+      return append(next, {
+        kind: "notice",
+        key,
+        tone: "info",
+        text: body.model
+          ? `Switched to ${body.model}.`
+          : "Switched to the agent's default model.",
+        switched: true,
+      })
+    case "agent-restarted": {
+      // An agent taking over after a switch, with the conversation, is the switch itself.
+      const notice = findLast(next.rows, (row) => row.kind === "notice")
+      const last = notice >= 0 ? next.rows[notice] : null
+      if (body.remembers && last?.kind === "notice" && last.switched) {
+        return next
+      }
       return append(next, {
         kind: "notice",
         key,
@@ -176,6 +194,7 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
           ? "The agent started again and remembers the conversation."
           : "The agent started again without its memory of this conversation.",
       })
+    }
     case "checkpoint-failed":
       return append(next, {
         kind: "notice",

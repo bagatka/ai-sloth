@@ -43,6 +43,7 @@ const kinds = [
   "checkpoint-saved",
   "checkpoint-failed",
   "agent-restarted",
+  "model-changed",
   "setup-started",
   "setup-ended",
   "disk-nearly-full",

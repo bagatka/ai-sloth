@@ -6,13 +6,27 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/components/ui/toast"
 import {
@@ -21,16 +35,23 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { ApiError, answer, api, messageOf, type Schemas } from "../api"
-import { ChooseAgentDialog } from "../choose-agent"
+import {
+  accountsFor,
+  modelLabel,
+  ModelPicker,
+  type Choice,
+} from "../model-picker"
 import {
   agentAccounts,
   harnesses as harnessesQuery,
+  models as modelsQuery,
   presets as presetsQuery,
 } from "../queries"
 import { NoRows, RemoveButton, Row, Rows, Section } from "./section"
 
 // Presets: the agents someone starts chats with most, each an agent, the account that pays, and its
-// model. They're a person's own, and show in every workspace their account works in.
+// model, at the top of every model picker. They're a person's own, and show in every workspace their
+// account works in.
 
 type Workspace = Schemas["WorkspaceSummary"]
 type Preset = Schemas["PresetSummary"]
@@ -40,7 +61,6 @@ export function PresetsSection({ workspace }: { workspace: Workspace }) {
   const list = useQuery(presetsQuery(workspace.id))
   const harnesses = useQuery(harnessesQuery).data
   const accounts = useQuery(agentAccounts(workspace.id)).data
-  const [adding, setAdding] = React.useState(false)
   const remove = useMutation({
     mutationFn: (id: string) =>
       answer(api.DELETE("/presets/{id}", { params: { path: { id } } })),
@@ -60,21 +80,8 @@ export function PresetsSection({ workspace }: { workspace: Workspace }) {
     <Section
       id="presets"
       title="Presets"
-      description="The agents you start chats with most: each one an agent, the account that pays, and its model. They're yours alone."
-      action={
-        <>
-          <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
-            <PlusIcon data-icon="inline-start" />
-            Add
-          </Button>
-          <ChooseAgentDialog
-            workspace={workspace}
-            open={adding}
-            onOpenChange={setAdding}
-            purpose="save"
-          />
-        </>
-      }
+      description="Shortcuts at the top of the model picker: an agent and its model, on the account that pays. They're yours alone."
+      action={<AddPreset workspace={workspace} />}
     >
       <Rows label="Presets">
         {list.isPending ? (
@@ -83,8 +90,8 @@ export function PresetsSection({ workspace }: { workspace: Workspace }) {
           </NoRows>
         ) : (list.data ?? []).length === 0 ? (
           <NoRows>
-            None yet. Save the agents and models you use most, and a new chat
-            offers them first.
+            None yet. Any model is a click away in the message box; save the
+            ones you use most to find them first.
           </NoRows>
         ) : (
           (list.data ?? []).map((preset) => (
@@ -212,4 +219,194 @@ function RenameButton({
       </DialogContent>
     </Dialog>
   )
+}
+
+function AddPreset({ workspace }: { workspace: Workspace }) {
+  const [open, setOpen] = React.useState(false)
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+        <PlusIcon data-icon="inline-start" />
+        Add
+      </DialogTrigger>
+      <DialogContent>
+        {/* A new form each time the dialog opens. */}
+        {open && (
+          <PresetForm workspace={workspace} onSaved={() => setOpen(false)} />
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function PresetForm({
+  workspace,
+  onSaved,
+}: {
+  workspace: Workspace
+  onSaved: () => void
+}) {
+  const queryClient = useQueryClient()
+  const accounts = useQuery(agentAccounts(workspace.id)).data ?? []
+  const harnesses = (useQuery(harnessesQuery).data ?? []).filter(
+    (harness) => accountsFor(accounts, harness).length > 0
+  )
+  const [chosen, setChosen] = React.useState<Choice | null>(null)
+  const [name, setName] = React.useState("")
+
+  // The agent holds while it's offered; until a model is picked, its first account's own default.
+  const harness =
+    harnesses.find((found) => found.id === chosen?.harness) ?? harnesses[0]
+  const offered = harness ? accountsFor(accounts, harness) : []
+  const choice: Choice | null =
+    harness && offered[0]
+      ? chosen?.harness === harness.id &&
+        offered.some((account) => account.id === chosen.account)
+        ? chosen
+        : { harness: harness.id, account: offered[0].id, model: null }
+      : null
+  const models = useQuery({
+    ...modelsQuery(workspace.id, choice?.harness ?? "", choice?.account ?? ""),
+    enabled: !!choice,
+  })
+  const picked = models.data?.find((model) => model.id === choice?.model)
+  const defaultName =
+    harness && choice?.model
+      ? `${harness.name} · ${picked ? spokenName(picked.name) : modelLabel(choice.model)}`
+      : (harness?.name ?? "")
+
+  const save = useMutation({
+    mutationFn: (of: Choice) =>
+      answer(
+        api.POST("/workspaces/{workspaceId}/presets", {
+          params: { path: { workspaceId: workspace.id } },
+          body: { ...of, name: name.trim() || defaultName },
+        })
+      ),
+    onSuccess: (preset) => {
+      void queryClient.invalidateQueries({
+        queryKey: presetsQuery(workspace.id).queryKey,
+      })
+      toast.add({ type: "success", title: `Saved ${preset.name}` })
+      onSaved()
+    },
+  })
+  const error = save.error instanceof ApiError ? save.error : null
+
+  if (!harness || !choice) {
+    return (
+      <DialogHeader>
+        <DialogTitle>Add a preset</DialogTitle>
+        <DialogDescription>
+          Add an agent account first: an API key, or your own plan.
+        </DialogDescription>
+      </DialogHeader>
+    )
+  }
+
+  return (
+    <form
+      className="contents"
+      onSubmit={(event) => {
+        event.preventDefault()
+        save.mutate(choice)
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>Add a preset</DialogTitle>
+        <DialogDescription>
+          An agent and its model, at the top of the model picker when you start
+          a chat.
+        </DialogDescription>
+      </DialogHeader>
+      <FieldGroup>
+        <Field>
+          <FieldLabel>Agent</FieldLabel>
+          <Select
+            items={harnesses.map((found) => ({
+              value: found.id,
+              label: found.name,
+            }))}
+            value={harness.id}
+            onValueChange={(value) => {
+              const next = harnesses.find((found) => found.id === value)
+              const first = next && accountsFor(accounts, next)[0]
+              if (next && first) {
+                setChosen({ harness: next.id, account: first.id, model: null })
+                save.reset()
+              }
+            }}
+          >
+            <SelectTrigger aria-label="Agent">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {harnesses.map((found) => (
+                <SelectItem key={found.id} value={found.id}>
+                  {found.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field
+          data-invalid={
+            !!(error?.fields.model || error?.fields.account) || undefined
+          }
+        >
+          <FieldLabel>Model</FieldLabel>
+          <ModelPicker
+            workspaceId={workspace.id}
+            harness={harness}
+            value={choice}
+            presets={[]}
+            onChange={(next) => {
+              setChosen(next)
+              save.reset()
+            }}
+            variant="outline"
+          />
+          <FieldDescription>
+            Every model of every account {harness.name} runs on, with its own
+            default first.
+          </FieldDescription>
+          {(error?.fields.model || error?.fields.account) && (
+            <FieldError>
+              {(error.fields.model ?? error.fields.account)?.[0]}
+            </FieldError>
+          )}
+        </Field>
+        <Field data-invalid={!!error?.fields.name || undefined}>
+          <FieldLabel htmlFor="preset-new-name">Name</FieldLabel>
+          <Input
+            id="preset-new-name"
+            value={name}
+            placeholder={defaultName}
+            onChange={(event) => setName(event.target.value)}
+            aria-invalid={!!error?.fields.name || undefined}
+          />
+          {error?.fields.name && (
+            <FieldError>{error.fields.name[0]}</FieldError>
+          )}
+        </Field>
+        {save.isError &&
+          !error?.fields.account &&
+          !error?.fields.model &&
+          !error?.fields.name && (
+            <FieldError>{messageOf(save.error)}</FieldError>
+          )}
+      </FieldGroup>
+      <DialogFooter>
+        <Button type="submit" loading={save.isPending}>
+          Save preset
+        </Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+// The vendor's name for a model as people say it, without the vendor: "GPT-6 Luna".
+function spokenName(name: string) {
+  const vendor = name.indexOf(": ")
+  return vendor < 0 ? name : name.slice(vendor + 2)
 }

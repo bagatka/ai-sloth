@@ -2132,6 +2132,46 @@
         }
       }
     },
+    "/chats/{id}/model": {
+      "put": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chats/{id}/events": {
       "get": {
         "tags": [
@@ -2844,6 +2884,23 @@
         },
         "description": "A repository a person\u0027s GitHub connection reaches."
       },
+      "ChangeModelRequest": {
+        "required": [
+          "account"
+        ],
+        "type": "object",
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AgentAccountId"
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ChatEventBody": {
         "type": "object",
         "anyOf": [
@@ -2878,6 +2935,9 @@
             "$ref": "#/components/schemas/AgentRestarted"
           },
           {
+            "$ref": "#/components/schemas/ModelChanged"
+          },
+          {
             "$ref": "#/components/schemas/SetupStarted"
           },
           {
@@ -2887,7 +2947,7 @@
             "$ref": "#/components/schemas/DiskNearlyFull"
           }
         ],
-        "description": "What happened in a chat. A message is sent, then either starts a turn, goes into the running\nturn (steered), or is cancelled. A turn shows the agent\u0027s updates and ends with a stop reason,\nthen a checkpoint of the nook\u0027s files. A proposal stays with the people in the chat until the\naccount\u0027s owner sends it on. An agent that had to be started again says whether it remembers.\nThe nook\u0027s setup, when its files have one, starts and ends before its agent starts; a setup the\nagent wrote is tested in a fresh nook after its turn."
+        "description": "What happened in a chat. A message is sent, then either starts a turn, goes into the running\nturn (steered), or is cancelled. A turn shows the agent\u0027s updates and ends with a stop reason,\nthen a checkpoint of the nook\u0027s files. A proposal stays with the people in the chat until the\naccount\u0027s owner sends it on. An agent that had to be started again says whether it remembers.\nSomeone may change the agent\u0027s model or account, from the next turn on.\nThe nook\u0027s setup, when its files have one, starts and ends before its agent starts; a setup the\nagent wrote is tested in a fresh nook after its turn."
       },
       "ChatEventData": {
         "required": [
@@ -3004,10 +3064,10 @@
               "null",
               "string"
             ],
-            "description": "The model its agent runs on; \u0060null\u0060 for the harness\u0027s default."
+            "description": "The model its agent runs on from its next turn; \u0060null\u0060 for the harness\u0027s default."
           },
           "account": {
-            "description": "The agent account that pays for its work.",
+            "description": "The agent account that pays for its work from its next turn.",
             "$ref": "#/components/schemas/AgentAccountId"
           },
           "accountOwner": {
@@ -3741,6 +3801,28 @@
         "properties": {
           "messageId": {
             "$ref": "#/components/schemas/MessageId"
+          }
+        }
+      },
+      "ModelChanged": {
+        "required": [
+          "account",
+          "model",
+          "changedBy"
+        ],
+        "type": "object",
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AgentAccountId"
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "changedBy": {
+            "$ref": "#/components/schemas/UserId"
           }
         }
       },

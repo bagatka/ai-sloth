@@ -30,7 +30,11 @@ pages show every component and a chat screen with made-up content, to judge the 
   set up, in `src/app/settings`), with the workspace's chats beside them. Settings show everyone
   what's there, and changes only to those the host lets make them.
 - **A new chat** (`src/app/new-chat.tsx`) starts on the host as soon as someone writes, so its nook
-  is ready when they send; the browser remembers each workspace's last choices.
+  is ready when they send; the browser remembers each workspace's last choices, and each agent's last
+  model.
+- **The model picker** (`src/app/model-picker.tsx`) sits in every message box: the person's presets,
+  then every model of every account the agent runs on, grouped by account and searched by name or
+  ID. In a chat it changes the model for the next turn; the agent stays, since its nook runs it.
 - **The API** (`src/app/api.ts`): one client whose types are generated from the WebApi's
   OpenAPI document, so a changed API fails the type check. Failures arrive as `ApiError`, with the
   host's problem details. Queries live in `src/app/queries.ts`, and TanStack Query owns their cache.

@@ -82,6 +82,19 @@ public interface IChatsApi
     /// <returns>Success; or <see cref="ChatsErrors.PresetNotFound"/>.</returns>
     public Task<Result> RemovePresetAsync(Actor actor, PresetId id, CancellationToken ct);
 
+    /// <summary>
+    /// Runs the chat's agent on another model, or on another account, from its next turn: an agent
+    /// working on a turn finishes it, and a new agent on the same harness continues the conversation.
+    /// The account must be one the actor may use, of a kind the harness takes, and whose the chat's
+    /// is: the workspace's for a chat on the workspace's account, the same person's own for a chat on
+    /// theirs. Choosing what the chat runs on already changes nothing.
+    /// </summary>
+    /// <returns>
+    /// The chat as it runs from its next turn; a validation error for the account or the model;
+    /// forbidden for anyone who may only read it; or not found.
+    /// </returns>
+    public Task<Result<ChatSummary>> ChangeModelAsync(Actor actor, ChangeModel command, CancellationToken ct);
+
     /// <summary>The chat. Not found when it doesn't exist or the actor has no access to its nook.</summary>
     public Task<Result<ChatSummary>> GetAsync(Actor actor, ChatId id, CancellationToken ct);
 

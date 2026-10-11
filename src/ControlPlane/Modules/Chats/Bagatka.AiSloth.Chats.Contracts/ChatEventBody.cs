@@ -5,7 +5,8 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// turn (steered), or is cancelled. A turn shows the agent's updates and ends with a stop reason,
 /// then a checkpoint of the nook's files. A proposal stays with the people in the chat until the
 /// account's owner sends it on. An agent that had to be started again says whether it remembers.
+/// Someone may change the agent's model or account, from the next turn on.
 /// The nook's setup, when its files have one, starts and ends before its agent starts; a setup the
 /// agent wrote is tested in a fresh nook after its turn.
 /// </summary>
-public union ChatEventBody(MessageSent, MessageProposed, TurnStarted, MessageSteered, MessageCancelled, AgentUpdate, TurnEnded, CheckpointSaved, CheckpointFailed, AgentRestarted, SetupStarted, SetupEnded, DiskNearlyFull);
+public union ChatEventBody(MessageSent, MessageProposed, TurnStarted, MessageSteered, MessageCancelled, AgentUpdate, TurnEnded, CheckpointSaved, CheckpointFailed, AgentRestarted, ModelChanged, SetupStarted, SetupEnded, DiskNearlyFull);

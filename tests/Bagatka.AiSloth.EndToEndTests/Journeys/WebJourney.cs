@@ -21,7 +21,7 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// a chat on, find a chat in Acme, and watch its turn as it happens; a chat started elsewhere shows up
 /// at once. A message they write starts the next turn, one written while the agent works goes into
 /// that turn, and Esc stops a turn. They start a chat in the app with Acme's repository, choosing its
-/// agent, review what changed in the repository, download its files, and open a pull request. The app
+/// agent and its model, switch the chat to another model, review what changed in the repository, download its files, and open a pull request. The app
 /// runs under the host's content security policy without a violation, and its session is a cookie no
 /// script can read. On another computer, a link to the chat signs them in through the host's provider
 /// and opens it. Only the model and GitHub are fake; the app is src/Apps/Web as last built, and
@@ -129,14 +129,19 @@ public sealed partial class WebJourney(ControlPlane app)
         return owner;
     }
 
-    // The agent picker offers each account's harnesses, and the repository picker the workspace's
-    // repositories; the nook starts as the message is written.
+    // The agent picker offers the harnesses the accounts run, the model picker every model of their
+    // accounts, and the repository picker the workspace's repositories; the nook starts as the message
+    // is written. In the chat, the model picker switches its model for the next turn.
     private static async Task<ChatSummary> StartsAChatWithTheRepositoryInTheAppAsync(IPage page, TestWorkspace acme)
     {
         await page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "New chat" }).ClickAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "What should Claude Code work on?" })).ToBeVisibleAsync();
-        await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Claude Code" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Agent" }).ClickAsync();
         await page.GetByRole(AriaRole.Menuitemradio, new PageGetByRoleOptions { Name = "Claude Code" }).ClickAsync();
+        await page.GetByRole(AriaRole.Combobox, new PageGetByRoleOptions { Name = "Model", Exact = true }).ClickAsync();
+        await page.GetByLabel("Search models").FillAsync("opus");
+        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "Anthropic: Claude Opus 5.5" }).ClickAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Combobox, new PageGetByRoleOptions { Name = "Model", Exact = true })).ToContainTextAsync("claude-opus-5.5");
         await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "No repository" }).ClickAsync();
         await page.GetByRole(AriaRole.Menuitemcheckbox, new PageGetByRoleOptions { Name = "api" }).ClickAsync();
         await page.Keyboard.PressAsync("Escape");
@@ -150,7 +155,13 @@ public sealed partial class WebJourney(ControlPlane app)
         await Assertions.Expect(page.GetByText("Done.")).ToBeVisibleAsync(WebBrowser.Shown);
         await Assertions.Expect(page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Please write hello.txt in a new chat" })).ToBeVisibleAsync();
         await WebBrowser.ShotAsync(page, "started");
+
+        await page.GetByRole(AriaRole.Combobox, new PageGetByRoleOptions { Name = "Model", Exact = true }).ClickAsync();
+        await WebBrowser.ShotAsync(page, "model-picker");
+        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "Default" }).ClickAsync();
+        await Assertions.Expect(page.GetByText("Switched to the agent's default model.")).ToBeVisibleAsync(WebBrowser.Shown);
         Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(acme.Person.SendGetAsync(acme.Path + "/chats"), HttpStatusCode.OK);
+        Assert.Null(chats.Items[0].Model);
         return chats.Items[0];
     }
 

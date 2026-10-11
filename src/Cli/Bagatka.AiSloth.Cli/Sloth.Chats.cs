@@ -474,7 +474,7 @@ internal sealed partial class Sloth
     {
         if (terminal.Interactive)
         {
-            await terminal.WriteLineAsync("Type to write to the agent, even while it works; /stop stops it. Ctrl+C leaves it working.");
+            await terminal.WriteLineAsync("Type to write to the agent, even while it works; /stop stops it, /model <id> switches its model. Ctrl+C leaves it working.");
         }
 
         using CancellationTokenSource leave = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -549,6 +549,18 @@ internal sealed partial class Sloth
                 if (text is "/stop")
                 {
                     await api.CallAsync(HttpMethod.Post, "/chats/" + chat.Id + "/stop", ct);
+                }
+                else if (text is "/model" || text.StartsWith("/model ", StringComparison.Ordinal))
+                {
+                    // On the chat's account; without an ID, the harness's default model.
+                    string model = text["/model".Length..].Trim();
+                    await api.SendAsync(
+                        HttpMethod.Put,
+                        "/chats/" + chat.Id + "/model",
+                        new Wire.ChangeModel(chat.Account, model.Length == 0 ? null : model),
+                        CliJsonContext.Default.ChangeModel,
+                        CliJsonContext.Default.Chat,
+                        ct);
                 }
                 else if (text.Length > 0)
                 {

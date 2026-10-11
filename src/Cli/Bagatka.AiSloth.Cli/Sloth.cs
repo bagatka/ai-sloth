@@ -75,7 +75,8 @@ internal sealed partial class Sloth(
                                      they are or at one of its checkpoints. Without a message,
                                      the nook starts while you type it
           sloth chat list
-          sloth chat open <id>       Follow a chat; type to write to the agent, /stop to stop it
+          sloth chat open <id>       Follow a chat; type to write to the agent, /stop to stop it,
+                                     /model <id> to switch its model
           sloth chat send <id> "<message>"
                                      Send a message
           sloth chat stop <id>
