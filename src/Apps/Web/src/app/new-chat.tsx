@@ -259,7 +259,7 @@ function NewChat({ workspace }: { workspace: Workspace }) {
                 hash="accounts"
                 className={buttonVariants({
                   size: "sm",
-                  className: "col-start-2 mt-2 w-fit",
+                  className: "mt-2 w-fit",
                 })}
               >
                 Add an agent account
