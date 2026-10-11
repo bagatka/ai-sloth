@@ -189,7 +189,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
     // OpenRouter speaks Anthropic's API for Claude Code and OpenAI's chat API for pi, at one address and
     // with one key, under its own names for models; models that can't call tools or are only for batches
     // aren't offered. Each of pi's calls costs GPT-6 Luna's price: 10 tokens in at $0.10 a million and 3
-    // out at $0.50.
+    // out at $0.50, which the chat's list shows, and the workspace's usage by day: today's where the
+    // person is, here fourteen hours ahead of UTC.
     private async Task OneOpenRouterKeyRunsEachAgentOnTheModelChosenForItsChatAsync()
     {
         TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice);
@@ -198,6 +199,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         IReadOnlyList<HarnessModel> models = await Api.ReadAsync<IReadOnlyList<HarnessModel>>(_alice.SendGetAsync(ModelsPath(workspace, "pi", key.Id)), HttpStatusCode.OK);
         IReadOnlyList<HarnessModel> anthropic = await Api.ReadAsync<IReadOnlyList<HarnessModel>>(_alice.SendGetAsync(ModelsPath(workspace, "claude-code", workspace.Account)), HttpStatusCode.OK);
         Problem codex = await Api.ProblemAsync(_alice.SendGetAsync(ModelsPath(workspace, "codex", key.Id)), HttpStatusCode.BadRequest);
+        DateTimeOffset before = TimeProvider.System.GetUtcNow();
 
         JsonElement[] ended = await Task.WhenAll(
             TurnAsync(workspace, "pi", key.Id, FakeModel.OpenRouterModel),
@@ -209,6 +211,10 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
             ChatUsage read = await Api.ReadAsync<ChatUsage>(_alice.SendGetAsync(Paths.Chat(piChat) + "/usage"), HttpStatusCode.OK);
             return read.Calls > 0 && read.Turns.Sum(turn => turn.Calls) == read.Calls ? read : null;
         });
+        Page<ChatSummary> listed = await Api.ReadAsync<Page<ChatSummary>>(_alice.SendGetAsync(workspace.Path + "/chats"), HttpStatusCode.OK);
+        WorkspaceUsage week = await Api.ReadAsync<WorkspaceUsage>(_alice.SendGetAsync(workspace.Path + "/usage?days=7&timeZone=Pacific/Kiritimati"), HttpStatusCode.OK);
+        Problem nowhere = await Api.ProblemAsync(_alice.SendGetAsync(workspace.Path + "/usage?days=7&timeZone=Mars/Olympus"), HttpStatusCode.BadRequest);
+        (DateOnly first, DateOnly last) = (Kiritimati(before), Kiritimati(TimeProvider.System.GetUtcNow()));
 
         Assert.Equal([FakeModel.OpenRouterModel, FakeModel.OpenRouterClaude, FakeModel.OpenAIModel], models.Select(model => model.Id), StringComparer.Ordinal);
         Assert.Equal(["off", "low", "medium", "high", "xhigh", "max"], models[0].ThinkingLevels);
@@ -216,6 +222,13 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Equal([272_000], models[0].Facts.Price?.Tiers.Select(tier => tier.AboveInputTokens));
         Assert.Contains(anthropic, model => model is { Id: FakeModel.OpenRouterClaude, Name: "Anthropic: Claude Opus 5.5" });
         Assert.Equal((piUsage.Calls * 0.0000025m, false), (piUsage.Cost, piUsage.Estimate));
+        Assert.Equal(piUsage.Cost, listed.Items.Single(chat => chat.Id == piChat.Id).Cost);
+        Assert.Equal(7, week.Days.Count);
+        Assert.InRange(week.Days[^1].Day, first, last);
+        Assert.True(week.Days.Where(day => day.Day >= first && day.Day <= last).Sum(day => day.Calls) >= piUsage.Calls);
+        Assert.Equal(week.Calls, week.Days.Sum(day => day.Calls));
+        Assert.Equal(piUsage.Cost, week.Chats.Single(chat => chat.Chat == piChat.Id).Cost);
+        Assert.True(nowhere.Errors?.ContainsKey("timeZone"));
         Assert.True(codex.Errors?.ContainsKey("account"));
         Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
         Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.OpenRouterModel + "\"", StringComparison.Ordinal) && body.Contains("\"messages\"", StringComparison.Ordinal));
@@ -329,6 +342,11 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
     private static async Task<IReadOnlyList<AgentAccountSummary>> ListAsync(HttpClient client, WorkspaceId workspace)
     {
         return await Api.ReadAsync<IReadOnlyList<AgentAccountSummary>>(client.SendGetAsync(Paths.Workspace(workspace) + "/agent-accounts"), HttpStatusCode.OK);
+    }
+
+    private static DateOnly Kiritimati(DateTimeOffset at)
+    {
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, TimeZoneInfo.FindSystemTimeZoneById("Pacific/Kiritimati")).DateTime);
     }
 
     private static string UsagePath(WorkspaceId workspace, AgentAccountId account)

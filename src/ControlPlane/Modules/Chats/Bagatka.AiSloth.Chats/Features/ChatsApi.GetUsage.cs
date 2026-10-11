@@ -2,7 +2,6 @@ using Bagatka.AiSloth.Chats.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
@@ -34,18 +33,18 @@ internal sealed partial class ChatsApi
         // By turn, the calls between turns together; the chat's whole is all of them.
         Chat chat = found.Output;
         IQueryable<ModelCall> calls = db.ModelCalls.AsNoTracking().Where(call => call.ChatId == id);
-        List<Spent> spent = await calls.GroupBy(call => call.Turn).Select(SpentOfTurn).ToListAsync(ct);
+        List<Spent<MessageId?>> spent = await calls.GroupBy(call => call.Turn).Select(SpentOf<MessageId?>()).ToListAsync(ct);
         List<ModelCall> latest = await calls.OrderByDescending(call => call.At).Take(LatestCalls).ToListAsync(ct);
-        Spent total = Spent.Sum(spent);
+        Spent<MessageId?> total = Spent<MessageId?>.Sum(key: null, spent);
 
         ModelCall? conversation = latest.MaxBy(call => call.WholeInput);
         ModelFacts facts = await FactsOfChatModelAsync(chat, ct);
         decimal? reread = conversation is null ? null : facts.Price?.CostOf(conversation.WholeInput, 0, 0, 0, 0);
         List<TurnUsage> turns = [.. spent
-            .Where(turn => turn.Turn is not null)
+            .Where(turn => turn.Key is not null)
             .OrderByDescending(turn => turn.Last)
             .Take(LatestTurns)
-            .Select(turn => new TurnUsage(turn.Turn!.Value, turn.Calls, turn.Tokens(), turn.Cost(), turn.Estimate))];
+            .Select(turn => new TurnUsage(turn.Key!.Value, turn.Calls, turn.Tokens(), turn.Cost(), turn.Estimate))];
         ChatUsage usage = new ChatUsage(
             total.Calls,
             total.Tokens(),
@@ -69,39 +68,5 @@ internal sealed partial class ChatsApi
 
         Result<ModelFacts> facts = await accounts.GetModelFactsAsync(SystemActors.Harness, chat.AgentAccountId, chat.WorkspaceId, model, ct);
         return facts.Failed ? ModelFacts.Unknown : facts.Output;
-    }
-
-    private static readonly Expression<Func<IGrouping<MessageId?, ModelCall>, Spent>> SpentOfTurn = group => new Spent(
-        group.Key, group.Count(), group.Sum(call => (long)call.Input), group.Sum(call => (long)call.CacheRead), group.Sum(call => (long)call.CacheWrite + call.CacheWriteLong),
-        group.Sum(call => (long)call.Output), group.Sum(call => (long)call.Reasoning), group.Sum(call => call.Cost), group.Count(call => call.Cost != null), group.Any(call => call.Estimate), group.Max(call => call.At));
-
-    // Calls added up: their tokens, their known costs, and whether any is an estimate.
-    private sealed record Spent(MessageId? Turn, int Calls, long Input, long CacheRead, long CacheWrite, long Output, long Reasoning, decimal? CostSum, int Priced, bool Estimate, DateTimeOffset Last)
-    {
-        public TokenCounts Tokens()
-        {
-            return new TokenCounts(Input, CacheRead, CacheWrite, Output, Reasoning);
-        }
-
-        public decimal? Cost()
-        {
-            return Priced > 0 ? CostSum : null;
-        }
-
-        public static Spent Sum(IReadOnlyList<Spent> all)
-        {
-            return new Spent(
-                Turn: null,
-                all.Sum(spent => spent.Calls),
-                all.Sum(spent => spent.Input),
-                all.Sum(spent => spent.CacheRead),
-                all.Sum(spent => spent.CacheWrite),
-                all.Sum(spent => spent.Output),
-                all.Sum(spent => spent.Reasoning),
-                all.Sum(spent => spent.CostSum ?? 0),
-                all.Sum(spent => spent.Priced),
-                all.Any(spent => spent.Estimate),
-                all.Count > 0 ? all.Max(spent => spent.Last) : DateTimeOffset.MinValue);
-        }
     }
 }

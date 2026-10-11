@@ -62,6 +62,8 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Steering | A message sent during a turn going into that turn, so the agent reads it while it works | Chats | interrupt, injection |
 | Stop | Ending the running turn at once; messages the agent hasn't received are cancelled | Chats | cancel (in the product), abort, interrupt |
 | Model gateway | The WebApi endpoint agents call their model through; it forwards each call to their chat's agent account's endpoint with the headers that pay for it, so no nook holds a key or a plan's token | WebApi, Chats | LLM proxy, API proxy |
+| Model usage | What agents' calls to their models used and cost, as the model gateway saw them: tokens and US dollars by turn, chat, workspace, and day; a plan's cost is an estimate at the vendor's API prices | Chats | spend, consumption, billing |
+| Plan limits | What a plan has used of the limits its vendor sets: ChatGPT's and Claude's five-hour and weekly windows, Copilot's premium requests a month, or the credits a plan without limits spent | AgentAccounts | rate limits, quota (except as Copilot names its own) |
 | Checkpoint | A nook's files saved at one moment, such as after each turn: `/work` and its repositories with their history, honoring `.gitignore`, and its kept paths; numbered in its nook, kept while the nook exists | Nooks | snapshot, backup, save point |
 | Kept paths | Paths outside `/work` a nook's checkpoints keep too, such as where its agent keeps its sessions | Nooks | extra paths, volumes |
 | Fork | A new chat continuing another's conversation from one of its turns, its agent loading that chat's session, in a nook started from the checkpoint after it | Nooks, Chats (planned) | clone, branch |

@@ -141,7 +141,8 @@ internal sealed partial class ChatsApi(
             .OrderBy(message => message.SentAt).ThenBy(message => message.Id)
             .Select(message => message.Text.Substring(0, FirstMessageStart))
             .FirstOrDefaultAsync(ct);
-        return chat.ToSummary(waiting, firstMessage);
+        Spent<ChatId>? spent = await db.ModelCalls.Where(call => call.ChatId == chat.Id).GroupBy(call => call.ChatId).Select(SpentOf<ChatId>()).SingleOrDefaultAsync(ct);
+        return chat.ToSummary(waiting, firstMessage, spent?.Cost(), spent?.Estimate == true);
     }
 
     // A chat's runner saves the chat too; a save it made meanwhile, which shows as a conflict or as an

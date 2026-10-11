@@ -71,6 +71,7 @@ public sealed partial class WebJourney(ControlPlane app)
             await TheChangesStayLiveAndKeepTheReadersPlaceAsync(page, acme, started);
             await ReviewsTheChangesDownloadsTheFilesAndOpensAPullRequestAsync(page, acme, started, owner);
             await ContinuesTheChatInANewOneAsync(page);
+            await TheSettingsSayWhatTheAgentsUsedAsync(page);
             await TheSessionIsACookieNoScriptReadsAndNothingBrokeThePolicyAsync(page, context);
             await ALinkToTheChatSignsInThroughTheProviderAsync(browser, chat, alice);
         }
@@ -147,6 +148,20 @@ public sealed partial class WebJourney(ControlPlane app)
         await Assertions.Expect(continues.GetByRole(AriaRole.Link)).ToHaveTextAsync(title);
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Level = 1 })).ToHaveTextAsync("New chat");
         await WebBrowser.ShotAsync(page, "continued");
+    }
+
+    // The settings say what the workspace's agents used this month, all of it and by chat; the fake
+    // model's endpoint is the account's own, whose prices aren't known.
+    private static async Task TheSettingsSayWhatTheAgentsUsedAsync(IPage page)
+    {
+        await page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Settings", Exact = true }).ClickAsync();
+
+        ILocator usage = page.GetByRole(AriaRole.Region, new PageGetByRoleOptions { Name = "Usage", Exact = true });
+        ILocator chats = usage.GetByRole(AriaRole.List, new LocatorGetByRoleOptions { Name = "Chats by cost" });
+        await Assertions.Expect(usage.GetByText("Cost not known")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(chats.GetByRole(AriaRole.Listitem).First).ToContainTextAsync("model calls");
+        await Assertions.Expect(usage.GetByRole(AriaRole.Img)).ToHaveAttributeAsync("aria-label", ModelCallsOnADay());
+        await WebBrowser.ShotAsync(page, "usage-settings");
     }
 
     // Someone starts a chat from sloth or another browser: the list shows it without a reload.
@@ -451,6 +466,9 @@ public sealed partial class WebJourney(ControlPlane app)
     {
         return page.GetByRole(AriaRole.Textbox, new PageGetByRoleOptions { Name = "Message", Exact = true });
     }
+
+    [GeneratedRegex(@"^[A-Z][a-z]{2} \d{1,2}: cost not known, \d+ calls", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex ModelCallsOnADay();
 
     [GeneratedRegex("/app/sign-in", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
     private static partial Regex SignInPage();

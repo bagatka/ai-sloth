@@ -32,6 +32,11 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// characters; <see langword="null"/> until someone writes in it.
 /// </param>
 /// <param name="Continues">The chat whose conversation it continues (<see cref="StartChat.WithConversation"/>), if any.</param>
+/// <param name="Cost">
+/// What its agents' model calls have cost so far, in US dollars, as far as their prices are known
+/// (<see cref="ChatUsage.Cost"/>); <see langword="null"/> before any priced call.
+/// </param>
+/// <param name="CostEstimate">Whether the cost is a plan's estimate at the vendor's API prices.</param>
 public sealed record ChatSummary(
     ChatId Id,
     NookId NookId,
@@ -45,4 +50,6 @@ public sealed record ChatSummary(
     AgentAccountId Account,
     UserId? AccountOwner,
     string? Title,
-    ChatId? Continues);
+    ChatId? Continues,
+    decimal? Cost,
+    bool CostEstimate);

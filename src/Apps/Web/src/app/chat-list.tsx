@@ -5,6 +5,7 @@ import { cn } from "cn"
 import { NookStateDot, type NookStateName } from "@/components/nook-state"
 import { useSidebar } from "@/components/ui/sidebar"
 import type { Schemas } from "./api"
+import { dollarsLabel } from "./models"
 import { chat as chatQuery, nooks, workspaces } from "./queries"
 import { useChosenWorkspace } from "./workspace"
 import { useWorkspaceChats } from "./workspace-chats"
@@ -17,6 +18,8 @@ export type ChatItem = {
   title: string
   state: NookStateName
   when: string
+  /** What it has cost so far, once that's a cent or more. */
+  cost: string | null
   group: "Working" | "Today" | "Earlier"
 }
 
@@ -60,6 +63,11 @@ export function useChatItems(workspaceId: string | undefined): {
       title: summary.title ?? "New chat",
       state: working ? "working" : stateOf(statuses.get(summary.nookId)),
       when: ago(started),
+      // Costs under a cent would only crowd the list.
+      cost:
+        summary.cost !== null && summary.cost >= 0.01
+          ? dollarsLabel(summary.cost, summary.costEstimate)
+          : null,
       group: working
         ? "Working"
         : started >= startOfToday
@@ -119,6 +127,11 @@ export function ChatList({
             >
               <NookStateDot state={item.state} />
               <span className="min-w-0 flex-1 truncate">{item.title}</span>
+              {item.cost && (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {item.cost}
+                </span>
+              )}
               <span className="text-xs text-muted-foreground tabular-nums">
                 {item.when}
               </span>

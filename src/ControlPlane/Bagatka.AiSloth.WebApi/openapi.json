@@ -2608,6 +2608,53 @@
         }
       }
     },
+    "/workspaces/{workspaceId}/usage": {
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "timeZone",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceUsage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspaces/{workspaceId}/presets": {
       "get": {
         "tags": [
@@ -3059,6 +3106,39 @@
           }
         }
       },
+      "ChatCost": {
+        "required": [
+          "chat",
+          "calls",
+          "cost",
+          "estimate"
+        ],
+        "type": "object",
+        "properties": {
+          "chat": {
+            "description": "The chat.",
+            "$ref": "#/components/schemas/ChatId"
+          },
+          "calls": {
+            "type": "integer",
+            "description": "How many calls its agents made then.",
+            "format": "int32"
+          },
+          "cost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "What they cost in US dollars, as far as their prices are known.",
+            "format": "double"
+          },
+          "estimate": {
+            "type": "boolean",
+            "description": "Whether the cost is a plan\u0027s estimate at the vendor\u0027s API prices."
+          }
+        },
+        "description": "What one chat\u0027s model calls cost over some days."
+      },
       "ChatEventBody": {
         "type": "object",
         "anyOf": [
@@ -3192,7 +3272,9 @@
           "account",
           "accountOwner",
           "title",
-          "continues"
+          "continues",
+          "cost",
+          "costEstimate"
         ],
         "type": "object",
         "properties": {
@@ -3268,6 +3350,18 @@
                 "$ref": "#/components/schemas/ChatId"
               }
             ]
+          },
+          "cost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "What its agents\u0027 model calls have cost so far, in US dollars, as far as their prices are known\n(decimal? ChatUsage.Cost); \u0060null\u0060 before any priced call.",
+            "format": "double"
+          },
+          "costEstimate": {
+            "type": "boolean",
+            "description": "Whether the cost is a plan\u0027s estimate at the vendor\u0027s API prices."
           }
         },
         "description": "A chat as the people with access to its nook see it."
@@ -3536,6 +3630,45 @@
             "type": "string"
           }
         }
+      },
+      "DayUsage": {
+        "required": [
+          "day",
+          "calls",
+          "tokens",
+          "cost",
+          "estimate"
+        ],
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "string",
+            "description": "The day, in the time zone asked for.",
+            "format": "date"
+          },
+          "calls": {
+            "type": "integer",
+            "description": "How many calls were made.",
+            "format": "int32"
+          },
+          "tokens": {
+            "description": "Their tokens.",
+            "$ref": "#/components/schemas/TokenCounts"
+          },
+          "cost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "What they cost in US dollars, as far as their prices are known.",
+            "format": "double"
+          },
+          "estimate": {
+            "type": "boolean",
+            "description": "Whether the cost includes plans\u0027 estimates at the vendors\u0027 API prices."
+          }
+        },
+        "description": "What one day\u0027s model calls in a workspace used and cost."
       },
       "DiskNearlyFull": {
         "required": [
@@ -5859,6 +5992,55 @@
           }
         },
         "description": "A workspace as one person with access sees it."
+      },
+      "WorkspaceUsage": {
+        "required": [
+          "days",
+          "chats",
+          "calls",
+          "tokens",
+          "cost",
+          "estimate"
+        ],
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DayUsage"
+            },
+            "description": "Each day, the oldest first, days without calls included."
+          },
+          "chats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatCost"
+            },
+            "description": "Each chat with calls in those days, with what they cost, the costliest first."
+          },
+          "calls": {
+            "type": "integer",
+            "description": "How many calls all of them made.",
+            "format": "int32"
+          },
+          "tokens": {
+            "description": "Their tokens.",
+            "$ref": "#/components/schemas/TokenCounts"
+          },
+          "cost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "What they cost in US dollars, as far as their prices are known.",
+            "format": "double"
+          },
+          "estimate": {
+            "type": "boolean",
+            "description": "Whether the cost includes plans\u0027 estimates at the vendors\u0027 API prices."
+          }
+        },
+        "description": "What a workspace\u0027s chats used of their models over its last days (Task\u0026lt;Result\u0026lt;WorkspaceUsage\u0026gt;\u0026gt; IChatsApi.GetWorkspaceUsageAsync(Actor actor, WorkspaceId workspaceId, int days, string timeZone, CancellationToken ct)),\nfrom every call the model gateway saw."
       }
     }
   },

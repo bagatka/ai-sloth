@@ -108,6 +108,20 @@ public interface IChatsApi
     /// <returns>The usage; or not found for a chat the actor can't see.</returns>
     public Task<Result<ChatUsage>> GetUsageAsync(Actor actor, ChatId id, CancellationToken ct);
 
+    /// <summary>
+    /// What the workspace's chats used of their models over its last days (<see cref="WorkspaceUsage"/>),
+    /// for anyone who sees its chats: each day's calls, tokens, and cost, each chat's, and all of them
+    /// added up. Days are those of the time zone given, such as the person's own. Reads the call
+    /// records; asks no vendor.
+    /// </summary>
+    /// <param name="actor">Who asks.</param>
+    /// <param name="workspaceId">The workspace.</param>
+    /// <param name="days">How many days, today included: 1 to 90.</param>
+    /// <param name="timeZone">The IANA time zone whose days count, such as <c>Europe/Berlin</c>.</param>
+    /// <param name="ct">Cancels the reading.</param>
+    /// <returns>The usage; a validation error for days out of range or an unknown time zone; or not found.</returns>
+    public Task<Result<WorkspaceUsage>> GetWorkspaceUsageAsync(Actor actor, WorkspaceId workspaceId, int days, string timeZone, CancellationToken ct);
+
     /// <summary>The workspace's chats someone wrote in, newest first. Not found for anyone without access to the workspace, such as a nook's guest.</summary>
     public Task<Result<Page<ChatSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, PageRequest page, CancellationToken ct);
 

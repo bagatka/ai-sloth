@@ -79,7 +79,7 @@ internal sealed partial class ChatsApi
 
         // The agent starts now, after the nook's setup, while people write their first message.
         runners.Wake(chat.Id);
-        return new Result<ChatSummary>(chat.ToSummary(messagesWaiting: false, firstMessage: null));
+        return new Result<ChatSummary>(chat.ToSummary(messagesWaiting: false, firstMessage: null, cost: null, costEstimate: false));
     }
 
     // What a new chat starts from: the chat whose nook's files it copies, if any, and, when it continues

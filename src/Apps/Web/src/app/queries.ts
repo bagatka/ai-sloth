@@ -188,6 +188,25 @@ export function usage(chatId: string, checkpoint: number) {
   })
 }
 
+/**
+ * What the workspace's chats used of their models over its last days, today included, by day in the
+ * person's own time zone and by chat. Read again every minute while shown.
+ */
+export function workspaceUsage(workspaceId: string, days: number) {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  return queryOptions({
+    queryKey: ["workspaces", workspaceId, "usage", days, timeZone],
+    queryFn: () =>
+      answer(
+        api.GET("/workspaces/{workspaceId}/usage", {
+          params: { path: { workspaceId }, query: { days, timeZone } },
+        })
+      ),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  })
+}
+
 /** Every kind of agent account, how each is added, and whether this host allows it. */
 export const accountKinds = queryOptions({
   queryKey: ["agent-account-kinds"],

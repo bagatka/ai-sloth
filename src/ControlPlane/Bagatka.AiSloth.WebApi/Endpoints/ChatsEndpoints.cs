@@ -72,6 +72,7 @@ internal static class ChatsEndpoints
         workspaces.MapPut("/instructions", SetWorkspaceInstructions);
         app.MapPut("/instructions", SetPersonalInstructions).WithTags("Chats");
         workspaces.MapGet("/models", ListModels);
+        workspaces.MapGet("/usage", GetWorkspaceUsage);
         workspaces.MapGet("/presets", ListPresets);
         workspaces.MapPost("/presets", AddPreset);
 
@@ -241,6 +242,23 @@ internal static class ChatsEndpoints
         CancellationToken ct)
     {
         Result<ChatSummary> result = await api.GetAsync(principal.ToActor(), ChatId.From(id), ct);
+        return result.ToOk();
+    }
+
+    /// <summary>
+    /// What the workspace's chats used of their models over its last days, today included (1 to 90):
+    /// each day's calls, tokens, and cost in the time zone given (IANA, such as <c>Europe/Berlin</c>),
+    /// each chat's, the costliest first, and all of them added up. Asks no vendor.
+    /// </summary>
+    private static async Task<Results<Ok<WorkspaceUsage>, ProblemHttpResult>> GetWorkspaceUsage(
+        [FromRoute] Guid workspaceId,
+        [FromQuery] int days,
+        [FromQuery] string timeZone,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result<WorkspaceUsage> result = await api.GetWorkspaceUsageAsync(principal.ToActor(), WorkspaceId.From(workspaceId), days, timeZone, ct);
         return result.ToOk();
     }
 

@@ -2851,6 +2851,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{workspaceId}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    days: number;
+                    timeZone: string;
+                };
+                header?: never;
+                path: {
+                    workspaceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceUsage"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{workspaceId}/presets": {
         parameters: {
             query?: never;
@@ -3122,6 +3162,23 @@ export interface components {
             model: string;
             thinking: string;
         };
+        /** @description What one chat's model calls cost over some days. */
+        ChatCost: {
+            /** @description The chat. */
+            chat: components["schemas"]["ChatId"];
+            /**
+             * Format: int32
+             * @description How many calls its agents made then.
+             */
+            calls: number;
+            /**
+             * Format: double
+             * @description What they cost in US dollars, as far as their prices are known.
+             */
+            cost: null | number;
+            /** @description Whether the cost is a plan's estimate at the vendor's API prices. */
+            estimate: boolean;
+        };
         /**
          * @description What happened in a chat. A message is sent, then either starts a turn, goes into the running
          *     turn (steered), or is cancelled. A turn shows the agent's updates and ends with a stop reason,
@@ -3198,6 +3255,14 @@ export interface components {
              */
             title: null | string;
             continues: null | components["schemas"]["ChatId"];
+            /**
+             * Format: double
+             * @description What its agents' model calls have cost so far, in US dollars, as far as their prices are known
+             *     (decimal? ChatUsage.Cost); `null` before any priced call.
+             */
+            cost: null | number;
+            /** @description Whether the cost is a plan's estimate at the vendor's API prices. */
+            costEstimate: boolean;
         };
         /**
          * @description What a chat's agents have used of their models: every call the model gateway saw, added up and by
@@ -3302,6 +3367,28 @@ export interface components {
         };
         CreateWorkspaceRequest: {
             name: string;
+        };
+        /** @description What one day's model calls in a workspace used and cost. */
+        DayUsage: {
+            /**
+             * Format: date
+             * @description The day, in the time zone asked for.
+             */
+            day: string;
+            /**
+             * Format: int32
+             * @description How many calls were made.
+             */
+            calls: number;
+            /** @description Their tokens. */
+            tokens: components["schemas"]["TokenCounts"];
+            /**
+             * Format: double
+             * @description What they cost in US dollars, as far as their prices are known.
+             */
+            cost: null | number;
+            /** @description Whether the cost includes plans' estimates at the vendors' API prices. */
+            estimate: boolean;
         };
         DiskNearlyFull: {
             /** Format: int64 */
@@ -4281,6 +4368,30 @@ export interface components {
             name: string;
             /** @description How much the caller may do in it. */
             access: components["schemas"]["AccessLevel"];
+        };
+        /**
+         * @description What a workspace's chats used of their models over its last days (Task&lt;Result&lt;WorkspaceUsage&gt;&gt; IChatsApi.GetWorkspaceUsageAsync(Actor actor, WorkspaceId workspaceId, int days, string timeZone, CancellationToken ct)),
+         *     from every call the model gateway saw.
+         */
+        WorkspaceUsage: {
+            /** @description Each day, the oldest first, days without calls included. */
+            days: components["schemas"]["DayUsage"][];
+            /** @description Each chat with calls in those days, with what they cost, the costliest first. */
+            chats: components["schemas"]["ChatCost"][];
+            /**
+             * Format: int32
+             * @description How many calls all of them made.
+             */
+            calls: number;
+            /** @description Their tokens. */
+            tokens: components["schemas"]["TokenCounts"];
+            /**
+             * Format: double
+             * @description What they cost in US dollars, as far as their prices are known.
+             */
+            cost: null | number;
+            /** @description Whether the cost includes plans' estimates at the vendors' API prices. */
+            estimate: boolean;
         };
     };
     responses: never;

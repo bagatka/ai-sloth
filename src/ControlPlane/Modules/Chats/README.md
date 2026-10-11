@@ -30,7 +30,7 @@ folders).
 `IChatsApi`: members list the harnesses and the models each can run on with an account, start chats
 (each creating its nook, with the workspace's repositories or another chat's files, now or at a
 checkpoint, and that chat's conversation when it continues it), list chats or watch the list as it changes, send
-messages and send proposals on, change the model and account a chat runs on, stop the agent, run a
+messages and send proposals on, say what chats and a workspace's chats used of their models, change the model and account a chat runs on, stop the agent, run a
 chat's setup again, start a chat that fixes it and bring its fix in, watch a chat's events from any sequence number, set
 and read the instructions every agent gets, list and forget their harness state, and keep presets. `IChatHarnessesApi` is the
 model gateway's side.
@@ -113,7 +113,10 @@ minutes unless given).
   (`IAgentAccountsApi.GetModelFactsAsync`), or by the vendor's own figure, and put in the turn the
   chat was on when the call started. A chat's usage (`GetUsageAsync`) adds them up; how full the
   context is comes from the agent itself where it says (`usage_update`), and from its largest
-  latest call otherwise. A Claude plan's agent holds its token, so its calls aren't recorded. What an
+  latest call otherwise. A Claude plan's agent holds its token, so its calls aren't recorded. Lists
+  show each chat's cost; a workspace's usage (`GetWorkspaceUsageAsync`) adds its calls up by day in
+  the person's time zone, which PostgreSQL works out (`AT TIME ZONE`, through `SqlQuery`: EF
+  translates no time zone conversion of a `DateTimeOffset`), and by chat. What an
   answer's headers say of the account's plan goes to its account (`ObservePlanUsageAsync`).
 - **No model key or plan in a nook.** An agent gets the model gateway's URL and a token for its chat;
   the gateway forwards each call with the headers that pay for it. A Claude plan's token, tied to

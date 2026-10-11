@@ -42,7 +42,8 @@ internal sealed partial class ChatsApi
         return db.Chats.AsNoTracking().Where(chat => chat.WorkspaceId == workspaceId && !db.Drafts.Any(draft => draft.ChatId == chat.Id));
     }
 
-    // The chats as lists show them, in their order: whether messages wait for each, and its first.
+    // The chats as lists show them, in their order: whether messages wait for each, its first, and what
+    // it has cost.
     private static async Task<List<ChatSummary>> SummariesAsync(ChatsDbContext db, List<Chat> chats, CancellationToken ct)
     {
         List<ChatId> ids = [.. chats.Select(chat => chat.Id)];
@@ -62,6 +63,15 @@ internal sealed partial class ChatsApi
                 Text = chatMessages.OrderBy(message => message.SentAt).ThenBy(message => message.Id).Select(message => message.Text.Substring(0, FirstMessageStart)).First(),
             })
             .ToDictionaryAsync(first => first.ChatId, first => first.Text, ct);
-        return [.. chats.Select(chat => chat.ToSummary(waiting.Contains(chat.Id), firstMessages.GetValueOrDefault(chat.Id)))];
+        Dictionary<ChatId, Spent<ChatId>> spent = await db.ModelCalls
+            .Where(call => ids.Contains(call.ChatId))
+            .GroupBy(call => call.ChatId)
+            .Select(SpentOf<ChatId>())
+            .ToDictionaryAsync(chatSpent => chatSpent.Key, ct);
+        return [.. chats.Select(chat => chat.ToSummary(
+            waiting.Contains(chat.Id),
+            firstMessages.GetValueOrDefault(chat.Id),
+            spent.GetValueOrDefault(chat.Id)?.Cost(),
+            spent.GetValueOrDefault(chat.Id)?.Estimate == true))];
     }
 }

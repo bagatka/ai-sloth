@@ -6,6 +6,7 @@ import { PeopleSection } from "./people"
 import { PresetsSection } from "./presets"
 import { RepositoriesSection } from "./repositories"
 import { SecretsSection } from "./secrets"
+import { UsageSection } from "./usage"
 
 // Setting up a workspace: what pays for its agents, your presets of agent and model, the
 // repositories its chats start with, the secrets its nooks get, the instructions its agents follow,
@@ -35,6 +36,7 @@ export function SettingsPage() {
             className="mx-auto flex max-w-[44rem] flex-col gap-12 px-4 pt-6 pb-16 md:px-5"
           >
             <AccountsSection workspace={workspace} />
+            <UsageSection workspace={workspace} />
             <PresetsSection workspace={workspace} />
             <RepositoriesSection workspace={workspace} />
             <SecretsSection workspace={workspace} />
