@@ -75,6 +75,10 @@ internal sealed class Chat
     // Its agent starts with the chat, before any message, until it tried.
     public bool StartsAgent { get; private set; }
 
+    // Set while AiSloth's work on the chat keeps failing, which the chat says once (WorkFailed) until
+    // it goes on (WorkResumed).
+    public bool WorkFailing { get; private set; }
+
     // The chat whose conversation this one continues, up to which of its events: its agent gets it
     // as a file (ConversationMarkdown).
     public ChatId? ContinuesFrom { get; private set; }
@@ -124,6 +128,30 @@ internal sealed class Chat
     public static Chat Start(NookId nookId, WorkspaceId workspaceId, UserId startedBy, string harness, string model, string thinking, AgentAccountCredential account, TimeProvider time)
     {
         return new Chat(ChatId.New(), nookId, workspaceId, startedBy, time.GetUtcNow(), harness, model, thinking, account.Id, account.OwnerId) { StartsAgent = true };
+    }
+
+    // That AiSloth's work on the chat failed, unless the chat already says so.
+    public StoredEvent? WorkFailed(TimeProvider time)
+    {
+        if (WorkFailing)
+        {
+            return null;
+        }
+
+        WorkFailing = true;
+        return Record(new ChatEventBody(new Contracts.WorkFailed()), time);
+    }
+
+    // That AiSloth's work on the chat goes on, when it had failed.
+    public StoredEvent? WorkResumed(TimeProvider time)
+    {
+        if (!WorkFailing)
+        {
+            return null;
+        }
+
+        WorkFailing = false;
+        return Record(new ChatEventBody(new Contracts.WorkResumed()), time);
     }
 
     // Continues the earlier chat's conversation as it was after its event upTo.

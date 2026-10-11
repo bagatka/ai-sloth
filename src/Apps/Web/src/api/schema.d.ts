@@ -3113,12 +3113,6 @@ export interface components {
              */
             needsSignIn: boolean;
         };
-        AgentRestarted: {
-            remembers: boolean;
-        };
-        AgentUpdate: {
-            update: components["schemas"]["JsonElement"];
-        };
         /**
          * @description The repositories a person's GitHub connection reaches: those of the accounts and organizations the
          *     host's GitHub App is installed on that the person may see.
@@ -3187,9 +3181,9 @@ export interface components {
          *     Someone may change the agent's model or account, from the next turn on.
          *     The nook's setup, when its files have one, starts and ends before its agent starts; someone may ask
          *     to run it again, which it does once the agent answered what was sent before, or start a chat that
-         *     fixes it.
+         *     fixes it. When AiSloth's own work on the chat keeps failing, the chat says so until it goes on.
          */
-        ChatEventBody: components["schemas"]["MessageSent"] | components["schemas"]["MessageProposed"] | components["schemas"]["TurnStarted"] | components["schemas"]["MessageSteered"] | components["schemas"]["MessageCancelled"] | components["schemas"]["AgentUpdate"] | components["schemas"]["TurnEnded"] | components["schemas"]["CheckpointSaved"] | components["schemas"]["CheckpointFailed"] | components["schemas"]["AgentRestarted"] | components["schemas"]["ModelChanged"] | components["schemas"]["SetupStarted"] | components["schemas"]["SetupEnded"] | components["schemas"]["SetupRunAsked"] | components["schemas"]["SetupFixStarted"] | components["schemas"]["DiskNearlyFull"];
+        ChatEventBody: Record<string, never>;
         ChatEventData: {
             /** Format: int64 */
             sequence: number;
@@ -3307,14 +3301,6 @@ export interface components {
             /** @description The latest turns' usage, newest first, at most 50. */
             turns: components["schemas"]["TurnUsage"][];
         };
-        CheckpointFailed: {
-            failure: string;
-        };
-        CheckpointSaved: {
-            /** Format: int32 */
-            number: number;
-            changes: null | components["schemas"]["ChangeCount"];
-        };
         /** @description A nook's files as they were at one moment, kept while the nook exists. */
         CheckpointSummary: {
             /** @description The nook. */
@@ -3389,12 +3375,6 @@ export interface components {
             cost: null | number;
             /** @description Whether the cost includes plans' estimates at the vendors' API prices. */
             estimate: boolean;
-        };
-        DiskNearlyFull: {
-            /** Format: int64 */
-            usedBytes: number;
-            /** Format: int64 */
-            totalBytes: number;
         };
         /** @description A person's GitHub account, connected to AiSloth. */
         GitHubAccount: {
@@ -3550,7 +3530,6 @@ export interface components {
              */
             expiresAt: string;
         };
-        JsonElement: unknown;
         /** @description A code that signs its creator in on another device, once, until it expires. Shown only here. */
         LinkCode: {
             /** @description The code. */
@@ -3602,34 +3581,11 @@ export interface components {
              */
             addedAt: string;
         };
-        MessageCancelled: {
-            messageId: components["schemas"]["MessageId"];
-        };
         /**
          * Format: uuid
          * @description Identifies a message in a chat.
          */
         MessageId: string;
-        MessageProposed: {
-            messageId: components["schemas"]["MessageId"];
-            proposedBy: components["schemas"]["UserId"];
-            text: string;
-        };
-        MessageSent: {
-            messageId: components["schemas"]["MessageId"];
-            sentBy: components["schemas"]["UserId"];
-            text: string;
-            proposal: null | components["schemas"]["MessageId"];
-        };
-        MessageSteered: {
-            messageId: components["schemas"]["MessageId"];
-        };
-        ModelChanged: {
-            account: components["schemas"]["AgentAccountId"];
-            model: string;
-            thinking: string;
-            changedBy: components["schemas"]["UserId"];
-        };
         /**
          * @description What's known of a model at an account: from the account's vendor, where it says, and otherwise from
          *     models.dev's open catalog. What isn't known is `null`, never a guess.
@@ -4108,17 +4064,6 @@ export interface components {
         SetSecretRequest: {
             value: string;
         };
-        SetupEnded: {
-            /** Format: int32 */
-            exitCode: number;
-            took: string;
-            output: null | string;
-        };
-        SetupFixStarted: {
-            failedIn: components["schemas"]["ChatId"];
-            fixingIn: components["schemas"]["ChatId"];
-            startedBy: components["schemas"]["UserId"];
-        };
         /**
          * @description A run of a nook's setup scripts: one process, whose output says what each script did. It fails
          *     with the first failing script's exit code, 124 for one that ran out of time, after the others ran.
@@ -4141,13 +4086,6 @@ export interface components {
              * @description How it ended, or `null` while it runs: 0 when every script succeeded.
              */
             exitCode: null | number;
-        };
-        SetupRunAsked: {
-            askedBy: components["schemas"]["UserId"];
-        };
-        SetupStarted: {
-            scripts: string[];
-            fromReadyCopy: boolean;
         };
         SignedIn: {
             token: string;
@@ -4285,13 +4223,6 @@ export interface components {
             codeVerifier: string;
             /** Format: uri */
             redirectUri: string;
-        };
-        TurnEnded: {
-            stopReason: string;
-            failure: null | string;
-        };
-        TurnStarted: {
-            messageId: components["schemas"]["MessageId"];
         };
         /** @description What one turn's model calls used and cost. */
         TurnUsage: {

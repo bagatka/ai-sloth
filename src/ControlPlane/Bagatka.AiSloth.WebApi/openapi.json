@@ -2999,28 +2999,6 @@
         },
         "description": "An agent account as people see it; its secret is never shown. A workspace\u0027s account has a\nWorkspaceId; a person\u0027s own has an OwnerId."
       },
-      "AgentRestarted": {
-        "required": [
-          "remembers"
-        ],
-        "type": "object",
-        "properties": {
-          "remembers": {
-            "type": "boolean"
-          }
-        }
-      },
-      "AgentUpdate": {
-        "required": [
-          "update"
-        ],
-        "type": "object",
-        "properties": {
-          "update": {
-            "$ref": "#/components/schemas/JsonElement"
-          }
-        }
-      },
       "AvailableRepositories": {
         "required": [
           "repositories",
@@ -3141,57 +3119,7 @@
       },
       "ChatEventBody": {
         "type": "object",
-        "anyOf": [
-          {
-            "$ref": "#/components/schemas/MessageSent"
-          },
-          {
-            "$ref": "#/components/schemas/MessageProposed"
-          },
-          {
-            "$ref": "#/components/schemas/TurnStarted"
-          },
-          {
-            "$ref": "#/components/schemas/MessageSteered"
-          },
-          {
-            "$ref": "#/components/schemas/MessageCancelled"
-          },
-          {
-            "$ref": "#/components/schemas/AgentUpdate"
-          },
-          {
-            "$ref": "#/components/schemas/TurnEnded"
-          },
-          {
-            "$ref": "#/components/schemas/CheckpointSaved"
-          },
-          {
-            "$ref": "#/components/schemas/CheckpointFailed"
-          },
-          {
-            "$ref": "#/components/schemas/AgentRestarted"
-          },
-          {
-            "$ref": "#/components/schemas/ModelChanged"
-          },
-          {
-            "$ref": "#/components/schemas/SetupStarted"
-          },
-          {
-            "$ref": "#/components/schemas/SetupEnded"
-          },
-          {
-            "$ref": "#/components/schemas/SetupRunAsked"
-          },
-          {
-            "$ref": "#/components/schemas/SetupFixStarted"
-          },
-          {
-            "$ref": "#/components/schemas/DiskNearlyFull"
-          }
-        ],
-        "description": "What happened in a chat. A message is sent, then either starts a turn, goes into the running\nturn (steered), or is cancelled. A turn shows the agent\u0027s updates and ends with a stop reason,\nthen a checkpoint of the nook\u0027s files. A proposal stays with the people in the chat until the\naccount\u0027s owner sends it on. An agent that had to be started again says whether it remembers.\nSomeone may change the agent\u0027s model or account, from the next turn on.\nThe nook\u0027s setup, when its files have one, starts and ends before its agent starts; someone may ask\nto run it again, which it does once the agent answered what was sent before, or start a chat that\nfixes it."
+        "description": "What happened in a chat. A message is sent, then either starts a turn, goes into the running\nturn (steered), or is cancelled. A turn shows the agent\u0027s updates and ends with a stop reason,\nthen a checkpoint of the nook\u0027s files. A proposal stays with the people in the chat until the\naccount\u0027s owner sends it on. An agent that had to be started again says whether it remembers.\nSomeone may change the agent\u0027s model or account, from the next turn on.\nThe nook\u0027s setup, when its files have one, starts and ends before its agent starts; someone may ask\nto run it again, which it does once the agent answered what was sent before, or start a chat that\nfixes it. When AiSloth\u0027s own work on the chat keeps failing, the chat says so until it goes on."
       },
       "ChatEventData": {
         "required": [
@@ -3443,40 +3371,6 @@
         },
         "description": "What a chat\u0027s agents have used of their models: every call the model gateway saw, added up and by\nturn, with what a cost is known for; how full the context is; and how long its prompt\u0027s cache stays.\nCalls of an agent that holds its own token (a Claude plan\u0027s) don\u0027t pass the gateway, so they aren\u0027t here."
       },
-      "CheckpointFailed": {
-        "required": [
-          "failure"
-        ],
-        "type": "object",
-        "properties": {
-          "failure": {
-            "type": "string"
-          }
-        }
-      },
-      "CheckpointSaved": {
-        "required": [
-          "number",
-          "changes"
-        ],
-        "type": "object",
-        "properties": {
-          "number": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "changes": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/ChangeCount"
-              }
-            ]
-          }
-        }
-      },
       "CheckpointSummary": {
         "required": [
           "nookId",
@@ -3669,23 +3563,6 @@
           }
         },
         "description": "What one day\u0027s model calls in a workspace used and cost."
-      },
-      "DiskNearlyFull": {
-        "required": [
-          "usedBytes",
-          "totalBytes"
-        ],
-        "type": "object",
-        "properties": {
-          "usedBytes": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "totalBytes": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
       },
       "GitHubAccount": {
         "required": [
@@ -4095,7 +3972,6 @@
         },
         "description": "A new invite: whoever accepts Code first gets the access, once, until it expires.\nThe code is shown only here."
       },
-      "JsonElement": {},
       "LinkCode": {
         "required": [
           "code",
@@ -4186,104 +4062,10 @@
         },
         "description": "A machine as the people with access to its workspace see it."
       },
-      "MessageCancelled": {
-        "required": [
-          "messageId"
-        ],
-        "type": "object",
-        "properties": {
-          "messageId": {
-            "$ref": "#/components/schemas/MessageId"
-          }
-        }
-      },
       "MessageId": {
         "type": "string",
         "description": "Identifies a message in a chat.",
         "format": "uuid"
-      },
-      "MessageProposed": {
-        "required": [
-          "messageId",
-          "proposedBy",
-          "text"
-        ],
-        "type": "object",
-        "properties": {
-          "messageId": {
-            "$ref": "#/components/schemas/MessageId"
-          },
-          "proposedBy": {
-            "$ref": "#/components/schemas/UserId"
-          },
-          "text": {
-            "type": "string"
-          }
-        }
-      },
-      "MessageSent": {
-        "required": [
-          "messageId",
-          "sentBy",
-          "text",
-          "proposal"
-        ],
-        "type": "object",
-        "properties": {
-          "messageId": {
-            "$ref": "#/components/schemas/MessageId"
-          },
-          "sentBy": {
-            "$ref": "#/components/schemas/UserId"
-          },
-          "text": {
-            "type": "string"
-          },
-          "proposal": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/MessageId"
-              }
-            ]
-          }
-        }
-      },
-      "MessageSteered": {
-        "required": [
-          "messageId"
-        ],
-        "type": "object",
-        "properties": {
-          "messageId": {
-            "$ref": "#/components/schemas/MessageId"
-          }
-        }
-      },
-      "ModelChanged": {
-        "required": [
-          "account",
-          "model",
-          "thinking",
-          "changedBy"
-        ],
-        "type": "object",
-        "properties": {
-          "account": {
-            "$ref": "#/components/schemas/AgentAccountId"
-          },
-          "model": {
-            "type": "string"
-          },
-          "thinking": {
-            "type": "string"
-          },
-          "changedBy": {
-            "$ref": "#/components/schemas/UserId"
-          }
-        }
       },
       "ModelFacts": {
         "required": [
@@ -5341,49 +5123,6 @@
           }
         }
       },
-      "SetupEnded": {
-        "required": [
-          "exitCode",
-          "took",
-          "output"
-        ],
-        "type": "object",
-        "properties": {
-          "exitCode": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "took": {
-            "pattern": "^-?(\\d\u002B\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
-            "type": "string"
-          },
-          "output": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
-      "SetupFixStarted": {
-        "required": [
-          "failedIn",
-          "fixingIn",
-          "startedBy"
-        ],
-        "type": "object",
-        "properties": {
-          "failedIn": {
-            "$ref": "#/components/schemas/ChatId"
-          },
-          "fixingIn": {
-            "$ref": "#/components/schemas/ChatId"
-          },
-          "startedBy": {
-            "$ref": "#/components/schemas/UserId"
-          }
-        }
-      },
       "SetupRun": {
         "required": [
           "process",
@@ -5420,35 +5159,6 @@
           }
         },
         "description": "A run of a nook\u0027s setup scripts: one process, whose output says what each script did. It fails\nwith the first failing script\u0027s exit code, 124 for one that ran out of time, after the others ran."
-      },
-      "SetupRunAsked": {
-        "required": [
-          "askedBy"
-        ],
-        "type": "object",
-        "properties": {
-          "askedBy": {
-            "$ref": "#/components/schemas/UserId"
-          }
-        }
-      },
-      "SetupStarted": {
-        "required": [
-          "scripts",
-          "fromReadyCopy"
-        ],
-        "type": "object",
-        "properties": {
-          "scripts": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "fromReadyCopy": {
-            "type": "boolean"
-          }
-        }
       },
       "SignedIn": {
         "required": [
@@ -5807,35 +5517,6 @@
           "redirectUri": {
             "type": "string",
             "format": "uri"
-          }
-        }
-      },
-      "TurnEnded": {
-        "required": [
-          "stopReason",
-          "failure"
-        ],
-        "type": "object",
-        "properties": {
-          "stopReason": {
-            "type": "string"
-          },
-          "failure": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
-      "TurnStarted": {
-        "required": [
-          "messageId"
-        ],
-        "type": "object",
-        "properties": {
-          "messageId": {
-            "$ref": "#/components/schemas/MessageId"
           }
         }
       },

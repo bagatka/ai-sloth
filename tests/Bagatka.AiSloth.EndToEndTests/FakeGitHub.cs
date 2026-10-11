@@ -54,6 +54,7 @@ internal sealed class FakeGitHub : IAsyncDisposable
     private readonly List<PullRequest> _pullRequests = [];
     private readonly List<Release> _releases = [];
     private readonly HashSet<string> _billedForCredits = new HashSet<string>(StringComparer.Ordinal);
+    private readonly HashSet<string> _downFor = new HashSet<string>(StringComparer.Ordinal);
 
     private FakeGitHub(WebApplication app)
     {
@@ -255,6 +256,11 @@ internal sealed class FakeGitHub : IAsyncDisposable
             if (string.Equals(form["grant_type"], "refresh_token", StringComparison.Ordinal))
             {
                 login = string.Equals(form["client_secret"], ClientSecret, StringComparison.Ordinal) ? _tokens.GetValueOrDefault(form["refresh_token"].ToString()) : null;
+                if (login is not null && _downFor.Contains(login))
+                {
+                    return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+                }
+
                 _tokens.Remove(form["refresh_token"].ToString());
             }
             else
@@ -276,6 +282,26 @@ internal sealed class FakeGitHub : IAsyncDisposable
         }
 
         return Results.Json(string.Equals(clientId, CopilotClientId, StringComparison.Ordinal) ? IssueCopilotToken(login) : IssueTokens(login));
+    }
+
+    /// <summary>
+    /// Has GitHub answer <paramref name="login"/>'s token renewals with 503, as in an outage, until
+    /// <see cref="ComeBackFor"/>; the refresh token stays good.
+    /// </summary>
+    public void GoDownFor(string login)
+    {
+        lock (_lock)
+        {
+            _downFor.Add(login);
+        }
+    }
+
+    public void ComeBackFor(string login)
+    {
+        lock (_lock)
+        {
+            _downFor.Remove(login);
+        }
     }
 
     /// <summary>Makes <paramref name="login"/>'s Copilot plan one without limits that bills the credits it spends, as an enterprise's.</summary>

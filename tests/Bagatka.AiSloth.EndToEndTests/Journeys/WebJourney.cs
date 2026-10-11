@@ -66,7 +66,7 @@ public sealed partial class WebJourney(ControlPlane app)
             await AMessageWhileTheAgentWorksGoesIntoItsTurnAsync(page);
             await EscStopsTheTurnAsync(page);
             await TheTranscriptFollowsOnlyWhileAtItsEndAsync(page, acme, chat);
-            ChatSummary started = await StartsAChatWithTheRepositoryInTheAppAsync(page, acme);
+            ChatSummary started = await StartsAChatWithTheRepositoryInTheAppAsync(page, acme, owner);
             await AFailedSetupIsFixedInAChatOfItsOwnAsync(page, acme);
             await TheChangesStayLiveAndKeepTheReadersPlaceAsync(page, acme, started);
             await ReviewsTheChangesDownloadsTheFilesAndOpensAPullRequestAsync(page, acme, started, owner);
@@ -196,7 +196,7 @@ public sealed partial class WebJourney(ControlPlane app)
     // The agent picker offers the harnesses the accounts run, the model picker every model of their
     // accounts, and the repository picker the workspace's repositories; the nook starts as the message
     // is written. In the chat, the model picker switches its model for the next turn.
-    private static async Task<ChatSummary> StartsAChatWithTheRepositoryInTheAppAsync(IPage page, TestWorkspace acme)
+    private async Task<ChatSummary> StartsAChatWithTheRepositoryInTheAppAsync(IPage page, TestWorkspace acme, string owner)
     {
         await page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "New chat" }).ClickAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "What should Claude Code work on?" })).ToBeVisibleAsync();
@@ -212,11 +212,20 @@ public sealed partial class WebJourney(ControlPlane app)
         await Assertions.Expect(page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "api" })).ToBeVisibleAsync();
         await WebBrowser.ShotAsync(page, "new-chat");
 
+        // GitHub is down while the repository is copied in: the message box says AiSloth keeps trying,
+        // and the chat goes on once GitHub is back.
+        string login = "alice-" + owner["acme-".Length..];
+        app.GitHub.GoDownFor(login);
         await Composer(page).FillAsync("Please write hello.txt in a new chat");
         await page.Keyboard.PressAsync("Enter");
+        ILocator failing = page.GetByText("AiSloth hit an error working on this chat");
+        await Assertions.Expect(failing).ToBeVisibleAsync(WebBrowser.Shown);
+        await WebBrowser.ShotAsync(page, "work-failing");
+        app.GitHub.ComeBackFor(login);
 
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Please write hello.txt in a new chat" })).ToBeVisibleAsync(WebBrowser.Shown);
         await Assertions.Expect(page.GetByText("Done.")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(failing).ToBeHiddenAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Please write hello.txt in a new chat" })).ToBeVisibleAsync();
         await WebBrowser.ShotAsync(page, "started");
 

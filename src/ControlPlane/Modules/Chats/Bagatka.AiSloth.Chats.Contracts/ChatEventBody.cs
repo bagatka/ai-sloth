@@ -8,6 +8,6 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// Someone may change the agent's model or account, from the next turn on.
 /// The nook's setup, when its files have one, starts and ends before its agent starts; someone may ask
 /// to run it again, which it does once the agent answered what was sent before, or start a chat that
-/// fixes it.
+/// fixes it. When AiSloth's own work on the chat keeps failing, the chat says so until it goes on.
 /// </summary>
-public union ChatEventBody(MessageSent, MessageProposed, TurnStarted, MessageSteered, MessageCancelled, AgentUpdate, TurnEnded, CheckpointSaved, CheckpointFailed, AgentRestarted, ModelChanged, SetupStarted, SetupEnded, SetupRunAsked, SetupFixStarted, DiskNearlyFull);
+public union ChatEventBody(MessageSent, MessageProposed, TurnStarted, MessageSteered, MessageCancelled, AgentUpdate, TurnEnded, CheckpointSaved, CheckpointFailed, AgentRestarted, ModelChanged, SetupStarted, SetupEnded, SetupRunAsked, SetupFixStarted, DiskNearlyFull, WorkFailed, WorkResumed);

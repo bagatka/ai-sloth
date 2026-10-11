@@ -51,6 +51,8 @@ internal sealed class StoredEvent
             SetupRunAsked asked => ("setup-run-asked", JsonSerializer.Serialize(asked, FoundationJson.Options)),
             SetupFixStarted fix => ("setup-fix-started", JsonSerializer.Serialize(fix, FoundationJson.Options)),
             DiskNearlyFull full => ("disk-nearly-full", JsonSerializer.Serialize(full, FoundationJson.Options)),
+            WorkFailed failed => ("work-failed", JsonSerializer.Serialize(failed, FoundationJson.Options)),
+            WorkResumed resumed => ("work-resumed", JsonSerializer.Serialize(resumed, FoundationJson.Options)),
         };
         return new StoredEvent(chatId, sequence, at, kind, data);
     }
@@ -75,6 +77,8 @@ internal sealed class StoredEvent
             "setup-run-asked" => new ChatEventBody(Read<SetupRunAsked>()),
             "setup-fix-started" => new ChatEventBody(Read<SetupFixStarted>()),
             "disk-nearly-full" => new ChatEventBody(Read<DiskNearlyFull>()),
+            "work-failed" => new ChatEventBody(Read<WorkFailed>()),
+            "work-resumed" => new ChatEventBody(Read<WorkResumed>()),
             _ => throw new InvalidOperationException("Chat " + ChatId.Value + " has an event of unknown kind " + Kind + "."),
         };
         return new ChatEvent(Sequence, At, Kind, body);

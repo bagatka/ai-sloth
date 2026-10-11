@@ -77,6 +77,11 @@ minutes unless given).
 
 ## Decisions and constraints
 
+- **A stuck chat says so.** When AiSloth's own work on a chat fails with an error it doesn't expect,
+  such as copying its repositories in while GitHub is down, its runner logs it and tries again every
+  few seconds; the chat says so once (`WorkFailed`) and again when it goes on (`WorkResumed`), so
+  nobody waits on a chat that silently can't move.
+
 - **A continuing chat gets the conversation as a file, never a summary.** It starts in a copy of the
   other chat's files with its conversation up to then as plain Markdown
   (`/work/.aisloth/chats/<id>.md`, `ConversationMarkdown`): what people wrote, what the agent

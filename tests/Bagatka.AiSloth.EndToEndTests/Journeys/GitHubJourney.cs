@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Nooks.Contracts;
@@ -38,6 +40,7 @@ public sealed class GitHubJourney(ControlPlane app) : IDisposable
         await APushNeverTouchesTheDefaultBranchOrATeammatesCommitsAndNeedsWriteAsync(chat);
         await AChatCopiedFromItStartsWithItsChangesAndRepositoryAsync(chat);
         await GitSettingsNameTheAuthorAndBranchAndCanLeaveOutTheCoAuthorAsync(chat);
+        await AChatSaysItKeepsTryingWhileGitHubIsDownAsync(chat);
     }
 
     public void Dispose()
@@ -102,6 +105,27 @@ public sealed class GitHubJourney(ControlPlane app) : IDisposable
         Assert.Equal(SourcesErrors.NotFastForward.Message, Assert.Single(toTaken).Problem);
         Assert.Equal(main, mainAfter);
         Assert.Equal("Their commit", takenAfter);
+    }
+
+    // GitHub is down while a new chat's repository is copied in: the chat says AiSloth keeps trying,
+    // once, and goes on when GitHub is back.
+    private async Task AChatSaysItKeepsTryingWhileGitHubIsDownAsync(ChatSummary chat)
+    {
+        IReadOnlyList<RepositorySummary> repositories = await Api.ReadAsync<IReadOnlyList<RepositorySummary>>(
+            Ada.SendGetAsync(Paths.Workspace(chat.WorkspaceId) + "/repositories"), HttpStatusCode.OK);
+        app.GitHub.GoDownFor(_login);
+        ChatSummary later = await Api.ReadAsync<ChatSummary>(
+            Ada.SendPostAsync(Paths.Workspace(chat.WorkspaceId) + "/chats", new { provider = "docker", harness = "claude-code", account = chat.Account, model = TestWorkspace.AnyModel, thinking = TestWorkspace.AnyThinking, repositories = new[] { new { repository = repositories[0].Id } } }),
+            HttpStatusCode.Created);
+        await using ChatWatch watch = await ChatWatch.OpenAsync(Ada, later);
+        await Api.ReadAsync<ChatMessage>(Ada.SendPostAsync(Paths.Chat(later) + "/messages", new { text = "say hello" }), HttpStatusCode.OK);
+        await watch.NextAsync("work-failed");
+        app.GitHub.ComeBackFor(_login);
+        await watch.NextAsync("work-resumed");
+        JsonElement ended = await watch.NextAsync("turn-ended");
+
+        Assert.Equal("end_turn", ended.GetProperty("stopReason").GetString());
+        Assert.Single(watch.Seen, seen => string.Equals(seen.Type, "work-failed", StringComparison.Ordinal));
     }
 
     private async Task AChatCopiedFromItStartsWithItsChangesAndRepositoryAsync(ChatSummary chat)

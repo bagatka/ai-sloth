@@ -179,24 +179,42 @@ internal sealed class ChatRunner(
         }
         catch (Exception exception) when (!ct.IsCancellationRequested)
         {
-            // A draft that went with its nook fails what its runner was doing; the next try retires it.
-            await using (ChatsDbContext db = await databases.CreateDbContextAsync(ct))
-            {
-                bool exists = await db.Chats.AnyAsync(found => found.Id == chatId, ct);
-                if (exists)
-                {
-                    Log.RunnerFailed(logger, exception, chatId.Value);
-                }
-            }
-
-            // Lines already queued were read past the saved offset; the next reader reads them again.
-            while (_inputs.Reader.TryRead(out _))
-            {
-            }
-
-            await Task.Delay(RetryDelay, time, ct);
+            await FailedAsync(exception, ct);
             return false;
         }
+    }
+
+    // What failed is logged, and the chat says it's stuck, once, so nobody waits on it without knowing;
+    // when saying so fails too, the next failure says it. A draft that went with its nook fails what
+    // its runner was doing; the next try retires it. Then the runner waits a moment to try again.
+    private async Task FailedAsync(Exception exception, CancellationToken ct)
+    {
+        await using (ChatsDbContext db = await databases.CreateDbContextAsync(ct))
+        {
+            Chat? chat = await db.Chats.SingleOrDefaultAsync(found => found.Id == chatId, ct);
+            StoredEvent? failed = chat?.WorkFailed(time);
+            if (chat is not null)
+            {
+                Log.RunnerFailed(logger, exception, chatId.Value);
+            }
+
+            if (failed is not null)
+            {
+                db.Events.Add(failed);
+                Result saved = await db.SaveAsync(ct);
+                if (!saved.Failed)
+                {
+                    signals.Notify(chatId);
+                }
+            }
+        }
+
+        // Lines already queued were read past the saved offset; the next reader reads them again.
+        while (_inputs.Reader.TryRead(out _))
+        {
+        }
+
+        await Task.Delay(RetryDelay, time, ct);
     }
 
     // Works with one agent process, reading its output, until the process ends or is replaced, or the
@@ -290,6 +308,14 @@ internal sealed class ChatRunner(
         }
 
         await DriveAgentAsync(db, chat, queued, waits, outgoing, ct);
+
+        // What failed before got this far now.
+        StoredEvent? resumed = chat.WorkResumed(time);
+        if (resumed is not null)
+        {
+            db.Events.Add(resumed);
+        }
+
         await SaveAsync(db, ct);
         await SendAsync(chat, outgoing, ct);
         bool idle = chat.TurnMessageId is null && !waiting.Any(message => message.Waiting) && !chat.StartsAgent && !chat.AgentChangeWaiting

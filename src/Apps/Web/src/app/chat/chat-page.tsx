@@ -32,6 +32,7 @@ import {
   people,
 } from "../queries"
 import { chatStream, useChat } from "./chat-stream"
+import { BoxLine } from "./box-line"
 import { ChangesPanel, DownloadFiles } from "./changes-panel"
 import { Composer } from "./composer"
 import { ContinueButton, ContinuesLine } from "./continue-chat"
@@ -168,6 +169,12 @@ export function ChatPage() {
               )
             }
           />
+        )}
+        {state.transcript.workFailing && (
+          <BoxLine tone="warning">
+            AiSloth hit an error working on this chat and tries again every few
+            seconds. If it lasts, the host's log says what failed.
+          </BoxLine>
         )}
         <SetupBanner
           chatId={chatId}

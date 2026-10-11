@@ -103,6 +103,8 @@ export type Transcript = {
    * those its model holds.
    */
   context: { used: number; size: number } | null
+  /** Whether AiSloth's own work on the chat keeps failing; it tries again every few seconds. */
+  workFailing: boolean
   /** Whether the agent is on a turn. */
   working: boolean
   /** When the running turn started. */
@@ -119,6 +121,7 @@ export const emptyTranscript: Transcript = {
   context: null,
   setupRunAsked: false,
   setupFix: null,
+  workFailing: false,
   working: false,
   turnStartedAt: null,
   sequence: 0,
@@ -276,6 +279,10 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
         tone: "warning",
         text: "This turn's files weren't saved; the next turn tries again.",
       })
+    case "work-failed":
+      return { ...next, workFailing: true }
+    case "work-resumed":
+      return { ...next, workFailing: false }
     case "disk-nearly-full":
       return append(next, {
         kind: "notice",

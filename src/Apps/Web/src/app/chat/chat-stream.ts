@@ -54,6 +54,8 @@ const kinds = [
   "setup-run-asked",
   "setup-fix-started",
   "disk-nearly-full",
+  "work-failed",
+  "work-resumed",
 ] as const
 
 // Going back to a chat shortly after leaving it finds it still connected.
