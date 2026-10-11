@@ -16,7 +16,7 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261011171518_ReportedLimits";
+    public override string LastMigrationId => "20261011184219_NoReportedLimits";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -49,10 +49,6 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("character varying(32)")
                     .HasColumnName("kind");
 
-                b.Property<DateTimeOffset?>("LimitsReportedAt")
-                    .HasColumnType("timestamp with time zone")
-                    .HasColumnName("limits_reported_at");
-
                 b.Property<string>("Name")
                     .IsRequired()
                     .HasMaxLength(64)
@@ -62,10 +58,6 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
                 b.Property<Guid?>("OwnerId")
                     .HasColumnType("uuid")
                     .HasColumnName("owner_id");
-
-                b.Property<string>("ReportedLimits")
-                    .HasColumnType("text")
-                    .HasColumnName("reported_limits");
 
                 b.Property<byte[]>("SealedSecret")
                     .IsRequired()

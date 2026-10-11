@@ -4563,11 +4563,11 @@
               "null",
               "string"
             ],
-            "description": "When the vendor reported them: now, for a plan asked when someone looks (Copilot, Claude); at its\nlatest call, for a plan whose calls report them (ChatGPT); null before any report.",
+            "description": "When the vendor reported them; null when nothing was reported.",
             "format": "date-time"
           }
         },
-        "description": "What a plan has used of its limits, as its vendor last reported it."
+        "description": "What a plan has used of its limits, as its vendor reports it."
       },
       "PostHogProject": {
         "required": [

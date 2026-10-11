@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text.Json;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
-using Bagatka.Foundation;
 using Bagatka.Sdk.Anthropic;
 using Bagatka.Sdk.GitHub;
 using Bagatka.Sdk.OpenAI;
@@ -16,42 +14,10 @@ namespace Bagatka.AiSloth.AgentAccounts.Model;
 // the credits spent.
 internal static class PlanMeters
 {
-    private const string CodexHeaders = "x-codex-";
-
-    // The headers of a ChatGPT plan's answer that report its limits, as AgentAccount.ReportedLimits
-    // keeps them; null when the answer reports none.
-    public static string? ChatGptReport(IReadOnlyDictionary<string, string> headers)
+    // ChatGPT's five-hour and weekly windows.
+    public static IReadOnlyList<UsageMeter> OfChatGpt(IReadOnlyList<ChatGptUsageWindow> windows)
     {
-        SortedDictionary<string, string> reported = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (KeyValuePair<string, string> header in headers)
-        {
-            if (header.Key.StartsWith(CodexHeaders, StringComparison.OrdinalIgnoreCase))
-            {
-                reported[header.Key] = header.Value;
-            }
-        }
-
-        return reported.Count == 0 ? null : JsonSerializer.Serialize(reported, FoundationJson.Options);
-    }
-
-    // Not handled: a ChatGPT plan's credits, which it spends once a window is used up; its balance
-    // isn't a part used of a whole, so it needs a meter of its own kind.
-    public static IReadOnlyList<UsageMeter> OfChatGpt(string? report)
-    {
-        Dictionary<string, string>? headers = report is null ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(report, FoundationJson.Options);
-        ChatGptPlanLimits? limits = headers is null ? null : ChatGptPlanLimits.Read(headers);
-        List<UsageMeter> meters = [];
-        if (limits?.Primary is { } primary)
-        {
-            meters.Add(new UsageMeter(WindowName(primary.Minutes, "Short window"), primary.UsedPercent, 100, "percent", primary.ResetsAt));
-        }
-
-        if (limits?.Secondary is { } secondary)
-        {
-            meters.Add(new UsageMeter(WindowName(secondary.Minutes, "Long window"), secondary.UsedPercent, 100, "percent", secondary.ResetsAt));
-        }
-
-        return meters;
+        return [.. windows.Select(window => new UsageMeter(WindowName(window.Length), window.UsedPercent, 100, "percent", window.ResetsAt))];
     }
 
     // Premium requests and chat requests, each of those the plan allows; code completions aren't an
@@ -84,11 +50,12 @@ internal static class PlanMeters
     }
 
     // ChatGPT's windows by their length: five hours and a week on today's plans.
-    private static string WindowName(int? minutes, string unknown)
+    private static string WindowName(TimeSpan? length)
     {
+        int minutes = length is TimeSpan known ? (int)known.TotalMinutes : 0;
         return minutes switch
         {
-            null or <= 0 => unknown,
+            <= 0 => "Window",
             10_080 => "Week",
             1_440 => "Day",
             _ when minutes % 1_440 == 0 => string.Create(CultureInfo.InvariantCulture, $"{minutes / 1_440} days"),

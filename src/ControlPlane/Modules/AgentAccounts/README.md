@@ -11,8 +11,7 @@ a nook: the model gateway adds them to each call.
 ## Owns
 
 - **Data:** the accounts: kind, name, whose they are (a workspace or a person), an API key's
-  endpoint, when a sign-in ended, the sealed secret, and a ChatGPT plan's limits as its latest call
-  reported them; and sign-ins in progress.
+  endpoint, when a sign-in ended, and the sealed secret; and sign-ins in progress.
 - **Rules:** who may add and remove them (Manage on the workspace, or the person), who may use them
   (Write on the workspace, or the person; the control plane's own processes, any), which kinds are
   personal only (plans), which are added by signing in (ChatGPT and Copilot plans), and which kinds this
@@ -24,9 +23,9 @@ a nook: the model gateway adds them to each call.
   models: OpenAI's through `Bagatka.Sdk.OpenAI`, Anthropic's through `Bagatka.Sdk.Anthropic`,
   Copilot's through `Bagatka.Sdk.GitHub`, and OpenRouter's catalog through `Bagatka.Sdk.OpenRouter`.
   models.dev's open catalog of what each model takes, holds, and costs (`Catalog/`). What plans have
-  used of their limits: ChatGPT's from its answers' `x-codex-*` headers, Copilot's quotas through
-  `Bagatka.Sdk.GitHub`, and Claude's windows through `Bagatka.Sdk.Anthropic`, the last two from the
-  vendors' undocumented endpoints that their own clients read.
+  used of their limits: ChatGPT's windows through `Bagatka.Sdk.OpenAI`, Copilot's quotas through
+  `Bagatka.Sdk.GitHub`, and Claude's windows through `Bagatka.Sdk.Anthropic`, from the vendors'
+  undocumented endpoints that their own clients read.
 
 ## Does not own
 
@@ -85,8 +84,7 @@ Nothing yet. Once workspaces can be deleted, `WorkspaceDeleted` removes their ac
 
 Schema `agent_accounts`. Table `accounts` (kind, name, workspace or owner — a check constraint keeps
 exactly one — when it was added, an API key's endpoint, when a sign-in ended, and the sealed
-secret: a key or token as given, or a plan's session as JSON; a ChatGPT plan's `x-codex-*` headers as
-its latest call reported them, as JSON, and when). Table `sign_ins` (who, the account's
+secret: a key or token as given, or a plan's session as JSON). Table `sign_ins` (who, the account's
 kind and name, the callback, the state and nonce, when it expires, and the sealed PKCE verifier).
 Table `code_sign_ins` (who, the account's kind and name, the sealed device code, when it expires,
 and when GitHub may be asked next).
@@ -109,16 +107,16 @@ background.
   since a local run is self-hosted;
 - `CopilotClientId`, the GitHub OAuth app people sign in to for their Copilot plans: AiSloth's own
   unless the host names another;
-- `ChatGptAuthority`, `ChatGptApi`, `OpenRouterApi`, `CopilotApi`, `ClaudeApi`, and `ModelsDevUrl`,
+- `ChatGptAuthority`, `ChatGptApi`, `ChatGptBackend`, `OpenRouterApi`, `CopilotApi`, `ClaudeApi`, and `ModelsDevUrl`,
   the vendors' own by default; tests point them at fakes. GitHub itself is the host's `GitHubClient`'s.
 
 ## Decisions and constraints
 
-- **A plan's limits, as its vendor counts them** (`PlanUsage`): a ChatGPT plan's five-hour and weekly
-  windows come with every answer, so the gateway's calls bring them through Chats
-  (`ObservePlanUsageAsync`) and the account keeps the latest; Copilot's quotas (premium requests used
-  of those allowed, or the credits a plan without limits spent) and a Claude plan's windows are asked
-  of the vendor when someone looks. No vendor documents these answers.
+- **A plan's limits, as its vendor counts them** (`PlanUsage`), asked of the vendor when someone
+  looks, where its own clients ask: a ChatGPT plan's five-hour and weekly windows from ChatGPT's
+  backend (`/wham/usage`, as Codex's `/status`; the API's answers to a Sign in with ChatGPT token
+  carry none), Copilot's quotas (requests used of those allowed, or the credits a plan without
+  limits spent), and a Claude plan's windows. No vendor documents these answers.
 
 - **One OpenRouter key, both APIs.** OpenRouter serves Anthropic's Messages API at its root
   (`/v1/messages`) and OpenAI's at `/v1`, so an OpenRouter key's endpoint is OpenRouter's root, with

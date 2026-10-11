@@ -3797,7 +3797,7 @@ export interface components {
             /** @description Pass it in the next PageRequest; `null` on the last page. */
             nextCursor: null | string;
         };
-        /** @description What a plan has used of its limits, as its vendor last reported it. */
+        /** @description What a plan has used of its limits, as its vendor reports it. */
         PlanUsage: {
             /**
              * @description Each limit or count the vendor reports, in its order; empty for an account that isn't a plan, or a
@@ -3806,8 +3806,7 @@ export interface components {
             meters: components["schemas"]["UsageMeter"][];
             /**
              * Format: date-time
-             * @description When the vendor reported them: now, for a plan asked when someone looks (Copilot, Claude); at its
-             *     latest call, for a plan whose calls report them (ChatGPT); null before any report.
+             * @description When the vendor reported them; null when nothing was reported.
              */
             reportedAt: null | string;
         };

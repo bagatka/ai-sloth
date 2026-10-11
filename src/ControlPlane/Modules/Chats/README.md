@@ -121,8 +121,7 @@ minutes unless given).
   latest call otherwise. A Claude plan's agent holds its token, so its calls aren't recorded. Lists
   show each chat's cost; a workspace's usage (`GetWorkspaceUsageAsync`) adds its calls up by day in
   the person's time zone, which PostgreSQL works out (`AT TIME ZONE`, through `SqlQuery`: EF
-  translates no time zone conversion of a `DateTimeOffset`), and by chat. What an
-  answer's headers say of the account's plan goes to its account (`ObservePlanUsageAsync`).
+  translates no time zone conversion of a `DateTimeOffset`), and by chat.
 - **No model key or plan in a nook.** An agent gets the model gateway's URL and a token for its chat;
   the gateway forwards each call with the headers that pay for it. A Claude plan's token, tied to
   Claude Code, goes to the harness itself.

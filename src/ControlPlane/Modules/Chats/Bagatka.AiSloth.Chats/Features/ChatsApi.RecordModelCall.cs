@@ -1,6 +1,5 @@
 using Bagatka.AiSloth.Chats.Data;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +14,7 @@ namespace Bagatka.AiSloth.Chats;
 
 internal sealed partial class ChatsApi
 {
-    public async Task<Result> RecordModelCallAsync(Actor actor, string token, ModelCallUsage usage, IReadOnlyDictionary<string, string> headers, DateTimeOffset startedAt, CancellationToken ct)
+    public async Task<Result> RecordModelCallAsync(Actor actor, string token, ModelCallUsage usage, DateTimeOffset startedAt, CancellationToken ct)
     {
         await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
 
@@ -39,16 +38,6 @@ internal sealed partial class ChatsApi
         // gone meanwhile.
         Result<ModelFacts> facts = await accounts.GetModelFactsAsync(SystemActors.Harness, chat.AgentAccountId, chat.WorkspaceId, usage.Model, ct);
         db.ModelCalls.Add(ModelCall.Record(chat, turn, startedAt, usage, facts.Failed ? ModelFacts.Unknown : facts.Output, time));
-        Result saved = await db.SaveAsync(ct);
-        if (saved.Failed)
-        {
-            return saved;
-        }
-
-        // What the answer said of the account's plan, such as a ChatGPT plan's limits; nothing to keep
-        // once the account is gone.
-        Result observed = await accounts.ObservePlanUsageAsync(SystemActors.Harness, chat.AgentAccountId, chat.WorkspaceId, headers, ct);
-        bool accountGone = observed.Failed && observed.Error == AgentAccountsErrors.NotFound;
-        return accountGone ? new Result(new Success()) : observed;
+        return await db.SaveAsync(ct);
     }
 }

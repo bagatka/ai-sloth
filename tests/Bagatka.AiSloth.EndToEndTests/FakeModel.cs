@@ -301,19 +301,6 @@ internal sealed class FakeModel : IAsyncDisposable
             new JsonObject { ["type"] = "response.output_item.done", ["output_index"] = 0, ["item"] = item },
             new JsonObject { ["type"] = "response.completed", ["response"] = completed },
         ];
-        // A ChatGPT plan's answers report its limits, as Codex reads them; the fake ChatGPT's tokens start "access-".
-        bool chatGptPlan = context.Request.Headers.Authorization.ToString().StartsWith("Bearer access-", StringComparison.Ordinal);
-        if (chatGptPlan)
-        {
-            long now = TimeProvider.System.GetUtcNow().ToUnixTimeSeconds();
-            context.Response.Headers["x-codex-primary-used-percent"] = "42.5";
-            context.Response.Headers["x-codex-primary-window-minutes"] = "300";
-            context.Response.Headers["x-codex-primary-reset-at"] = (now + 7200).ToString(CultureInfo.InvariantCulture);
-            context.Response.Headers["x-codex-secondary-used-percent"] = "12";
-            context.Response.Headers["x-codex-secondary-window-minutes"] = "10080";
-            context.Response.Headers["x-codex-secondary-reset-at"] = (now + 259_200).ToString(CultureInfo.InvariantCulture);
-        }
-
         context.Response.ContentType = "text/event-stream";
         await context.Response.WriteAsync(EventStream(events), context.RequestAborted);
 

@@ -289,8 +289,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
     }
 
     // Every token set the fake ChatGPT issues asks to be renewed at once, so each model call renews:
-    // two agents working at the same time on one plan must never use a refresh token twice. The plan's
-    // answers report its five-hour and weekly windows.
+    // two agents working at the same time on one plan must never use a refresh token twice. ChatGPT
+    // says how much of the plan's five-hour and weekly windows is used.
     private async Task AChatGptPlanIsAddedBySigningInAndRenewedOneCallAtATimeAsync()
     {
         TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice, openAI: true);
@@ -322,7 +322,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
         Assert.True(app.ChatGpt.Renewals > renewalsBefore);
         Assert.Equal(0, app.ChatGpt.ReusedRefreshTokens);
-        Assert.Equal([("5 hours", 42.5m, 100m), ("Week", 12m, 100m)], usage.Meters.Select(meter => (meter.Name, meter.Used, meter.Limit ?? 0)));
+        Assert.Equal([("5 hours", 42m, 100m), ("Week", 12m, 100m)], usage.Meters.Select(meter => (meter.Name, meter.Used, meter.Limit ?? 0)));
         Assert.NotNull(usage.ReportedAt);
         Assert.Equal("The agent couldn't start: " + AgentAccountsErrors.SignInEnded.Message, afterDisconnect.GetProperty("failure").GetString());
         Assert.True(accounts.Single(found => found.Id == plan.Id).NeedsSignIn);
