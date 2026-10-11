@@ -64,6 +64,8 @@ export type Row =
       output: string | null
       /** How long it took, in seconds, once it ended. */
       took: number | null
+      /** Whether someone wrote after the agent's first answer since it. */
+      followedUp: boolean
     }
   | {
       kind: "notice"
@@ -102,7 +104,7 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
   const key = String(chatEvent.sequence)
   switch (chatEvent.kind) {
     case "message-sent":
-      return append(next, {
+      return append(followUpSetup(next), {
         kind: "message",
         key,
         id: body.messageId,
@@ -112,7 +114,7 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
         proposal: false,
       })
     case "message-proposed":
-      return append(next, {
+      return append(followUpSetup(next), {
         kind: "message",
         key,
         id: body.messageId,
@@ -157,6 +159,7 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
         exitCode: null,
         output: null,
         took: null,
+        followedUp: false,
       })
     case "setup-ended": {
       const index = findLast(next.rows, (row) => row.kind === "setup")
@@ -167,6 +170,7 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
         exitCode: body.exitCode,
         output: body.output ?? null,
         took: seconds(body.took),
+        followedUp: false,
       }
       return index >= 0 ? replace(next, index, ended) : append(next, ended)
     }
@@ -344,6 +348,24 @@ function setMessageState(
   }
   const message = transcript.rows[index] as Extract<Row, { kind: "message" }>
   return replace(transcript, index, { ...message, state })
+}
+
+// Someone wrote after the agent's first answer since the setup, which says how it went, so the setup
+// no longer asks for an answer. Agents start once their nook's setup ended, so any turn after its row
+// ended after it; messages sent while it ran come before that answer.
+function followUpSetup(transcript: Transcript): Transcript {
+  const index = findLast(transcript.rows, (row) => row.kind === "setup")
+  if (index < 0) {
+    return transcript
+  }
+  const setup = transcript.rows[index]
+  const answered = transcript.rows
+    .slice(index + 1)
+    .some((row) => row.kind === "turn-ended")
+  if (setup.kind !== "setup" || setup.followedUp || !answered) {
+    return transcript
+  }
+  return replace(transcript, index, { ...setup, followedUp: true })
 }
 
 function append(transcript: Transcript, row: Row): Transcript {

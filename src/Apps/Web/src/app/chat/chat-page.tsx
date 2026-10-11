@@ -133,6 +133,7 @@ export function ChatPage() {
         />
       ) : (
         <TranscriptView
+          chatId={chatId}
           state={state}
           me={person.id}
           names={nameOf}

@@ -21,7 +21,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// a chat on, find a chat in Acme, and watch its turn as it happens; a chat started elsewhere shows up
 /// at once. A message they write starts the next turn, one written while the agent works goes into
 /// that turn, and Esc stops a turn. They start a chat in the app with Acme's repository, choosing its
-/// agent and its model, switch the chat to another model, review what changed in the repository, download its files, and open a pull request. The app
+/// agent and its model, switch the chat to another model, have the agent fix the repository's failed
+/// setup in one click, review what changed in the repository, download its files, and open a pull request. The app
 /// runs under the host's content security policy without a violation, and its session is a cookie no
 /// script can read. On another computer, a link to the chat signs them in through the host's provider
 /// and opens it. Only the model and GitHub are fake; the app is src/Apps/Web as last built, and
@@ -57,6 +58,7 @@ public sealed partial class WebJourney(ControlPlane app)
             await AMessageWhileTheAgentWorksGoesIntoItsTurnAsync(page);
             await EscStopsTheTurnAsync(page);
             ChatSummary started = await StartsAChatWithTheRepositoryInTheAppAsync(page, acme);
+            await AFailedSetupIsFixedInOneClickAsync(page);
             await ReviewsTheChangesDownloadsTheFilesAndOpensAPullRequestAsync(page, acme, started, owner);
             await TheSessionIsACookieNoScriptReadsAndNothingBrokeThePolicyAsync(page, context);
             await ALinkToTheChatSignsInThroughTheProviderAsync(browser, chat, alice);
@@ -122,6 +124,11 @@ public sealed partial class WebJourney(ControlPlane app)
         string login = "alice-" + suffix;
         string owner = "acme-" + suffix;
         await app.GitHub.CreateRepositoryAsync(owner, "api", login);
+        Dictionary<string, string> setup = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [".agents/setup"] = "#!/bin/sh\necho 'npm ERR! 404 Not Found: @acme/ui'\nexit 2\n",
+        };
+        await app.GitHub.CommitFilesAsync(owner, "api", "main", setup, "Add a setup");
         GitHubConnectionStarted connecting = await Api.ReadAsync<GitHubConnectionStarted>(person.SendPostAsync("/github/connections", new { }), HttpStatusCode.OK);
         app.GitHub.Approve(connecting.UserCode, login);
         await Api.ExpectAsync(person.SendPostAsync(string.Create(CultureInfo.InvariantCulture, $"/github/connections/{connecting.Id.Value}/complete"), new { }), HttpStatusCode.OK);
@@ -166,6 +173,23 @@ public sealed partial class WebJourney(ControlPlane app)
         Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(acme.Person.SendGetAsync(acme.Path + "/chats"), HttpStatusCode.OK);
         Assert.Equal((null, "xhigh"), (chats.Items[0].Model, chats.Items[0].Thinking));
         return chats.Items[0];
+    }
+
+    // The repository's setup failed before the agent started. The app says so, and one click asks the
+    // agent to fix it, as the person; then the offer goes, as with any answer.
+    private static async Task AFailedSetupIsFixedInOneClickAsync(IPage page)
+    {
+        ILocator fix = page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Fix the setup" });
+        ILocator failed = page.GetByText("The setup failed (exit code 2)");
+        await Assertions.Expect(failed).ToBeVisibleAsync(WebBrowser.Shown);
+        await failed.ScrollIntoViewIfNeededAsync();
+        await WebBrowser.ShotAsync(page, "setup-failed");
+
+        await fix.ClickAsync();
+
+        await Assertions.Expect(page.GetByText("Fix the setup that failed, run it again, and commit the fix.")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(fix).ToBeHiddenAsync();
+        await Assertions.Expect(page.GetByText(TurnEnded())).ToHaveCountAsync(2, new LocatorAssertionsToHaveCountOptions { Timeout = 60_000 });
     }
 
     // The agent changes the repository (here the journey does, as it would); the changes show as a
