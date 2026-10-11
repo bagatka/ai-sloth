@@ -11,12 +11,12 @@ using Microsoft.Extensions.Logging;
 namespace Bagatka.AiSloth.Chats.Harness;
 
 // What harnesses write for themselves to use later (HarnessProfile.StatePaths), such as Claude Code's
-// memory, kept as a folder AiSloth keeps (INooksApi.SyncFolderAsync) for whoever may direct the agents
+// memory, kept as a folder AiSloth keeps (INookFilesApi.SyncFolderAsync) for whoever may direct the agents
 // that write it: a person for the chats on their own accounts, and the workspace for the chats on its
 // accounts. So nobody's notes reach agents they couldn't direct themselves. A chat syncs when its agent
 // starts and after each turn. It never leaves its workspace, whose work it may describe. Failures are
 // logged, never the chat's: the agent works with what its nook has, and the next sync tries again.
-internal sealed class HarnessStates(INooksApi nooks, ILogger<HarnessStates> logger)
+internal sealed class HarnessStates(INookFilesApi nookFiles, ILogger<HarnessStates> logger)
 {
     public async Task SyncAsync(Chat chat, CancellationToken ct)
     {
@@ -24,7 +24,7 @@ internal sealed class HarnessStates(INooksApi nooks, ILogger<HarnessStates> logg
         foreach (string path in harness?.StatePaths ?? [])
         {
             SyncFolder sync = new SyncFolder(chat.NookId, path, FolderOf(chat.WorkspaceId, chat.AccountOwnerId, chat.Harness, path));
-            Result synced = await nooks.SyncFolderAsync(SystemActors.Harness, sync, ct);
+            Result synced = await nookFiles.SyncFolderAsync(SystemActors.Harness, sync, ct);
             if (synced.Failed)
             {
                 Log.HarnessStateNotSynced(logger, chat.Id.Value, synced.Error.Message);

@@ -2,7 +2,7 @@ using System;
 
 namespace Bagatka.AiSloth.Nooks.Contracts;
 
-/// <summary>A folder AiSloth keeps outside every nook (<see cref="INooksApi.SyncFolderAsync"/>).</summary>
+/// <summary>A folder AiSloth keeps outside every nook (<see cref="INookFilesApi.SyncFolderAsync"/>).</summary>
 /// <param name="Folder">Its name.</param>
 /// <param name="SavedAt">When a nook last saved changes to it.</param>
 /// <param name="Bytes">How much its history takes.</param>

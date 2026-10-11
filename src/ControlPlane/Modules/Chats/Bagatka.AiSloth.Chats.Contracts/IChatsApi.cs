@@ -56,35 +56,6 @@ public interface IChatsApi
     public Task<Result<IReadOnlyList<HarnessModel>>> ListModelsAsync(Actor actor, WorkspaceId workspaceId, string harness, AgentAccountId account, CancellationToken ct);
 
     /// <summary>
-    /// The actor's presets that can start chats in the workspace, oldest first: those on the
-    /// workspace's accounts, for people with Write on it, and those on their own accounts. A preset on
-    /// an account that was removed isn't listed.
-    /// </summary>
-    /// <returns>The presets; forbidden for anyone but a person; or not found when the actor has no access to the workspace.</returns>
-    public Task<Result<IReadOnlyList<PresetSummary>>> ListPresetsAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct);
-
-    /// <summary>
-    /// Saves a preset of the actor's, checked as a chat's start is: a harness, an account the actor may
-    /// use in the workspace of a kind the harness takes, and a model and thinking level only for a
-    /// harness that takes them. A person keeps at most 20, each harness, account, model, and thinking
-    /// level once.
-    /// </summary>
-    /// <returns>
-    /// The preset; a validation error for its harness, account, model, or name; <see cref="ChatsErrors.PresetExists"/>;
-    /// <see cref="ChatsErrors.TooManyPresets"/>; forbidden for anyone but a person; or not found when
-    /// the actor has no access to the workspace.
-    /// </returns>
-    public Task<Result<PresetSummary>> AddPresetAsync(Actor actor, AddPreset command, CancellationToken ct);
-
-    /// <summary>Renames one of the actor's presets: 1 to 64 characters.</summary>
-    /// <returns>The preset; a validation error for the name; or <see cref="ChatsErrors.PresetNotFound"/>.</returns>
-    public Task<Result<PresetSummary>> RenamePresetAsync(Actor actor, PresetId id, string name, CancellationToken ct);
-
-    /// <summary>Removes one of the actor's presets. Chats started from it keep running as they are.</summary>
-    /// <returns>Success; or <see cref="ChatsErrors.PresetNotFound"/>.</returns>
-    public Task<Result> RemovePresetAsync(Actor actor, PresetId id, CancellationToken ct);
-
-    /// <summary>
     /// Runs the chat's agent on another model, at another thinking level, or on another account, from its
     /// next turn: an agent
     /// working on a turn finishes it, and a new agent on the same harness continues the conversation.
@@ -100,27 +71,6 @@ public interface IChatsApi
 
     /// <summary>The chat. Not found when it doesn't exist or the actor has no access to its nook.</summary>
     public Task<Result<ChatSummary>> GetAsync(Actor actor, ChatId id, CancellationToken ct);
-
-    /// <summary>
-    /// What the chat's agents have used of their models (<see cref="ChatUsage"/>), for whoever may read
-    /// the chat. Reads the chat's call records and what's known of its model; asks no vendor.
-    /// </summary>
-    /// <returns>The usage; or not found for a chat the actor can't see.</returns>
-    public Task<Result<ChatUsage>> GetUsageAsync(Actor actor, ChatId id, CancellationToken ct);
-
-    /// <summary>
-    /// What the workspace's chats used of their models over its last days (<see cref="WorkspaceUsage"/>),
-    /// for anyone who sees its chats: each day's calls, tokens, and cost, each chat's, and all of them
-    /// added up. Days are those of the time zone given, such as the person's own. Reads the call
-    /// records; asks no vendor.
-    /// </summary>
-    /// <param name="actor">Who asks.</param>
-    /// <param name="workspaceId">The workspace.</param>
-    /// <param name="days">How many days, today included: 1 to 90.</param>
-    /// <param name="timeZone">The IANA time zone whose days count, such as <c>Europe/Berlin</c>.</param>
-    /// <param name="ct">Cancels the reading.</param>
-    /// <returns>The usage; a validation error for days out of range or an unknown time zone; or not found.</returns>
-    public Task<Result<WorkspaceUsage>> GetWorkspaceUsageAsync(Actor actor, WorkspaceId workspaceId, int days, string timeZone, CancellationToken ct);
 
     /// <summary>The workspace's chats someone wrote in, newest first. Not found for anyone without access to the workspace, such as a nook's guest.</summary>
     public Task<Result<Page<ChatSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, PageRequest page, CancellationToken ct);
@@ -152,7 +102,6 @@ public interface IChatsApi
     /// messages don't reach the agent; or not found.
     /// </returns>
     public Task<Result<ChatMessage>> SendAsync(Actor actor, SendMessage command, CancellationToken ct);
-
 
     /// <summary>
     /// Stops the agent: the running turn ends as <c>cancelled</c>, and messages it hasn't received yet
@@ -197,44 +146,6 @@ public interface IChatsApi
     /// forbidden for anyone who may only read the chat; or not found.
     /// </returns>
     public Task<Result> UseSetupFixAsync(Actor actor, ChatId id, CancellationToken ct);
-
-    /// <summary>
-    /// The harness state the actor's agents in the workspace get, for each harness that keeps any: what
-    /// its agents write for themselves to use later, such as Claude Code's memory, saved after each
-    /// turn that changed it and given to the next agents. It follows who may direct the agents: the
-    /// chats on the actor's own accounts share theirs, and the chats on the workspace's accounts share
-    /// the workspace's. It never leaves its workspace.
-    /// </summary>
-    /// <returns>The states; forbidden for anyone but a person; or not found without access to the workspace.</returns>
-    public Task<Result<IReadOnlyList<HarnessStateSummary>>> ListHarnessStatesAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct);
-
-    /// <summary>
-    /// Forgets the actor's state for the harness in the workspace, or the workspace's shared one, which
-    /// takes Write on the workspace: the next agents start without it. A chat whose agent already has
-    /// it saves it again when it changes it. Forgetting none succeeds.
-    /// </summary>
-    public Task<Result> ForgetHarnessStateAsync(Actor actor, ForgetHarnessState command, CancellationToken ct);
-
-    /// <summary>
-    /// The instructions the actor's agents in the workspace get, whatever their harness: the
-    /// workspace's, for everyone's chats there, and the actor's own, for the chats they start in any
-    /// workspace. Agents read them as their user's standing instructions, from when they start.
-    /// </summary>
-    /// <returns>The instructions; forbidden for anyone but a person; or not found without access to the workspace.</returns>
-    public Task<Result<Instructions>> GetInstructionsAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct);
-
-    /// <summary>
-    /// Sets the workspace's instructions, up to 10,000 characters of Markdown; empty for none. People
-    /// with Write on the workspace may. Agents that start afterwards follow them; running ones keep
-    /// theirs.
-    /// </summary>
-    public Task<Result> SetWorkspaceInstructionsAsync(Actor actor, WorkspaceId workspaceId, string text, CancellationToken ct);
-
-    /// <summary>
-    /// Sets the actor's own instructions, up to 10,000 characters of Markdown; empty for none. Agents
-    /// of the chats they start that start afterwards follow them.
-    /// </summary>
-    public Task<Result> SetPersonalInstructionsAsync(Actor actor, string text, CancellationToken ct);
 
     /// <summary>
     /// Streams the chat's events after a sequence number, first those already saved and then live.

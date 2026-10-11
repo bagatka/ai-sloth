@@ -23,7 +23,7 @@ namespace Bagatka.AiSloth.Chats.Harness;
 // instructions from (HarnessProfile.InstructionsPath), outside /work, so they never meet a
 // repository's files and every session of the harness reads them. A chat that continues another's
 // conversation gets it as a file too (ConversationMarkdown), which they name.
-internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databases, INooksApi nooks)
+internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databases, INooksApi nooks, INookFilesApi nookFiles)
 {
     // Each text's limit: instructions go into every model call the agent makes.
     public const int MaxLength = 10_000;
@@ -65,7 +65,7 @@ internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databa
         }
 
         using MemoryStream archive = await ArchiveAsync(files, ct);
-        return await nooks.CopyFilesInAsync(SystemActors.Harness, new CopyFilesIn(chat.NookId, Replacing: []), archive, ct);
+        return await nookFiles.CopyFilesInAsync(SystemActors.Harness, new CopyFilesIn(chat.NookId, Replacing: []), archive, ct);
     }
 
     // The earlier chat's conversation up to the event the chat continues it after; null once that chat

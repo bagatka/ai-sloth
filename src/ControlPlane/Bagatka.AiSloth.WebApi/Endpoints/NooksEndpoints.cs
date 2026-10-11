@@ -80,7 +80,7 @@ internal static class NooksEndpoints
     private static async Task<Results<Ok<IReadOnlyList<SourceChanges>>, ProblemHttpResult>> GetChanges(
         [FromRoute] Guid id,
         ClaimsPrincipal principal,
-        [FromServices] INooksApi api,
+        [FromServices] INookFilesApi api,
         CancellationToken ct)
     {
         Result<IReadOnlyList<SourceChanges>> result = await api.GetChangesAsync(principal.ToActor(), NookId.From(id), ct);
@@ -98,7 +98,7 @@ internal static class NooksEndpoints
         [FromQuery] int? checkpoint,
         ClaimsPrincipal principal,
         HttpContext context,
-        [FromServices] INooksApi api,
+        [FromServices] INookFilesApi api,
         [FromServices] IProductEvents productEvents,
         CancellationToken ct)
     {
@@ -196,7 +196,7 @@ internal static class NooksEndpoints
         [FromRoute] Guid nookId,
         [FromBody] StartProcessRequest request,
         ClaimsPrincipal principal,
-        [FromServices] INooksApi api,
+        [FromServices] INookProcessesApi api,
         CancellationToken ct)
     {
         StartProcess command = new StartProcess(
@@ -216,7 +216,7 @@ internal static class NooksEndpoints
         [FromQuery] string? cursor,
         [FromQuery] int? limit,
         ClaimsPrincipal principal,
-        [FromServices] INooksApi api,
+        [FromServices] INookProcessesApi api,
         CancellationToken ct)
     {
         Result<Page<ProcessSummary>> result = await api.ListProcessesAsync(principal.ToActor(), NookId.From(nookId), Paging.Request(cursor, limit), ct);
@@ -258,7 +258,7 @@ internal static class NooksEndpoints
         [FromQuery] string? cursor,
         [FromQuery] int? limit,
         ClaimsPrincipal principal,
-        [FromServices] INooksApi api,
+        [FromServices] INookFilesApi api,
         CancellationToken ct)
     {
         Result<Page<CheckpointSummary>> result = await api.ListCheckpointsAsync(principal.ToActor(), NookId.From(nookId), Paging.Request(cursor, limit), ct);
@@ -277,7 +277,7 @@ internal static class NooksEndpoints
         [FromQuery] long? fromOffset,
         ClaimsPrincipal principal,
         HttpResponse response,
-        [FromServices] INooksApi api,
+        [FromServices] INookProcessesApi api,
         CancellationToken ct)
     {
         WatchProcess command = new WatchProcess(NookId.From(nookId), ProcessId.From(processId), fromOffset ?? 0);
@@ -296,7 +296,7 @@ internal static class NooksEndpoints
         [FromRoute] Guid processId,
         [FromBody] SendInputRequest request,
         ClaimsPrincipal principal,
-        [FromServices] INooksApi api,
+        [FromServices] INookProcessesApi api,
         CancellationToken ct)
     {
         Result result = await api.SendInputAsync(principal.ToActor(), new SendInput(NookId.From(nookId), ProcessId.From(processId), request.Data.AsMemory()), ct);
@@ -308,7 +308,7 @@ internal static class NooksEndpoints
         [FromRoute] Guid nookId,
         [FromRoute] Guid processId,
         ClaimsPrincipal principal,
-        [FromServices] INooksApi api,
+        [FromServices] INookProcessesApi api,
         CancellationToken ct)
     {
         Result result = await api.StopProcessAsync(principal.ToActor(), new StopProcess(NookId.From(nookId), ProcessId.From(processId)), ct);

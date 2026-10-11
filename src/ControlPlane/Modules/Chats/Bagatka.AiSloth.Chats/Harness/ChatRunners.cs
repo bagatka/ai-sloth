@@ -23,6 +23,7 @@ namespace Bagatka.AiSloth.Chats.Harness;
 internal sealed class ChatRunners(
     IDbContextFactory<ChatsDbContext> databases,
     INooksApi nooks,
+    INookFilesApi nookFiles,
     IAgentAccountsApi accounts,
     AgentProcess agent,
     HarnessStates states,
@@ -129,7 +130,7 @@ internal sealed class ChatRunners(
 
             // A runner outlives the call that needed it, so it carries nothing of that call, such as
             // the trace of the request that sent a message; its turns are traces of their own.
-            ChatRunner runner = new ChatRunner(chat, databases, nooks, accounts, agent, states, instructions, setups, meter, settings, signals, productEvents, time, logger);
+            ChatRunner runner = new ChatRunner(chat, databases, nooks, nookFiles, accounts, agent, states, instructions, setups, meter, settings, signals, productEvents, time, logger);
             Task running;
             using (ExecutionContext.SuppressFlow())
             {

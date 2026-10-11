@@ -1,7 +1,7 @@
 namespace Bagatka.AiSloth.Nooks.Contracts;
 
 /// <summary>
-/// Input to <see cref="INooksApi.WatchProcessAsync"/>.
+/// Input to <see cref="INookProcessesApi.WatchProcessAsync"/>.
 /// </summary>
 /// <param name="NookId">The nook.</param>
 /// <param name="ProcessId">The process.</param>

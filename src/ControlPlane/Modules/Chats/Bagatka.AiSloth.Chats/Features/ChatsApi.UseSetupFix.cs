@@ -36,7 +36,7 @@ internal sealed partial class ChatsApi
             return new Result(ChatsErrors.SetupNotFixed);
         }
 
-        Result<IReadOnlyList<SourceChanges>> changes = await nooks.GetChangesAsync(actor, fixer.NookId, ct);
+        Result<IReadOnlyList<SourceChanges>> changes = await nookFiles.GetChangesAsync(actor, fixer.NookId, ct);
         if (changes.Failed)
         {
             return new Result(changes.Error);

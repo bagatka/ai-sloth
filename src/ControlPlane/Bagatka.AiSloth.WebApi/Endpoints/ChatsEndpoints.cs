@@ -136,7 +136,7 @@ internal static class ChatsEndpoints
     private static async Task<Results<Ok<IReadOnlyList<PresetSummary>>, ProblemHttpResult>> ListPresets(
         [FromRoute] Guid workspaceId,
         ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
+        [FromServices] IChatSettingsApi api,
         CancellationToken ct)
     {
         Result<IReadOnlyList<PresetSummary>> result = await api.ListPresetsAsync(principal.ToActor(), WorkspaceId.From(workspaceId), ct);
@@ -152,7 +152,7 @@ internal static class ChatsEndpoints
         [FromRoute] Guid workspaceId,
         [FromBody] AddPresetRequest request,
         ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
+        [FromServices] IChatSettingsApi api,
         CancellationToken ct)
     {
         AddPreset command = new AddPreset(WorkspaceId.From(workspaceId), request.Harness, request.Account, request.Model, request.Thinking, request.Name);
@@ -165,7 +165,7 @@ internal static class ChatsEndpoints
         [FromRoute] Guid id,
         [FromBody] PresetNameRequest request,
         ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
+        [FromServices] IChatSettingsApi api,
         CancellationToken ct)
     {
         Result<PresetSummary> result = await api.RenamePresetAsync(principal.ToActor(), PresetId.From(id), request.Name, ct);
@@ -176,7 +176,7 @@ internal static class ChatsEndpoints
     private static async Task<Results<NoContent, ProblemHttpResult>> RemovePreset(
         [FromRoute] Guid id,
         ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
+        [FromServices] IChatSettingsApi api,
         CancellationToken ct)
     {
         Result result = await api.RemovePresetAsync(principal.ToActor(), PresetId.From(id), ct);
@@ -255,7 +255,7 @@ internal static class ChatsEndpoints
         [FromQuery] int days,
         [FromQuery] string timeZone,
         ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
+        [FromServices] IChatUsageApi api,
         CancellationToken ct)
     {
         Result<WorkspaceUsage> result = await api.GetWorkspaceUsageAsync(principal.ToActor(), WorkspaceId.From(workspaceId), days, timeZone, ct);
@@ -269,7 +269,7 @@ internal static class ChatsEndpoints
     private static async Task<Results<Ok<ChatUsage>, ProblemHttpResult>> GetUsage(
         [FromRoute] Guid id,
         ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
+        [FromServices] IChatUsageApi api,
         CancellationToken ct)
     {
         Result<ChatUsage> result = await api.GetUsageAsync(principal.ToActor(), ChatId.From(id), ct);
@@ -302,7 +302,7 @@ internal static class ChatsEndpoints
     private static async Task<Results<Ok<IReadOnlyList<HarnessStateSummary>>, ProblemHttpResult>> ListHarnessStates(
         [FromRoute] Guid workspaceId,
         ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
+        [FromServices] IChatSettingsApi api,
         CancellationToken ct)
     {
         Result<IReadOnlyList<HarnessStateSummary>> result = await api.ListHarnessStatesAsync(principal.ToActor(), WorkspaceId.From(workspaceId), ct);
@@ -318,7 +318,7 @@ internal static class ChatsEndpoints
         [FromRoute] string harness,
         [FromQuery] bool? shared,
         ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
+        [FromServices] IChatSettingsApi api,
         CancellationToken ct)
     {
         Result result = await api.ForgetHarnessStateAsync(principal.ToActor(), new ForgetHarnessState(WorkspaceId.From(workspaceId), harness, shared ?? false), ct);
@@ -332,7 +332,7 @@ internal static class ChatsEndpoints
     private static async Task<Results<Ok<Instructions>, ProblemHttpResult>> GetInstructions(
         [FromRoute] Guid workspaceId,
         ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
+        [FromServices] IChatSettingsApi api,
         CancellationToken ct)
     {
         Result<Instructions> result = await api.GetInstructionsAsync(principal.ToActor(), WorkspaceId.From(workspaceId), ct);
@@ -347,7 +347,7 @@ internal static class ChatsEndpoints
         [FromRoute] Guid workspaceId,
         [FromBody] InstructionsRequest request,
         ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
+        [FromServices] IChatSettingsApi api,
         CancellationToken ct)
     {
         Result result = await api.SetWorkspaceInstructionsAsync(principal.ToActor(), WorkspaceId.From(workspaceId), request.Text, ct);
@@ -361,7 +361,7 @@ internal static class ChatsEndpoints
     private static async Task<Results<NoContent, ProblemHttpResult>> SetPersonalInstructions(
         [FromBody] InstructionsRequest request,
         ClaimsPrincipal principal,
-        [FromServices] IChatsApi api,
+        [FromServices] IChatSettingsApi api,
         CancellationToken ct)
     {
         Result result = await api.SetPersonalInstructionsAsync(principal.ToActor(), request.Text, ct);
@@ -440,13 +440,14 @@ internal static class ChatsEndpoints
         ClaimsPrincipal principal,
         [FromServices] IChatsApi chats,
         [FromServices] INooksApi nooks,
+        [FromServices] INookFilesApi nookFiles,
         [FromServices] ISourcesApi sources,
         [FromServices] IWorkspacesApi workspaces,
         [FromServices] IProductEvents productEvents,
         CancellationToken ct)
     {
         Result<IReadOnlyList<ChatPush.PushedSource>> result = await ChatPush.PushAsync(
-            principal.ToActor(), ChatId.From(id), request.Sources, request.Branch, request.PullRequest, request.Message, chats, nooks, sources, workspaces, productEvents, ct);
+            principal.ToActor(), ChatId.From(id), request.Sources, request.Branch, request.PullRequest, request.Message, chats, nooks, nookFiles, sources, workspaces, productEvents, ct);
         return result.ToOk();
     }
 

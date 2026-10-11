@@ -42,14 +42,14 @@ internal sealed partial class ChatsApi
         }
 
         UserId? keptFor = command.Shared ? null : person.Output;
-        return await nooks.DeleteFoldersAsync(SystemActors.Harness, HarnessStates.PrefixOf(command.WorkspaceId, keptFor, command.Harness), ct);
+        return await nookFiles.DeleteFoldersAsync(SystemActors.Harness, HarnessStates.PrefixOf(command.WorkspaceId, keptFor, command.Harness), ct);
     }
 
     // The state kept for the person in the workspace, or the workspace's own for none, by harness.
     private async Task<Result<IReadOnlyList<HarnessStateSummary>>> StatesAsync(WorkspaceId workspaceId, UserId? person, CancellationToken ct)
     {
         string prefix = HarnessStates.PrefixOf(workspaceId, person, harness: null);
-        Result<IReadOnlyList<KeptFolderSummary>> folders = await nooks.ListFoldersAsync(SystemActors.Harness, prefix, ct);
+        Result<IReadOnlyList<KeptFolderSummary>> folders = await nookFiles.ListFoldersAsync(SystemActors.Harness, prefix, ct);
         if (folders.Failed)
         {
             return new Result<IReadOnlyList<HarnessStateSummary>>(folders.Error);

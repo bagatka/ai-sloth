@@ -5708,7 +5708,7 @@
             "description": "Whether the cost includes plans\u0027 estimates at the vendors\u0027 API prices."
           }
         },
-        "description": "What a workspace\u0027s chats used of their models over its last days (Task\u0026lt;Result\u0026lt;WorkspaceUsage\u0026gt;\u0026gt; IChatsApi.GetWorkspaceUsageAsync(Actor actor, WorkspaceId workspaceId, int days, string timeZone, CancellationToken ct)),\nfrom every call the model gateway saw."
+        "description": "What a workspace\u0027s chats used of their models over its last days, from every call the model gateway\nsaw."
       }
     }
   },

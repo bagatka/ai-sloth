@@ -3,7 +3,7 @@ using Bagatka.AiSloth.Workspaces.Contracts;
 
 namespace Bagatka.AiSloth.Chats.Contracts;
 
-/// <summary>Input to <see cref="IChatsApi.AddPresetAsync"/>.</summary>
+/// <summary>Input to <see cref="IChatSettingsApi.AddPresetAsync"/>.</summary>
 /// <param name="WorkspaceId">A workspace whose chats it can start: its account is the workspace's, or the actor's own.</param>
 /// <param name="Harness">The harness, as for <see cref="StartChat"/>.</param>
 /// <param name="Account">The agent account, as for <see cref="StartChat"/>.</param>

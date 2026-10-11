@@ -4299,8 +4299,8 @@ export interface components {
             access: components["schemas"]["AccessLevel"];
         };
         /**
-         * @description What a workspace's chats used of their models over its last days (Task&lt;Result&lt;WorkspaceUsage&gt;&gt; IChatsApi.GetWorkspaceUsageAsync(Actor actor, WorkspaceId workspaceId, int days, string timeZone, CancellationToken ct)),
-         *     from every call the model gateway saw.
+         * @description What a workspace's chats used of their models over its last days, from every call the model gateway
+         *     saw.
          */
         WorkspaceUsage: {
             /** @description Each day, the oldest first, days without calls included. */

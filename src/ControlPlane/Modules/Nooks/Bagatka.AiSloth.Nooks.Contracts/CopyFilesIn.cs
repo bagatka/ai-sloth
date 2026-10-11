@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace Bagatka.AiSloth.Nooks.Contracts;
 
-/// <summary>Input to <see cref="INooksApi.CopyFilesInAsync"/>.</summary>
+/// <summary>Input to <see cref="INookFilesApi.CopyFilesInAsync"/>.</summary>
 /// <param name="NookId">The nook.</param>
 /// <param name="Replacing">
 /// Absolute paths removed before the archive is unpacked, such as a folder it holds all of, so files

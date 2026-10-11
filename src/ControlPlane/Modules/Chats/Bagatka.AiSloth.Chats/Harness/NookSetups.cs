@@ -15,7 +15,7 @@ namespace Bagatka.AiSloth.Chats.Harness;
 
 // A nook's setup as chats work with it (Nooks runs it): following a run to its end, keeping the end of
 // its output to show. What people see in a chat never names where files are in a nook.
-internal sealed class NookSetups(INooksApi nooks)
+internal sealed class NookSetups(INookProcessesApi nookProcesses, INookFilesApi nookFiles)
 {
     // How much of a failed setup's output a chat shows: its end, where the failure is.
     public const int MaxOutput = 2000;
@@ -49,7 +49,7 @@ internal sealed class NookSetups(INooksApi nooks)
         }
 
         using MemoryStream archive = await ArchiveAsync(patches, ct);
-        Result copied = await nooks.CopyFilesInAsync(actor, new CopyFilesIn(into, Replacing: [FixFolder]), archive, ct);
+        Result copied = await nookFiles.CopyFilesInAsync(actor, new CopyFilesIn(into, Replacing: [FixFolder]), archive, ct);
         if (copied.Failed)
         {
             return copied;
@@ -80,7 +80,7 @@ internal sealed class NookSetups(INooksApi nooks)
     private async Task<Result<int>> GitAsync(Actor actor, NookId nook, string source, IReadOnlyList<string> arguments, CancellationToken ct)
     {
         StartProcess git = new StartProcess(nook, "git", arguments, "/work/" + source, OutputRetention.Recent, new Dictionary<string, string>(StringComparer.Ordinal));
-        Result<ProcessSummary> started = await nooks.StartProcessAsync(actor, git, ct);
+        Result<ProcessSummary> started = await nookProcesses.StartProcessAsync(actor, git, ct);
         if (started.Failed)
         {
             return new Result<int>(started.Error);
@@ -129,7 +129,7 @@ internal sealed class NookSetups(INooksApi nooks)
 
     private async Task<SetupEnd> ReadAsync(NookId nookId, ProcessId run, CancellationToken ct)
     {
-        Result<IAsyncEnumerable<ProcessEvent>> watch = await nooks.WatchProcessAsync(SystemActors.Harness, new WatchProcess(nookId, run, FromOffset: 0), ct);
+        Result<IAsyncEnumerable<ProcessEvent>> watch = await nookProcesses.WatchProcessAsync(SystemActors.Harness, new WatchProcess(nookId, run, FromOffset: 0), ct);
         if (watch.Failed)
         {
             return new SetupEnd(ProcessExited.Lost, "Following the setup failed: " + watch.Error.Message);

@@ -306,7 +306,11 @@ conflict.
 - **Module maps:** `src/ControlPlane/Modules/<Module>/README.md`, from the template
   `docs/templates/module-readme.md`
 - **Contracts and enforcement:**
-  - Each module's contract is `I<Module>Api` in `Bagatka.AiSloth.<Module>.Contracts`.
+  - Each module's contract is in `Bagatka.AiSloth.<Module>.Contracts`: one interface per concept
+    (`IChatsApi`, `IChatSettingsApi`, `IChatUsageApi`), or just `I<Module>Api` for a small module.
+  - General capabilities are `Bagatka.<Capability>` projects (`Bagatka.Harnesses`,
+    `Bagatka.ModelAccess`, `Bagatka.Sandboxing`): no AiSloth in them; modules compose them with a
+    little glue (`ARCHITECTURE.md`, "Layers").
   - Everything else in a module is `internal`.
   - Boundaries are enforced by project references, `internal`, analyzers (`AnalysisMode` `All`,
     Meziantou, banned APIs), and `tests/Bagatka.AiSloth.ArchitectureTests`.

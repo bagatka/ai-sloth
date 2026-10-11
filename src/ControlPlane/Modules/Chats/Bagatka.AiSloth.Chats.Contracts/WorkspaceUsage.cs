@@ -3,8 +3,8 @@ using System.Collections.Generic;
 namespace Bagatka.AiSloth.Chats.Contracts;
 
 /// <summary>
-/// What a workspace's chats used of their models over its last days (<see cref="IChatsApi.GetWorkspaceUsageAsync"/>),
-/// from every call the model gateway saw.
+/// What a workspace's chats used of their models over its last days, from every call the model gateway
+/// saw.
 /// </summary>
 /// <param name="Days">Each day, the oldest first, days without calls included.</param>
 /// <param name="Chats">Each chat with calls in those days, with what they cost, the costliest first.</param>

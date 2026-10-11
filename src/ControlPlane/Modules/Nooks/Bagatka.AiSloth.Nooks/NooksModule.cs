@@ -11,7 +11,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Bagatka.AiSloth.Nooks;
 
 /// <summary>
-/// Registers the Nooks module: <see cref="INooksApi"/>, <see cref="INookDaemonsApi"/>, their database,
+/// Registers the Nooks module: <see cref="INooksApi"/>, <see cref="INookProcessesApi"/>,
+/// <see cref="INookFilesApi"/>, <see cref="INookDaemonsApi"/>, their database,
 /// the daemon connections this instance holds, its jobs, and its reactions to other modules' events.
 /// </summary>
 public static class NooksModule
@@ -40,6 +41,8 @@ public static class NooksModule
         services.AddSingleton<KeptFolders>();
         services.AddSingleton<NooksApi>();
         services.AddSingleton<INooksApi>(provider => provider.GetRequiredService<NooksApi>());
+        services.AddSingleton<INookProcessesApi>(provider => provider.GetRequiredService<NooksApi>());
+        services.AddSingleton<INookFilesApi>(provider => provider.GetRequiredService<NooksApi>());
         services.AddSingleton<INookDaemonsApi>(provider => provider.GetRequiredService<NooksApi>());
         services.AddReaction<MachineRemoved, OnMachineRemoved>();
         return services;

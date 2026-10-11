@@ -29,6 +29,7 @@ internal static class ChatPush
         string? message,
         IChatsApi chats,
         INooksApi nooks,
+        INookFilesApi nookFiles,
         ISourcesApi sources,
         IWorkspacesApi workspaces,
         IProductEvents productEvents,
@@ -75,7 +76,7 @@ internal static class ChatPush
         List<PushedSource> pushed = [];
         foreach (string name in names ?? [.. nook.Output.Sources.Select(found => found.Name)])
         {
-            PushedSource outcome = await PushSourceAsync(actor, push, name, nooks, sources, ct);
+            PushedSource outcome = await PushSourceAsync(actor, push, name, nookFiles, sources, ct);
             pushed.Add(outcome);
         }
 
@@ -93,11 +94,11 @@ internal static class ChatPush
     }
 
     // One repository's changes: taken out of the nook into a file of their own, then pushed.
-    private static async Task<PushedSource> PushSourceAsync(Actor actor, Push push, string name, INooksApi nooks, ISourcesApi sources, CancellationToken ct)
+    private static async Task<PushedSource> PushSourceAsync(Actor actor, Push push, string name, INookFilesApi nookFiles, ISourcesApi sources, CancellationToken ct)
     {
         string bundlePath = Path.GetTempFileName();
         await using FileStream bundle = new FileStream(bundlePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None, bufferSize: 81920, FileOptions.DeleteOnClose | FileOptions.Asynchronous);
-        Result<ExportedChanges> exported = await nooks.ExportChangesAsync(actor, new ExportChanges(push.NookId, name, push.Identity, push.Message), bundle, ct);
+        Result<ExportedChanges> exported = await nookFiles.ExportChangesAsync(actor, new ExportChanges(push.NookId, name, push.Identity, push.Message), bundle, ct);
         if (exported.Failed)
         {
             return new PushedSource(name, Branch: null, 0, BranchUrl: null, PullRequestUrl: null, Describe(exported.Error));

@@ -1,7 +1,7 @@
 namespace Bagatka.AiSloth.Nooks.Contracts;
 
 /// <summary>
-/// Input to <see cref="INooksApi.SyncFolderAsync"/>.
+/// Input to <see cref="INookFilesApi.SyncFolderAsync"/>.
 /// </summary>
 /// <param name="NookId">The nook.</param>
 /// <param name="Path">The absolute path of the folder in the nook, such as <c>/root/.claude/memory</c>.</param>

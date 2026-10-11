@@ -3,7 +3,7 @@ using System;
 namespace Bagatka.AiSloth.Nooks.Contracts;
 
 /// <summary>
-/// Input to <see cref="INooksApi.SendInputAsync"/>.
+/// Input to <see cref="INookProcessesApi.SendInputAsync"/>.
 /// </summary>
 /// <param name="NookId">The nook.</param>
 /// <param name="ProcessId">The process.</param>

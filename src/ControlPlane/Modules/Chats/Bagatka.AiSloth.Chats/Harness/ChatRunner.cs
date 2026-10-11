@@ -30,6 +30,7 @@ internal sealed class ChatRunner(
     ChatId chatId,
     IDbContextFactory<ChatsDbContext> databases,
     INooksApi nooks,
+    INookFilesApi nookFiles,
     IAgentAccountsApi accounts,
     AgentProcess agent,
     HarnessStates states,
@@ -413,7 +414,7 @@ internal sealed class ChatRunner(
     {
         await SaveAsync(db, ct);
         TurnMessage message = await db.Messages.Where(found => found.Id == turn).Select(found => new TurnMessage(found.Text, found.SentBy, found.SentAt)).SingleAsync(ct);
-        Result<CheckpointSummary> taken = await nooks.CheckpointAsync(SystemActors.Harness, new CheckpointNook(chat.NookId, Note(message.Text)), ct);
+        Result<CheckpointSummary> taken = await nookFiles.CheckpointAsync(SystemActors.Harness, new CheckpointNook(chat.NookId, Note(message.Text)), ct);
         ChatEventBody told = taken.Failed
             ? new ChatEventBody(new CheckpointFailed(taken.Error.Message))
             : new ChatEventBody(new CheckpointSaved(taken.Output.Number, taken.Output.Changes));

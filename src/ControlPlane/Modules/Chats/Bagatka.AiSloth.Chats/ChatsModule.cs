@@ -7,8 +7,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Bagatka.AiSloth.Chats;
 
 /// <summary>
-/// Registers the Chats module: <see cref="IChatsApi"/>, <see cref="IChatHarnessesApi"/>, their
-/// database, and the runners that talk to agents.
+/// Registers the Chats module: <see cref="IChatsApi"/>, <see cref="IChatSettingsApi"/>,
+/// <see cref="IChatUsageApi"/>, <see cref="IChatHarnessesApi"/>, their database, and the runners that
+/// talk to agents.
 /// </summary>
 public static class ChatsModule
 {
@@ -32,6 +33,8 @@ public static class ChatsModule
         services.AddHostedService(provider => provider.GetRequiredService<ChatRunners>());
         services.AddSingleton<ChatsApi>();
         services.AddSingleton<IChatsApi>(provider => provider.GetRequiredService<ChatsApi>());
+        services.AddSingleton<IChatSettingsApi>(provider => provider.GetRequiredService<ChatsApi>());
+        services.AddSingleton<IChatUsageApi>(provider => provider.GetRequiredService<ChatsApi>());
         services.AddSingleton<IChatHarnessesApi>(provider => provider.GetRequiredService<ChatsApi>());
         return services;
     }

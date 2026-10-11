@@ -17,19 +17,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Chats;
 
-// The front door for both contracts. Each feature is a file in Features/. Streams that outlive a
+// The front door for every contract of the module. Each feature is a file in Features/. Streams that outlive a
 // call use `databases`, never `db`.
 internal sealed partial class ChatsApi(
     IDbContextFactory<ChatsDbContext> databases,
     IWorkspacesApi workspaces,
     INooksApi nooks,
+    INookFilesApi nookFiles,
     IAgentAccountsApi accounts,
     ChatRunners runners,
     NookSetups setups,
     ChatSignals signals,
     ActiveInstance active,
     IProductEvents productEvents,
-    TimeProvider time) : IChatsApi, IChatHarnessesApi
+    TimeProvider time) : IChatsApi, IChatSettingsApi, IChatUsageApi, IChatHarnessesApi
 {
     // Adds a message to be saved, and says whether it is the chat's first. A chat's first message ends
     // its draft in the same save, so a draft is never deleted with a message in it: when the draft went

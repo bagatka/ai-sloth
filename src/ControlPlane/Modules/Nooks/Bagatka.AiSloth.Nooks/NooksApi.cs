@@ -35,7 +35,7 @@ internal sealed partial class NooksApi(
     NookActivity activity,
     NookStarts starts,
     NooksSettings settings,
-    TimeProvider time) : INooksApi, INookDaemonsApi
+    TimeProvider time) : INooksApi, INookProcessesApi, INookFilesApi, INookDaemonsApi
 {
     // The nook, if the actor may do at least `needed` with it: a person as their access to it allows,
     // through its workspace or given to them directly, and the control plane's own processes, such as

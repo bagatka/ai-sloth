@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Bagatka.AiSloth.Nooks.Contracts;
 
 /// <summary>
-/// Input to <see cref="INooksApi.StartProcessAsync"/>. The program runs directly, not through a
+/// Input to <see cref="INookProcessesApi.StartProcessAsync"/>. The program runs directly, not through a
 /// shell, so arguments are never re-parsed.
 /// </summary>
 /// <param name="NookId">The nook to run in.</param>
