@@ -580,7 +580,14 @@ internal sealed class FakeModel : IAsyncDisposable
             ["content"] = new JsonArray(),
             ["stop_reason"] = stopReason,
             ["stop_sequence"] = null,
-            ["usage"] = new JsonObject { ["input_tokens"] = 10, ["output_tokens"] = 3 },
+            ["usage"] = new JsonObject
+            {
+                ["input_tokens"] = 10,
+                ["cache_read_input_tokens"] = 0,
+                ["cache_creation_input_tokens"] = 5,
+                ["cache_creation"] = new JsonObject { ["ephemeral_5m_input_tokens"] = 5, ["ephemeral_1h_input_tokens"] = 0 },
+                ["output_tokens"] = 3,
+            },
         };
     }
 

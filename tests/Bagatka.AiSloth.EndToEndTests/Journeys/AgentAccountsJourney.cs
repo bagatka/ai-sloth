@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.Foundation;
 using Microsoft.AspNetCore.WebUtilities;
 using Xunit;
 
@@ -184,7 +185,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
 
     // OpenRouter speaks Anthropic's API for Claude Code and OpenAI's chat API for pi, at one address and
     // with one key, under its own names for models; models that can't call tools or are only for batches
-    // aren't offered.
+    // aren't offered. Each of pi's calls costs GPT-6 Luna's price: 10 tokens in at $0.10 a million and 3
+    // out at $0.50.
     private async Task OneOpenRouterKeyRunsEachAgentOnTheModelChosenForItsChatAsync()
     {
         TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice);
@@ -197,12 +199,20 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         JsonElement[] ended = await Task.WhenAll(
             TurnAsync(workspace, "pi", key.Id, FakeModel.OpenRouterModel),
             TurnAsync(workspace, "claude-code", key.Id, FakeModel.OpenRouterClaude));
+        Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(_alice.SendGetAsync(workspace.Path + "/chats"), HttpStatusCode.OK);
+        ChatSummary piChat = chats.Items.Single(chat => string.Equals(chat.Harness, "pi", StringComparison.Ordinal));
+        ChatUsage piUsage = await Api.EventuallyAsync(async () =>
+        {
+            ChatUsage read = await Api.ReadAsync<ChatUsage>(_alice.SendGetAsync(Paths.Chat(piChat) + "/usage"), HttpStatusCode.OK);
+            return read.Calls > 0 && read.Turns.Sum(turn => turn.Calls) == read.Calls ? read : null;
+        });
 
         Assert.Equal([FakeModel.OpenRouterModel, FakeModel.OpenRouterClaude, FakeModel.OpenAIModel], models.Select(model => model.Id), StringComparer.Ordinal);
         Assert.Equal(["off", "low", "medium", "high", "xhigh", "max"], models[0].ThinkingLevels);
         Assert.Equal((400_000, 0.1m, 0.5m, false), (models[0].Facts.ContextWindow, models[0].Facts.Price?.Input, models[0].Facts.Price?.Output, models[0].Facts.Price?.Estimate));
         Assert.Equal([272_000], models[0].Facts.Price?.Tiers.Select(tier => tier.AboveInputTokens));
         Assert.Contains(anthropic, model => model is { Id: FakeModel.OpenRouterClaude, Name: "Anthropic: Claude Opus 5.5" });
+        Assert.Equal((piUsage.Calls * 0.0000025m, false), (piUsage.Cost, piUsage.Estimate));
         Assert.True(codex.Errors?.ContainsKey("account"));
         Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
         Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.OpenRouterModel + "\"", StringComparison.Ordinal) && body.Contains("\"messages\"", StringComparison.Ordinal));

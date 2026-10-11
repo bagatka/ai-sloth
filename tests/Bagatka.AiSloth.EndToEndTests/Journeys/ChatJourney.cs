@@ -37,6 +37,7 @@ public sealed class ChatJourney(ControlPlane app) : IDisposable
         ChatSummary chat = await acme.StartChatAsync();
         await using ChatWatch watch = await ChatWatch.OpenAsync(_alice, chat);
         await EveryoneSeesEachStepAndEachTurnSavesTheFilesAsync(acme, chat, watch);
+        await EachModelCallIsRecordedWithItsTokensAsync(chat);
         await ProductAnalyticsSeeTheChatStartItsFirstMessageAndItsTurnEndAsync(acme);
         await AMessageSentWhileTheAgentWorksJoinsItsTurnAsync(acme, chat, watch);
         await StoppingEndsTheTurnAndTheNextMessageWorksAsync(acme, chat, watch);
@@ -142,6 +143,24 @@ public sealed class ChatJourney(ControlPlane app) : IDisposable
         Assert.All(app.Model.Credentials, credentials => Assert.True(
             credentials == (FakeModel.ApiKey, null) || credentials == (null, "Bearer " + FakeModel.OpenRouterKey),
             "A model call carried " + (credentials.ApiKey ?? credentials.Authorization)));
+    }
+
+    // Each call the gateway passed is recorded in its turn: the fake answers 10 tokens in and 3 out,
+    // and writes 5 to Anthropic's cache, which then stays five minutes. The workspace's key names an
+    // endpoint of its own, whose prices nobody knows.
+    private async Task EachModelCallIsRecordedWithItsTokensAsync(ChatSummary chat)
+    {
+        ChatUsage usage = await Api.EventuallyAsync(async () =>
+        {
+            ChatUsage read = await Api.ReadAsync<ChatUsage>(_alice.SendGetAsync(Paths.Chat(chat) + "/usage"), HttpStatusCode.OK);
+            return read.Turns.Count == 2 && read.Turns.Sum(turn => turn.Calls) == read.Calls ? read : null;
+        });
+
+        Assert.True(usage.Calls >= 2);
+        Assert.Equal((10L * usage.Calls, 5L * usage.Calls, 3L * usage.Calls), (usage.Tokens.Input, usage.Tokens.CacheWrite, usage.Tokens.Output));
+        Assert.Equal(18, usage.ContextUsed);
+        Assert.True(usage.CacheWarmUntil > TimeProvider.System.GetUtcNow().AddMinutes(4));
+        Assert.Null(usage.Cost);
     }
 
     private async Task AMessageSentWhileTheAgentWorksJoinsItsTurnAsync(TestWorkspace acme, ChatSummary chat, ChatWatch watch)

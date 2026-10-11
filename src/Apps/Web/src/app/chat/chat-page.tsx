@@ -30,6 +30,7 @@ import { Composer } from "./composer"
 import { PushMenu } from "./push-menu"
 import { SetupBanner } from "./setup-banner"
 import { TranscriptView } from "./transcript-view"
+import { UsageMeter } from "./usage-meter"
 
 // One chat as it happens: who wrote what, what the agent did, and a box to write to it.
 export function ChatPage() {
@@ -174,6 +175,7 @@ export function ChatPage() {
           working={working}
           agent={agent}
           proposing={proposing}
+          usage={<UsageMeter chatId={chatId} transcript={state.transcript} />}
         />
       </MessageScrollerProvider>
     </>

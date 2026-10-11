@@ -1,4 +1,7 @@
 using System;
+using System.Buffers;
+using System.IO;
+using System.Threading;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -9,6 +12,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 
 namespace Bagatka.AiSloth.WebApi.Endpoints;
@@ -19,10 +23,17 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 /// key or a plan's token. A call carries its chat's token, as a bearer token or an API key, and its
 /// path follows the gateway's URL as it would follow the endpoint's. Everything else passes through
 /// unchanged, streams included. Refusals answer in the shape OpenAI's and Anthropic's clients show.
+/// Each answer's usage is read as it passes (<see cref="ModelUsageReader"/>) and recorded for its chat
+/// once the agent has all of it.
 /// </summary>
 internal static class ModelGatewayEndpoints
 {
     public const string HttpClientName = "model-gateway";
+
+    private const int RelayBuffer = 16 * 1024;
+
+    // Recording a call is one row; a database that slow is down.
+    private static readonly TimeSpan RecordingTimeout = TimeSpan.FromSeconds(10);
 
     // Hop-by-hop headers and the caller's own credentials stay here.
     private static readonly HashSet<string> NotForwarded = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -40,8 +51,11 @@ internal static class ModelGatewayEndpoints
         [FromRoute] string? path,
         [FromServices] IChatHarnessesApi chats,
         [FromServices] ModelGatewaySettings settings,
-        [FromServices] IHttpClientFactory clients)
+        [FromServices] IHttpClientFactory clients,
+        [FromServices] ILogger<ModelUsageReader> logger,
+        [FromServices] TimeProvider time)
     {
+        DateTimeOffset startedAt = time.GetUtcNow();
         HttpRequest request = context.Request;
         string authorization = request.Headers.Authorization.ToString();
         bool bearer = authorization.StartsWith("Bearer ", StringComparison.Ordinal);
@@ -85,7 +99,49 @@ internal static class ModelGatewayEndpoints
             context.Response.Headers[header.Key] = new StringValues([.. header.Value]);
         }
 
-        await response.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
+        ModelCallUsage? usage = await RelayAsync(context, response);
+        if (usage is null)
+        {
+            return;
+        }
+
+        // The agent has the whole answer before the call is recorded, which can't hold it up.
+        await context.Response.CompleteAsync();
+        using CancellationTokenSource recording = new CancellationTokenSource(RecordingTimeout);
+        Result recorded = await chats.RecordModelCallAsync(Actor.Anonymous, token, usage, startedAt, recording.Token);
+        if (recorded.Failed)
+        {
+            Log.ModelCallNotRecorded(logger, recorded.Error.Code);
+        }
+    }
+
+    // Passes the answer to the agent as it comes, reading a successful one's usage on the way.
+    private static async Task<ModelCallUsage?> RelayAsync(HttpContext context, HttpResponseMessage response)
+    {
+        bool streamed = string.Equals(response.Content.Headers.ContentType?.MediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase);
+        ModelUsageReader reader = new ModelUsageReader(streamed);
+        await using Stream body = await response.Content.ReadAsStreamAsync(context.RequestAborted);
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(RelayBuffer);
+        try
+        {
+            while (true)
+            {
+                int read = await body.ReadAsync(buffer, context.RequestAborted);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                await context.Response.Body.WriteAsync(buffer.AsMemory(0, read), context.RequestAborted);
+                reader.Read(buffer.AsSpan(0, read));
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+
+        return response.IsSuccessStatusCode ? reader.Usage() : null;
     }
 
     // The agent's call as it goes to the endpoint: the same method, path, query, body, and headers,

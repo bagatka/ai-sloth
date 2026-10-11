@@ -59,6 +59,7 @@ public sealed partial class WebJourney(ControlPlane app)
             await SignsInWithALinkCodeAsync(page, code.Code);
             await AWorkspaceWithoutAnAccountSaysWhatChatsNeedAsync(page);
             await FindsTheChatAndSeesItsTurnAsync(page);
+            await TheMessageBoxShowsWhatTheChatUsedAsync(page);
             await AChatStartedElsewhereShowsUpAtOnceAsync(page, acme);
             await AMessageStartsTheNextTurnAsync(page);
             await AMessageCopiesAsItsTextAsync(page, context);
@@ -115,6 +116,22 @@ public sealed partial class WebJourney(ControlPlane app)
         await Assertions.Expect(page.GetByText("Done.")).ToBeVisibleAsync(WebBrowser.Shown);
         await Assertions.Expect(page.GetByText(TurnEnded()).First).ToBeVisibleAsync(WebBrowser.Shown);
         await WebBrowser.ShotAsync(page, "first-turn");
+    }
+
+    // Beside Send, what the chat used: the cache the fake model wrote stays five minutes, counted
+    // down; the workspace's key names an endpoint of its own, so no price shows. A click opens the
+    // details.
+    private static async Task TheMessageBoxShowsWhatTheChatUsedAsync(IPage page)
+    {
+        ILocator usage = page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Usage" });
+        await Assertions.Expect(usage).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(usage).ToHaveTextAsync(CacheCountdown());
+        await usage.ClickAsync();
+        ILocator details = page.GetByRole(AriaRole.Dialog);
+        await Assertions.Expect(details.GetByText("Not known for this account")).ToBeVisibleAsync();
+        await Assertions.Expect(details.GetByText(WarmFor())).ToBeVisibleAsync();
+        await WebBrowser.ShotAsync(page, "usage");
+        await page.Keyboard.PressAsync("Escape");
     }
 
     // Someone starts a chat from sloth or another browser: the list shows it without a reload.
@@ -425,4 +442,11 @@ public sealed partial class WebJourney(ControlPlane app)
 
     [GeneratedRegex("^Turn ended", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
     private static partial Regex TurnEnded();
+
+    // Five minutes of Anthropic's cache, counted down from the turn a moment ago.
+    [GeneratedRegex(@"^[45]:\d\d$", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex CacheCountdown();
+
+    [GeneratedRegex("^Warm for [45]:", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex WarmFor();
 }

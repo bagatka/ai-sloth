@@ -55,6 +55,7 @@ internal static class ChatsEndpoints
 
         RouteGroupBuilder chats = app.MapGroup("/chats").WithTags("Chats");
         chats.MapGet("/{id:guid}", Get);
+        chats.MapGet("/{id:guid}/usage", GetUsage);
         chats.MapPost("/{id:guid}/messages", Send);
         chats.MapPost("/{id:guid}/stop", Stop);
         chats.MapPost("/{id:guid}/setup", RunSetupAgain);
@@ -240,6 +241,20 @@ internal static class ChatsEndpoints
         CancellationToken ct)
     {
         Result<ChatSummary> result = await api.GetAsync(principal.ToActor(), ChatId.From(id), ct);
+        return result.ToOk();
+    }
+
+    /// <summary>
+    /// What the chat's agents have used of their models: calls, tokens, and cost, in all and by turn;
+    /// how full the context is; and until when the prompt's cache stays. Asks no vendor.
+    /// </summary>
+    private static async Task<Results<Ok<ChatUsage>, ProblemHttpResult>> GetUsage(
+        [FromRoute] Guid id,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result<ChatUsage> result = await api.GetUsageAsync(principal.ToActor(), ChatId.From(id), ct);
         return result.ToOk();
     }
 

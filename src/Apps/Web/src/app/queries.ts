@@ -154,6 +154,23 @@ export function changes(nookId: string, checkpoint: number) {
   })
 }
 
+/**
+ * What the chat's agents have used of their models: tokens and cost, in all and by turn, how full
+ * the context is, and until when the prompt's cache stays. Read again at each checkpoint, which
+ * every turn ends with, and as the caller asks while the agent works.
+ */
+export function usage(chatId: string, checkpoint: number) {
+  return queryOptions({
+    queryKey: ["chats", chatId, "usage", checkpoint],
+    placeholderData: keepPreviousData,
+    queryFn: () =>
+      answer(
+        api.GET("/chats/{id}/usage", { params: { path: { id: chatId } } })
+      ),
+    staleTime: 0,
+  })
+}
+
 /** Every kind of agent account, how each is added, and whether this host allows it. */
 export const accountKinds = queryOptions({
   queryKey: ["agent-account-kinds"],

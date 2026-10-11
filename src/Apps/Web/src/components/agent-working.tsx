@@ -1,39 +1,10 @@
-import * as React from "react"
-
+import { clockLabel, useNow } from "@/components/clock"
 import { NookStateDot } from "@/components/nook-state"
 
-// One shared clock for everything showing elapsed time: it ticks once a second, and only while
-// something on screen shows it.
-const listeners = new Set<() => void>()
-let now = Date.now()
-let ticker: number | undefined
-
-function subscribe(listener: () => void) {
-  listeners.add(listener)
-  if (ticker === undefined) {
-    now = Date.now()
-    ticker = window.setInterval(() => {
-      now = Date.now()
-      listeners.forEach((notify) => notify())
-    }, 1000)
-  }
-  return () => {
-    listeners.delete(listener)
-    if (listeners.size === 0) {
-      window.clearInterval(ticker)
-      ticker = undefined
-    }
-  }
-}
-
 function Elapsed({ since }: { since: number }) {
-  const current = React.useSyncExternalStore(subscribe, () => now)
-  const seconds = Math.max(0, Math.floor((current - since) / 1000))
-  const minutes = Math.floor(seconds / 60)
+  const now = useNow()
   return (
-    <span className="tabular-nums">
-      {minutes}:{String(seconds % 60).padStart(2, "0")}
-    </span>
+    <span className="tabular-nums">{clockLabel((now - since) / 1000)}</span>
   )
 }
 

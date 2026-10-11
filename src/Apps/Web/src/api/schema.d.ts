@@ -2295,6 +2295,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chats/{id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChatUsage"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/chats/{id}/messages": {
         parameters: {
             query?: never;
@@ -3122,6 +3159,49 @@ export interface components {
              *     characters; `null` until someone writes in it.
              */
             title: null | string;
+        };
+        /**
+         * @description What a chat's agents have used of their models: every call the model gateway saw, added up and by
+         *     turn, with what a cost is known for; how full the context is; and how long its prompt's cache stays.
+         *     Calls of an agent that holds its own token (a Claude plan's) don't pass the gateway, so they aren't here.
+         */
+        ChatUsage: {
+            /**
+             * Format: int32
+             * @description How many calls the chat's agents made.
+             */
+            calls: number;
+            /** @description Their tokens. */
+            tokens: components["schemas"]["TokenCounts"];
+            /**
+             * Format: double
+             * @description What they cost in US dollars, as far as their prices are known; null when none is.
+             */
+            cost: null | number;
+            /** @description Whether the cost is a plan's estimate at the vendor's API prices. */
+            estimate: boolean;
+            /**
+             * Format: int32
+             * @description Tokens in the context at the latest call, its input and answer.
+             */
+            contextUsed: null | number;
+            /**
+             * Format: int32
+             * @description The most tokens the chat's model's context holds, when known.
+             */
+            contextWindow: null | number;
+            /**
+             * Format: date-time
+             * @description Until when the prompt's cache stays, at least, when a call used one and the vendor's rule is known.
+             */
+            cacheWarmUntil: null | string;
+            /**
+             * Format: double
+             * @description What the next call costs to read the context again once the cache is gone, in US dollars, when known.
+             */
+            rereadCost: null | number;
+            /** @description The latest turns' usage, newest first, at most 50. */
+            turns: components["schemas"]["TurnUsage"][];
         };
         CheckpointFailed: {
             failure: string;
@@ -4031,6 +4111,34 @@ export interface components {
             /** Format: uri */
             callback?: null | string;
         };
+        /** @description Tokens of model calls, added up; input counted once, as in ModelCallUsage. */
+        TokenCounts: {
+            /**
+             * Format: int64
+             * @description Input tokens neither read from a cache nor written to one.
+             */
+            input: number;
+            /**
+             * Format: int64
+             * @description Input tokens read from a cache.
+             */
+            cacheRead: number;
+            /**
+             * Format: int64
+             * @description Input tokens written to a cache, for minutes or an hour.
+             */
+            cacheWrite: number;
+            /**
+             * Format: int64
+             * @description Output tokens, reasoning included.
+             */
+            output: number;
+            /**
+             * Format: int64
+             * @description Of the output, the reasoning tokens.
+             */
+            reasoning: number;
+        };
         TokenRequest: {
             code: string;
             codeVerifier: string;
@@ -4043,6 +4151,25 @@ export interface components {
         };
         TurnStarted: {
             messageId: components["schemas"]["MessageId"];
+        };
+        /** @description What one turn's model calls used and cost. */
+        TurnUsage: {
+            /** @description The message the turn answered. */
+            turn: components["schemas"]["MessageId"];
+            /**
+             * Format: int32
+             * @description How many calls it made.
+             */
+            calls: number;
+            /** @description Their tokens. */
+            tokens: components["schemas"]["TokenCounts"];
+            /**
+             * Format: double
+             * @description What they cost in US dollars, as far as their prices are known.
+             */
+            cost: null | number;
+            /** @description Whether the cost is a plan's estimate at the vendor's API prices. */
+            estimate: boolean;
         };
         /**
          * Format: uuid

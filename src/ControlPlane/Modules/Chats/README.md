@@ -55,8 +55,9 @@ Schema `chats`: `chats` (one per nook; its harness, account, and model, and anot
 model chosen while an agent ran; whether its setup is to run again; the agent's process, session,
 and how far its output is read; the turn in progress; `xmin` as concurrency token), `messages`,
 `events` (sequence numbers per chat; an agent update is stored as the agent sent it), `drafts`,
-`workspace_instructions`, `personal_instructions`, and `presets` (a person's harness, account, and
-model, each once).
+`workspace_instructions`, `personal_instructions`, `presets` (a person's harness, account, and
+model, each once), and `model_calls` (each call the gateway passed: its chat, nook, workspace,
+account, and turn, its tokens, its cost then, and until when its cache stays).
 
 ## Background work
 
@@ -98,6 +99,13 @@ minutes unless given).
 - **Presets are personal.** A preset is someone's saved harness, account, model, and thinking level:
   a shortcut that starts a choice, which every picker still changes. It shows wherever its account works, and hides once the account is removed.
   A person keeps at most 20.
+- **Every model call through the gateway is recorded,** once its answer reached the agent: the
+  gateway reads the usage the answer reports as it passes (`ModelUsageReader`, in the WebApi), and
+  the call is priced by what's known of the model at the chat's account
+  (`IAgentAccountsApi.GetModelFactsAsync`), or by the vendor's own figure, and put in the turn the
+  chat was on when the call started. A chat's usage (`GetUsageAsync`) adds them up; how full the
+  context is comes from the agent itself where it says (`usage_update`), and from its largest
+  latest call otherwise. A Claude plan's agent holds its token, so its calls aren't recorded.
 - **No model key or plan in a nook.** An agent gets the model gateway's URL and a token for its chat;
   the gateway forwards each call with the headers that pay for it. A Claude plan's token, tied to
   Claude Code, goes to the harness itself.

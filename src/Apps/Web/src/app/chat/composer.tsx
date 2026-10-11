@@ -32,6 +32,7 @@ export function Composer({
   working,
   agent,
   proposing,
+  usage,
 }: {
   chat: Schemas["ChatSummary"]
   harness: Schemas["HarnessSummary"] | undefined
@@ -41,6 +42,8 @@ export function Composer({
   agent: string
   /** Whose account the agent runs on, when the signed-in person's messages are only proposals. */
   proposing: string | null
+  /** What the agent has used, shown beside the action. */
+  usage?: React.ReactNode
 }) {
   const chatId = chat.id
   const [draft, setDraft] = React.useState("")
@@ -131,43 +134,46 @@ export function Composer({
           // One button that follows intent: Stop while the agent works and nothing is typed, Send
           // (which steers a running turn) as soon as there is text. The two cross-fade with a little
           // blur, so they read as one thing changing.
-          <div className="relative size-8">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    aria-label="Stop the turn"
-                    loading={stop.isPending}
-                    onClick={() => stop.mutate()}
-                    inert={!stopShown}
-                    className={cn(
-                      "absolute inset-0",
-                      !stopShown && "scale-90 opacity-0 blur-[2px]"
-                    )}
-                  />
-                }
+          <div className="flex items-center gap-1">
+            {usage}
+            <div className="relative size-8">
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Stop the turn"
+                      loading={stop.isPending}
+                      onClick={() => stop.mutate()}
+                      inert={!stopShown}
+                      className={cn(
+                        "absolute inset-0",
+                        !stopShown && "scale-90 opacity-0 blur-[2px]"
+                      )}
+                    />
+                  }
+                >
+                  <StopIcon weight="fill" className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipContent className="gap-2">
+                  Stop the turn <Shortcut keys={["Esc"]} />
+                </TooltipContent>
+              </Tooltip>
+              <Button
+                type="submit"
+                size="icon-sm"
+                aria-label={working ? "Send to the running turn" : "Send"}
+                disabled={empty || needsModel}
+                inert={stopShown}
+                className={cn(
+                  "absolute inset-0",
+                  stopShown && "scale-90 opacity-0 blur-[2px]"
+                )}
               >
-                <StopIcon weight="fill" className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipContent className="gap-2">
-                Stop the turn <Shortcut keys={["Esc"]} />
-              </TooltipContent>
-            </Tooltip>
-            <Button
-              type="submit"
-              size="icon-sm"
-              aria-label={working ? "Send to the running turn" : "Send"}
-              disabled={empty || needsModel}
-              inert={stopShown}
-              className={cn(
-                "absolute inset-0",
-                stopShown && "scale-90 opacity-0 blur-[2px]"
-              )}
-            >
-              <ArrowUpIcon weight="bold" />
-            </Button>
+                <ArrowUpIcon weight="bold" />
+              </Button>
+            </div>
           </div>
         }
       />

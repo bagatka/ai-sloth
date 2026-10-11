@@ -2075,6 +2075,36 @@
         }
       }
     },
+    "/chats/{id}/usage": {
+      "get": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatUsage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chats/{id}/messages": {
       "post": {
         "tags": [
@@ -3190,6 +3220,83 @@
           }
         },
         "description": "A chat as the people with access to its nook see it."
+      },
+      "ChatUsage": {
+        "required": [
+          "calls",
+          "tokens",
+          "cost",
+          "estimate",
+          "contextUsed",
+          "contextWindow",
+          "cacheWarmUntil",
+          "rereadCost",
+          "turns"
+        ],
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "integer",
+            "description": "How many calls the chat\u0027s agents made.",
+            "format": "int32"
+          },
+          "tokens": {
+            "description": "Their tokens.",
+            "$ref": "#/components/schemas/TokenCounts"
+          },
+          "cost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "What they cost in US dollars, as far as their prices are known; null when none is.",
+            "format": "double"
+          },
+          "estimate": {
+            "type": "boolean",
+            "description": "Whether the cost is a plan\u0027s estimate at the vendor\u0027s API prices."
+          },
+          "contextUsed": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Tokens in the context at the latest call, its input and answer.",
+            "format": "int32"
+          },
+          "contextWindow": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The most tokens the chat\u0027s model\u0027s context holds, when known.",
+            "format": "int32"
+          },
+          "cacheWarmUntil": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Until when the prompt\u0027s cache stays, at least, when a call used one and the vendor\u0027s rule is known.",
+            "format": "date-time"
+          },
+          "rereadCost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "What the next call costs to read the context again once the cache is gone, in US dollars, when known.",
+            "format": "double"
+          },
+          "turns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TurnUsage"
+            },
+            "description": "The latest turns\u0027 usage, newest first, at most 50."
+          }
+        },
+        "description": "What a chat\u0027s agents have used of their models: every call the model gateway saw, added up and by\nturn, with what a cost is known for; how full the context is; and how long its prompt\u0027s cache stays.\nCalls of an agent that holds its own token (a Claude plan\u0027s) don\u0027t pass the gateway, so they aren\u0027t here."
       },
       "CheckpointFailed": {
         "required": [
@@ -5430,6 +5537,44 @@
           }
         }
       },
+      "TokenCounts": {
+        "required": [
+          "input",
+          "cacheRead",
+          "cacheWrite",
+          "output",
+          "reasoning"
+        ],
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "integer",
+            "description": "Input tokens neither read from a cache nor written to one.",
+            "format": "int64"
+          },
+          "cacheRead": {
+            "type": "integer",
+            "description": "Input tokens read from a cache.",
+            "format": "int64"
+          },
+          "cacheWrite": {
+            "type": "integer",
+            "description": "Input tokens written to a cache, for minutes or an hour.",
+            "format": "int64"
+          },
+          "output": {
+            "type": "integer",
+            "description": "Output tokens, reasoning included.",
+            "format": "int64"
+          },
+          "reasoning": {
+            "type": "integer",
+            "description": "Of the output, the reasoning tokens.",
+            "format": "int64"
+          }
+        },
+        "description": "Tokens of model calls, added up; input counted once, as in ModelCallUsage."
+      },
       "TokenRequest": {
         "required": [
           "code",
@@ -5478,6 +5623,44 @@
             "$ref": "#/components/schemas/MessageId"
           }
         }
+      },
+      "TurnUsage": {
+        "required": [
+          "turn",
+          "calls",
+          "tokens",
+          "cost",
+          "estimate"
+        ],
+        "type": "object",
+        "properties": {
+          "turn": {
+            "description": "The message the turn answered.",
+            "$ref": "#/components/schemas/MessageId"
+          },
+          "calls": {
+            "type": "integer",
+            "description": "How many calls it made.",
+            "format": "int32"
+          },
+          "tokens": {
+            "description": "Their tokens.",
+            "$ref": "#/components/schemas/TokenCounts"
+          },
+          "cost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "What they cost in US dollars, as far as their prices are known.",
+            "format": "double"
+          },
+          "estimate": {
+            "type": "boolean",
+            "description": "Whether the cost is a plan\u0027s estimate at the vendor\u0027s API prices."
+          }
+        },
+        "description": "What one turn\u0027s model calls used and cost."
       },
       "UserId": {
         "type": "string",

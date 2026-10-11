@@ -28,6 +28,8 @@ internal sealed class ChatsDbContext(DbContextOptions<ChatsDbContext> options) :
 
     public DbSet<Preset> Presets => Set<Preset>();
 
+    public DbSet<ModelCall> ModelCalls => Set<ModelCall>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -38,6 +40,7 @@ internal sealed class ChatsDbContext(DbContextOptions<ChatsDbContext> options) :
         modelBuilder.ApplyConfiguration<WorkspaceInstructions>(new InstructionsConfiguration());
         modelBuilder.ApplyConfiguration<PersonalInstructions>(new InstructionsConfiguration());
         modelBuilder.ApplyConfiguration(new PresetConfiguration());
+        modelBuilder.ApplyConfiguration(new ModelCallConfiguration());
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

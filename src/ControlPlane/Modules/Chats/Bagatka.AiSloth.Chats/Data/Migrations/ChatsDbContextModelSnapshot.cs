@@ -16,7 +16,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261011132551_ExplicitModels";
+    public override string LastMigrationId => "20261011165318_ModelCalls";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -246,6 +246,92 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasDatabaseName("ix_messages_chat_id_state_id");
 
                 b.ToTable("messages", "chats");
+            });
+
+        modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.ModelCall", b =>
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid")
+                    .HasColumnName("id");
+
+                b.Property<Guid>("AgentAccountId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("agent_account_id");
+
+                b.Property<DateTimeOffset>("At")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("at");
+
+                b.Property<int>("CacheRead")
+                    .HasColumnType("integer")
+                    .HasColumnName("cache_read");
+
+                b.Property<DateTimeOffset?>("CacheWarmUntil")
+                    .HasColumnType("timestamp with time zone")
+                    .HasColumnName("cache_warm_until");
+
+                b.Property<int>("CacheWrite")
+                    .HasColumnType("integer")
+                    .HasColumnName("cache_write");
+
+                b.Property<int>("CacheWriteLong")
+                    .HasColumnType("integer")
+                    .HasColumnName("cache_write_long");
+
+                b.Property<Guid>("ChatId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("chat_id");
+
+                b.Property<decimal?>("Cost")
+                    .HasPrecision(18, 8)
+                    .HasColumnType("numeric(18,8)")
+                    .HasColumnName("cost");
+
+                b.Property<bool>("Estimate")
+                    .HasColumnType("boolean")
+                    .HasColumnName("estimate");
+
+                b.Property<int>("Input")
+                    .HasColumnType("integer")
+                    .HasColumnName("input");
+
+                b.Property<string>("Model")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("character varying(200)")
+                    .HasColumnName("model");
+
+                b.Property<Guid>("NookId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("nook_id");
+
+                b.Property<int>("Output")
+                    .HasColumnType("integer")
+                    .HasColumnName("output");
+
+                b.Property<int>("Reasoning")
+                    .HasColumnType("integer")
+                    .HasColumnName("reasoning");
+
+                b.Property<Guid?>("Turn")
+                    .HasColumnType("uuid")
+                    .HasColumnName("turn");
+
+                b.Property<Guid>("WorkspaceId")
+                    .HasColumnType("uuid")
+                    .HasColumnName("workspace_id");
+
+                b.HasKey("Id")
+                    .HasName("pk_model_calls");
+
+                b.HasIndex("ChatId", "At")
+                    .HasDatabaseName("ix_model_calls_chat_id_at");
+
+                b.HasIndex("WorkspaceId", "At")
+                    .HasDatabaseName("ix_model_calls_workspace_id_at");
+
+                b.ToTable("model_calls", "chats");
             });
 
         modelBuilder.Entity("Bagatka.AiSloth.Chats.Model.PersonalInstructions", b =>

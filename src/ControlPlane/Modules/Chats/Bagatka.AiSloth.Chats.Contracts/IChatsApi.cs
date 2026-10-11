@@ -101,6 +101,13 @@ public interface IChatsApi
     /// <summary>The chat. Not found when it doesn't exist or the actor has no access to its nook.</summary>
     public Task<Result<ChatSummary>> GetAsync(Actor actor, ChatId id, CancellationToken ct);
 
+    /// <summary>
+    /// What the chat's agents have used of their models (<see cref="ChatUsage"/>), for whoever may read
+    /// the chat. Reads the chat's call records and what's known of its model; asks no vendor.
+    /// </summary>
+    /// <returns>The usage; or not found for a chat the actor can't see.</returns>
+    public Task<Result<ChatUsage>> GetUsageAsync(Actor actor, ChatId id, CancellationToken ct);
+
     /// <summary>The workspace's chats someone wrote in, newest first. Not found for anyone without access to the workspace, such as a nook's guest.</summary>
     public Task<Result<Page<ChatSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, PageRequest page, CancellationToken ct);
 

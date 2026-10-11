@@ -98,6 +98,11 @@ export type Transcript = {
    * event that told it.
    */
   setupFix: { failedIn: string; fixingIn: string; sequence: number } | null
+  /**
+   * How full the agent's context is, as it last said (Codex, pi, and Copilot do): tokens used of
+   * those its model holds.
+   */
+  context: { used: number; size: number } | null
   /** Whether the agent is on a turn. */
   working: boolean
   /** When the running turn started. */
@@ -111,6 +116,7 @@ export const emptyTranscript: Transcript = {
   queued: [],
   checkpoint: 0,
   changes: null,
+  context: null,
   setupRunAsked: false,
   setupFix: null,
   working: false,
@@ -291,6 +297,10 @@ function foldUpdate(
   at: string
 ): Transcript {
   switch (update.sessionUpdate) {
+    case "usage_update":
+      return typeof update.used === "number" && typeof update.size === "number"
+        ? { ...transcript, context: { used: update.used, size: update.size } }
+        : transcript
     case "agent_message_chunk":
     case "agent_thought_chunk": {
       const kind =
