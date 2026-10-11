@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using Azure.Identity;
@@ -144,11 +145,13 @@ builder.Services.AddSingleton(modelGateway);
 
 // Model calls stream for as long as the agent's turn needs; the agent cancels, never a timeout here.
 // Endpoints are people's choice, so connections reach only the public internet unless the deployment
-// allows private networks, and redirects go back to the agent instead of being followed.
+// allows private networks, and redirects go back to the agent instead of being followed. Answers come
+// compressed and are passed on plain, so the gateway reads their usage on the way.
 builder.Services.AddHttpClient(ModelGatewayEndpoints.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
     {
         AllowAutoRedirect = false,
+        AutomaticDecompression = DecompressionMethods.All,
         ConnectCallback = modelGateway.AllowPrivateNetworks ? null : PublicNetworks.ConnectAsync,
     });
 

@@ -32,7 +32,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// stands in for OpenRouter too: its catalog of models, and OpenAI's chat API, which pi calls there,
 /// answering every call with a short text. One catalog of models answers OpenRouter's, OpenAI's, and
 /// Anthropic's list of models, with every field each reads. Under <c>/copilot</c> it is Copilot's API:
-/// its list of a plan's models, and OpenAI's two APIs for them, for a plan's token only.
+/// its list of a plan's models, and OpenAI's two APIs for them, for a plan's token only. Its answers
+/// come compressed to callers that accept it.
 /// </summary>
 internal sealed class FakeModel : IAsyncDisposable
 {
@@ -129,7 +130,11 @@ internal sealed class FakeModel : IAsyncDisposable
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(kestrel => kestrel.Listen(IPAddress.Loopback, 0));
+
+        // Compressed when the caller accepts it, streams included, as model APIs answer.
+        builder.Services.AddResponseCompression(options => options.MimeTypes = ["text/event-stream", "application/json"]);
         WebApplication app = builder.Build();
+        app.UseResponseCompression();
         FakeModel model = new FakeModel(app);
         app.MapMethods("/api/hello", ["GET", "HEAD"], () => Results.Ok());
         app.MapPost("/v1/messages/count_tokens", () => Results.Json(new { input_tokens = 10 }));

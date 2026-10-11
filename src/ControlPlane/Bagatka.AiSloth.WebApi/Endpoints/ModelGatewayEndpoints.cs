@@ -35,10 +35,12 @@ internal static class ModelGatewayEndpoints
     // Recording a call is one row; a database that slow is down.
     private static readonly TimeSpan RecordingTimeout = TimeSpan.FromSeconds(10);
 
-    // Hop-by-hop headers and the caller's own credentials stay here.
+    // Hop-by-hop headers and the caller's own credentials stay here, and so does the compression the
+    // agent accepts: the gateway asks for its own and passes answers on plain (Program.cs).
     private static readonly HashSet<string> NotForwarded = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "Host", "Authorization", "X-Api-Key", "Connection", "Keep-Alive", "Proxy-Connection", "Transfer-Encoding", "TE", "Trailer", "Upgrade",
+        "Accept-Encoding",
     };
 
     public static IEndpointConventionBuilder MapModelGateway(this IEndpointRouteBuilder app)
