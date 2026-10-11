@@ -45,10 +45,30 @@ export function Composer({
   const [draft, setDraft] = React.useState("")
   const empty = draft.trim() === ""
   const stopShown = working && empty
+  const stream = chatStream(chatId)
 
-  const send = useSend(chatId, (text) =>
-    setDraft((current) => (current.trim() === "" ? text : current))
-  )
+  const send = useMutation({
+    mutationFn: ({ text }: { text: string; key: string }) =>
+      answer(
+        api.POST("/chats/{id}/messages", {
+          params: { path: { id: chatId } },
+          body: { text },
+        })
+      ),
+    onSuccess: (message, { key }) => stream.taken(key, message.id),
+    onError: (error, { text, key }) => {
+      stream.dropPending(key)
+      setDraft((current) => (current.trim() === "" ? text : current))
+      toast.add({
+        type: "error",
+        title: "Not sent",
+        description:
+          error instanceof ApiError
+            ? error.message
+            : "Can't reach the host. Your message is back in the box.",
+      })
+    },
+  })
   const stop = useMutation({
     mutationFn: () =>
       answer(
@@ -74,7 +94,7 @@ export function Composer({
       return
     }
     setDraft("")
-    send(text)
+    send.mutate({ text, key: stream.addPending(text) })
   }
 
   const placeholder = proposing
@@ -145,38 +165,6 @@ export function Composer({
       />
     </div>
   )
-}
-
-/**
- * Sends messages to a chat's agent, each shown as sending until the host has it. One the host didn't
- * take is dropped with a toast; `notSent` gets its text back, to put it where it was written.
- */
-export function useSend(chatId: string, notSent?: (text: string) => void) {
-  const stream = chatStream(chatId)
-  const mutation = useMutation({
-    mutationFn: ({ text }: { text: string; key: string }) =>
-      answer(
-        api.POST("/chats/{id}/messages", {
-          params: { path: { id: chatId } },
-          body: { text },
-        })
-      ),
-    onSuccess: (message, { key }) => stream.taken(key, message.id),
-    onError: (error, { text, key }) => {
-      stream.dropPending(key)
-      notSent?.(text)
-      toast.add({
-        type: "error",
-        title: "Not sent",
-        description:
-          notSent && !(error instanceof ApiError)
-            ? "Can't reach the host. Your message is back in the box."
-            : messageOf(error),
-      })
-    },
-  })
-  return (text: string) =>
-    mutation.mutate({ text, key: stream.addPending(text) })
 }
 
 // The chat's model and account, changed for its next turn. Its agent stays: its nook runs it. The

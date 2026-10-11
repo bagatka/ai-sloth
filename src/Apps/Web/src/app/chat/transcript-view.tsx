@@ -23,7 +23,6 @@ import { Diff, preloadCode } from "@/components/code"
 import { Markdown } from "@/components/markdown"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
-import { Button } from "@/components/ui/button"
 import {
   Collapsible,
   CollapsibleContent,
@@ -40,16 +39,9 @@ import {
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
 import type { ChatState, PendingMessage } from "./chat-stream"
-import { useSend } from "./composer"
 import type { Row } from "./transcript"
 
-// What "Fix the setup" sends, as the person: the agent already knows the setup failed and where its
-// output is.
-const fixTheSetup =
-  "Fix the setup that failed, run it again, and commit the fix."
-
 type Props = {
-  chatId: string
   state: ChatState
   /** The signed-in person, whose messages read as theirs. */
   me: string
@@ -59,9 +51,8 @@ type Props = {
   agent: string
 }
 
-export function TranscriptView({ chatId, state, me, names, agent }: Props) {
+export function TranscriptView({ state, me, names, agent }: Props) {
   const { transcript, pending } = state
-  const send = useSend(chatId)
 
   return (
     <div className="min-h-0 flex-1">
@@ -83,9 +74,6 @@ export function TranscriptView({ chatId, state, me, names, agent }: Props) {
                     me={me}
                     names={names}
                     working={transcript.working}
-                    fixSetup={
-                      pending.length === 0 ? () => send(fixTheSetup) : undefined
-                    }
                   />
                 </MessageScrollerItem>
               ))}
@@ -145,14 +133,11 @@ function TranscriptRow({
   me,
   names,
   working,
-  fixSetup,
 }: {
   row: Row
   me: string
   names: ReadonlyMap<string, string>
   working: boolean
-  /** Asks the agent to fix a failed setup; none while a message is on its way. */
-  fixSetup: (() => void) | undefined
 }) {
   switch (row.kind) {
     case "message": {
@@ -260,33 +245,17 @@ function TranscriptRow({
           />
         )
       }
-      return row.exitCode === 0 ? (
+      // A failed setup's output and fix are in the chat's header, as the nook's state.
+      return (
         <Marker variant="separator" className="py-3 text-caption">
           <MarkerContent>
-            {row.took === null ? "Set up" : `Set up in ${duration(row.took)}`}
+            {row.exitCode !== 0
+              ? `The setup failed (exit code ${row.exitCode})`
+              : row.took === null
+                ? "Set up"
+                : `Set up in ${duration(row.took)}`}
           </MarkerContent>
         </Marker>
-      ) : (
-        <Alert variant="warning">
-          <WarningCircleIcon />
-          <AlertTitle>The setup failed (exit code {row.exitCode})</AlertTitle>
-          <AlertDescription>
-            The agent knows, and can fix it when asked.
-          </AlertDescription>
-          {!row.followedUp && fixSetup && (
-            <div className="col-start-2 mt-2">
-              <Button variant="outline" size="sm" onClick={fixSetup}>
-                <WrenchIcon />
-                Fix the setup
-              </Button>
-            </div>
-          )}
-          {row.output && (
-            <pre className="col-span-full mt-2 max-h-48 overflow-auto rounded-lg bg-muted px-3 py-2 text-xs">
-              {row.output}
-            </pre>
-          )}
-        </Alert>
       )
     case "notice":
       return (

@@ -21,8 +21,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// a chat on, find a chat in Acme, and watch its turn as it happens; a chat started elsewhere shows up
 /// at once. A message they write starts the next turn, one written while the agent works goes into
 /// that turn, and Esc stops a turn. They start a chat in the app with Acme's repository, choosing its
-/// agent and its model, switch the chat to another model, have the agent fix the repository's failed
-/// setup in one click, review what changed in the repository, download its files, and open a pull request. The app
+/// agent and its model, switch the chat to another model, see that the repository's setup failed and
+/// fix it in a new chat, review what changed in the repository, download its files, and open a pull request. The app
 /// runs under the host's content security policy without a violation, and its session is a cookie no
 /// script can read. On another computer, a link to the chat signs them in through the host's provider
 /// and opens it. Only the model and GitHub are fake; the app is src/Apps/Web as last built, and
@@ -58,7 +58,7 @@ public sealed partial class WebJourney(ControlPlane app)
             await AMessageWhileTheAgentWorksGoesIntoItsTurnAsync(page);
             await EscStopsTheTurnAsync(page);
             ChatSummary started = await StartsAChatWithTheRepositoryInTheAppAsync(page, acme);
-            await AFailedSetupIsFixedInOneClickAsync(page);
+            await AFailedSetupIsFixedInANewChatAsync(page);
             await ReviewsTheChangesDownloadsTheFilesAndOpensAPullRequestAsync(page, acme, started, owner);
             await TheSessionIsACookieNoScriptReadsAndNothingBrokeThePolicyAsync(page, context);
             await ALinkToTheChatSignsInThroughTheProviderAsync(browser, chat, alice);
@@ -175,21 +175,32 @@ public sealed partial class WebJourney(ControlPlane app)
         return chats.Items[0];
     }
 
-    // The repository's setup failed before the agent started. The app says so, and one click asks the
-    // agent to fix it, as the person; then the offer goes, as with any answer.
-    private static async Task AFailedSetupIsFixedInOneClickAsync(IPage page)
+    // The repository's setup failed before the agent started: the transcript says so in a line, and
+    // the header, as the nook's state, shows its output and starts a chat that fixes it, with the same
+    // repository and agent, which offers no other. Then they go back to the chat.
+    private static async Task AFailedSetupIsFixedInANewChatAsync(IPage page)
     {
-        ILocator fix = page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Fix the setup" });
-        ILocator failed = page.GetByText("The setup failed (exit code 2)");
-        await Assertions.Expect(failed).ToBeVisibleAsync(WebBrowser.Shown);
-        await failed.ScrollIntoViewIfNeededAsync();
+        const string FixRequest = "Fix the setup that failed, run it again, and commit the fix.";
+        ILocator failed = page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Setup failed" });
+        ILocator popup = page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "The setup failed (exit code 2)" });
+        await Assertions.Expect(page.GetByText("The setup failed (exit code 2)")).ToBeVisibleAsync(WebBrowser.Shown);
+        await failed.ClickAsync();
+        await popup.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Output" }).ClickAsync();
+        await Assertions.Expect(popup.GetByText("npm ERR! 404 Not Found: @acme/ui")).ToBeVisibleAsync();
         await WebBrowser.ShotAsync(page, "setup-failed");
 
-        await fix.ClickAsync();
+        await popup.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Fix in a new chat" }).ClickAsync();
 
-        await Assertions.Expect(page.GetByText("Fix the setup that failed, run it again, and commit the fix.")).ToBeVisibleAsync(WebBrowser.Shown);
-        await Assertions.Expect(fix).ToBeHiddenAsync();
-        await Assertions.Expect(page.GetByText(TurnEnded())).ToHaveCountAsync(2, new LocatorAssertionsToHaveCountOptions { Timeout = 60_000 });
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = FixRequest })).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(page.GetByText(TurnEnded())).ToHaveCountAsync(1, new LocatorAssertionsToHaveCountOptions { Timeout = 60_000 });
+        await failed.ClickAsync();
+        await Assertions.Expect(popup.GetByText("This chat fixes it.")).ToBeVisibleAsync();
+        await Assertions.Expect(popup.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Fix in a new chat" })).ToBeHiddenAsync();
+        await WebBrowser.ShotAsync(page, "fixing-the-setup");
+        await page.Keyboard.PressAsync("Escape");
+
+        await page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Please write hello.txt in a new chat" }).ClickAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Please write hello.txt in a new chat" })).ToBeVisibleAsync();
     }
 
     // The agent changes the repository (here the journey does, as it would); the changes show as a
