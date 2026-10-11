@@ -15,8 +15,10 @@ model=$(copilot-model)
 set -- $model
 export COPILOT_PROVIDER_BASE_URL="$HARNESS_MODEL_URL" COPILOT_PROVIDER_BEARER_TOKEN="$HARNESS_TOKEN" COPILOT_PROVIDER_WIRE_API="$1"
 
-# The chat's model, and how hard it reasons when it can: none, minimal, low, medium, high, xhigh, or max.
+# The chat's model, and how hard it reasons: none, minimal, low, medium, high, xhigh, or max; none
+# for a model that doesn't, which also clears an effort a loaded session kept from an earlier model.
+effort=none
 if [ "$2" = reasons ]; then
-  exec copilot --acp --model "$HARNESS_MODEL" --reasoning-effort "$HARNESS_THINKING"
+  effort="$HARNESS_THINKING"
 fi
-exec copilot --acp --model "$HARNESS_MODEL"
+exec copilot --acp --model "$HARNESS_MODEL" --reasoning-effort "$effort"
