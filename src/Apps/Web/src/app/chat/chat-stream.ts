@@ -29,6 +29,11 @@ export type ChatState = {
   live: boolean
   /** Whether the host refused the stream: the chat is gone or the browser is signed out. */
   refused: boolean
+  /**
+   * Whether what changed last arrived as it happened, for a moment after: not the history the
+   * stream replays as it opens, nor a chat shown again later.
+   */
+  arriving: boolean
 }
 
 // Every kind of event the host sends (ChatEventBody in its openapi.json).
@@ -54,6 +59,12 @@ const kinds = [
 // Going back to a chat shortly after leaving it finds it still connected.
 const keepOpenFor = 30_000
 
+// The history the host replays as a stream opens arrives within this; later events are new.
+const replayFor = 1000
+
+// How long events that just arrived count as arriving: long enough for their rows to appear.
+const arrivingFor = 400
+
 class ChatStream {
   readonly chatId: string
   private state: ChatState = {
@@ -61,11 +72,14 @@ class ChatStream {
     pending: [],
     live: false,
     refused: false,
+    arriving: false,
   }
   private readonly listeners = new Set<() => void>()
   private source: EventSource | null = null
   private queue: ChatEvent[] = []
   private frame = 0
+  private openedAt = 0
+  private arrivingTimer = 0
   private closeTimer = 0
   private nextKey = 0
   lastUsed = 0
@@ -132,6 +146,7 @@ class ChatStream {
       return
     }
 
+    this.openedAt = performance.now()
     const url = new URL(`chats/${this.chatId}/events`, apiUrl)
     url.searchParams.set("after", String(this.state.transcript.sequence))
     const source = new EventSource(url, { withCredentials: apiElsewhere })
@@ -160,7 +175,8 @@ class ChatStream {
     window.cancelAnimationFrame(this.frame)
     this.frame = 0
     this.flush()
-    this.set({ live: false })
+    window.clearTimeout(this.arrivingTimer)
+    this.set({ live: false, arriving: false })
   }
 
   private receive(kind: string, data: string) {
@@ -188,6 +204,7 @@ class ChatStream {
       return
     }
 
+    const arriving = performance.now() - this.openedAt > replayFor
     let transcript = this.state.transcript
     for (const chatEvent of this.queue) {
       transcript = fold(transcript, chatEvent)
@@ -201,7 +218,15 @@ class ChatStream {
       pending: this.state.pending.filter(
         (message) => !message.id || !reported.has(message.id)
       ),
+      arriving,
     })
+    if (arriving) {
+      window.clearTimeout(this.arrivingTimer)
+      this.arrivingTimer = window.setTimeout(
+        () => this.set({ arriving: false }),
+        arrivingFor
+      )
+    }
   }
 
   private set(change: Partial<ChatState>) {

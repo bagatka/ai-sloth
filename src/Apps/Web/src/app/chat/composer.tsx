@@ -16,6 +16,7 @@ import { ModelPicker, ThinkingPicker } from "../model-picker"
 import { type Choice } from "../models"
 import { chat as chatQuery, presets as presetsQuery } from "../queries"
 import { chatStream } from "./chat-stream"
+import { useMessageScroller } from "@/components/ui/message-scroller"
 import { MessageBox } from "./message-box"
 
 // Writing to the agent in a chat. While the agent works, a message goes into its running turn
@@ -46,6 +47,7 @@ export function Composer({
   const empty = draft.trim() === ""
   const stopShown = working && empty
   const stream = chatStream(chatId)
+  const scroller = useMessageScroller()
 
   const send = useMutation({
     mutationFn: ({ text }: { text: string; key: string }) =>
@@ -95,6 +97,8 @@ export function Composer({
     }
     setDraft("")
     send.mutate({ text, key: stream.addPending(text) })
+    // Whoever writes wants to see what they wrote and what comes back.
+    scroller.scrollToEnd()
   }
 
   const placeholder = proposing

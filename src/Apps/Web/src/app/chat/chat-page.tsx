@@ -2,9 +2,11 @@ import { useQuery } from "@tanstack/react-query"
 import { useParams } from "@tanstack/react-router"
 import { ChatTeardropIcon } from "@phosphor-icons/react"
 
+import { AgentWorking } from "@/components/agent-working"
 import { NookState, type NookStateName } from "@/components/nook-state"
 import { Shortcut } from "@/components/shortcut"
 import { Button } from "@/components/ui/button"
+import { MessageScrollerProvider } from "@/components/ui/message-scroller"
 import {
   Empty,
   EmptyDescription,
@@ -126,35 +128,49 @@ export function ChatPage() {
           nook && <DownloadFiles nookId={nook.id} />
         )}
       </header>
-      {state.refused ? (
-        <Missing
-          title="Can't follow this chat"
-          description="The host stopped sending its events. Try again in a moment."
-          retry={() => chatStream(chatId).retry()}
+      {/* The transcript and the message box share one scroller: sending follows the newest output
+          again. A chat gets its own, starting at its end. */}
+      <MessageScrollerProvider key={chatId} autoScroll>
+        {state.refused ? (
+          <Missing
+            title="Can't follow this chat"
+            description="The host stopped sending its events. Try again in a moment."
+            retry={() => chatStream(chatId).retry()}
+          />
+        ) : (
+          <TranscriptView
+            state={state}
+            me={person.id}
+            names={nameOf}
+            agent={agent}
+          />
+        )}
+        <SetupBanner
+          chatId={chatId}
+          transcript={state.transcript}
+          proposing={proposing !== null}
         />
-      ) : (
-        <TranscriptView
-          state={state}
-          me={person.id}
-          names={nameOf}
+        {/* While the agent works, a line on the message box says so, wherever the transcript is read. */}
+        {working && state.transcript.turnStartedAt && (
+          <div className="shrink-0 px-4 pb-1.5 md:px-5">
+            <div className="mx-auto w-full max-w-[44rem] px-[15px]">
+              <AgentWorking
+                since={Date.parse(state.transcript.turnStartedAt)}
+              />
+            </div>
+          </div>
+        )}
+        <Composer
+          key={chatId}
+          chat={chat.data}
+          harness={agents?.find((harness) => harness.id === chat.data.harness)}
+          nookId={chat.data.nookId}
+          asleep={nook?.status === "Asleep"}
+          working={working}
           agent={agent}
+          proposing={proposing}
         />
-      )}
-      <SetupBanner
-        chatId={chatId}
-        transcript={state.transcript}
-        proposing={proposing !== null}
-      />
-      <Composer
-        key={chatId}
-        chat={chat.data}
-        harness={agents?.find((harness) => harness.id === chat.data.harness)}
-        nookId={chat.data.nookId}
-        asleep={nook?.status === "Asleep"}
-        working={working}
-        agent={agent}
-        proposing={proposing}
-      />
+      </MessageScrollerProvider>
     </>
   )
 }

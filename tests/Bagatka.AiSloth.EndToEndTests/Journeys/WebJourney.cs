@@ -64,6 +64,7 @@ public sealed partial class WebJourney(ControlPlane app)
             await AMessageCopiesAsItsTextAsync(page, context);
             await AMessageWhileTheAgentWorksGoesIntoItsTurnAsync(page);
             await EscStopsTheTurnAsync(page);
+            await TheTranscriptFollowsOnlyWhileAtItsEndAsync(page, acme, chat);
             ChatSummary started = await StartsAChatWithTheRepositoryInTheAppAsync(page, acme);
             await AFailedSetupIsFixedInAChatOfItsOwnAsync(page, acme);
             await ReviewsTheChangesDownloadsTheFilesAndOpensAPullRequestAsync(page, acme, started, owner);
@@ -278,6 +279,37 @@ public sealed partial class WebJourney(ControlPlane app)
 
         string copied = await page.EvaluateAsync<string>("() => navigator.clipboard.readText()");
         Assert.Equal("say hello", copied);
+    }
+
+    // The transcript follows the agent's newest output while the reader is at its end. Scrolled away,
+    // it stays where they put it as output arrives, and its button scrolls to the end, which follows
+    // again. A short window makes the transcript scroll.
+    private static async Task TheTranscriptFollowsOnlyWhileAtItsEndAsync(IPage page, TestWorkspace acme, ChatSummary chat)
+    {
+        await page.SetViewportSizeAsync(1440, 420);
+        ILocator viewport = page.Locator("[data-slot=message-scroller-viewport]");
+        ILocator toEnd = page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Scroll to end" });
+        ILocator replies = page.GetByText("Hello.", new PageGetByTextOptions { Exact = true });
+        int replied = await replies.CountAsync();
+        await viewport.HoverAsync();
+        await page.Mouse.WheelAsync(0, -300);
+        await Assertions.Expect(toEnd).ToHaveAttributeAsync("data-active", "true");
+        double before = await viewport.EvaluateAsync<double>("node => node.scrollTop");
+
+        await acme.SendAsync(chat, "say hello from afar");
+        await Assertions.Expect(replies).ToHaveCountAsync(replied + 1, new LocatorAssertionsToHaveCountOptions { Timeout = 60_000 });
+        double after = await viewport.EvaluateAsync<double>("node => node.scrollTop");
+        await WebBrowser.ShotAsync(page, "scrolled-away");
+        await toEnd.ClickAsync();
+        await Assertions.Expect(toEnd).ToHaveAttributeAsync("data-active", "false");
+        await acme.SendAsync(chat, "say hello once more");
+        await Assertions.Expect(replies).ToHaveCountAsync(replied + 2, new LocatorAssertionsToHaveCountOptions { Timeout = 60_000 });
+        bool atEnd = await viewport.EvaluateAsync<bool>("node => node.scrollHeight - node.scrollTop - node.clientHeight < 2");
+        await WebBrowser.ShotAsync(page, "following");
+        await page.SetViewportSizeAsync(1440, 900);
+
+        Assert.Equal(before, after, 1);
+        Assert.True(atEnd);
     }
 
     // The model holds a call that says Wait, so the turn runs until it's released.

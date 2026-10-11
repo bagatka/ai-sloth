@@ -18,7 +18,6 @@ import {
 } from "@phosphor-icons/react"
 import { cn } from "cn"
 
-import { AgentWorking } from "@/components/agent-working"
 import { Diff, preloadCode } from "@/components/code"
 import { Markdown } from "@/components/markdown"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -35,7 +34,6 @@ import {
   MessageScrollerButton,
   MessageScrollerContent,
   MessageScrollerItem,
-  MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
 import type { ChatState, PendingMessage } from "./chat-stream"
@@ -51,66 +49,54 @@ type Props = {
   agent: string
 }
 
+// The transcript follows the newest output while the reader is at its end, and stays where they put
+// it once they scroll away; reaching the end again, or the scroll button, follows again. What
+// arrives while the chat shows rises into place; what was there when it opened, history the stream
+// replays included, doesn't move.
 export function TranscriptView({ state, me, names, agent }: Props) {
   const { transcript, pending } = state
 
   return (
     <div className="min-h-0 flex-1">
-      <MessageScrollerProvider>
-        <MessageScroller>
-          <MessageScrollerViewport>
-            <MessageScrollerContent className="mx-auto w-full max-w-[44rem] gap-3 px-4 pt-8 pb-10">
-              {transcript.rows.map((row, index) => (
-                <MessageScrollerItem
-                  key={row.key}
-                  messageId={row.key}
-                  scrollAnchor={row.kind === "message" && row.sentBy === me}
-                >
-                  {startsAgentOutput(transcript.rows, index) && (
-                    <p className="pb-1.5 text-label font-semibold">{agent}</p>
-                  )}
-                  <TranscriptRow
-                    row={row}
-                    me={me}
-                    names={names}
-                    working={transcript.working}
-                  />
-                </MessageScrollerItem>
-              ))}
-              {transcript.working && transcript.turnStartedAt && (
-                <MessageScrollerItem messageId="working">
-                  <AgentWorking since={Date.parse(transcript.turnStartedAt)} />
-                </MessageScrollerItem>
-              )}
-              {/* Messages for later turns wait after the agent's work, then those still sending. */}
-              {transcript.queued.map((message) => (
-                <MessageScrollerItem
-                  key={message.key}
-                  messageId={message.key}
-                  scrollAnchor={message.sentBy === me}
-                >
-                  <TranscriptRow
-                    row={message}
-                    me={me}
-                    names={names}
-                    working={transcript.working}
-                  />
-                </MessageScrollerItem>
-              ))}
-              {pending.map((message) => (
-                <MessageScrollerItem
-                  key={message.key}
-                  messageId={message.key}
-                  scrollAnchor
-                >
-                  <PendingRow message={message} />
-                </MessageScrollerItem>
-              ))}
-            </MessageScrollerContent>
-          </MessageScrollerViewport>
-          <MessageScrollerButton />
-        </MessageScroller>
-      </MessageScrollerProvider>
+      <MessageScroller>
+        <MessageScrollerViewport>
+          <MessageScrollerContent
+            data-arriving={state.arriving ? "" : undefined}
+            className="mx-auto w-full max-w-[44rem] gap-3 px-4 pt-8 pb-10"
+          >
+            {transcript.rows.map((row, index) => (
+              <MessageScrollerItem key={row.key} messageId={row.key}>
+                {startsAgentOutput(transcript.rows, index) && (
+                  <p className="pb-1.5 text-label font-semibold">{agent}</p>
+                )}
+                <TranscriptRow
+                  row={row}
+                  me={me}
+                  names={names}
+                  working={transcript.working}
+                />
+              </MessageScrollerItem>
+            ))}
+            {/* Messages for later turns wait after the agent's work, then those still sending. */}
+            {transcript.queued.map((message) => (
+              <MessageScrollerItem key={message.key} messageId={message.key}>
+                <TranscriptRow
+                  row={message}
+                  me={me}
+                  names={names}
+                  working={transcript.working}
+                />
+              </MessageScrollerItem>
+            ))}
+            {pending.map((message) => (
+              <MessageScrollerItem key={message.key} messageId={message.key}>
+                <PendingRow message={message} />
+              </MessageScrollerItem>
+            ))}
+          </MessageScrollerContent>
+        </MessageScrollerViewport>
+        <MessageScrollerButton />
+      </MessageScroller>
     </div>
   )
 }
