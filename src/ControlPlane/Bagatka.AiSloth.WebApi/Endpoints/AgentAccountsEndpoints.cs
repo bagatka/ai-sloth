@@ -103,6 +103,7 @@ internal static class AgentAccountsEndpoints
     /// <summary>
     /// What the plan has used of its limits, asked of the vendor now: a ChatGPT or Claude plan's
     /// five-hour and weekly windows, or a Copilot plan's quotas or credits spent. Nothing for an API key.
+    /// A conflict when the vendor asks to be asked later.
     /// </summary>
     private static async Task<Results<Ok<PlanUsage>, ProblemHttpResult>> GetPlanUsage(
         [FromRoute] Guid workspaceId,

@@ -26,7 +26,10 @@ export function isPlan(account: Account): boolean {
   )
 }
 
-/** The plan's usage; nothing to read for an API key. While someone works, it's read every minute. */
+/**
+ * The plan's usage; nothing to read for an API key. While someone works, it's read every 5 minutes:
+ * vendors ask to be asked less often than every minute or so.
+ */
 export function usePlanUsage(
   workspaceId: string,
   account: Account | undefined,
@@ -35,7 +38,7 @@ export function usePlanUsage(
   return useQuery({
     ...planUsage(workspaceId, account?.id ?? ""),
     enabled: !!account && isPlan(account),
-    refetchInterval: working ? 60_000 : false,
+    refetchInterval: working ? 5 * 60_000 : false,
   })
 }
 

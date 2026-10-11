@@ -34,7 +34,7 @@ if (credential.RenewalDue(now))
 
 ModelEndpoint endpoint = vendors.Endpoint(ModelAccessKind.ClaudePlan, credential, ownEndpoint: null);  // forward an agent's calls here
 IReadOnlyList<AgentModel> models = await vendors.ListModelsAsync(ModelAccessKind.ClaudePlan, credential, ownEndpoint: null, ct);
-IReadOnlyList<UsageMeter> limits = await vendors.LimitsAsync(ModelAccessKind.ClaudePlan, credential, ct); // 5 hours 37%, Week 8%
+Result<IReadOnlyList<UsageMeter>> limits = await vendors.LimitsAsync(ModelAccessKind.ClaudePlan, credential, ct); // 5 hours 37%, Week 8%
 ```
 
 ## Rules
@@ -52,7 +52,8 @@ IReadOnlyList<UsageMeter> limits = await vendors.LimitsAsync(ModelAccessKind.Cla
 - **A plan's limits, as its vendor counts them,** asked where its own clients ask: ChatGPT's
   five-hour and weekly windows (`/wham/usage`, as Codex's `/status`), Claude's (`/api/oauth/usage`,
   as Claude Code's `/usage`), and Copilot's quotas (requests used of those allowed, or the credits a
-  plan without limits spent).
+  plan without limits spent). Anthropic asks to be asked later (429) when asked every minute or so,
+  which fails as a conflict.
 - **One OpenRouter key, both APIs.** OpenRouter serves Anthropic's Messages API at its root
   (`/v1/messages`) and OpenAI's at `/v1`, so each harness calls the API it speaks. Only Anthropic and
   OpenAI API keys name an endpoint of their own.

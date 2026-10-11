@@ -26,7 +26,9 @@ internal sealed partial class AgentAccountsApi
             return new Result<PlanUsage>(PlanUsage.None);
         }
 
-        IReadOnlyList<UsageMeter> meters = await vendors.LimitsAsync(account.Kind, account.OpenCredential(box), ct);
-        return new Result<PlanUsage>(new PlanUsage(meters, time.GetUtcNow()));
+        Result<IReadOnlyList<UsageMeter>> meters = await vendors.LimitsAsync(account.Kind, account.OpenCredential(box), ct);
+        return meters.Failed
+            ? new Result<PlanUsage>(meters.Error)
+            : new Result<PlanUsage>(new PlanUsage(meters.Output, time.GetUtcNow()));
     }
 }

@@ -287,8 +287,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
     // A Claude plan signed in as Claude Code: Alice approves at Claude and pastes back the code its page
     // shows. Claude Code calls Anthropic's API through the gateway with the plan's token, renewed one call
     // at a time, and its calls are recorded; pi can't use it, and Anthropic says how much of the plan's
-    // five-hour and weekly windows is used. Once she signs out of Claude Code everywhere, the plan says
-    // why it runs no more agents.
+    // five-hour and weekly windows is used, asking to be asked later when asked again at once. Once she
+    // signs out of Claude Code everywhere, the plan says why it runs no more agents.
     private async Task AClaudePlanRunsClaudeCodeThroughTheGatewayAndShowsItsLimitsAsync()
     {
         TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice);
@@ -310,6 +310,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
             return read.Calls > 0 ? read : null;
         });
         PlanUsage usage = await Api.ReadAsync<PlanUsage>(_alice.SendGetAsync(UsagePath(workspace.Id, plan.Id)), HttpStatusCode.OK);
+        Problem askedAgain = await Api.ProblemAsync(_alice.SendGetAsync(UsagePath(workspace.Id, plan.Id)), HttpStatusCode.Conflict);
         ChatSummary later = await workspace.StartChatAsync("claude-code", plan.Id);
         await using ChatWatch laterWatch = await ChatWatch.OpenAsync(workspace.Person, later);
         app.Claude.SignOut(person);
@@ -327,6 +328,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.True(app.Claude.Renewals > renewalsBefore);
         Assert.Equal(0, app.Claude.ReusedRefreshTokens);
         Assert.Equal([("5 hours", 37m, 100m), ("Week", 8m, 100m)], usage.Meters.Select(meter => (meter.Name, meter.Used, meter.Limit ?? 0)));
+        Assert.Equal("model_access.ask_later", askedAgain.Code);
         Assert.Equal("The agent couldn't start: " + AgentAccountsErrors.SignInEnded.Message, afterSignOut.GetProperty("failure").GetString());
         Assert.True(accounts.Single(found => found.Id == plan.Id).NeedsSignIn);
     }

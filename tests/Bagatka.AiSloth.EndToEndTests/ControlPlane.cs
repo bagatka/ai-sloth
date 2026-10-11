@@ -166,10 +166,10 @@ public sealed partial class ControlPlane : IAsyncLifetime
     {
         CancellationToken ct = TestContext.Current.CancellationToken;
         _issuer = await FakeIssuer.StartAsync();
-        _model = await FakeModel.StartAsync();
+        _claude = await FakeClaude.StartAsync();
+        _model = await FakeModel.StartAsync(_claude);
         _postHog = await FakePostHog.StartAsync();
         _chatGpt = await FakeChatGpt.StartAsync();
-        _claude = await FakeClaude.StartAsync();
         _gitHub = await FakeGitHub.StartAsync();
         IDistributedApplicationTestingBuilder appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Bagatka_AiSloth_AppHost>(
             [

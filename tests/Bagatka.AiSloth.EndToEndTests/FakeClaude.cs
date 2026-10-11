@@ -45,6 +45,7 @@ internal sealed class FakeClaude : IAsyncDisposable
     private readonly Lock _lock = new Lock();
     private readonly Dictionary<string, PendingCode> _codes = new Dictionary<string, PendingCode>(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _refreshTokens = new Dictionary<string, string>(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _accessTokens = new Dictionary<string, string>(StringComparer.Ordinal);
     private readonly HashSet<string> _usedRefreshTokens = new HashSet<string>(StringComparer.Ordinal);
     private readonly HashSet<string> _signedOut = new HashSet<string>(StringComparer.Ordinal);
 
@@ -112,6 +113,15 @@ internal sealed class FakeClaude : IAsyncDisposable
         string[] parts = accessToken.StartsWith(TokenPrefix, StringComparison.Ordinal) ? accessToken[TokenPrefix.Length..].Split('-') : [];
         bool dated = long.TryParse(parts.FirstOrDefault(), NumberStyles.None, CultureInfo.InvariantCulture, out long expiresAt);
         return dated && parts.Length == 2 && expiresAt > TimeProvider.System.GetUtcNow().ToUnixTimeSeconds();
+    }
+
+    /// <summary>Whose an access token it issued is, as Anthropic's API knows its account.</summary>
+    public string? PersonOf(string accessToken)
+    {
+        lock (_lock)
+        {
+            return _accessTokens.GetValueOrDefault(accessToken);
+        }
     }
 
     /// <summary>The person signs out of Claude Code everywhere: their refresh tokens stop working.</summary>
@@ -215,6 +225,7 @@ internal sealed class FakeClaude : IAsyncDisposable
         long expiresAt = TimeProvider.System.GetUtcNow().ToUnixTimeSeconds() + 60;
         string access = TokenPrefix + expiresAt.ToString(CultureInfo.InvariantCulture) + "-" + RandomNumberGenerator.GetHexString(16, lowercase: true);
         string refresh = "sk-ant-ort01-e2e-" + RandomNumberGenerator.GetHexString(24, lowercase: true);
+        _accessTokens[access] = person;
         _refreshTokens[refresh] = person;
         JsonObject answer = new JsonObject
         {

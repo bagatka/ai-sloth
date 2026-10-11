@@ -91,7 +91,11 @@ public interface IAgentAccountsApi
     /// credits spent; nothing for an API key. A plan's access token is renewed first when it is due. No
     /// vendor documents these answers; asking throws when the vendor can't be reached or refuses.
     /// </summary>
-    /// <returns>The usage; <see cref="AgentAccountsErrors.SignInEnded"/>; or not found for anyone who may not use the account.</returns>
+    /// <returns>
+    /// The usage; a conflict when the vendor asks to be asked later, as Anthropic does when asked about
+    /// every minute; <see cref="AgentAccountsErrors.SignInEnded"/>; or not found for anyone who may not
+    /// use the account.
+    /// </returns>
     public Task<Result<PlanUsage>> GetPlanUsageAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct);
 
     /// <summary>

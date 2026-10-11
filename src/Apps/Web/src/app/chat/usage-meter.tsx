@@ -100,15 +100,15 @@ export function UsageMeter({
           <PopoverTitle>This chat</PopoverTitle>
         </PopoverHeader>
         <UsageDetails usage={usage} context={context} warmFor={warmFor} />
-        {account && (plan.data?.meters.length || plan.isError) ? (
+        {account && (plan.data?.meters.length || plan.error) ? (
           <section className="flex flex-col gap-2 border-t pt-3">
             <h3 className="text-sm font-medium">{account.name}</h3>
-            {plan.isError ? (
-              <p className="text-sm text-muted-foreground">
-                Its use of its limits couldn't be read.
-              </p>
+            {plan.data?.meters.length ? (
+              <PlanMeterList meters={plan.data.meters} now={now} />
             ) : (
-              <PlanMeterList meters={plan.data?.meters ?? []} now={now} />
+              <p className="text-sm text-muted-foreground">
+                {plan.error?.message}
+              </p>
             )}
           </section>
         ) : null}

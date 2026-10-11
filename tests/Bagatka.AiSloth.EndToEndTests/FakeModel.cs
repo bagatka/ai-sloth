@@ -60,16 +60,19 @@ internal sealed class FakeModel : IAsyncDisposable
     public const string CopilotGpt = "gpt-6.1-sol";
 
     private readonly WebApplication _app;
+    private readonly FakeClaude _claude;
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan StreamLinger = TimeSpan.FromSeconds(1);
 
     private readonly ConcurrentDictionary<string, Hold> _holds = new ConcurrentDictionary<string, Hold>(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, byte> _refusedCopilot = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> _claudeUsageRead = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
     private int _cut;
 
-    private FakeModel(WebApplication app)
+    private FakeModel(WebApplication app, FakeClaude claude)
     {
         _app = app;
+        _claude = claude;
     }
 
     /// <summary>Its Anthropic API, as an account names it: the root, such as <c>http://127.0.0.1:41235/</c>.</summary>
@@ -127,7 +130,8 @@ internal sealed class FakeModel : IAsyncDisposable
         _refusedCopilot.TryAdd(FakeGitHub.CopilotTokenPrefix(login), 0);
     }
 
-    public static async Task<FakeModel> StartAsync()
+    /// <summary>Starts it; a Claude plan's tokens are Claude's (<paramref name="claude"/>).</summary>
+    public static async Task<FakeModel> StartAsync(FakeClaude claude)
     {
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
@@ -137,11 +141,11 @@ internal sealed class FakeModel : IAsyncDisposable
         builder.Services.AddResponseCompression(options => options.MimeTypes = ["text/event-stream", "application/json"]);
         WebApplication app = builder.Build();
         app.UseResponseCompression();
-        FakeModel model = new FakeModel(app);
+        FakeModel model = new FakeModel(app, claude);
         app.MapMethods("/api/hello", ["GET", "HEAD"], () => Results.Ok());
         app.MapPost("/v1/messages/count_tokens", () => Results.Json(new { input_tokens = 10 }));
         app.MapPost("/v1/messages", context => ClaudePlanCall(context) ? model.ClaudePlanAsync(context, model.MessagesAsync) : model.MessagesAsync(context));
-        app.MapGet("/api/oauth/usage", context => model.ClaudePlanAsync(context, ClaudeUsageAsync));
+        app.MapGet("/api/oauth/usage", context => model.ClaudePlanAsync(context, model.ClaudeUsageAsync));
         app.MapPost("/v1/responses", model.ResponsesAsync);
         app.MapPost("/v1/chat/completions", model.ChatCompletionsAsync);
         app.MapGet("/v1/models", OpenRouterCatalog);
@@ -349,9 +353,19 @@ internal sealed class FakeModel : IAsyncDisposable
         await answer(context);
     }
 
-    // The plan's five-hour and weekly windows, as Claude Code's /usage reads them.
-    private static async Task ClaudeUsageAsync(HttpContext context)
+    // The plan's five-hour and weekly windows, as Claude Code's /usage reads them. An account that read
+    // them is asked to ask later (429), as Anthropic asks one that reads them every minute or so.
+    private async Task ClaudeUsageAsync(HttpContext context)
     {
+        string? person = _claude.PersonOf(context.Request.Headers.Authorization.ToString()["Bearer ".Length..]);
+        bool first = _claudeUsageRead.TryAdd(person ?? string.Empty, 0);
+        if (!first)
+        {
+            JsonObject later = new JsonObject { ["type"] = "error", ["error"] = new JsonObject { ["type"] = "rate_limit_error", ["message"] = "Rate limited. Please try again later." } };
+            await Results.Json(later, statusCode: StatusCodes.Status429TooManyRequests).ExecuteAsync(context);
+            return;
+        }
+
         DateTimeOffset now = TimeProvider.System.GetUtcNow();
         JsonObject usage = new JsonObject
         {

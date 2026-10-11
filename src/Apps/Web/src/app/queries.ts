@@ -93,7 +93,7 @@ export function planUsage(workspaceId: string, account: string) {
           params: { path: { workspaceId, id: account } },
         })
       ),
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   })
 }
 

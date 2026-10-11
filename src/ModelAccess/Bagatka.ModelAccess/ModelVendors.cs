@@ -2,6 +2,8 @@ using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.Foundation;
@@ -116,11 +118,20 @@ public sealed class ModelVendors
 
     /// <summary>
     /// What the plan has used of its limits, asked of its vendor now, as its own agent asks. No vendor
-    /// documents these answers; throws when the vendor can't be reached or refuses.
+    /// documents these answers. Fails when the vendor asks to be asked later (429), as Anthropic does
+    /// when asked every minute or so; throws when the vendor can't be reached or refuses otherwise.
     /// </summary>
-    public Task<IReadOnlyList<UsageMeter>> LimitsAsync(ModelAccessKind kind, ModelCredential credential, CancellationToken ct)
+    public async Task<Result<IReadOnlyList<UsageMeter>>> LimitsAsync(ModelAccessKind kind, ModelCredential credential, CancellationToken ct)
     {
-        return PlanOf(kind).MetersAsync(credential, ct);
+        try
+        {
+            IReadOnlyList<UsageMeter> meters = await PlanOf(kind).MetersAsync(credential, ct);
+            return new Result<IReadOnlyList<UsageMeter>>(meters);
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == HttpStatusCode.TooManyRequests)
+        {
+            return new Result<IReadOnlyList<UsageMeter>>(Error.Conflict("model_access.ask_later", "The plan's vendor asked to be asked later; its limits show again in a few minutes."));
+        }
     }
 
     private IAccountKind KindOf(ModelAccessKind kind)
