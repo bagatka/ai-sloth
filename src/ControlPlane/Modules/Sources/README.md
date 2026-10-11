@@ -76,8 +76,9 @@ can't be connected; and the deployment's `EncryptionSettings`, for sealing token
 - **One GitHub App per host, acting as each person.** People connect with GitHub's device flow, so a
   CLI needs no callback and the host no public address. A company installs the app on its
   organization's repositories; each member's pushes and pull requests are theirs, under GitHub's own
-  permissions and branch protection. `sloth github create-app` makes a host's app with GitHub's
-  manifest flow; its "Enable Device Flow" setting is turned on by hand.
+  permissions and branch protection. The host's operator makes its app with `./host github-app`,
+  from GitHub's form with the app's settings filled in, which works wherever their browser is; its
+  "Enable Device Flow" setting and client secret are made by hand there.
 - **Tokens never enter a nook.** Repositories go in as git bundles and changes come out as bundles;
   git on the control plane talks to GitHub, with the token only in its environment, as the HTTP
   header it sends (`Git/GitCommand.cs`). Agents can't push or call GitHub with it; people who want

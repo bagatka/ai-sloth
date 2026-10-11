@@ -4,8 +4,9 @@
 accounts and secrets, connect GitHub and add repositories, start, follow, and steer chats, see
 and prepare the setup of their files, push their changes or download their files, now or at any
 checkpoint, start chats from another's checkpoint, set the instructions every agent gets, and see
-or forget harness state. Its machine mode runs a workspace's nooks on the computer it runs on, and `github create-app` makes a host's GitHub App for its operator. A released sloth
-updates itself from its repository's releases.
+or forget harness state. Its machine mode runs a workspace's nooks on the computer it runs on. It
+only uses a host: making and configuring one is its operator's, with the host's own tooling. A
+released sloth updates itself from its repository's releases.
 
 ## Parts
 
@@ -15,8 +16,7 @@ updates itself from its repository's releases.
 - **`HostApi`**: calls to one host as one session, or anonymously to sign in. A refusal or an
   unreachable host is an `HttpRequestException` with the host's words, which `sloth` prints.
 - **`LoopbackCallback`**: where a browser comes back after signing in, at `http://127.0.0.1:<port>/auth/callback`,
-  or the address pasted when the browser is on another computer; it can first serve a page the
-  browser starts from, such as the form GitHub's manifest flow begins with.
+  or the address pasted when the browser is on another computer.
 - **`Terminal`**: the person at the keyboard; secrets are read without echo at a console, or from
   standard input.
 - **`PrivateFile`**, **`HostsFile`**: what lasts between runs, readable by its owner only.

@@ -1,6 +1,8 @@
 # Self-host AiSloth
 
-Run AiSloth on a computer of yours:
+Run AiSloth on a computer of yours. This guide is for you as the host's operator: you start it,
+update it, and set it up. The people who use it, you included, need none of it: they sign in with
+`sloth`, and everything they do is there.
 
 - **[On one server or computer](#on-one-server-or-computer):** a server you rent, such as one from
   Hetzner or Hostinger, or your own PC. It takes a few minutes, and you need no accounts or keys.
@@ -76,8 +78,9 @@ Change `host.env`, then run `./host up` again. Its comments say what each settin
 
 - **Your own domain:** point the domain's DNS `A` record at the server, then set
   `Host__PublicUrl=https://<your domain>`.
-- **GitHub,** so agents work in your repositories and open pull requests: sign in, run
-  `sloth github create-app` on your computer, and put the three settings it shows in `host.env`.
+- **GitHub,** so agents work in your repositories and open pull requests: run `./host github-app`.
+  It takes you through making your host's GitHub App at GitHub, and saves its three settings in
+  `host.env`.
 - **Sign-in with your company's accounts,** through an OpenID Connect provider such as Microsoft
   Entra ID: set the four `SignIn__Provider__` settings.
 - **Other people on your host:** set `Modules__AgentAccounts__AllowChatGptPlans=false`. OpenAI
@@ -294,17 +297,16 @@ resource group in the Azure portal: Cost Management, then Budgets.
 
 Do this so that agents can work in your GitHub repositories and open pull requests.
 
-1. Make a GitHub App for your host:
+1. In the AiSloth shell, make your host's GitHub App:
 
    ```sh
-   sloth github create-app
+   ./host github-app https://<address of your host>
    ```
 
-   A browser opens at GitHub. Confirm the app. Then the command shows three values: a client ID, a
-   client secret, and a slug.
+   It shows a link to GitHub's form, with the app's settings filled in, and what to do there. You end
+   with three values: the app's client ID, a client secret, and its slug.
 
-2. On GitHub, open the settings of the new app. Select **Enable Device Flow**, and save.
-3. Add these three settings to your deploy command, and run it again:
+2. Add these three settings to your deploy command, and run it again:
 
    ```sh
    --Parameters:github-app-client-id=<client ID> --Parameters:github-app-client-secret=<client secret> --Parameters:github-app-slug=<slug>

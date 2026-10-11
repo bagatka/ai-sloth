@@ -77,9 +77,9 @@ None; the host passes the shared database.
 - **A setup code while nobody has signed up.** The WebApi asks for one at startup and prints it to
   standard output only; it works for a day, once, and stops working when anyone signs up.
 - **Link codes** work once within 10 minutes, for their creator only; someone who lost every device
-  asks the host's owner for an invite.
+  asks a manager of their workspace for an invite.
 - **Any provider, no provider code.** The issuer and subject are opaque strings, so WorkOS, Entra ID,
-  or a self-hoster's provider all work the same, and changing providers means new users until
+  or a host operator's own provider all work the same, and changing providers means new users until
   accounts can be linked.
 - **Two first sign-ins at once** (a web app's parallel requests) both get the same user: the unique
   index lets one insert win, and the other reads what it wrote.

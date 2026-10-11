@@ -104,10 +104,6 @@ internal sealed partial class Sloth(
                                      Connect this computer to a workspace with a code from its owner
           sloth machine run          Run the workspace's nooks here, in Docker
 
-        Hosting
-          sloth github create-app [--org <org>] [--name <name>] [--public]
-                                     Make the host's GitHub App, which people connect GitHub through
-
         sloth itself
           sloth version
           sloth update [<version>]   Install the newest sloth, or the version named
@@ -209,7 +205,6 @@ internal sealed partial class Sloth(
             ["github"] => ShowGitHubAsync(ct),
             ["github", "connect"] => ConnectGitHubAsync(ct),
             ["github", "disconnect"] => DisconnectGitHubAsync(ct),
-            ["github", "create-app", .. string[] rest] => CreateGitHubAppAsync(rest, ct),
             ["repo"] or ["repo", "list"] => ListRepositoriesAsync(ct),
             ["repo", "add", .. string[] rest] => AddRepositoryAsync(rest, ct),
             ["repo", "remove", string name] => RemoveRepositoryAsync(name, ct),

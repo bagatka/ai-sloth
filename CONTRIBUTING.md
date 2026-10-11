@@ -62,51 +62,51 @@ $env.DOCKER_HOST = "unix:///run/<your engine>.sock"
 
 ## 3. Run AiSloth on your computer
 
+Here you are two people: the host's operator, who starts and sets up the host, and its first user,
+who then uses it like anyone else. Only the operator's steps touch the host's settings; everything a
+user does is in the web app and `sloth`.
+
+### Set up the host, as its operator
+
 1. Start everything: PostgreSQL, the database migrations, the nook image, and the host.
 
    ```sh
    dotnet aspire run
    ```
 
-   The first build of the nook image takes some minutes.
+   The first build of the nook image takes some minutes. The database keeps its data between runs,
+   in a Docker volume whose name ends in `postgres-data`. To start over, stop AiSloth and remove
+   that volume.
 
-2. Open the dashboard link that the command shows. Go to the console logs of `webapi`, and find the
-   line that starts with `First sign-in:`.
-3. Sign in with the code from that line. Use the command line from the source code, in place of
-   `sloth`:
-
-   ```sh
-   dotnet run --project src/Cli/Bagatka.AiSloth.Cli -- host add <address> --code <setup code>
-   ```
-
-4. See what you can do:
+2. Optional: to work in GitHub repositories, make the host's GitHub App, give its three values to
+   the AppHost, and start AiSloth again:
 
    ```sh
-   dotnet run --project src/Cli/Bagatka.AiSloth.Cli -- help
-   ```
-
-### Optional: work in GitHub repositories
-
-1. Make a GitHub App for your host:
-
-   ```sh
-   dotnet run --project src/Cli/Bagatka.AiSloth.Cli -- github create-app
-   ```
-
-2. On GitHub, open the settings of the new app. Select **Enable Device Flow**, and save.
-3. Give the three values that the command showed to the AppHost:
-
-   ```sh
+   ./host github-app http://localhost:5170
    dotnet user-secrets set Parameters:github-app-client-id <client ID> --project src/Aspire/Bagatka.AiSloth.AppHost
    dotnet user-secrets set Parameters:github-app-client-secret <client secret> --project src/Aspire/Bagatka.AiSloth.AppHost
    dotnet user-secrets set Parameters:github-app-slug <slug> --project src/Aspire/Bagatka.AiSloth.AppHost
    ```
 
-### Optional: sign in with an OpenID Connect provider
+3. Optional: people always sign in with codes. To sign them in with an OpenID Connect provider too,
+   such as a WorkOS staging environment, give the AppHost these settings with
+   `dotnet user-secrets set`, as above: `Parameters:sign-in-provider-issuer`, `-client-id`,
+   `-client-secret`, and `-name`.
+4. Open the dashboard link that `dotnet aspire run` shows. Go to the console logs of `webapi`, and
+   find the line that starts with `First sign-in:`. Until someone signs up, it has the setup code.
 
-People always sign in with codes. You can also sign them in with a provider, such as a WorkOS
-staging environment. Give the AppHost these settings with `dotnet user-secrets set`, as above:
-`Parameters:sign-in-provider-issuer`, `-client-id`, `-client-secret`, and `-name`.
+### Use it, as anyone would
+
+Sign in with the setup code: in the web app at `http://localhost:5170/app/`, or with the command
+line from the source code, in place of `sloth`:
+
+```sh
+dotnet run --project src/Cli/Bagatka.AiSloth.Cli -- host add http://localhost:5170 --code <setup code>
+dotnet run --project src/Cli/Bagatka.AiSloth.Cli -- help
+```
+
+Agent accounts, GitHub, repositories, secrets, and instructions are in the web app's settings and in
+`sloth help`.
 
 ## 4. Check your change
 

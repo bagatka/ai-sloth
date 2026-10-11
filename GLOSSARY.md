@@ -40,6 +40,7 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 |---|---|---|---|
 | Control plane | The system that owns all state and decisions: the WebApi and its modules, later several services | `src/ControlPlane` | platform, backend, engine |
 | Host | A running control plane people sign in to, known by its address: the official one, someone's VPS, a company's | WebApi | server, instance, deployment (for the running thing) |
+| Host operator | Whoever runs a host: starts, updates, and configures it with the host's own tooling (`./host`, the AppHost), never through a client. Its settings, such as its GitHub App, are its operator's; everything people do in a host, its clients do through the API | WebApi, `host` | host owner, admin, self-hoster |
 | App address | Where a host serves its web app: `/app/` on the host's own address, unless the host names another | WebApi | frontend URL, SPA URL, web address |
 | User | A person who signs in. One user can have access to many workspaces and nooks. | Users | account, customer |
 | Session | One device's sign-in to a host: an opaque token the host issued, kept only as a hash, ending when signed out or after 90 days unused. A browser carries it as a cookie, other clients as a bearer token | Users | login, JWT, access token |

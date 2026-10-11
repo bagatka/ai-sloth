@@ -6,6 +6,9 @@
 #                      after git pull it updates AiSloth, and after a change to host.env applies it
 #   ./host up --build  the same, with images built from this checkout, changes and all
 #   ./host remove      deletes AiSloth from this computer: its data, nooks, and images
+#   ./host github-app [<address>] [--org <organization>]
+#                      makes the GitHub App people connect GitHub through, and saves it in host.env;
+#                      with an address, another host's, such as http://localhost:5170 in development
 #   ./host <command>   runs any docker compose command, such as ./host logs webapi or ./host down
 set -eu
 cd "$(dirname "$0")"
@@ -210,8 +213,8 @@ Modules__AgentAccounts__AllowChatGptPlans=true
 
 # Optional. Remove the # in front of a setting to turn it on.
 
-# GitHub, so agents work in your repositories and open pull requests: sign in to this host, run
-# sloth github create-app on your computer, and put the three settings it shows here.
+# GitHub, so agents work in your repositories and open pull requests: ./host github-app makes the
+# host's GitHub App and saves its three settings here.
 #Modules__Sources__GitHubApp__ClientId=
 #Modules__Sources__GitHubApp__ClientSecret=
 #Modules__Sources__GitHubApp__Slug=
@@ -482,7 +485,7 @@ EOF
     off=""
     if [ -z "$(setting Modules__Sources__GitHubApp__ClientId)" ]; then
         off="$off
-  GitHub, so agents work in your repositories and open pull requests"
+  GitHub, so agents work in your repositories and open pull requests: ./host github-app"
     fi
 
     case $site in
@@ -505,6 +508,122 @@ EOF
         say ""
         say "Turned off until you set them in host.env, then run ./host up again:$off"
     fi
+}
+
+# Makes the GitHub App people connect GitHub through, from GitHub's form with its settings filled
+# in, which works wherever the browser is; then saves what GitHub shows in host.env. With an address,
+# it's another host's app, such as an Azure deployment's or the AppHost's in development, and the
+# settings go wherever that host keeps them.
+github_app() {
+    address=""
+    organization=""
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --org)
+                [ $# -ge 2 ] || fail "--org takes the name of the organization that will own the app."
+                organization=$2
+                shift 2
+                ;;
+            http://* | https://*)
+                address=${1%/}
+                shift
+                ;;
+            *) fail "./host github-app takes an address, such as http://localhost:5170, and --org <organization>." ;;
+        esac
+    done
+
+    saving=""
+    if [ -z "$address" ]; then
+        [ -f "$settings" ] || fail "There's no host.env here yet: run ./host up first, or give the address of the host the app is for."
+        address=$(setting Host__PublicUrl)
+        saving=yes
+    fi
+
+    case $organization in
+        "") form=https://github.com/settings/apps/new ;;
+        *[!A-Za-z0-9-]*) fail "$organization isn't an organization's name on GitHub." ;;
+        *) form="https://github.com/organizations/$organization/settings/apps/new" ;;
+    esac
+
+    # The app acts only as the people who connect it: it reads and writes their repositories'
+    # contents and pull requests, and needs no webhook.
+    site=${address#*://}
+    link="$form?name=$(encode "AiSloth on ${site%%[:/]*}")&url=$(encode "$address")&public=false&webhook_active=false&contents=write&pull_requests=write&metadata=read"
+    say "Make the host's GitHub App at GitHub:"
+    say ""
+    say "1. Open this link, signed in to GitHub as the account that will own the app:"
+    say "   $link"
+    say "   Choose \"Any account\" if people will add repositories that other accounts or organizations"
+    say "   own. Click Create GitHub App; if GitHub says the name is taken, change it."
+    say "2. On the app's page, check Enable Device Flow, and click Save changes."
+    say "3. Click Generate a new client secret."
+    if [ -z "$saving" ]; then
+        say "4. Give the host the app's client ID, the client secret, and its slug, the last part of the"
+        say "   page's address: in development, as the AppHost's user secrets (CONTRIBUTING.md); deployed"
+        say "   to Azure, as deploy parameters (docs/self-hosting.md)."
+        return
+    fi
+
+    say "4. Paste here what the app's page shows."
+    say ""
+    printf 'The page'"'"'s address: '
+    read -r page || page=
+    path=${page%%\?*}
+    path=${path%/}
+    slug=${path##*/}
+    case ${path%/*} in
+        https://github.com/apps | https://github.com/settings/apps | https://github.com/organizations/*/settings/apps) ;;
+        *) slug="" ;;
+    esac
+    case $slug in
+        "" | *[!a-z0-9-]*) fail "That isn't the address of a GitHub App's page, such as https://github.com/settings/apps/aisloth-on-example-com." ;;
+    esac
+
+    printf 'Client ID: '
+    read -r client_id || client_id=
+    case $client_id in
+        "" | *[!A-Za-z0-9.]*) fail "That isn't a client ID, such as Iv23liAbCdEf01234567." ;;
+    esac
+
+    printf 'Client secret: '
+    if [ -t 0 ]; then
+        trap 'stty echo; exit 130' INT
+        stty -echo
+    fi
+    read -r client_secret || client_secret=
+    if [ -t 0 ]; then
+        stty echo
+        trap - INT
+        say ""
+    fi
+    case $client_secret in
+        "" | *[!0-9a-f]*) fail "That isn't a client secret: GitHub shows one once, as 40 letters and digits, after Generate a new client secret." ;;
+    esac
+
+    save_setting Modules__Sources__GitHubApp__ClientId "$client_id"
+    save_setting Modules__Sources__GitHubApp__ClientSecret "$client_secret"
+    save_setting Modules__Sources__GitHubApp__Slug "$slug"
+    say ""
+    say "Saved the app's settings in host.env. Run ./host up to turn GitHub on."
+}
+
+# Text as a URL's query value; the addresses and names here have no other special characters.
+encode() {
+    printf '%s' "$1" | sed -e 's/%/%25/g' -e 's/ /%20/g' -e 's/:/%3A/g' -e 's|/|%2F|g' -e 's/?/%3F/g' -e 's/&/%26/g' -e 's/#/%23/g' -e 's/+/%2B/g'
+}
+
+# Sets a setting in host.env where it is, commented out or not, or at its end. Its values are made of
+# letters, digits, and dots, so awk takes them as they are. host.env stays readable by its owner only.
+save_setting() {
+    (
+        umask 077
+        awk -v name="$1" -v value="$2" '
+            $0 ~ "^#?" name "=" { if (!saved) print name "=" value; else if ($0 ~ "^#") print; saved = 1; next }
+            { print }
+            END { if (!saved) print name "=" value }
+        ' "$settings" > "$settings.new"
+    )
+    mv "$settings.new" "$settings"
 }
 
 # Nooks are containers the host makes, not compose's, so they go by the label their provider gives
@@ -540,8 +659,12 @@ case ${1:-} in
     remove)
         remove
         ;;
+    github-app)
+        shift
+        github_app "$@"
+        ;;
     "" | help | -h | --help)
-        sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
         ;;
     *)
         if [ ! -f "$running" ]; then

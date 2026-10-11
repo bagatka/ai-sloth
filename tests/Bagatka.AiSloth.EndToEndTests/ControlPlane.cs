@@ -162,6 +162,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
                 "Parameters:sign-in-provider-client-secret=" + FakeIssuer.ClientSecret,
                 "Parameters:sign-in-provider-name=Fake",
                 "Parameters:invite-sign-up=true",
+                "Parameters:fresh-database=true",
                 "Parameters:sandbox-scope=" + Scope,
                 "Parameters:object-storage=" + ObjectStorage,
                 "Parameters:model-private-networks=true",

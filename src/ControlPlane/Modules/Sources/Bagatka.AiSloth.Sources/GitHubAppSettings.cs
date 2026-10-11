@@ -4,8 +4,8 @@ namespace Bagatka.AiSloth.Sources;
 
 /// <summary>
 /// The host's GitHub App, which people connect their GitHub account through. Its "Enable Device Flow"
-/// setting is on, and it may read and write contents and pull requests. Each host has its own:
-/// <c>sloth github create-app</c> makes one.
+/// setting is on, and it may read and write contents and pull requests. Each host has its own, which
+/// its operator makes with <c>./host github-app</c>.
 /// </summary>
 public sealed record GitHubAppSettings
 {

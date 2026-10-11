@@ -29,7 +29,7 @@ internal sealed partial class Sloth
         "secret list", "secret set", "secret remove",
         "chat list", "chat open", "chat send", "chat stop", "chat push", "chat download", "chat checkpoints", "chat setup", "chat prepare",
         "harness state", "instructions set", "instructions clear",
-        "github connect", "github disconnect", "github create-app",
+        "github connect", "github disconnect",
         "repo list", "repo add", "repo remove",
         "git author", "git committer", "git co-author", "git branch-prefix",
         "machine connect", "machine run");

@@ -48,8 +48,8 @@ IResourceBuilder<ParameterResource> encryptionKey = builder.ExecutionContext.IsP
 // public. Settings left empty, as a deploy workflow passes ones a fork doesn't set, count as not given.
 string? postHogHost = builder.Configuration["Parameters:posthog-host"] is { Length: > 0 } givenPostHog ? givenPostHog : null;
 
-// People connect GitHub through the host's GitHub App, which `sloth github create-app` makes: give
-// github-app-client-id, -client-secret, and -slug as user secrets of this project.
+// People connect GitHub through the host's GitHub App, which `./host github-app http://localhost:5170`
+// makes: give github-app-client-id, -client-secret, and -slug as user secrets of this project.
 string? gitHubAppClientId = builder.Configuration["Parameters:github-app-client-id"];
 
 // The scope nooks run in, which the control plane owns: it deletes sandboxes there that no nook
@@ -202,11 +202,17 @@ if (builder.ExecutionContext.IsPublishMode)
 }
 else
 {
-    // Run here: Postgres in a container, checkpoints in a folder of this computer unless tests give
-    // their own, and nooks on the Docker Engine, or in an Azure sandbox group too.
-    IResourceBuilder<PostgresDatabaseResource> postgres = builder.AddPostgres("postgres")
-        .WithImageTag("18")
-        .AddDatabase("aisloth");
+    // Run here: Postgres in a container, checkpoints in a folder of this computer, and nooks on the
+    // Docker Engine, or in an Azure sandbox group too. The database keeps its data between runs in a
+    // Docker volume, as checkpoints do in their folder; tests start each run with an empty database
+    // (fresh-database) and give their own folder.
+    IResourceBuilder<PostgresServerResource> postgresServer = builder.AddPostgres("postgres").WithImageTag("18");
+    if (builder.Configuration["Parameters:fresh-database"] is not "true")
+    {
+        postgresServer.WithDataVolume();
+    }
+
+    IResourceBuilder<PostgresDatabaseResource> postgres = postgresServer.AddDatabase("aisloth");
     database = postgres.Resource.ConnectionStringExpression;
     IResourceBuilder<ParameterResource> objectStorage = builder.AddParameter(
         "object-storage",

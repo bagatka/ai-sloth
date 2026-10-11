@@ -317,7 +317,8 @@ vendor-shaped, product-agnostic, and used from module internals. Rules are in `s
 the images main publishes for each commit: it takes the newest commit of its checkout whose images
 are published, and installs Docker and Sysbox first on a fresh Ubuntu 24.04. `./host up --build`
 builds the images from the checkout instead, as CI does to check every commit on main. `host.env` holds the
-WebApi's own settings, which its operator keeps. The WebApi runs on the computer's network, as a
+WebApi's own settings, which its operator keeps; `./host github-app` makes the host's GitHub App and
+saves its settings there. The WebApi runs on the computer's network, as a
 process there would, because nooks' routers keep them from the addresses it finds on its network
 interfaces; the endpoints nooks reach listen on Docker's bridge only. PostgreSQL has no network,
 only a socket it shares with the WebApi, and Caddy gives a public address HTTPS.
