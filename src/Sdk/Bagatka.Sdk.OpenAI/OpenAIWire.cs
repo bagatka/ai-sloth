@@ -38,8 +38,5 @@ internal static class OpenAIWire
         [property: JsonPropertyName("aud")] JsonElement Audience,
         [property: JsonPropertyName("exp")] long? ExpiresAt,
         [property: JsonPropertyName("nonce")] string? Nonce,
-        [property: JsonPropertyName("email")] string? Email,
-        [property: JsonPropertyName("https://api.openai.com/auth")] AuthClaims? Auth);
-
-    internal sealed record AuthClaims([property: JsonPropertyName("chatgpt_account_id")] string? ChatGptAccountId);
+        [property: JsonPropertyName("email")] string? Email);
 }

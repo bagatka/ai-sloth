@@ -24,7 +24,6 @@ internal sealed partial class AgentAccountsApi(
     [FromKeyedServices(AgentAccountsDbContext.Schema)] SecretBox box,
     AgentAccountsSettings settings,
     ChatGptSignInClient chatGpt,
-    ChatGptUsageClient chatGptUsage,
     OpenAIModelsClient openAI,
     AnthropicModelsClient anthropic,
     ClaudePlanUsageClient claudeUsage,

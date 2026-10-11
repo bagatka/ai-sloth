@@ -63,7 +63,6 @@ internal sealed class FakeChatGpt : IAsyncDisposable
         app.MapGet("/api/accounts/authorize", chatGpt.Authorize);
         app.MapPost("/api/accounts/oauth/token", chatGpt.TokenAsync);
         app.MapPost("/api/accounts/oauth/revoke", chatGpt.RevokeAsync);
-        app.MapGet("/backend-api/wham/usage", chatGpt.Usage);
         await app.StartAsync();
         IServerAddressesFeature? addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
         if (addresses is null)
@@ -272,47 +271,8 @@ internal sealed class FakeChatGpt : IAsyncDisposable
             ["exp"] = now + 3600,
             ["nonce"] = nonce,
             ["email"] = registration.Subject + "@example.com",
-            ["https://api.openai.com/auth"] = new JsonObject { ["chatgpt_account_id"] = AccountIdOf(registration) },
         };
         return Base64Url.EncodeToString("""{"alg":"none","typ":"JWT"}"""u8) + "." + Base64Url.EncodeToString(Encoding.UTF8.GetBytes(payload.ToJsonString())) + ".unsigned";
-    }
-
-    // ChatGPT's own backend, as Codex's /status reads it: the plan's five-hour and weekly windows, for an
-    // access token it issued and the ChatGPT account the sign-in chose.
-    private IResult Usage(HttpRequest request)
-    {
-        string authorization = request.Headers.Authorization.ToString();
-        string token = authorization.StartsWith("Bearer ", StringComparison.Ordinal) ? authorization["Bearer ".Length..] : string.Empty;
-        bool known;
-        lock (_lock)
-        {
-            known = _accessTokens.Contains(token)
-                && _registrations.Values.Any(registration => string.Equals(AccountIdOf(registration), request.Headers["ChatGPT-Account-Id"].ToString(), StringComparison.Ordinal));
-        }
-
-        if (!known)
-        {
-            return Results.StatusCode(StatusCodes.Status401Unauthorized);
-        }
-
-        long now = TimeProvider.System.GetUtcNow().ToUnixTimeSeconds();
-        return Results.Json(new JsonObject
-        {
-            ["plan_type"] = "plus",
-            ["rate_limit"] = new JsonObject
-            {
-                ["allowed"] = true,
-                ["limit_reached"] = false,
-                ["primary_window"] = new JsonObject { ["used_percent"] = 42, ["limit_window_seconds"] = 18_000, ["reset_after_seconds"] = 7_200, ["reset_at"] = now + 7_200 },
-                ["secondary_window"] = new JsonObject { ["used_percent"] = 12, ["limit_window_seconds"] = 604_800, ["reset_after_seconds"] = 259_200, ["reset_at"] = now + 259_200 },
-            },
-            ["credits"] = new JsonObject { ["has_credits"] = false, ["unlimited"] = false, ["balance"] = "0" },
-        });
-    }
-
-    private static string AccountIdOf(Registration registration)
-    {
-        return "account-" + registration.Subject;
     }
 
     private static IResult Refused(string error)

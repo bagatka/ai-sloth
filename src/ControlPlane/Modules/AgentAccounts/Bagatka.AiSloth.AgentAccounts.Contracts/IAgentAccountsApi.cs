@@ -86,10 +86,10 @@ public interface IAgentAccountsApi
 
     /// <summary>
     /// What a plan has used of its limits (<see cref="PlanUsage"/>), asked of its vendor now, as the
-    /// vendor's own clients ask: a ChatGPT plan's five-hour and weekly windows (as Codex's
-    /// <c>/status</c> does), a Copilot plan's quotas or credits spent, and a Claude plan's windows;
-    /// nothing for an API key. A ChatGPT plan's access token is renewed first when it is due. No vendor
-    /// documents these answers; asking throws when the vendor can't be reached or refuses.
+    /// vendor's own clients ask: a Copilot plan's quotas or credits spent, and a Claude plan's windows.
+    /// Nothing for an API key, nor for a ChatGPT plan: ChatGPT shares its usage with no app that signs
+    /// in with ChatGPT, only on its own page. No vendor documents these answers; asking throws when the
+    /// vendor can't be reached or refuses.
     /// </summary>
     /// <returns>The usage; <see cref="AgentAccountsErrors.SignInEnded"/>; or not found for anyone who may not use the account.</returns>
     public Task<Result<PlanUsage>> GetPlanUsageAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct);

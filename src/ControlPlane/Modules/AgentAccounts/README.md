@@ -23,9 +23,8 @@ a nook: the model gateway adds them to each call.
   models: OpenAI's through `Bagatka.Sdk.OpenAI`, Anthropic's through `Bagatka.Sdk.Anthropic`,
   Copilot's through `Bagatka.Sdk.GitHub`, and OpenRouter's catalog through `Bagatka.Sdk.OpenRouter`.
   models.dev's open catalog of what each model takes, holds, and costs (`Catalog/`). What plans have
-  used of their limits: ChatGPT's windows through `Bagatka.Sdk.OpenAI`, Copilot's quotas through
-  `Bagatka.Sdk.GitHub`, and Claude's windows through `Bagatka.Sdk.Anthropic`, from the vendors'
-  undocumented endpoints that their own clients read.
+  used of their limits: Copilot's quotas through `Bagatka.Sdk.GitHub` and Claude's windows through
+  `Bagatka.Sdk.Anthropic`, from the vendors' undocumented endpoints that their own clients read.
 
 ## Does not own
 
@@ -107,16 +106,16 @@ background.
   since a local run is self-hosted;
 - `CopilotClientId`, the GitHub OAuth app people sign in to for their Copilot plans: AiSloth's own
   unless the host names another;
-- `ChatGptAuthority`, `ChatGptApi`, `ChatGptBackend`, `OpenRouterApi`, `CopilotApi`, `ClaudeApi`, and `ModelsDevUrl`,
+- `ChatGptAuthority`, `ChatGptApi`, `OpenRouterApi`, `CopilotApi`, `ClaudeApi`, and `ModelsDevUrl`,
   the vendors' own by default; tests point them at fakes. GitHub itself is the host's `GitHubClient`'s.
 
 ## Decisions and constraints
 
 - **A plan's limits, as its vendor counts them** (`PlanUsage`), asked of the vendor when someone
-  looks, where its own clients ask: a ChatGPT plan's five-hour and weekly windows from ChatGPT's
-  backend (`/wham/usage`, as Codex's `/status`; the API's answers to a Sign in with ChatGPT token
-  carry none), Copilot's quotas (requests used of those allowed, or the credits a plan without
-  limits spent), and a Claude plan's windows. No vendor documents these answers.
+  looks, where its own clients ask: Copilot's quotas (requests used of those allowed, or the credits
+  a plan without limits spent) and a Claude plan's windows. No vendor documents these answers. A
+  ChatGPT plan's usage stays on ChatGPT's own page: neither the API's answers to a Sign in with
+  ChatGPT token nor ChatGPT's backend (`/wham/usage`, which refuses that token) share it.
 
 - **One OpenRouter key, both APIs.** OpenRouter serves Anthropic's Messages API at its root
   (`/v1/messages`) and OpenAI's at `/v1`, so an OpenRouter key's endpoint is OpenRouter's root, with

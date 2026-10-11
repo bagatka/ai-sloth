@@ -17,13 +17,20 @@ const NearShare = 0.9
 const day = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" })
 const amount = new Intl.NumberFormat("en", { maximumFractionDigits: 1 })
 
-/** Whether the account is a plan, whose vendor says what it used of its limits. */
+/** Whether the account is a plan whose vendor says what it used of its limits: Copilot and Claude do. */
 export function isPlan(account: Account): boolean {
-  return (
-    account.kind === "ChatGptPlan" ||
-    account.kind === "CopilotPlan" ||
-    account.kind === "ClaudePlan"
-  )
+  return account.kind === "CopilotPlan" || account.kind === "ClaudePlan"
+}
+
+/**
+ * ChatGPT shows a plan's usage on its own page only, and the limits it sets this app there; as OpenAI
+ * asks of apps that use the plan, they link to it.
+ */
+export const chatGptUsage = "https://chatgpt.com/settings/usage"
+
+/** Whether the account is a ChatGPT plan, whose usage ChatGPT shows on its own page. */
+export function usesChatGptPlan(account: Account): boolean {
+  return account.kind === "ChatGptPlan"
 }
 
 /** The plan's usage; nothing to read for an API key. While someone works, it's read every minute. */

@@ -210,7 +210,6 @@ public sealed partial class ControlPlane : IAsyncLifetime
         webApi.WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", string.Empty)
             .WithEnvironment("Host__SignInsPerMinute", "100000")
             .WithEnvironment("Modules__AgentAccounts__ChatGptAuthority", ChatGpt.Url.AbsoluteUri)
-            .WithEnvironment("Modules__AgentAccounts__ChatGptBackend", new Uri(ChatGpt.Url, "backend-api").AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__ChatGptApi", Model.OpenAIUrl.AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__OpenRouterApi", Model.Url.AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__CopilotApi", new Uri(Model.Url, "copilot").AbsoluteUri)

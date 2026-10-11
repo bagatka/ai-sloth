@@ -33,7 +33,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/components/ui/toast"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { ApiError, answer, api, messageOf, type Schemas } from "../api"
-import { metersSummary, nearLimit, usePlanUsage } from "../plan-usage"
+import {
+  chatGptUsage,
+  metersSummary,
+  nearLimit,
+  usePlanUsage,
+  usesChatGptPlan,
+} from "../plan-usage"
 import { accountKinds, agentAccounts, me } from "../queries"
 import { aborted, CodeSteps, waitForCode } from "./code-sign-in"
 import { NoRows, RemoveButton, Row, Rows, Section } from "./section"
@@ -184,6 +190,18 @@ function PlanMeters({
 }) {
   const usage = usePlanUsage(workspaceId, account)
   const meters = usage.data?.meters ?? []
+  if (usesChatGptPlan(account)) {
+    return (
+      <a
+        href={chatGptUsage}
+        target="_blank"
+        rel="noreferrer"
+        className="hidden text-label text-muted-foreground underline underline-offset-4 hover:text-foreground sm:inline"
+      >
+        Manage usage
+      </a>
+    )
+  }
   if (meters.length === 0) {
     return null
   }

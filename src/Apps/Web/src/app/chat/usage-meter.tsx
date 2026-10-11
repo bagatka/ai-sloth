@@ -15,9 +15,11 @@ import { type Schemas } from "../api"
 import { dollarsLabel, tokensLabel } from "../models"
 import {
   PlanMeterList,
+  chatGptUsage,
   limitSentence,
   nearLimit,
   usePlanUsage,
+  usesChatGptPlan,
 } from "../plan-usage"
 import { usage as usageQuery } from "../queries"
 import { BoxLine } from "./box-line"
@@ -100,6 +102,22 @@ export function UsageMeter({
           <PopoverTitle>This chat</PopoverTitle>
         </PopoverHeader>
         <UsageDetails usage={usage} context={context} warmFor={warmFor} />
+        {account && usesChatGptPlan(account) && (
+          <section className="flex flex-col gap-1 border-t pt-3">
+            <h3 className="text-sm font-medium">Using ChatGPT plan</h3>
+            <p className="text-sm text-muted-foreground">
+              ChatGPT shows how much of it is left, and this app's limit.{" "}
+              <a
+                href={chatGptUsage}
+                target="_blank"
+                rel="noreferrer"
+                className="text-foreground underline underline-offset-4"
+              >
+                Manage usage
+              </a>
+            </p>
+          </section>
+        )}
         {account && (plan.data?.meters.length || plan.isError) ? (
           <section className="flex flex-col gap-2 border-t pt-3">
             <h3 className="text-sm font-medium">{account.name}</h3>

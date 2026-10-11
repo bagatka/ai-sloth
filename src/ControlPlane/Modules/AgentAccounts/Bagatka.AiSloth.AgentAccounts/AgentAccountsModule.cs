@@ -24,7 +24,6 @@ public static class AgentAccountsModule
         services.AddSingleton(settings);
         services.AddKeyedSingleton(AgentAccountsDbContext.Schema, new SecretBox(encryption, AgentAccountsDbContext.Schema));
         services.AddChatGptSignInClient(settings.ChatGptSignIn);
-        services.AddChatGptUsageClient();
         services.AddOpenAIModelsClient();
         services.AddAnthropicModelsClient();
         services.AddClaudePlanUsageClient();

@@ -112,7 +112,7 @@ public sealed class ChatGptSignInClient : IDisposable
             }
         }
 
-        return new ChatGptIdToken(claims.Issuer, claims.Subject, audiences, DateTimeOffset.FromUnixTimeSeconds(claims.ExpiresAt.Value), claims.Nonce, claims.Email, claims.Auth?.ChatGptAccountId);
+        return new ChatGptIdToken(claims.Issuer, claims.Subject, audiences, DateTimeOffset.FromUnixTimeSeconds(claims.ExpiresAt.Value), claims.Nonce, claims.Email);
     }
 
     /// <summary>Where to send the person's browser to sign in; it returns to the request's redirect URI.</summary>

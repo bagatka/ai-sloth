@@ -21,17 +21,6 @@ public static class ChatGptSignInRegistration
     }
 
     /// <summary>
-    /// Registers one <see cref="ChatGptUsageClient"/> for the whole application, disposed with the
-    /// service provider. Call it once.
-    /// </summary>
-    public static IServiceCollection AddChatGptUsageClient(this IServiceCollection services)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        services.AddSingleton(_ => new ChatGptUsageClient());
-        return services;
-    }
-
-    /// <summary>
     /// Registers one <see cref="OpenAIModelsClient"/> for the whole application, disposed with the
     /// service provider. Call it once.
     /// </summary>

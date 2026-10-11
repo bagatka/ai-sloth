@@ -12,12 +12,10 @@ namespace Bagatka.Sdk.OpenAI;
 /// <param name="ExpiresAt">When it expires.</param>
 /// <param name="Nonce">The nonce of the authorization it answers.</param>
 /// <param name="Email">The person's email address, if shared.</param>
-/// <param name="AccountId">The ChatGPT account, personal or a workspace's, whose plan the sign-in uses, when it says.</param>
 public sealed record ChatGptIdToken(
     string Issuer,
     string Subject,
     IReadOnlyList<string> Audiences,
     DateTimeOffset ExpiresAt,
     string? Nonce,
-    string? Email,
-    string? AccountId);
+    string? Email);
