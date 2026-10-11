@@ -34,10 +34,11 @@ import {
 import { chatStream, useChat } from "./chat-stream"
 import { ChangesPanel, DownloadFiles } from "./changes-panel"
 import { Composer } from "./composer"
+import { ContinueButton, ContinuesLine } from "./continue-chat"
 import { PushMenu } from "./push-menu"
 import { SetupBanner } from "./setup-banner"
 import { TranscriptView } from "./transcript-view"
-import { PlanLimitLine, UsageMeter } from "./usage-meter"
+import { CacheGoneLine, PlanLimitLine, UsageMeter } from "./usage-meter"
 
 // One chat as it happens: who wrote what, what the agent did, and a box to write to it.
 export function ChatPage() {
@@ -161,6 +162,11 @@ export function ChatPage() {
             me={person.id}
             names={nameOf}
             agent={agent}
+            start={
+              chat.data.continues && (
+                <ContinuesLine chatId={chat.data.continues} />
+              )
+            }
           />
         )}
         <SetupBanner
@@ -173,6 +179,15 @@ export function ChatPage() {
           account={account}
           working={working}
         />
+        {proposing === null && (
+          <CacheGoneLine
+            chatId={chatId}
+            transcript={state.transcript}
+            action={
+              <ContinueButton chat={chat.data} provider={nook?.provider} />
+            }
+          />
+        )}
         {/* While the agent works, a line on the message box says so, wherever the transcript is read. */}
         {working && state.transcript.turnStartedAt && (
           <div className="shrink-0 px-4 pb-1.5 md:px-5">
@@ -198,6 +213,11 @@ export function ChatPage() {
               transcript={state.transcript}
               workspaceId={chat.data.workspaceId}
               account={account}
+              actions={
+                proposing === null && (
+                  <ContinueButton chat={chat.data} provider={nook?.provider} />
+                )
+              }
             />
           }
         />

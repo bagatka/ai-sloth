@@ -31,17 +31,24 @@ import type { Transcript } from "./transcript"
 // Under a minute left, the cache countdown asks for attention.
 const SoonSeconds = 60
 
+// From this much context, reading it all again once the cache is gone costs enough to say so, and to
+// offer a new chat that continues this one with an empty context.
+const CostlyReread = 50_000
+
 export function UsageMeter({
   chatId,
   transcript,
   workspaceId,
   account,
+  actions,
 }: {
   chatId: string
   transcript: Transcript
   workspaceId: string
   /** The chat's account, when the person can see it. */
   account: Schemas["AgentAccountSummary"] | undefined
+  /** What can be done about it, at the details' end. */
+  actions?: React.ReactNode
 }) {
   const working = transcript.working
   const usage = useQuery({
@@ -105,8 +112,42 @@ export function UsageMeter({
             )}
           </section>
         ) : null}
+        {actions && <div className="flex justify-end">{actions}</div>}
       </PopoverContent>
     </Popover>
+  )
+}
+
+/**
+ * A line on the message box once the prompt's cache is gone from a chat with a large context: the next
+ * message reads all of it again, at full price.
+ */
+export function CacheGoneLine({
+  chatId,
+  transcript,
+  action,
+}: {
+  chatId: string
+  transcript: Transcript
+  /** What to do instead, at the line's end. */
+  action: React.ReactNode
+}) {
+  const usage = useQuery(usageQuery(chatId, transcript.checkpoint)).data
+  const now = useNow()
+  const context = transcript.context ?? contextOf(usage)
+  const gone =
+    !!usage?.cacheWarmUntil && Date.parse(usage.cacheWarmUntil) <= now
+  if (transcript.working || !gone || !context || context.used < CostlyReread) {
+    return null
+  }
+  const cost =
+    usage.rereadCost !== null
+      ? ` (${dollarsLabel(usage.rereadCost, true)})`
+      : ""
+  return (
+    <BoxLine tone="warning" actions={action}>
+      {`The prompt's cache is gone, so your next message reads all ${tokensLabel(context.used)} tokens of context again${cost}.`}
+    </BoxLine>
   )
 }
 

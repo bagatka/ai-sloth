@@ -3197,6 +3197,7 @@ export interface components {
              *     characters; `null` until someone writes in it.
              */
             title: null | string;
+            continues: null | components["schemas"]["ChatId"];
         };
         /**
          * @description What a chat's agents have used of their models: every call the model gateway saw, added up and by
@@ -4147,6 +4148,7 @@ export interface components {
             copyOf?: string;
             /** Format: int32 */
             checkpoint?: null | number;
+            withConversation?: null | boolean;
         };
         StartProcessRequest: {
             command: string;

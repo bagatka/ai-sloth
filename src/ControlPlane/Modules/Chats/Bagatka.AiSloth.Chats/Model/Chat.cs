@@ -75,6 +75,12 @@ internal sealed class Chat
     // Its agent starts with the chat, before any message, until it tried.
     public bool StartsAgent { get; private set; }
 
+    // The chat whose conversation this one continues, up to which of its events: its agent gets it
+    // as a file (ConversationMarkdown).
+    public ChatId? ContinuesFrom { get; private set; }
+
+    public long? ContinuesUpTo { get; private set; }
+
     // The run of its nook's setup whose start the chat told, and that run's exit code once it told its
     // end. The agent starts after that.
     public ProcessId? SetupRunId { get; private set; }
@@ -118,6 +124,13 @@ internal sealed class Chat
     public static Chat Start(NookId nookId, WorkspaceId workspaceId, UserId startedBy, string harness, string model, string thinking, AgentAccountCredential account, TimeProvider time)
     {
         return new Chat(ChatId.New(), nookId, workspaceId, startedBy, time.GetUtcNow(), harness, model, thinking, account.Id, account.OwnerId) { StartsAgent = true };
+    }
+
+    // Continues the earlier chat's conversation as it was after its event upTo.
+    public void Continue(ChatId earlier, long upTo)
+    {
+        ContinuesFrom = earlier;
+        ContinuesUpTo = upTo;
     }
 
     public static byte[] HashToken(string token)
@@ -309,7 +322,7 @@ internal sealed class Chat
     /// <param name="firstMessage">The start of its first message, if anyone wrote in it.</param>
     public ChatSummary ToSummary(bool messagesWaiting, string? firstMessage)
     {
-        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, AgentChangeWaiting ? NextModel : Model, AgentChangeWaiting ? NextThinking! : Thinking, AgentChangeWaiting ? NextAgentAccountId!.Value : AgentAccountId, AccountOwnerId, TitleFrom(firstMessage));
+        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, AgentChangeWaiting ? NextModel : Model, AgentChangeWaiting ? NextThinking! : Thinking, AgentChangeWaiting ? NextAgentAccountId!.Value : AgentAccountId, AccountOwnerId, TitleFrom(firstMessage), ContinuesFrom);
     }
 
     private static bool Same(AgentAccountId account, string? model, string? thinking, AgentAccountId otherAccount, string? otherModel, string? otherThinking)
@@ -318,7 +331,7 @@ internal sealed class Chat
     }
 
     // A title is the first line with words in it, its spaces collapsed, cut at a word near 80 characters.
-    private static string? TitleFrom(string? firstMessage)
+    public static string? TitleFrom(string? firstMessage)
     {
         string? line = firstMessage?.Split('\n').Select(text => string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))).FirstOrDefault(text => text.Length > 0);
         if (line is null || line.Length <= TitleLength)

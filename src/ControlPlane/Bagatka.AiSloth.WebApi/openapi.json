@@ -3191,7 +3191,8 @@
           "thinking",
           "account",
           "accountOwner",
-          "title"
+          "title",
+          "continues"
         ],
         "type": "object",
         "properties": {
@@ -3256,6 +3257,17 @@
               "string"
             ],
             "description": "What the chat is about, as lists show it: the first line of its first message, at most 80\ncharacters; \u0060null\u0060 until someone writes in it."
+          },
+          "continues": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The chat whose conversation it continues (bool StartChat.WithConversation), if any.",
+                "$ref": "#/components/schemas/ChatId"
+              }
+            ]
           }
         },
         "description": "A chat as the people with access to its nook see it."
@@ -5531,6 +5543,12 @@
               "integer"
             ],
             "format": "int32"
+          },
+          "withConversation": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },

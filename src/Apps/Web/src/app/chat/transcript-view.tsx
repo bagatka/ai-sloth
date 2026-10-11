@@ -47,13 +47,15 @@ type Props = {
   names: ReadonlyMap<string, string>
   /** The agent's name, such as "Claude Code". */
   agent: string
+  /** What comes before the conversation, such as the chat it continues. */
+  start?: React.ReactNode
 }
 
 // The transcript follows the newest output while the reader is at its end, and stays where they put
 // it once they scroll away; reaching the end again, or the scroll button, follows again. What
 // arrives while the chat shows rises into place; what was there when it opened, history the stream
 // replays included, doesn't move.
-export function TranscriptView({ state, me, names, agent }: Props) {
+export function TranscriptView({ state, me, names, agent, start }: Props) {
   const { transcript, pending } = state
 
   return (
@@ -64,6 +66,7 @@ export function TranscriptView({ state, me, names, agent }: Props) {
             data-arriving={state.arriving ? "" : undefined}
             className="mx-auto w-full max-w-[44rem] gap-3 px-4 pt-8 pb-10"
           >
+            {start}
             {transcript.rows.map((row, index) => (
               <MessageScrollerItem key={row.key} messageId={row.key}>
                 {startsAgentOutput(transcript.rows, index) && (

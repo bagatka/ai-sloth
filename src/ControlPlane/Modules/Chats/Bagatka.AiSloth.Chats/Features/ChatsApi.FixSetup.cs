@@ -120,7 +120,7 @@ internal sealed partial class ChatsApi
         }
 
         NookRepository[] repositories = [.. nook.Output.Sources.Select(source => new NookRepository(source.Repository, source.Branch))];
-        StartChat start = new StartChat(failed.WorkspaceId, nook.Output.Provider, like.Harness, like.Account, model, like.Thinking, repositories, CopyOf: null, Checkpoint: null);
+        StartChat start = new StartChat(failed.WorkspaceId, nook.Output.Provider, like.Harness, like.Account, model, like.Thinking, repositories, CopyOf: null, Checkpoint: null, WithConversation: false);
         Result<ChatSummary> started = await StartAsync(actor, start, ct);
         return started;
     }

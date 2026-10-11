@@ -23,11 +23,18 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <param name="Repositories">The workspace's repositories its nook starts with, each at <c>/work/&lt;name&gt;</c>; empty for none.</param>
 /// <param name="CopyOf">
 /// Another chat of the workspace whose nook's files its nook starts with, with its repositories; or
-/// <see langword="null"/>. Not together with repositories. The conversation isn't copied.
+/// <see langword="null"/>. Not together with repositories. Its conversation comes only with
+/// <paramref name="WithConversation"/>.
 /// </param>
 /// <param name="Checkpoint">
 /// With <paramref name="CopyOf"/>, which of its checkpoints (<see cref="CheckpointSaved"/>) to start
 /// from; <see langword="null"/> for its files as they are when the new agent starts.
+/// </param>
+/// <param name="WithConversation">
+/// With <paramref name="CopyOf"/>, whether the new chat continues that chat's conversation: up to the
+/// checkpoint, or all of it now, as a Markdown file in its nook (<c>/work/.aisloth/chats/&lt;id&gt;.md</c>)
+/// that its agent's instructions name. The agent starts a session of its own, and reads the file
+/// when it needs it.
 /// </param>
 public sealed record StartChat(
     WorkspaceId WorkspaceId,
@@ -38,4 +45,5 @@ public sealed record StartChat(
     string Thinking,
     IReadOnlyList<NookRepository> Repositories,
     ChatId? CopyOf,
-    int? Checkpoint);
+    int? Checkpoint,
+    bool WithConversation);

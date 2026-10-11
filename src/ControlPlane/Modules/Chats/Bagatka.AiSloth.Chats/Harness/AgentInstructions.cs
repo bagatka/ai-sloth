@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Chats.Data;
 using Bagatka.AiSloth.Chats.Model;
 using Bagatka.AiSloth.Nooks.Contracts;
@@ -20,7 +21,8 @@ namespace Bagatka.AiSloth.Chats.Harness;
 // nook's setup ended when it failed, then its workspace's, then those of the person who started
 // its chat. They are written, before the agent starts, to the file its harness reads its user's own
 // instructions from (HarnessProfile.InstructionsPath), outside /work, so they never meet a
-// repository's files and every session of the harness reads them.
+// repository's files and every session of the harness reads them. A chat that continues another's
+// conversation gets it as a file too (ConversationMarkdown), which they name.
 internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databases, INooksApi nooks)
 {
     // Each text's limit: instructions go into every model call the agent makes.
@@ -36,10 +38,15 @@ internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databa
     {
         string? workspace;
         string? personal;
+        string? conversation = null;
         await using (ChatsDbContext db = await databases.CreateDbContextAsync(ct))
         {
             workspace = await db.WorkspaceInstructions.Where(found => found.WorkspaceId == chat.WorkspaceId).Select(found => found.Text).SingleOrDefaultAsync(ct);
             personal = await db.PersonalInstructions.Where(found => found.PersonId == chat.StartedBy).Select(found => found.Text).SingleOrDefaultAsync(ct);
+            if (chat.ContinuesFrom is ChatId earlier)
+            {
+                conversation = await ConversationAsync(db, earlier, chat.ContinuesUpTo ?? 0, ct);
+            }
         }
 
         Result<NookSummary> nook = await nooks.GetAsync(SystemActors.Harness, chat.NookId, ct);
@@ -48,9 +55,40 @@ internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databa
             return new Result(nook.Error);
         }
 
-        string text = Compose(Nook(chat.SetupExitCode, nook.Output.Sources), workspace ?? string.Empty, personal ?? string.Empty);
-        using MemoryStream archive = await ArchiveAsync(harness.InstructionsPath, text, ct);
+        // The same conversation every time the agent starts, since it ends where the chat continued it.
+        string? continues = conversation is null ? null : ConversationMarkdown.PathOf(chat.ContinuesFrom!.Value);
+        string text = Compose(Nook(chat.SetupExitCode, nook.Output.Sources), continues, workspace ?? string.Empty, personal ?? string.Empty);
+        List<(string Path, string Text)> files = [(harness.InstructionsPath, text)];
+        if (continues is not null)
+        {
+            files.Add((continues, conversation!));
+        }
+
+        using MemoryStream archive = await ArchiveAsync(files, ct);
         return await nooks.CopyFilesInAsync(SystemActors.Harness, new CopyFilesIn(chat.NookId, Replacing: []), archive, ct);
+    }
+
+    // The earlier chat's conversation up to the event the chat continues it after; null once that chat
+    // is gone.
+    private static async Task<string?> ConversationAsync(ChatsDbContext db, ChatId earlier, long upTo, CancellationToken ct)
+    {
+        Chat? chat = await db.Chats.AsNoTracking().SingleOrDefaultAsync(found => found.Id == earlier, ct);
+        if (chat is null)
+        {
+            return null;
+        }
+
+        ConversationMarkdown markdown = new ConversationMarkdown(chat);
+        IAsyncEnumerable<StoredEvent> events = db.Events.AsNoTracking()
+            .Where(found => found.ChatId == earlier && found.Sequence <= upTo && (found.Kind == "message-sent" || found.Kind == "agent-update"))
+            .OrderBy(found => found.Sequence)
+            .AsAsyncEnumerable();
+        await foreach (StoredEvent stored in events.WithCancellation(ct))
+        {
+            markdown.Add(stored);
+        }
+
+        return markdown.ToMarkdown();
     }
 
     // What every agent knows about its nook: what it has, where its repositories are, how setups
@@ -84,9 +122,16 @@ internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databa
             + "`sloth secret set <NAME>`, tell them.";
     }
 
-    private static string Compose(string nook, string workspace, string personal)
+    private static string Compose(string nook, string? continues, string workspace, string personal)
     {
         List<string> parts = [nook];
+        if (continues is not null)
+        {
+            parts.Add("## The chat this one continues\n\nThis chat continues an earlier one, in a copy of its files. That chat's conversation is in `"
+                + continues + "`: what people wrote, what its agent answered, and what it did. Read it before you answer whenever what "
+                + "you're asked builds on it, rather than guessing what was said or decided there.");
+        }
+
         if (workspace.Length > 0 || personal.Length > 0)
         {
             parts.Add("The people you work for gave the rest through AiSloth. Follow it everywhere, together with each repository's own instructions.");
@@ -105,20 +150,23 @@ internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databa
         return "# Instructions from AiSloth\n\n" + string.Join("\n\n", parts) + "\n";
     }
 
-    // A gzipped tar archive holding the one file, by its path relative to /, as Nooks unpacks it.
-    private static async Task<MemoryStream> ArchiveAsync(string path, string text, CancellationToken ct)
+    // A gzipped tar archive holding the files, by their paths relative to /, as Nooks unpacks it.
+    private static async Task<MemoryStream> ArchiveAsync(IReadOnlyList<(string Path, string Text)> files, CancellationToken ct)
     {
         MemoryStream archive = new MemoryStream();
         await using (GZipStream zipped = new GZipStream(archive, CompressionLevel.Fastest, leaveOpen: true))
         await using (TarWriter tar = new TarWriter(zipped, TarEntryFormat.Pax, leaveOpen: true))
         {
-            using MemoryStream content = new MemoryStream(Encoding.UTF8.GetBytes(text));
-            PaxTarEntry entry = new PaxTarEntry(TarEntryType.RegularFile, path.TrimStart('/'))
+            foreach ((string path, string text) in files)
             {
-                DataStream = content,
-                Mode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead,
-            };
-            await tar.WriteEntryAsync(entry, ct);
+                using MemoryStream content = new MemoryStream(Encoding.UTF8.GetBytes(text));
+                PaxTarEntry entry = new PaxTarEntry(TarEntryType.RegularFile, path.TrimStart('/'))
+                {
+                    DataStream = content,
+                    Mode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead,
+                };
+                await tar.WriteEntryAsync(entry, ct);
+            }
         }
 
         archive.Position = 0;

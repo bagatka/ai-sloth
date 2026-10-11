@@ -70,6 +70,7 @@ public sealed partial class WebJourney(ControlPlane app)
             await AFailedSetupIsFixedInAChatOfItsOwnAsync(page, acme);
             await TheChangesStayLiveAndKeepTheReadersPlaceAsync(page, acme, started);
             await ReviewsTheChangesDownloadsTheFilesAndOpensAPullRequestAsync(page, acme, started, owner);
+            await ContinuesTheChatInANewOneAsync(page);
             await TheSessionIsACookieNoScriptReadsAndNothingBrokeThePolicyAsync(page, context);
             await ALinkToTheChatSignsInThroughTheProviderAsync(browser, chat, alice);
         }
@@ -132,6 +133,20 @@ public sealed partial class WebJourney(ControlPlane app)
         await Assertions.Expect(details.GetByText(WarmFor())).ToBeVisibleAsync();
         await WebBrowser.ShotAsync(page, "usage");
         await page.Keyboard.PressAsync("Escape");
+    }
+
+    // From what the chat used, a new chat continues it in a copy of its files, and says which one.
+    private static async Task ContinuesTheChatInANewOneAsync(IPage page)
+    {
+        string title = await page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Level = 1 }).InnerTextAsync();
+        await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Usage" }).ClickAsync();
+        await page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Continue in a new chat" }).ClickAsync();
+
+        ILocator continues = page.Locator("p", new PageLocatorOptions { HasText = "The agent starts with an empty context" });
+        await Assertions.Expect(continues).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(continues.GetByRole(AriaRole.Link)).ToHaveTextAsync(title);
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Level = 1 })).ToHaveTextAsync("New chat");
+        await WebBrowser.ShotAsync(page, "continued");
     }
 
     // Someone starts a chat from sloth or another browser: the list shows it without a reload.

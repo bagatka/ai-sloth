@@ -29,14 +29,14 @@ folders).
 
 `IChatsApi`: members list the harnesses and the models each can run on with an account, start chats
 (each creating its nook, with the workspace's repositories or another chat's files, now or at a
-checkpoint, on a model or the harness's default), list chats or watch the list as it changes, send
+checkpoint, and that chat's conversation when it continues it), list chats or watch the list as it changes, send
 messages and send proposals on, change the model and account a chat runs on, stop the agent, run a
 chat's setup again, start a chat that fixes it and bring its fix in, watch a chat's events from any sequence number, set
 and read the instructions every agent gets, list and forget their harness state, and keep presets. `IChatHarnessesApi` is the
 model gateway's side.
 
 ```csharp
-Result<ChatSummary> started = await chats.StartAsync(alice, new StartChat(workspaceId, "docker", "pi", openRouterKeyId, "openai/gpt-6-luna", [new NookRepository(apiRepositoryId)], CopyOf: null, Checkpoint: null), ct);
+Result<ChatSummary> started = await chats.StartAsync(alice, new StartChat(workspaceId, "docker", "pi", openRouterKeyId, "openai/gpt-6-luna", "medium", [new NookRepository(apiRepositoryId)], CopyOf: null, Checkpoint: null, WithConversation: false), ct);
 Result<ChatMessage> sent = await chats.SendAsync(alice, new SendMessage(started.Output.Id, "Add a README", Proposal: null), ct);
 Result<IAsyncEnumerable<ChatEvent>> watch = await chats.WatchAsync(bob, new WatchChat(started.Output.Id, AfterSequence: 0), ct);
 // SetupStarted, SetupEnded, MessageSent, TurnStarted, AgentUpdate (ACP's session/update), ...,
@@ -52,7 +52,7 @@ AgentAccounts (the account a chat runs on, and who may use it).
 ## Data
 
 Schema `chats`: `chats` (one per nook; its harness, account, and model, and another account and
-model chosen while an agent ran; whether its setup is to run again; the agent's process, session,
+model chosen while an agent ran; the chat it continues, up to which event; whether its setup is to run again; the agent's process, session,
 and how far its output is read; the turn in progress; `xmin` as concurrency token), `messages`,
 `events` (sequence numbers per chat; an agent update is stored as the agent sent it), `drafts`,
 `workspace_instructions`, `personal_instructions`, `presets` (a person's harness, account, and
@@ -76,6 +76,14 @@ account, and turn, its tokens, its cost then, and until when its cache stays).
 minutes unless given).
 
 ## Decisions and constraints
+
+- **A continuing chat gets the conversation as a file, never a summary.** It starts in a copy of the
+  other chat's files with its conversation up to then as plain Markdown
+  (`/work/.aisloth/chats/<id>.md`, `ConversationMarkdown`): what people wrote, what the agent
+  answered, and a line for each thing it did, without its thinking or tools' output. The instructions
+  name the file; the agent starts a session of its own, with an empty context, and reads it when it
+  needs it. Being in `/work`, the file goes with later copies, so a chain of them keeps every
+  conversation.
 
 - **A chat is a draft until its first message.** Apps start a chat as someone starts writing, so its
   nook and agent are ready when they send. A draft isn't listed, and goes with its nook after the

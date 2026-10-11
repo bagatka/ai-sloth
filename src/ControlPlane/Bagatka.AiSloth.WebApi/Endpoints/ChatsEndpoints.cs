@@ -24,7 +24,7 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class ChatsEndpoints
 {
-    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account, string Model, string Thinking, IReadOnlyList<NookRepository>? Repositories = null, ChatId? CopyOf = null, int? Checkpoint = null);
+    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account, string Model, string Thinking, IReadOnlyList<NookRepository>? Repositories = null, ChatId? CopyOf = null, int? Checkpoint = null, bool? WithConversation = null);
 
     internal sealed record AddPresetRequest(string Harness, AgentAccountId Account, string Model, string Thinking, string? Name = null);
 
@@ -106,7 +106,7 @@ internal static class ChatsEndpoints
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        StartChat command = new StartChat(WorkspaceId.From(workspaceId), request.Provider, request.Harness, request.Account, request.Model, request.Thinking, request.Repositories ?? [], request.CopyOf, request.Checkpoint);
+        StartChat command = new StartChat(WorkspaceId.From(workspaceId), request.Provider, request.Harness, request.Account, request.Model, request.Thinking, request.Repositories ?? [], request.CopyOf, request.Checkpoint, request.WithConversation == true);
         Result<ChatSummary> result = await api.StartAsync(principal.ToActor(), command, ct);
         return result.ToCreated(chat => string.Create(CultureInfo.InvariantCulture, $"/chats/{chat.Id.Value}"));
     }

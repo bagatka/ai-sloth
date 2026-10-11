@@ -31,6 +31,7 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// What the chat is about, as lists show it: the first line of its first message, at most 80
 /// characters; <see langword="null"/> until someone writes in it.
 /// </param>
+/// <param name="Continues">The chat whose conversation it continues (<see cref="StartChat.WithConversation"/>), if any.</param>
 public sealed record ChatSummary(
     ChatId Id,
     NookId NookId,
@@ -43,4 +44,5 @@ public sealed record ChatSummary(
     string Thinking,
     AgentAccountId Account,
     UserId? AccountOwner,
-    string? Title);
+    string? Title,
+    ChatId? Continues);

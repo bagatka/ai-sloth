@@ -64,7 +64,8 @@ One name per concept, used the same way in code, APIs, storage, UI, and conversa
 | Model gateway | The WebApi endpoint agents call their model through; it forwards each call to their chat's agent account's endpoint with the headers that pay for it, so no nook holds a key or a plan's token | WebApi, Chats | LLM proxy, API proxy |
 | Checkpoint | A nook's files saved at one moment, such as after each turn: `/work` and its repositories with their history, honoring `.gitignore`, and its kept paths; numbered in its nook, kept while the nook exists | Nooks | snapshot, backup, save point |
 | Kept paths | Paths outside `/work` a nook's checkpoints keep too, such as where its agent keeps its sessions | Nooks | extra paths, volumes |
-| Fork | A new chat continuing another's conversation from one of its turns, in a nook started from the checkpoint after it | Nooks, Chats (planned) | clone, branch |
+| Fork | A new chat continuing another's conversation from one of its turns, its agent loading that chat's session, in a nook started from the checkpoint after it | Nooks, Chats (planned) | clone, branch |
+| Continuing chat | A new chat in a copy of another's files, now or at a checkpoint, whose agent starts with an empty context and has that chat's conversation as a Markdown file to read; for when a context grew costly to read again | Chats | handoff, summary, compact |
 | Source | Where some of a nook's files come from: a repository, later a folder. A nook holds a copy of each at `/work/<name>`, named after it | Sources, Nooks | repo (for both kinds), mount, folder (for a repository) |
 | Repository | A GitHub repository a workspace connected, which its chats' nooks can start with | Sources | repo link, git source, project |
 | GitHub connection | A person's GitHub account, connected through the host's GitHub App; AiSloth copies repositories in and pushes changes as them with it, and no nook ever holds it | Sources | GitHub integration, token, login |

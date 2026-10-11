@@ -10,7 +10,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// <summary>
 /// Journey: a chat starts from another chat's files. With <c>sloth</c>, Erin lists a chat's checkpoints
 /// and starts a new chat from one, whose nook has the files as they were then; a chat copied through
-/// the API starts with the files as they are now.
+/// the API starts with the files as they are now, and one that continues the other's conversation gets
+/// it as a file its agent's instructions name.
 /// </summary>
 public sealed class CopyJourney(ControlPlane app) : IDisposable
 {
@@ -20,7 +21,7 @@ public sealed class CopyJourney(ControlPlane app) : IDisposable
     private HttpClient Erin => _erin!;
 
     [Fact]
-    public async Task A_chat_starts_from_another_chats_files_as_they_are_or_were_at_a_checkpoint()
+    public async Task A_chat_starts_from_another_chats_files_as_they_are_or_were_at_a_checkpoint_and_can_continue_its_conversation()
     {
         await using SlothCli sloth = new SlothCli(_person);
         await sloth.RunAsync("host", "add", app.WebApiUrl.AbsoluteUri);
@@ -28,6 +29,7 @@ public sealed class CopyJourney(ControlPlane app) : IDisposable
         _erin = app.ClientFor(_person);
         ChatSummary first = await SlothStartsAChatFromACheckpointOfAnotherAsync(sloth);
         await AChatCopiedNowStartsWithTheFilesAsTheyAreAsync(first);
+        await AChatThatContinuesTheConversationHasItAsAFileAsync(first);
     }
 
     public void Dispose()
@@ -65,5 +67,27 @@ public sealed class CopyJourney(ControlPlane app) : IDisposable
         int? copied = await NookProcesses.ExitCodeAsync(Erin, copy.NookId, "grep", "-q", "changed", "/work/hello.txt");
 
         Assert.Equal(0, copied);
+    }
+
+    // The new chat starts on a fresh session; its agent reads the earlier conversation from a file when
+    // it needs it. The person writes the first message.
+    private async Task AChatThatContinuesTheConversationHasItAsAFileAsync(ChatSummary first)
+    {
+        string chats = Paths.Workspace(first.WorkspaceId) + "/chats";
+        ChatSummary continued = await Api.ReadAsync<ChatSummary>(
+            Erin.SendPostAsync(chats, new { provider = "docker", harness = "claude-code", account = first.Account, model = TestWorkspace.AnyModel, thinking = TestWorkspace.AnyThinking, copyOf = first.Id, withConversation = true }), HttpStatusCode.Created);
+        Problem withoutCopy = await Api.ProblemAsync(
+            Erin.SendPostAsync(chats, new { provider = "docker", harness = "claude-code", account = first.Account, model = TestWorkspace.AnyModel, thinking = TestWorkspace.AnyThinking, withConversation = true }), HttpStatusCode.BadRequest);
+        await using ChatWatch watch = await ChatWatch.OpenAsync(Erin, continued);
+        await Api.ReadAsync<ChatMessage>(Erin.SendPostAsync(Paths.Chat(continued) + "/messages", new { text = "say hello" }), HttpStatusCode.OK);
+        await watch.NextAsync("turn-ended");
+        string path = "/work/.aisloth/chats/" + first.Id.Value + ".md";
+        ProcessRun conversation = await NookProcesses.RunAsync(Erin, continued.NookId, "cat", path);
+
+        Assert.Equal(first.Id, continued.Continues);
+        Assert.True(withoutCopy.Errors?.ContainsKey("withConversation"));
+        Assert.StartsWith("# Please write hello.txt for me\n", conversation.StandardOutput, StringComparison.Ordinal);
+        Assert.Contains("\n## Person\n\nPlease write hello.txt for me\n\n## Agent\n\n", conversation.StandardOutput, StringComparison.Ordinal);
+        Assert.Contains(app.Model.Requests, body => body.Contains(path, StringComparison.Ordinal));
     }
 }
