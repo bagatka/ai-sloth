@@ -20,9 +20,9 @@ internal static class AgentAccountsEndpoints
 {
     internal sealed record AddAgentAccountRequest(AgentAccountKind Kind, string Name, string Secret, Uri? Endpoint = null);
 
-    internal sealed record StartSignInRequest(AgentAccountKind Kind, string Name, Uri? Callback = null);
+    internal sealed record StartSignInRequest(AgentAccountKind Kind, string Name);
 
-    internal sealed record CompleteSignInRequest(Uri? ReturnedTo = null);
+    internal sealed record CompleteSignInRequest(string? Code = null);
 
     public static RouteGroupBuilder MapAgentAccountsEndpoints(this IEndpointRouteBuilder app)
     {
@@ -100,9 +100,8 @@ internal static class AgentAccountsEndpoints
     }
 
     /// <summary>
-    /// What the plan has used of its limits: a ChatGPT plan's windows as its latest call reported them, a
-    /// Copilot plan's quotas or credits spent, and a Claude plan's windows, both asked of the vendor now.
-    /// Nothing for an API key.
+    /// What the plan has used of its limits, asked of the vendor now: a ChatGPT or Claude plan's
+    /// five-hour and weekly windows, or a Copilot plan's quotas or credits spent. Nothing for an API key.
     /// </summary>
     private static async Task<Results<Ok<PlanUsage>, ProblemHttpResult>> GetPlanUsage(
         [FromRoute] Guid workspaceId,
@@ -127,11 +126,11 @@ internal static class AgentAccountsEndpoints
     }
 
     /// <summary>
-    /// Starts adding the caller's own plan by signing in at its vendor. A ChatGPT plan: listen on the
-    /// callback, an <c>http://127.0.0.1:&lt;port&gt;/auth/callback</c> address on the caller's computer,
-    /// open the returned URL in a browser, then complete the sign-in with the address the browser came
-    /// back to, within ten minutes. A Copilot plan, without a callback: the person enters the returned
-    /// code at the returned URL, GitHub's, while the caller completes the sign-in every interval.
+    /// Starts adding the caller's own plan by signing in at its vendor. A ChatGPT or Copilot plan: the
+    /// person enters the returned code at the returned URL, OpenAI's or GitHub's, while the caller
+    /// completes the sign-in every interval. A Claude plan: the person approves at the returned URL,
+    /// Claude's, and the caller completes the sign-in with the code Claude's page shows, within ten
+    /// minutes.
     /// </summary>
     private static async Task<Results<Ok<SignInStarted>, ProblemHttpResult>> StartSignIn(
         [FromBody] StartSignInRequest request,
@@ -139,15 +138,15 @@ internal static class AgentAccountsEndpoints
         [FromServices] IAgentAccountsApi api,
         CancellationToken ct)
     {
-        StartSignIn command = new StartSignIn(request.Kind, request.Name, request.Callback);
+        StartSignIn command = new StartSignIn(request.Kind, request.Name);
         Result<SignInStarted> result = await api.StartSignInAsync(principal.ToActor(), command, ct);
         return result.ToOk();
     }
 
     /// <summary>
-    /// Completes a sign-in, adding the account: with the whole address the browser came back to, or,
-    /// for a sign-in with a code and without a body, once the person approved it; until then, the
-    /// progress says when to ask again. A failed or expired sign-in starts again.
+    /// Completes a sign-in, adding the account: with the code Claude's page showed, or, for a sign-in
+    /// with a user code and without a body, once the person approved it; until then, the progress says
+    /// when to ask again. A failed or expired sign-in starts again.
     /// </summary>
     private static async Task<Results<Ok<SignInProgress>, ProblemHttpResult>> CompleteSignIn(
         [FromRoute] Guid id,
@@ -156,7 +155,7 @@ internal static class AgentAccountsEndpoints
         [FromServices] IAgentAccountsApi api,
         CancellationToken ct)
     {
-        CompleteSignIn command = new CompleteSignIn(SignInId.From(id), request?.ReturnedTo);
+        CompleteSignIn command = new CompleteSignIn(SignInId.From(id), request?.Code);
         Result<SignInProgress> result = await api.CompleteSignInAsync(principal.ToActor(), command, ct);
         return result.ToOk();
     }

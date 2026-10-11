@@ -7,6 +7,7 @@ using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
+using Bagatka.Sdk.Anthropic;
 using Bagatka.Sdk.OpenAI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -71,10 +72,11 @@ internal sealed partial class AgentAccountsApi
         return await AllowedAsync(actor, account, workspaceId, ct);
     }
 
-    // Renews a plan's access token, one renewal at a time per account: OpenAI replaces the refresh
-    // token with every renewal and refuses one used twice, so the account's row stays locked while
-    // OpenAI answers (within the client's timeout), and whoever waited finds it renewed. The caller's
-    // cancellation doesn't apply: a renewal OpenAI completed but this side dropped would end the sign-in.
+    // Renews a plan's access token, one renewal at a time per account: the vendor replaces the refresh
+    // token with every renewal and may refuse one used twice, so the account's row stays locked while
+    // the vendor answers (within the client's timeout), and whoever waited finds it renewed. The
+    // caller's cancellation doesn't apply: a renewal the vendor completed but this side dropped would
+    // end the sign-in.
     private async Task<Result<AgentAccount>> RenewAsync(AgentAccountsDbContext db, AgentAccountId id)
     {
         await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(CancellationToken.None);
@@ -98,20 +100,16 @@ internal sealed partial class AgentAccountsApi
             return new Result<AgentAccount>(account);
         }
 
-        // A Codex plan renews as Codex does; a ChatGPT plan with its own sign-in's client.
-        Task<Result<ChatGptTokens>> renewing = account.Kind == AgentAccountKind.CodexPlan
-            ? codex.RefreshAsync(session.RefreshToken, CancellationToken.None)
-            : chatGpt.RefreshAsync(session.ClientId, session.RefreshToken, CancellationToken.None);
-        Result<ChatGptTokens> tokens = await renewing;
-        if (tokens.Failed)
+        Result<PlanSession> renewed = await RenewedAsync(account.Kind, session);
+        if (renewed.Failed)
         {
             // Every refusal means the session is over, such as after the person disconnected the app.
             account.SignInEnded(time);
-            Log.SignInEnded(logger, account.Id.Value, tokens.Error.Code);
+            Log.SignInEnded(logger, account.Id.Value, renewed.Error.Code);
         }
         else
         {
-            account.Renewed(session.Renewed(tokens.Output, time.GetUtcNow()), box);
+            account.Renewed(renewed.Output, box);
         }
 
         Result saved = await db.SaveAsync(CancellationToken.None);
@@ -121,12 +119,31 @@ internal sealed partial class AgentAccountsApi
         }
 
         await transaction.CommitAsync(CancellationToken.None);
-        if (tokens.Failed)
+        if (renewed.Failed)
         {
             return new Result<AgentAccount>(AgentAccountsErrors.SignInEnded);
         }
 
         return new Result<AgentAccount>(account);
+    }
+
+    // The session with its tokens renewed, as the plan's own agent renews them: Codex for a ChatGPT
+    // plan, Claude Code for a Claude plan. The caller's cancellation doesn't apply (RenewAsync).
+    private async Task<Result<PlanSession>> RenewedAsync(AgentAccountKind kind, PlanSession session)
+    {
+        DateTimeOffset now = time.GetUtcNow();
+        if (kind == AgentAccountKind.ClaudePlan)
+        {
+            Result<ClaudeTokens> claudeTokens = await claude.RefreshAsync(session.RefreshToken, CancellationToken.None);
+            return claudeTokens.Failed
+                ? new Result<PlanSession>(claudeTokens.Error)
+                : new Result<PlanSession>(session.Renewed(claudeTokens.Output.AccessToken, claudeTokens.Output.RefreshToken, idToken: null, claudeTokens.Output.ExpiresIn, now));
+        }
+
+        Result<ChatGptTokens> codexTokens = await codex.RefreshAsync(session.RefreshToken, CancellationToken.None);
+        return codexTokens.Failed
+            ? new Result<PlanSession>(codexTokens.Error)
+            : new Result<PlanSession>(session.Renewed(codexTokens.Output.AccessToken, codexTokens.Output.RefreshToken, codexTokens.Output.IdToken, codexTokens.Output.ExpiresIn, now));
     }
 
     // The account, unless it doesn't exist or is another workspace's.

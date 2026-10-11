@@ -23,8 +23,8 @@ public static class AgentAccountsModule
     {
         services.AddSingleton(settings);
         services.AddKeyedSingleton(AgentAccountsDbContext.Schema, new SecretBox(encryption, AgentAccountsDbContext.Schema));
-        services.AddChatGptSignInClient(settings.ChatGptSignIn);
         services.AddCodexSignInClient(settings.ChatGptAuthority);
+        services.AddClaudeSignInClient(ClaudeSignInSettings.Public with { AuthorizeUrl = settings.ClaudeAuthorizeUrl, TokenUrl = settings.ClaudeTokenUrl });
         services.AddChatGptUsageClient();
         services.AddOpenAIModelsClient();
         services.AddAnthropicModelsClient();

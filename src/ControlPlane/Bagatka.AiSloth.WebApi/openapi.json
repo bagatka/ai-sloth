@@ -2900,8 +2900,7 @@
           "ClaudePlan",
           "OpenAIApiKey",
           "ChatGptPlan",
-          "OpenRouterApiKey",
-          "CodexPlan"
+          "OpenRouterApiKey"
         ],
         "description": "What an agent account is at its vendor, and so which harnesses can use it."
       },
@@ -3464,12 +3463,11 @@
       "CompleteSignInRequest": {
         "type": "object",
         "properties": {
-          "returnedTo": {
+          "code": {
             "type": [
               "null",
               "string"
-            ],
-            "format": "uri"
+            ]
           }
         }
       },
@@ -5303,7 +5301,7 @@
             "description": "How long to wait before completing a sign-in with a code; zero otherwise."
           }
         },
-        "description": "A sign-in in progress, until ExpiresAt: the person opens Url.\nWith a UserCode (a Copilot plan, at GitHub), they enter it there and approve,\nwhile the caller completes the sign-in every Interval until it is done. Without one\n(a ChatGPT plan), the caller completes it once, with the address the browser returned to."
+        "description": "A sign-in in progress, until ExpiresAt: the person opens Url.\nWith a UserCode (a Copilot plan, at GitHub; a ChatGPT plan, at OpenAI), they\nenter it there and approve, while the caller completes the sign-in every Interval\nuntil it is done. Without one (a Claude plan), they approve there and bring back the code the page\nshows, which the caller completes the sign-in with, once."
       },
       "SourceChanges": {
         "required": [
@@ -5453,13 +5451,6 @@
           },
           "name": {
             "type": "string"
-          },
-          "callback": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uri"
           }
         }
       },

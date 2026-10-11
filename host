@@ -207,9 +207,10 @@ Host__PublicUrl=$url
 
 Encryption__Key=$key
 
-# ChatGPT plans as agent accounts. OpenAI allows them only when you run AiSloth for yourself, so set
-# this to false when other people use this host.
+# ChatGPT and Claude plans as agent accounts, for running AiSloth for yourself: set these to false
+# when other people use this host.
 Modules__AgentAccounts__AllowChatGptPlans=true
+Modules__AgentAccounts__AllowClaudePlans=true
 
 # Optional. Remove the # in front of a setting to turn it on.
 

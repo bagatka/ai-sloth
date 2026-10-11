@@ -91,20 +91,20 @@ public sealed record HarnessProfile(
 
     /// <summary>
     /// The variables a harness starts with: <c>HARNESS_CREDENTIAL</c>, the kind (<c>openai</c>,
-    /// <c>anthropic</c>, <c>openrouter</c>, <c>copilot</c>, or <c>claude-oauth-token</c>);
-    /// <c>HARNESS_TOKEN</c>; for a model API <c>HARNESS_MODEL_URL</c>; <c>HARNESS_MODEL</c>, the model it
-    /// runs on; and <c>HARNESS_THINKING</c>, how hard it thinks. A model API
-    /// always goes through a model gateway, so <paramref name="token"/> is the gateway's token and
-    /// <paramref name="gateway"/> its URL; a token tied to one harness goes to it, with no gateway.
+    /// <c>codex</c>, <c>anthropic</c>, <c>claude-plan</c>, <c>openrouter</c>, or <c>copilot</c>);
+    /// <c>HARNESS_MODEL_URL</c> and <c>HARNESS_TOKEN</c>, the model gateway's URL and token;
+    /// <c>HARNESS_MODEL</c>, the model it runs on; and <c>HARNESS_THINKING</c>, how hard it thinks.
+    /// Every model API goes through a model gateway, so no key or plan reaches the harness.
     /// </summary>
     /// <param name="kind">What it pays with.</param>
-    /// <param name="token">The gateway's token, or the harness's own.</param>
-    /// <param name="gateway">The gateway's URL, for a model API.</param>
+    /// <param name="token">The gateway's token.</param>
+    /// <param name="gateway">The gateway's URL.</param>
     /// <param name="model">The model's ID (<see cref="IsModelId"/>).</param>
     /// <param name="thinking">One of its <see cref="ThinkingLevels"/>.</param>
-    public IReadOnlyDictionary<string, string> EnvironmentFor(CredentialKind kind, string token, Uri? gateway, string model, string thinking)
+    public IReadOnlyDictionary<string, string> EnvironmentFor(CredentialKind kind, string token, Uri gateway, string model, string thinking)
     {
         ArgumentException.ThrowIfNullOrEmpty(token);
+        ArgumentNullException.ThrowIfNull(gateway);
         if (!IsModelId(model))
         {
             throw new ArgumentException("A model's ID takes letters, digits, and . _ - : / ~ @ + only.", nameof(model));
@@ -115,32 +115,23 @@ public sealed record HarnessProfile(
             throw new ArgumentException(Name + " thinks at " + string.Join(", ", ThinkingLevels) + " only.", nameof(thinking));
         }
 
-        (string name, bool modelApi) = kind switch
+        string name = kind switch
         {
-            CredentialKind.OpenAIApi => ("openai", true),
-            CredentialKind.AnthropicApi => ("anthropic", true),
-            CredentialKind.OpenRouterApi => ("openrouter", true),
-            CredentialKind.CopilotApi => ("copilot", true),
-            CredentialKind.CodexApi => ("codex", true),
-            CredentialKind.ClaudeOAuthToken => ("claude-oauth-token", false),
+            CredentialKind.OpenAIApi => "openai",
+            CredentialKind.AnthropicApi => "anthropic",
+            CredentialKind.OpenRouterApi => "openrouter",
+            CredentialKind.CopilotApi => "copilot",
+            CredentialKind.CodexApi => "codex",
+            CredentialKind.ClaudePlanApi => "claude-plan",
         };
-        if (modelApi != gateway is not null)
-        {
-            throw new ArgumentException(modelApi ? "A model API goes through a gateway." : "A harness's own token takes no gateway.", nameof(gateway));
-        }
-
         Dictionary<string, string> environment = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["HARNESS_CREDENTIAL"] = name,
             ["HARNESS_TOKEN"] = token,
             ["HARNESS_MODEL"] = model,
             ["HARNESS_THINKING"] = thinking,
+            ["HARNESS_MODEL_URL"] = gateway.AbsoluteUri.TrimEnd('/'),
         };
-        if (gateway is not null)
-        {
-            environment["HARNESS_MODEL_URL"] = gateway.AbsoluteUri.TrimEnd('/');
-        }
-
         return environment;
     }
 }

@@ -33,21 +33,16 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/components/ui/toast"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { ApiError, answer, api, messageOf, type Schemas } from "../api"
-import {
-  chatGptUsage,
-  metersSummary,
-  nearLimit,
-  usePlanUsage,
-  usesChatGptPlan,
-} from "../plan-usage"
+import { metersSummary, nearLimit, usePlanUsage } from "../plan-usage"
 import { accountKinds, agentAccounts, me } from "../queries"
 import { aborted, CodeSteps, waitForCode } from "./code-sign-in"
 import { NoRows, RemoveButton, Row, Rows, Section } from "./section"
 
 // Agent accounts: what pays for the agents' work. A workspace's account is for everyone who works
-// there; someone's own is for their chats alone. Most are added with a secret; a ChatGPT plan by
-// signing in with ChatGPT, or with a code entered at OpenAI as Codex does, and a Copilot plan with a
-// code entered at GitHub.
+// there; someone's own is for their chats alone. API keys are added with their secret, plans by
+// signing in at their vendor: a ChatGPT plan with a code entered at OpenAI, as Codex does, a Copilot
+// plan with a code entered at GitHub, and a Claude plan with the code Claude's page shows, as Claude
+// Code does.
 
 type Workspace = Schemas["WorkspaceSummary"]
 type Kind = Schemas["AgentAccountKind"]
@@ -91,7 +86,7 @@ const kindNames: Record<
   ClaudePlan: {
     name: "Claude plan",
     description: "Claude Pro or Max",
-    secret: "Token from claude setup-token",
+    secret: null,
     endpoint: null,
   },
   CopilotPlan: {
@@ -100,24 +95,13 @@ const kindNames: Record<
     secret: null,
     endpoint: null,
   },
-  CodexPlan: {
-    name: "ChatGPT plan through Codex",
-    description:
-      "ChatGPT Plus or Pro, signed in as Codex, with its limits shown",
-    secret: null,
-    endpoint: null,
-  },
 }
 
 // The plans added with a code entered at their vendor, and where.
 const codeVendors: Partial<Record<Kind, string>> = {
   CopilotPlan: "GitHub",
-  CodexPlan: "OpenAI",
+  ChatGptPlan: "OpenAI",
 }
-
-// Where ChatGPT sends the browser back. ChatGPT returns only to this computer, where nothing
-// listens, so the person brings the address back themselves.
-const chatGptCallback = "http://127.0.0.1:1456/auth/callback"
 
 // Own accounts show in every workspace, and presets where their account works, so any account
 // change reads them all again.
@@ -204,18 +188,6 @@ function PlanMeters({
 }) {
   const usage = usePlanUsage(workspaceId, account)
   const meters = usage.data?.meters ?? []
-  if (usesChatGptPlan(account)) {
-    return (
-      <a
-        href={chatGptUsage}
-        target="_blank"
-        rel="noreferrer"
-        className="hidden text-label text-muted-foreground underline underline-offset-4 hover:text-foreground sm:inline"
-      >
-        Manage usage
-      </a>
-    )
-  }
   if (meters.length === 0) {
     return null
   }
@@ -340,9 +312,11 @@ function AccountForm({
         <DialogDescription>
           {chosen.kind === "CopilotPlan"
             ? "Its token is kept on the host, sealed, and reaches only your Copilot; agents use it in their nooks."
-            : chosen.kind === "CodexPlan"
+            : chosen.kind === "ChatGptPlan"
               ? "Codex's sign-in is kept on the host, sealed, and renewed there; Codex reaches ChatGPT through the host, so no nook holds it."
-              : "It's kept on the host, sealed, and never shown again; agents reach their model through the host, so no nook holds it."}
+              : chosen.kind === "ClaudePlan"
+                ? "Claude Code's sign-in is kept on the host, sealed, and renewed there; Claude Code reaches Claude through the host, so no nook holds it."
+                : "It's kept on the host, sealed, and never shown again; agents reach their model through the host, so no nook holds it."}
         </DialogDescription>
       </DialogHeader>
       <FieldGroup>
@@ -415,7 +389,7 @@ function AccountForm({
           onAdded={added}
         />
       ) : chosen.addedBySignIn ? (
-        <ChatGptSignIn name={name.trim() || names.name} onAdded={added} />
+        <ClaudeSignIn name={name.trim() || names.name} onAdded={added} />
       ) : (
         <form
           className="contents"
@@ -487,22 +461,21 @@ function AccountForm({
   )
 }
 
-// Signing in with ChatGPT: the host makes the sign-in address; the person signs in there, and
-// ChatGPT sends their browser to this computer's address, which doesn't load. They paste that
-// address back, and the host finishes adding the plan.
-function ChatGptSignIn({
+// Signing in as Claude Code does: the host makes the sign-in address; the person approves there, and
+// Claude's page shows a code, which they paste back for the host to finish adding the plan.
+function ClaudeSignIn({
   name,
   onAdded,
 }: {
   name: string
   onAdded: (account: Schemas["AgentAccountSummary"]) => void
 }) {
-  const [returned, setReturned] = React.useState("")
+  const [code, setCode] = React.useState("")
   const start = useMutation({
     mutationFn: () =>
       answer(
         api.POST("/agent-accounts/sign-ins", {
-          body: { kind: "ChatGptPlan", name, callback: chatGptCallback },
+          body: { kind: "ClaudePlan", name },
         })
       ),
   })
@@ -511,7 +484,7 @@ function ChatGptSignIn({
       answer(
         api.POST("/agent-accounts/sign-ins/{id}/complete", {
           params: { path: { id } },
-          body: { returnedTo: returned.trim() },
+          body: { code: code.trim() },
         })
       ),
     onSuccess: (progress) => progress.account && onAdded(progress.account),
@@ -527,7 +500,7 @@ function ChatGptSignIn({
         )}
         <DialogFooter>
           <Button loading={start.isPending} onClick={() => start.mutate()}>
-            Sign in with ChatGPT
+            Sign in with Claude
           </Button>
         </DialogFooter>
       </>
@@ -539,7 +512,7 @@ function ChatGptSignIn({
       className="contents"
       onSubmit={(event) => {
         event.preventDefault()
-        if (returned.trim()) {
+        if (code.trim()) {
           complete.mutate(start.data.id)
         }
       }}
@@ -551,27 +524,24 @@ function ChatGptSignIn({
           rel="noopener noreferrer"
           className={buttonVariants({ variant: "outline", className: "w-fit" })}
         >
-          Open ChatGPT to sign in
+          Open Claude to sign in
           <ArrowSquareOutIcon data-icon="inline-end" />
         </a>
         <Field data-invalid={complete.isError || undefined}>
-          <FieldLabel htmlFor="returned-to">
-            The address ChatGPT sent you to
-          </FieldLabel>
+          <FieldLabel htmlFor="claude-code">The code Claude shows</FieldLabel>
           <Input
-            id="returned-to"
-            value={returned}
-            placeholder="http://127.0.0.1:1456/auth/callback?code=…"
-            onChange={(event) => setReturned(event.target.value)}
+            id="claude-code"
+            value={code}
+            autoComplete="off"
+            onChange={(event) => setCode(event.target.value)}
             aria-invalid={complete.isError || undefined}
           />
           {complete.isError ? (
             <FieldError>{messageOf(complete.error)}</FieldError>
           ) : (
             <FieldDescription>
-              After you sign in, your browser opens a page that doesn't load.
-              Copy its whole address from the address bar and paste it here,
-              within ten minutes.
+              After you approve, Claude shows a code. Copy it and paste it
+              here, within ten minutes.
             </FieldDescription>
           )}
         </Field>
@@ -584,7 +554,7 @@ function ChatGptSignIn({
             onClick={() => {
               complete.reset()
               start.reset()
-              setReturned("")
+              setCode("")
             }}
           >
             Start again
@@ -593,7 +563,7 @@ function ChatGptSignIn({
         <Button
           type="submit"
           loading={complete.isPending}
-          disabled={!returned.trim()}
+          disabled={!code.trim()}
         >
           Add plan
         </Button>
@@ -603,7 +573,7 @@ function ChatGptSignIn({
 }
 
 // Adding a plan with a code: the host gets a code from the vendor (GitHub for Copilot, OpenAI for
-// Codex), and the person enters it there and approves, while the dialog asks the host whether they
+// ChatGPT, as Codex does), and the person enters it there and approves, while the dialog asks the host whether they
 // have, until the plan is added, the code expires, or the dialog closes.
 function CodeSignIn({
   kind,

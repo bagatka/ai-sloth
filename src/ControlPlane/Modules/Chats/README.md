@@ -118,13 +118,11 @@ minutes unless given).
   (`IAgentAccountsApi.GetModelFactsAsync`), or by the vendor's own figure, and put in the turn the
   chat was on when the call started. A chat's usage (`GetUsageAsync`) adds them up; how full the
   context is comes from the agent itself where it says (`usage_update`), and from its largest
-  latest call otherwise. A Claude plan's agent holds its token, so its calls aren't recorded. Lists
-  show each chat's cost; a workspace's usage (`GetWorkspaceUsageAsync`) adds its calls up by day in
+  latest call otherwise. Lists show each chat's cost; a workspace's usage (`GetWorkspaceUsageAsync`) adds its calls up by day in
   the person's time zone, which PostgreSQL works out (`AT TIME ZONE`, through `SqlQuery`: EF
   translates no time zone conversion of a `DateTimeOffset`), and by chat.
 - **No model key or plan in a nook.** An agent gets the model gateway's URL and a token for its chat;
-  the gateway forwards each call with the headers that pay for it. A Claude plan's token, tied to
-  Claude Code, goes to the harness itself.
+  the gateway forwards each call with the headers that pay for it, a plan's token included.
 - **Every turn ends with a checkpoint,** however it ended, before `TurnEnded`, so clients wait for one
   event. A failed checkpoint is told (`CheckpointFailed`), and the chat goes on. A nearly full disk is
   told too (`DiskNearlyFull`), since the next checkpoints may fail.

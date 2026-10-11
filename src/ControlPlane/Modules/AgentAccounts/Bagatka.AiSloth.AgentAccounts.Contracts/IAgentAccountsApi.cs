@@ -7,8 +7,8 @@ using Bagatka.Foundation;
 namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 
 /// <summary>
-/// Agent accounts: accounts at agent vendors that pay for agents' work, such as an OpenAI API key, a
-/// ChatGPT plan, or a Copilot plan. A workspace's account serves the people with Write on it; a
+/// Agent accounts: accounts at agent vendors that pay for agents' work, such as an OpenAI API key, or a
+/// ChatGPT, Claude, or Copilot plan. A workspace's account serves the people with Write on it; a
 /// personal account serves its owner, wherever they work. Secrets are encrypted at rest and never shown
 /// again, and the keys and plans of model APIs never enter a nook: the model gateway adds them.
 /// </summary>
@@ -19,8 +19,8 @@ public interface IAgentAccountsApi
 
     /// <summary>
     /// Adds an account with its secret: to a workspace, by one of its managers, or as the actor's own.
-    /// Plans are personal only. An API key may name another endpoint than its vendor's. ChatGPT and
-    /// Copilot plans are added by signing in instead (<see cref="StartSignInAsync"/>).
+    /// API keys only: plans are added by signing in (<see cref="StartSignInAsync"/>). An API key may name
+    /// another endpoint than its vendor's.
     /// </summary>
     /// <returns>
     /// The account; a validation error for an invalid name, secret, or endpoint, or a kind that can't be
@@ -30,29 +30,27 @@ public interface IAgentAccountsApi
     public Task<Result<AgentAccountSummary>> AddAsync(Actor actor, AddAgentAccount command, CancellationToken ct);
 
     /// <summary>
-    /// Starts adding the actor's own account by signing in at its vendor, for kinds added this way. A
-    /// ChatGPT plan: open the answer's URL in the person's browser; ChatGPT sends it back to the
-    /// callback, and <see cref="CompleteSignInAsync"/> finishes, within ten minutes. A Copilot plan: the
-    /// person enters the answer's code at GitHub's URL, while <see cref="CompleteSignInAsync"/> asks
-    /// whether they have, until the code expires. Asks GitHub for the code.
+    /// Starts adding the actor's own plan by signing in at its vendor, as the vendor's own agent signs in.
+    /// A ChatGPT plan (as Codex) or a Copilot plan: the person enters the answer's code at its URL, at
+    /// OpenAI or GitHub, while <see cref="CompleteSignInAsync"/> asks whether they have, until the code
+    /// expires; asks the vendor for the code. A Claude plan (as Claude Code): the person approves at the
+    /// answer's URL, and <see cref="CompleteSignInAsync"/> finishes with the code Claude's page shows
+    /// them, within ten minutes.
     /// </summary>
     /// <returns>
-    /// The sign-in; a validation error for an invalid name, a callback the vendor can't return to (or
-    /// any, for a sign-in with a code), or a kind added with its secret or that this deployment doesn't
-    /// allow; forbidden for anyone but a person.
+    /// The sign-in; a validation error for an invalid name, or a kind added with its secret or that this
+    /// deployment doesn't allow; forbidden for anyone but a person.
     /// </returns>
     public Task<Result<SignInStarted>> StartSignInAsync(Actor actor, StartSignIn command, CancellationToken ct);
 
     /// <summary>
-    /// Finishes a sign-in and adds the account: with the address the person's browser returned to, or,
-    /// with a code, once they approved it at GitHub; until then the progress says when to ask again,
-    /// and asking sooner waits until then. The vendor's answer is used once: a failed sign-in starts
-    /// again.
+    /// Finishes a sign-in and adds the account: with the code Claude's page showed, or, for a sign-in with
+    /// a user code, once the person approved it at the vendor; until then the progress says when to ask
+    /// again, and asking sooner waits until then. A code works once: a failed sign-in starts again.
     /// </summary>
     /// <returns>
-    /// The progress; a validation error when the person declined, didn't allow the app to use their
-    /// plan, or the vendor refused the answer; or <see cref="AgentAccountsErrors.SignInNotFound"/>,
-    /// also once a code expired or was declined.
+    /// The progress; a validation error for a code of another sign-in or one the vendor refused; or
+    /// <see cref="AgentAccountsErrors.SignInNotFound"/>, also once a code expired or was declined.
     /// </returns>
     public Task<Result<SignInProgress>> CompleteSignInAsync(Actor actor, CompleteSignIn command, CancellationToken ct);
 
@@ -66,10 +64,10 @@ public interface IAgentAccountsApi
     /// <summary>
     /// The models the account's vendor offers, for choosing one per chat: OpenRouter's catalog without
     /// its batch variants, and the lists of Anthropic's and OpenAI's APIs at the account's endpoint,
-    /// asked with its credentials, newest first; a ChatGPT plan's catalog in its own order; a Copilot
-    /// plan's chat models from Copilot's API; and a Claude plan's from Anthropic's. Asks the vendor each
-    /// time, which throws when it can't be reached; try again later. Each comes with what's known of it
-    /// (<see cref="ModelFacts"/>).
+    /// asked with its credentials, newest first; a ChatGPT plan's from ChatGPT's Codex backend, in its
+    /// own order; a Copilot plan's chat models from Copilot's API; and a Claude plan's from Anthropic's.
+    /// Asks the vendor each time, which throws when it can't be reached; try again later. Each comes
+    /// with what's known of it (<see cref="ModelFacts"/>).
     /// </summary>
     /// <returns>
     /// The models; <see cref="AgentAccountsErrors.SignInEnded"/>; or not found for anyone who may not
@@ -86,25 +84,25 @@ public interface IAgentAccountsApi
 
     /// <summary>
     /// What a plan has used of its limits (<see cref="PlanUsage"/>), asked of its vendor now, as the
-    /// vendor's own clients ask: a Copilot plan's quotas or credits spent, and a Claude plan's windows.
-    /// Nothing for an API key, nor for a ChatGPT plan: ChatGPT shares its usage with no app that signs
-    /// in with ChatGPT, only on its own page. No vendor documents these answers; asking throws when the
-    /// vendor can't be reached or refuses.
+    /// vendor's own agent asks: a ChatGPT plan's five-hour and weekly windows (as Codex's
+    /// <c>/status</c>), a Claude plan's (as Claude Code's <c>/usage</c>), and a Copilot plan's quotas or
+    /// credits spent; nothing for an API key. A plan's access token is renewed first when it is due. No
+    /// vendor documents these answers; asking throws when the vendor can't be reached or refuses.
     /// </summary>
     /// <returns>The usage; <see cref="AgentAccountsErrors.SignInEnded"/>; or not found for anyone who may not use the account.</returns>
     public Task<Result<PlanUsage>> GetPlanUsageAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct);
 
     /// <summary>
-    /// Removes an account: a personal one by its owner, a workspace's by its managers. Agents already
-    /// running with a token they hold keep it until they stop; calls through the model gateway stop at
-    /// once. A sign-in's session at the vendor ends too, when the vendor can be reached.
+    /// Removes an account: a personal one by its owner, a workspace's by its managers. Calls through the
+    /// model gateway stop at once. A plan's tokens go with it; the person can also disconnect it at the
+    /// vendor.
     /// </summary>
     public Task<Result> RemoveAsync(Actor actor, AgentAccountId id, CancellationToken ct);
 
     /// <summary>
     /// What running an agent on the account in the workspace takes (<see cref="MayUseAsync"/>), called
-    /// when an agent starts and for every call through the model gateway. A ChatGPT plan's access token
-    /// is renewed here when it is due, one renewal at a time per account, which may take a moment and
+    /// when an agent starts and for every call through the model gateway. A ChatGPT or Claude plan's
+    /// access token is renewed here when it is due, one renewal at a time per account, which may take a moment and
     /// throws when the vendor can't be reached; try again later.
     /// </summary>
     /// <returns>

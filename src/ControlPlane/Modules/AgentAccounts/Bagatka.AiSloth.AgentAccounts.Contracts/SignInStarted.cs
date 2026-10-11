@@ -4,9 +4,10 @@ namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 
 /// <summary>
 /// A sign-in in progress, until <paramref name="ExpiresAt"/>: the person opens <paramref name="Url"/>.
-/// With a <paramref name="UserCode"/> (a Copilot plan, at GitHub), they enter it there and approve,
-/// while the caller completes the sign-in every <paramref name="Interval"/> until it is done. Without one
-/// (a ChatGPT plan), the caller completes it once, with the address the browser returned to.
+/// With a <paramref name="UserCode"/> (a Copilot plan, at GitHub; a ChatGPT plan, at OpenAI), they
+/// enter it there and approve, while the caller completes the sign-in every <paramref name="Interval"/>
+/// until it is done. Without one (a Claude plan), they approve there and bring back the code the page
+/// shows, which the caller completes the sign-in with, once.
 /// </summary>
 /// <param name="Id">The sign-in.</param>
 /// <param name="Url">The vendor's sign-in page.</param>

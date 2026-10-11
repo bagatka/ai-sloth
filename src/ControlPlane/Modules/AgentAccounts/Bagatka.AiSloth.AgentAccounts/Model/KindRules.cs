@@ -10,16 +10,15 @@ internal static class KindRules
     public static bool Known(AgentAccountKind kind)
     {
         return kind is AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey
-            or AgentAccountKind.ChatGptPlan or AgentAccountKind.ClaudePlan or AgentAccountKind.CopilotPlan or AgentAccountKind.CodexPlan;
+            or AgentAccountKind.ChatGptPlan or AgentAccountKind.ClaudePlan or AgentAccountKind.CopilotPlan;
     }
 
     public static bool AddedBySignIn(AgentAccountKind kind)
     {
         return kind switch
         {
-            AgentAccountKind.ChatGptPlan or AgentAccountKind.CopilotPlan or AgentAccountKind.CodexPlan => true,
-            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey
-                or AgentAccountKind.ClaudePlan => false,
+            AgentAccountKind.ChatGptPlan or AgentAccountKind.CopilotPlan or AgentAccountKind.ClaudePlan => true,
+            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey => false,
         };
     }
 
@@ -28,7 +27,7 @@ internal static class KindRules
     {
         return kind switch
         {
-            AgentAccountKind.ChatGptPlan or AgentAccountKind.ClaudePlan or AgentAccountKind.CopilotPlan or AgentAccountKind.CodexPlan => true,
+            AgentAccountKind.ChatGptPlan or AgentAccountKind.ClaudePlan or AgentAccountKind.CopilotPlan => true,
             AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey => false,
         };
     }
@@ -39,14 +38,15 @@ internal static class KindRules
         return kind switch
         {
             AgentAccountKind.ClaudePlan => settings.AllowClaudePlans,
-            AgentAccountKind.ChatGptPlan or AgentAccountKind.CodexPlan => settings.AllowChatGptPlans,
+            AgentAccountKind.ChatGptPlan => settings.AllowChatGptPlans,
             AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey or AgentAccountKind.CopilotPlan => true,
         };
     }
 
-    // Sign-ins with a code, entered at the vendor, rather than in a browser that returns to the caller.
+    // Sign-ins with a code the person enters at the vendor, rather than one the vendor's page shows them
+    // to bring back.
     public static bool SignsInWithCode(AgentAccountKind kind)
     {
-        return kind is AgentAccountKind.CopilotPlan or AgentAccountKind.CodexPlan;
+        return kind is AgentAccountKind.CopilotPlan or AgentAccountKind.ChatGptPlan;
     }
 }

@@ -1,6 +1,5 @@
 using Bagatka.AiSloth.AgentAccounts.Data;
 using System;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,6 +7,7 @@ using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
+using Bagatka.Sdk.Anthropic;
 using Bagatka.Sdk.GitHub;
 using Bagatka.Sdk.OpenAI;
 using Microsoft.EntityFrameworkCore;
@@ -16,9 +16,6 @@ namespace Bagatka.AiSloth.AgentAccounts;
 
 internal sealed partial class AgentAccountsApi
 {
-    // The app's name ChatGPT suggests to the person when they first allow it.
-    private const string AppName = "AiSloth";
-
     public async Task<Result<SignInStarted>> StartSignInAsync(Actor actor, StartSignIn command, CancellationToken ct)
     {
         await using AgentAccountsDbContext db = await databases.CreateDbContextAsync(ct);
@@ -62,17 +59,14 @@ internal sealed partial class AgentAccountsApi
             return await StartCodeSignInAsync(db, user, command, name.Output, ct);
         }
 
-        return await StartChatGptSignInAsync(db, user, command, name.Output, ct);
+        return await StartPageSignInAsync(db, user, command, name.Output, ct);
     }
 
-    private async Task<Result<SignInStarted>> StartChatGptSignInAsync(AgentAccountsDbContext db, UserActor user, StartSignIn command, AgentAccountName name, CancellationToken ct)
+    // A Claude plan, as Claude Code signs in: the person approves at Claude's page, which then shows them
+    // a code to bring back.
+    private async Task<Result<SignInStarted>> StartPageSignInAsync(AgentAccountsDbContext db, UserActor user, StartSignIn command, AgentAccountName name, CancellationToken ct)
     {
-        if (command.Callback is not Uri callback || callback.AbsoluteUri.Length > SignIn.MaxCallbackLength || !ChatGptSignInClient.AcceptsRedirect(callback))
-        {
-            return new Result<SignInStarted>(Error.Validation("callback", "ChatGPT returns only to http://127.0.0.1:<port>/auth/callback."));
-        }
-
-        SignIn signIn = SignIn.Start(user.UserId, command.Kind, name, callback, box, time);
+        SignIn signIn = SignIn.Start(user.UserId, command.Kind, name, box, time);
         db.SignIns.Add(signIn);
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)
@@ -80,24 +74,17 @@ internal sealed partial class AgentAccountsApi
             return new Result<SignInStarted>(saved.Error);
         }
 
-        // OpenAI identifies each installation; this deployment's ID derives from its encryption key.
-        string hostId = "urn:uuid:" + box.DeriveId("openai-agent-host").ToString("D", CultureInfo.InvariantCulture);
-        Uri url = chatGpt.AuthorizationUrl(signIn.Authorization(AppName, hostId, box));
+        Uri url = claude.AuthorizationUrl(signIn.State, ClaudeSignInClient.CodeChallenge(signIn.OpenVerifier(box)));
         return new Result<SignInStarted>(new SignInStarted(signIn.Id, url, UserCode: null, signIn.ExpiresAt, TimeSpan.Zero));
     }
 
-    // A Copilot plan: the person enters GitHub's code for the host's Copilot app at GitHub. A Codex
+    // A Copilot plan: the person enters GitHub's code for the host's Copilot app at GitHub. A ChatGPT
     // plan: they enter OpenAI's code for Codex at OpenAI, as Codex's own sign-in asks.
     private async Task<Result<SignInStarted>> StartCodeSignInAsync(AgentAccountsDbContext db, UserActor user, StartSignIn command, AgentAccountName name, CancellationToken ct)
     {
-        if (command.Callback is not null)
-        {
-            return new Result<SignInStarted>(Error.Validation("callback", "This plan signs in with a code, which returns nowhere."));
-        }
-
         CodeSignIn signIn;
         Uri verificationUrl;
-        if (command.Kind == AgentAccountKind.CodexPlan)
+        if (command.Kind == AgentAccountKind.ChatGptPlan)
         {
             CodexDeviceCode code = await codex.StartAsync(ct);
             signIn = CodeSignIn.Start(user.UserId, command.Kind, name, code.DeviceAuthId, code.UserCode, code.ExpiresIn, code.Interval, box, time);

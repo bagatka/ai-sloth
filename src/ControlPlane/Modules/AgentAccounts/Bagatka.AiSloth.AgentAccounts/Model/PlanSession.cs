@@ -1,14 +1,16 @@
 using System;
+using Bagatka.Sdk.Anthropic;
 using Bagatka.Sdk.OpenAI;
 
 namespace Bagatka.AiSloth.AgentAccounts.Model;
 
-// A ChatGPT plan's sign-in, with ChatGPT or as Codex: the client ID it signed in to, who signed in and
-// to which ChatGPT account, and the current tokens. Kept sealed as the account's secret. The access
-// token lasts about an hour and is renewed when OpenAI asks, or shortly before it expires.
+// A plan's sign-in, as its vendor's own agent signs in: Codex's for a ChatGPT plan, Claude Code's for a
+// Claude plan. The client it signed in to, who signed in and to which account, and the current tokens.
+// Kept sealed as the account's secret. Access tokens last hours; one is renewed shortly before it
+// expires, one renewal at a time, since a renewal replaces the refresh token.
 internal sealed record PlanSession(
     string ClientId,
-    string Subject,
+    string? Subject,
     string? Email,
     string AccessToken,
     string RefreshToken,
@@ -17,10 +19,20 @@ internal sealed record PlanSession(
     DateTimeOffset RenewalDueAt,
     string? AccountId = null)
 {
-    public static PlanSession Start(string clientId, ChatGptIdToken identity, ChatGptTokens tokens, DateTimeOffset now)
+    private static readonly TimeSpan RenewalMargin = TimeSpan.FromMinutes(5);
+
+    // Codex's sign-in, to the ChatGPT account its ID token names.
+    public static PlanSession Start(ChatGptIdToken identity, ChatGptTokens tokens, DateTimeOffset now)
     {
         DateTimeOffset expiresAt = now + tokens.ExpiresIn;
-        return new PlanSession(clientId, identity.Subject, identity.Email, tokens.AccessToken, tokens.RefreshToken, tokens.IdToken, expiresAt, DueAt(tokens, expiresAt), identity.AccountId);
+        return new PlanSession(CodexSignInClient.ClientId, identity.Subject, identity.Email, tokens.AccessToken, tokens.RefreshToken, tokens.IdToken, expiresAt, expiresAt - RenewalMargin, identity.AccountId);
+    }
+
+    // Claude Code's sign-in.
+    public static PlanSession Start(ClaudeTokens tokens, DateTimeOffset now)
+    {
+        DateTimeOffset expiresAt = now + tokens.ExpiresIn;
+        return new PlanSession(ClaudeSignInClient.ClientId, tokens.AccountId, tokens.Email, tokens.AccessToken, tokens.RefreshToken, IdToken: null, expiresAt, expiresAt - RenewalMargin, tokens.AccountId);
     }
 
     public bool RenewalDue(DateTimeOffset now)
@@ -28,24 +40,17 @@ internal sealed record PlanSession(
         return now >= RenewalDueAt;
     }
 
-    // A renewal replaces the tokens; an ID token is kept for signing in again later when none came.
-    public PlanSession Renewed(ChatGptTokens tokens, DateTimeOffset now)
+    // A renewal replaces the tokens; the ID token stays when none came.
+    public PlanSession Renewed(string accessToken, string refreshToken, string? idToken, TimeSpan expiresIn, DateTimeOffset now)
     {
-        DateTimeOffset expiresAt = now + tokens.ExpiresIn;
+        DateTimeOffset expiresAt = now + expiresIn;
         return this with
         {
-            AccessToken = tokens.AccessToken,
-            RefreshToken = tokens.RefreshToken,
-            IdToken = tokens.IdToken ?? IdToken,
+            AccessToken = accessToken,
+            RefreshToken = refreshToken,
+            IdToken = idToken ?? IdToken,
             ExpiresAt = expiresAt,
-            RenewalDueAt = DueAt(tokens, expiresAt),
+            RenewalDueAt = expiresAt - RenewalMargin,
         };
-    }
-
-    private static DateTimeOffset DueAt(ChatGptTokens tokens, DateTimeOffset expiresAt)
-    {
-        DateTimeOffset requested = tokens.EarliestRefreshAt ?? expiresAt - TimeSpan.FromMinutes(5);
-        DateTimeOffset latest = expiresAt - TimeSpan.FromMinutes(1);
-        return requested < latest ? requested : latest;
     }
 }

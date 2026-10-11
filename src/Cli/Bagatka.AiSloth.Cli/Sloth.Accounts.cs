@@ -9,7 +9,7 @@ namespace Bagatka.AiSloth.Cli;
 
 // Agent accounts: what pays for agents' work. A person's own, or with --workspace the workspace's,
 // which everyone with Write on it uses. Secrets are typed hidden or read from standard input, and plans
-// added by signing in go through the person's browser; neither is ever shown again.
+// are added by signing in at their vendor in the person's browser; neither is ever shown again.
 internal sealed partial class Sloth
 {
     private async Task<int> ListAccountsAsync(CancellationToken ct)
@@ -161,33 +161,37 @@ internal sealed partial class Sloth
         return await api.SendAsync(HttpMethod.Post, path, add, CliJsonContext.Default.AddAccount, CliJsonContext.Default.Account, ct);
     }
 
-    // A plan added by signing in at its vendor in the person's browser, which comes back to sloth;
-    // the host finishes the sign-in with the address it came back to. Or with a code, entered there.
+    // A plan added by signing in at its vendor's page: the person approves there and pastes back the
+    // code it shows, or enters a code of sloth's there.
     private async Task<Wire.Account?> SignInAccountAsync(HostApi api, AccountKinds.Kind kind, string name, CancellationToken ct)
     {
-        if (kind.WithCode)
-        {
-            return await SignInWithCodeAsync(api, kind, name, ct);
-        }
-
-        using LoopbackCallback callback = LoopbackCallback.Start();
         Wire.AccountSignInStarted started = await api.SendAsync(
             HttpMethod.Post,
             "/agent-accounts/sign-ins",
-            new Wire.StartAccountSignIn(kind.HostKind, name, callback.Url),
+            new Wire.StartAccountSignIn(kind.HostKind, name),
             CliJsonContext.Default.StartAccountSignIn,
             CliJsonContext.Default.AccountSignInStarted,
             ct);
-        Uri? returned = await BrowserRoundTripAsync(started.Url, callback, kind.SignsInWith ?? kind.Name, ct);
-        if (returned is null)
+        if (kind.WithCode)
         {
+            return await SignInWithCodeAsync(api, kind, started, ct);
+        }
+
+        await terminal.WriteLineAsync("Opening your browser to sign in with " + kind.SignsInWith + ". If it doesn't open, go to:");
+        await terminal.WriteLineAsync("  " + started.Url.AbsoluteUri);
+        await openBrowser(started.Url, ct);
+        await terminal.WriteAsync("Approve there, then paste the code it shows: ");
+        string? code = await terminal.ReadLineAsync(ct);
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            await terminal.FailAsync("No code; start again: sloth account add " + kind.Id);
             return null;
         }
 
         Wire.AccountSignInProgress progress = await api.SendAsync(
             HttpMethod.Post,
             "/agent-accounts/sign-ins/" + started.Id + "/complete",
-            new Wire.CompleteAccountSignIn(returned),
+            new Wire.CompleteAccountSignIn(code.Trim()),
             CliJsonContext.Default.CompleteAccountSignIn,
             CliJsonContext.Default.AccountSignInProgress,
             ct);
@@ -196,15 +200,8 @@ internal sealed partial class Sloth
 
     // A plan added by signing in with a code: the person enters it at the vendor's page, while sloth
     // asks the host whether they have, as often as the vendor allows.
-    private async Task<Wire.Account?> SignInWithCodeAsync(HostApi api, AccountKinds.Kind kind, string name, CancellationToken ct)
+    private async Task<Wire.Account?> SignInWithCodeAsync(HostApi api, AccountKinds.Kind kind, Wire.AccountSignInStarted started, CancellationToken ct)
     {
-        Wire.AccountSignInStarted started = await api.SendAsync(
-            HttpMethod.Post,
-            "/agent-accounts/sign-ins",
-            new Wire.StartAccountSignIn(kind.HostKind, name, Callback: null),
-            CliJsonContext.Default.StartAccountSignIn,
-            CliJsonContext.Default.AccountSignInStarted,
-            ct);
         await terminal.WriteLineAsync("Open " + started.Url + " and enter " + started.UserCode + " to add your " + kind.Name + ".");
         await openBrowser(started.Url, ct);
 
@@ -215,7 +212,7 @@ internal sealed partial class Sloth
             Wire.AccountSignInProgress progress = await api.SendAsync(
                 HttpMethod.Post,
                 "/agent-accounts/sign-ins/" + started.Id + "/complete",
-                new Wire.CompleteAccountSignIn(ReturnedTo: null),
+                new Wire.CompleteAccountSignIn(Code: null),
                 CliJsonContext.Default.CompleteAccountSignIn,
                 CliJsonContext.Default.AccountSignInProgress,
                 ct);

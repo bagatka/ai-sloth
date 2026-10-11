@@ -23,15 +23,17 @@ speak. Nothing here knows AiSloth; Chats is its caller.
 
   | Variable | Value |
   |---|---|
-  | `HARNESS_CREDENTIAL` | `openai`, `codex` (ChatGPT's Codex backend), `anthropic`, `openrouter`, `copilot`, or `claude-oauth-token` |
-  | `HARNESS_MODEL_URL` | the model gateway's URL, for all but `claude-oauth-token` |
-  | `HARNESS_TOKEN` | the gateway's token, or the harness's own token |
+  | `HARNESS_CREDENTIAL` | `openai`, `codex` (ChatGPT's Codex backend), `anthropic`, `claude-plan` (Anthropic's API on a Claude plan), `openrouter`, or `copilot` |
+  | `HARNESS_MODEL_URL` | the model gateway's URL |
+  | `HARNESS_TOKEN` | the gateway's token for the chat |
   | `HARNESS_MODEL` | the model's ID as its vendor names it (`IsModelId`) |
   | `HARNESS_THINKING` | one of its `ThinkingLevels` |
 
   The script translates them into its harness's own configuration (environment variables, a file,
-  or its adapter's gateway sign-in) and runs it. A model API always goes through a model gateway, so
-  the key or plan behind it never reaches the harness; only a token tied to one harness goes to it.
+  or its adapter's gateway sign-in) and runs it. Every model API goes through a model gateway, so
+  the key or plan behind it never reaches the harness. A Claude plan signs Claude Code in to the
+  gateway as to Anthropic, with an OAuth token that is the chat's; the gateway calls Anthropic with
+  the plan's own.
   OpenRouter is one credential for two APIs: Claude Code calls its Anthropic API at the gateway's
   root, with OpenRouter's newest Claude models behind its aliases, and pi its OpenAI chat API at
   `/v1`. Copilot's API is one credential for both of OpenAI's: Copilot's CLI and pi take it as an

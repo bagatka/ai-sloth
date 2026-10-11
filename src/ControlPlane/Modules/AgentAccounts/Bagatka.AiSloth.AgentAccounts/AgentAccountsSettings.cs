@@ -1,5 +1,5 @@
 using System;
-using Bagatka.Sdk.OpenAI;
+using Bagatka.Sdk.Anthropic;
 using Bagatka.Sdk.OpenRouter;
 
 namespace Bagatka.AiSloth.AgentAccounts;
@@ -11,15 +11,15 @@ public sealed record AgentAccountsSettings
 {
     /// <summary>Creates the settings.</summary>
     /// <param name="allowClaudePlans">
-    /// Whether people may add Claude plans. Off unless Anthropic has given this deployment
-    /// written permission: its terms forbid storing Claude sign-in tokens otherwise.
+    /// Whether people may add Claude plans, signed in as Claude Code. Anthropic lets apps built on its
+    /// Agent SDK use a person's own plan; a service that offers it to other people should agree it with
+    /// Anthropic first.
     /// </param>
     /// <param name="allowChatGptPlans">
-    /// Whether people may sign in with ChatGPT to add their plans. OpenAI lets open-source and
-    /// self-hosted deployments do so; a hosted service for other people needs OpenAI's approval first.
+    /// Whether people may add ChatGPT plans, signed in as Codex. A service that offers it to other
+    /// people should agree it with OpenAI first.
     /// </param>
-    /// <param name="chatGptAuthority">OpenAI's authorization server; <see langword="null"/> for <c>https://auth.openai.com</c>. Tests change it.</param>
-    /// <param name="chatGptApi">The API a ChatGPT plan's calls go to; <see langword="null"/> for <c>https://api.openai.com/v1</c>. Tests change it.</param>
+    /// <param name="chatGptAuthority">OpenAI's authorization server, where Codex signs in; <see langword="null"/> for <c>https://auth.openai.com</c>. Tests change it.</param>
     /// <param name="openRouterApi">OpenRouter's API, its models' calls and catalog; <see langword="null"/> for <c>https://openrouter.ai/api</c>. Tests change it.</param>
     /// <param name="copilotApi">Copilot's API, where a Copilot plan's calls go and its models are listed; <see langword="null"/> for <c>https://api.githubcopilot.com</c>. Tests change it.</param>
     /// <param name="copilotClientId">
@@ -32,22 +32,27 @@ public sealed record AgentAccountsSettings
     /// for <c>https://models.dev/api.json</c>. Tests change it.
     /// </param>
     /// <param name="chatGptBackend">
-    /// ChatGPT's own backend, where a Codex plan's calls (at <c>/codex</c>) and usage go;
+    /// ChatGPT's own backend, where a ChatGPT plan's calls (at <c>/codex</c>) and usage go;
     /// <see langword="null"/> for <c>https://chatgpt.com/backend-api</c>. Tests change it.
     /// </param>
-    /// <param name="claudeApi">Anthropic's API, where a Claude plan's models and usage are asked; <see langword="null"/> for <c>https://api.anthropic.com</c>. Tests change it.</param>
+    /// <param name="claudeApi">Anthropic's API, where a Claude plan's calls go and its models and usage are asked; <see langword="null"/> for <c>https://api.anthropic.com</c>. Tests change it.</param>
+    /// <param name="claudeAuthorizeUrl">Claude's page where a person approves Claude Code's sign-in; <see langword="null"/> for Anthropic's. Tests change it.</param>
+    /// <param name="claudeTokenUrl">Where Claude Code's sign-in gets and renews its tokens; <see langword="null"/> for Anthropic's. Tests change it.</param>
     public AgentAccountsSettings(
         bool allowClaudePlans = false,
         bool allowChatGptPlans = false,
         Uri? chatGptAuthority = null,
-        Uri? chatGptApi = null,
         Uri? openRouterApi = null,
         Uri? copilotApi = null,
         string? copilotClientId = null,
         Uri? modelsDevUrl = null,
         Uri? claudeApi = null,
-        Uri? chatGptBackend = null)
+        Uri? chatGptBackend = null,
+        Uri? claudeAuthorizeUrl = null,
+        Uri? claudeTokenUrl = null)
     {
+        ClaudeAuthorizeUrl = claudeAuthorizeUrl ?? ClaudeSignInSettings.Public.AuthorizeUrl;
+        ClaudeTokenUrl = claudeTokenUrl ?? ClaudeSignInSettings.Public.TokenUrl;
         ChatGptBackend = chatGptBackend ?? new Uri("https://chatgpt.com/backend-api");
         CodexApi = new Uri(ChatGptBackend.AbsoluteUri.TrimEnd('/') + "/codex");
         ClaudeApi = claudeApi ?? new Uri("https://api.anthropic.com");
@@ -57,25 +62,23 @@ public sealed record AgentAccountsSettings
         AllowClaudePlans = allowClaudePlans;
         AllowChatGptPlans = allowChatGptPlans;
         ChatGptAuthority = chatGptAuthority ?? new Uri("https://auth.openai.com");
-        ChatGptApi = chatGptApi ?? ChatGptSignInClient.Resource;
-        ChatGptSignIn = new ChatGptSignInSettings(ChatGptAuthority);
         OpenRouterApi = openRouterApi ?? OpenRouterSettings.Public.ApiUrl;
     }
 
     /// <summary>Whether people may add Claude plans.</summary>
     public bool AllowClaudePlans { get; }
 
-    /// <summary>Whether people may sign in with ChatGPT to add their plans.</summary>
+    /// <summary>Whether people may add ChatGPT plans.</summary>
     public bool AllowChatGptPlans { get; }
 
-    /// <summary>OpenAI's authorization server.</summary>
+    /// <summary>OpenAI's authorization server, where Codex signs in.</summary>
     public Uri ChatGptAuthority { get; }
 
-    /// <summary>The API a ChatGPT plan's calls go to.</summary>
-    public Uri ChatGptApi { get; }
+    /// <summary>Claude's page where a person approves Claude Code's sign-in.</summary>
+    public Uri ClaudeAuthorizeUrl { get; }
 
-    /// <summary>The Sign in with ChatGPT client's settings.</summary>
-    public ChatGptSignInSettings ChatGptSignIn { get; }
+    /// <summary>Where Claude Code's sign-in gets and renews its tokens.</summary>
+    public Uri ClaudeTokenUrl { get; }
 
     /// <summary>OpenRouter's API: where an OpenRouter key's calls go, and its catalog of models.</summary>
     public Uri OpenRouterApi { get; }
@@ -86,13 +89,13 @@ public sealed record AgentAccountsSettings
     /// <summary>The GitHub OAuth app people sign in to for their Copilot plans, by its client ID.</summary>
     public string CopilotClientId { get; }
 
-    /// <summary>ChatGPT's own backend, where a Codex plan's usage is asked.</summary>
+    /// <summary>ChatGPT's own backend, where a ChatGPT plan's usage is asked.</summary>
     public Uri ChatGptBackend { get; }
 
-    /// <summary>ChatGPT's Codex backend, where a Codex plan's calls go and its models are listed.</summary>
+    /// <summary>ChatGPT's Codex backend, where a ChatGPT plan's calls go and its models are listed.</summary>
     public Uri CodexApi { get; }
 
-    /// <summary>Anthropic's API, where a Claude plan's models and usage are asked.</summary>
+    /// <summary>Anthropic's API, where a Claude plan's calls go and its models and usage are asked.</summary>
     public Uri ClaudeApi { get; }
 
     /// <summary>models.dev's catalog of models, read daily.</summary>

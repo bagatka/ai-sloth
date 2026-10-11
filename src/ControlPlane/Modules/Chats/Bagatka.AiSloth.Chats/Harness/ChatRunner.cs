@@ -603,18 +603,9 @@ internal sealed class ChatRunner(
         AgentAccountCredential account = used.Output;
 
         // A model API stays behind the model gateway: the agent gets a token for this chat instead,
-        // saved first so its first model call finds it. A plan's token tied to the harness goes to it.
+        // saved first so its first model call finds it.
         CredentialKind kind = AccountCredentials.KindOf(account.Kind);
-        IReadOnlyDictionary<string, string> environment;
-        if (account.Access is HarnessToken token)
-        {
-            environment = harness.EnvironmentFor(kind, token.Value, gateway: null, model, chat.Thinking);
-        }
-        else
-        {
-            environment = harness.EnvironmentFor(kind, chat.IssueHarnessToken(), settings.ModelGatewayUrl, model, chat.Thinking);
-        }
-
+        IReadOnlyDictionary<string, string> environment = harness.EnvironmentFor(kind, chat.IssueHarnessToken(), settings.ModelGatewayUrl, model, chat.Thinking);
         await SaveAsync(db, ct);
 
         // The agent starts with its instructions and its starter's harness state, after the nook's files

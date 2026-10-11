@@ -6,6 +6,7 @@ using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
+using Bagatka.Sdk.Anthropic;
 using Bagatka.Sdk.GitHub;
 using Bagatka.Sdk.OpenAI;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,7 @@ internal sealed partial class AgentAccountsApi
         SignIn? signIn = await db.SignIns.SingleOrDefaultAsync(found => found.Id == command.Id && found.UserId == user.UserId, ct);
         if (signIn is not null && !signIn.ExpiredAt(now))
         {
-            return await CompleteChatGptSignInAsync(db, user, signIn, command.ReturnedTo, now, ct);
+            return await CompletePageSignInAsync(db, user, signIn, command.Code, now, ct);
         }
 
         CodeSignIn? codeSignIn = await db.CodeSignIns.SingleOrDefaultAsync(found => found.Id == command.Id && found.UserId == user.UserId, ct);
@@ -39,40 +40,24 @@ internal sealed partial class AgentAccountsApi
         return await CompleteCodeSignInAsync(db, user, codeSignIn, now, ct);
     }
 
-    private async Task<Result<SignInProgress>> CompleteChatGptSignInAsync(AgentAccountsDbContext db, UserActor user, SignIn signIn, Uri? returnedTo, DateTimeOffset now, CancellationToken ct)
+    // A Claude plan, as Claude Code signs in: the code Claude's page showed becomes the plan's session,
+    // renewed by this host; the model gateway adds its token to Claude Code's calls to Anthropic.
+    private async Task<Result<SignInProgress>> CompletePageSignInAsync(AgentAccountsDbContext db, UserActor user, SignIn signIn, string? shown, DateTimeOffset now, CancellationToken ct)
     {
-        if (returnedTo is null)
+        Result<string> code = signIn.Read(shown);
+        if (code.Failed)
         {
-            return new Result<SignInProgress>(Error.Validation("returnedTo", "Give the address ChatGPT sent the browser to."));
-        }
-
-        Result<SignInAnswer> answer = signIn.Read(returnedTo);
-        if (answer.Failed)
-        {
-            return new Result<SignInProgress>(answer.Error);
+            return new Result<SignInProgress>(code.Error);
         }
 
         // A code works once: whatever happens next, this attempt is over (it expires on its own).
-        string clientId = answer.Output.ClientId;
-        Result<ChatGptTokens> exchanged = await chatGpt.ExchangeCodeAsync(clientId, answer.Output.Code, signIn.OpenVerifier(box), signIn.Callback, ct);
+        Result<ClaudeTokens> exchanged = await claude.ExchangeAsync(code.Output, signIn.State, signIn.OpenVerifier(box), ct);
         if (exchanged.Failed)
         {
-            return new Result<SignInProgress>(Error.Validation("returnedTo", "ChatGPT refused the sign-in (" + exchanged.Error.Message + "); start again."));
+            return new Result<SignInProgress>(Error.Validation("code", "Claude refused the code (" + exchanged.Error.Message + "); start again."));
         }
 
-        ChatGptTokens tokens = exchanged.Output;
-        if (!tokens.AllowsPlanUse)
-        {
-            return new Result<SignInProgress>(Error.Validation("returnedTo", "ChatGPT didn't allow using your plan; sign in again and allow it."));
-        }
-
-        ChatGptIdToken? identity = tokens.IdToken is null ? null : ChatGptSignInClient.ReadIdToken(tokens.IdToken);
-        if (!signIn.IssuedFor(identity, clientId, settings.ChatGptAuthority, now))
-        {
-            return new Result<SignInProgress>(Error.Validation("returnedTo", "ChatGPT's answer didn't check out; start again."));
-        }
-
-        PlanSession session = PlanSession.Start(clientId, identity, tokens, now);
+        PlanSession session = PlanSession.Start(exchanged.Output, now);
         AgentAccount account = AgentAccount.SignedIn(user.UserId, signIn.Kind, signIn.Name, session, box, time);
         db.Accounts.Add(account);
         db.SignIns.Remove(signIn);
@@ -89,7 +74,7 @@ internal sealed partial class AgentAccountsApi
             return new Result<SignInProgress>(new SignInProgress(Account: null, wait));
         }
 
-        if (signIn.Kind == AgentAccountKind.CodexPlan)
+        if (signIn.Kind == AgentAccountKind.ChatGptPlan)
         {
             return await CompleteCodexSignInAsync(db, user, signIn, now, ct);
         }
@@ -132,14 +117,14 @@ internal sealed partial class AgentAccountsApi
 
         // A code works once: whatever happens next, this sign-in is over.
         db.CodeSignIns.Remove(signIn);
-        ChatGptIdToken? identity = tokens.IdToken is null ? null : ChatGptSignInClient.ReadIdToken(tokens.IdToken);
+        ChatGptIdToken? identity = tokens.IdToken is null ? null : ChatGptIdToken.Read(tokens.IdToken);
         if (identity is null)
         {
             _ = await db.SaveAsync(ct);
             return new Result<SignInProgress>(Error.Conflict("agent_accounts.codex_no_identity", "OpenAI signed Codex in without saying who; start again."));
         }
 
-        PlanSession session = PlanSession.Start(CodexSignInClient.ClientId, identity, tokens, now);
+        PlanSession session = PlanSession.Start(identity, tokens, now);
         AgentAccount account = AgentAccount.SignedIn(user.UserId, signIn.Kind, signIn.Name, session, box, time);
         db.Accounts.Add(account);
         return await AddedAsync(db, user, account, ct);

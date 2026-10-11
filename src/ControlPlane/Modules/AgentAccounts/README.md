@@ -2,10 +2,10 @@
 
 Agent accounts are accounts at agent vendors that pay for agents' work: an API key for OpenAI's or
 Anthropic's API (at the vendor or at another endpoint that speaks it, such as a company's gateway),
-an OpenRouter key for many vendors' models, a ChatGPT plan added by signing in with ChatGPT or
-with a code entered at OpenAI as Codex does (a Codex plan), a Copilot plan added with a code entered
-at GitHub, or a Claude plan. A workspace's
-account serves everyone with Write on it; a personal account serves its owner, wherever they work.
+an OpenRouter key for many vendors' models, or a plan its vendor's own agent signs in to: a ChatGPT
+plan with a code entered at OpenAI, as Codex does; a Claude plan approved at Claude's page, as Claude
+Code does; or a Copilot plan with a code entered at GitHub. A workspace's account serves everyone
+with Write on it; a personal account serves its owner, wherever they work.
 Secrets are encrypted at rest and never shown again, and the keys and plans of model APIs never enter
 a nook: the model gateway adds them to each call.
 
@@ -15,19 +15,18 @@ a nook: the model gateway adds them to each call.
   endpoint, when a sign-in ended, and the sealed secret; and sign-ins in progress.
 - **Rules:** who may add and remove them (Manage on the workspace, or the person), who may use them
   (Write on the workspace, or the person; the control plane's own processes, any), which kinds are
-  personal only (plans), which are added by signing in (ChatGPT and Copilot plans), and which kinds this
-  deployment allows. What each kind is at its vendor: where its calls go and which headers pay for
-  them, or that its token goes to its harness.
-- **Integrations:** Sign in with ChatGPT, through `Bagatka.Sdk.OpenAI`: registering, exchanging the
-  code, renewing a plan's access token, and ending its session on removal. GitHub's device flow for
-  the host's Copilot app, through `Bagatka.Sdk.GitHub`. The vendors' lists of
-  models: OpenAI's through `Bagatka.Sdk.OpenAI`, Anthropic's through `Bagatka.Sdk.Anthropic`,
-  Copilot's through `Bagatka.Sdk.GitHub`, and OpenRouter's catalog through `Bagatka.Sdk.OpenRouter`.
-  models.dev's open catalog of what each model takes, holds, and costs (`Catalog/`). What plans have
-  used of their limits: a Codex plan's windows through `Bagatka.Sdk.OpenAI`, Copilot's quotas through
-  `Bagatka.Sdk.GitHub`, and Claude's windows through `Bagatka.Sdk.Anthropic`, from the vendors'
-  undocumented endpoints that their own clients read. Codex's own sign-in (its device flow and
-  renewals, `CodexSignInClient`) and ChatGPT's Codex backend's models, through `Bagatka.Sdk.OpenAI`.
+  personal only and added by signing in (plans), and which kinds this deployment allows. What each
+  kind is at its vendor: where its calls go and which headers pay for them.
+- **Integrations:** the plans' sign-ins, as their vendors' agents sign in: Codex's (its device flow
+  and renewals) through `Bagatka.Sdk.OpenAI`, Claude Code's (its code shown at Claude's page, and
+  renewals) through `Bagatka.Sdk.Anthropic`, and GitHub's device flow for the host's Copilot app
+  through `Bagatka.Sdk.GitHub`. The vendors' lists of models: OpenAI's and ChatGPT's Codex backend's
+  through `Bagatka.Sdk.OpenAI`, Anthropic's through `Bagatka.Sdk.Anthropic`, Copilot's through
+  `Bagatka.Sdk.GitHub`, and OpenRouter's catalog through `Bagatka.Sdk.OpenRouter`. models.dev's open
+  catalog of what each model takes, holds, and costs (`Catalog/`). What plans have used of their
+  limits, from the vendors' undocumented endpoints that their own clients read: ChatGPT's windows
+  through `Bagatka.Sdk.OpenAI`, Claude's through `Bagatka.Sdk.Anthropic`, and Copilot's quotas
+  through `Bagatka.Sdk.GitHub`.
 
 ## Does not own
 
@@ -49,25 +48,22 @@ token when it is due; it is for module callers only, never a route.
 Result<AgentAccountSummary> added = await accounts.AddAsync(owner, new AddAgentAccount(workspaceId, AgentAccountKind.OpenRouterApiKey, "OpenRouter", key, Endpoint: null), ct);
 Result<IReadOnlyList<AgentModel>> models = await accounts.ListModelsAsync(owner, added.Output.Id, workspaceId, ct); // openai/gpt-6-luna, …
 
-// A ChatGPT plan: the caller listens on the callback and opens the URL in the person's browser.
-Result<SignInStarted> started = await accounts.StartSignInAsync(owner, new StartSignIn(AgentAccountKind.ChatGptPlan, "My ChatGPT", new Uri("http://127.0.0.1:1455/auth/callback")), ct);
-Result<SignInProgress> plan = await accounts.CompleteSignInAsync(owner, new CompleteSignIn(started.Output.Id, returnedTo), ct);
+// A Claude plan: the person approves at started.Output.Url, Claude's page, and pastes the code it shows.
+Result<SignInStarted> started = await accounts.StartSignInAsync(owner, new StartSignIn(AgentAccountKind.ClaudePlan, "My Claude"), ct);
+Result<SignInProgress> plan = await accounts.CompleteSignInAsync(owner, new CompleteSignIn(started.Output.Id, shownCode), ct);
 
-// A Copilot plan: the person enters started.Output.UserCode at started.Output.Url, GitHub's; the
-// caller completes without an address every interval until plan.Output.Account is there.
-Result<SignInStarted> code = await accounts.StartSignInAsync(owner, new StartSignIn(AgentAccountKind.CopilotPlan, "My Copilot", Callback: null), ct);
+// A ChatGPT or Copilot plan: the person enters started.Output.UserCode at started.Output.Url, OpenAI's
+// or GitHub's; the caller completes without a code every interval until progress.Output.Account is there.
+Result<SignInStarted> code = await accounts.StartSignInAsync(owner, new StartSignIn(AgentAccountKind.ChatGptPlan, "My ChatGPT"), ct);
+Result<SignInProgress> progress = await accounts.CompleteSignInAsync(owner, new CompleteSignIn(code.Output.Id, Code: null), ct);
 
-Result<AgentAccountCredential> used = await accounts.UseAsync(SystemActors.Harness, plan.Output.Id, workspaceId, ct);
+Result<AgentAccountCredential> used = await accounts.UseAsync(SystemActors.Harness, plan.Output.Account!.Id, workspaceId, ct);
 if (used.Failed)
 {
     return new Result(used.Error);   // e.g. AgentAccountsErrors.SignInEnded
 }
 
-switch (used.Output.Access)
-{
-    case ModelEndpoint endpoint: ...; break;   // the gateway forwards to endpoint.Url with endpoint.Headers
-    case HarnessToken token: ...; break;       // a Claude plan's token goes to the harness
-}
+// The gateway forwards to used.Output.Endpoint.Url with used.Output.Endpoint.Headers.
 ```
 
 ## Asks
@@ -87,7 +83,8 @@ Nothing yet. Once workspaces can be deleted, `WorkspaceDeleted` removes their ac
 Schema `agent_accounts`. Table `accounts` (kind, name, workspace or owner — a check constraint keeps
 exactly one — when it was added, an API key's endpoint, when a sign-in ended, and the sealed
 secret: a key or token as given, or a plan's session as JSON). Table `sign_ins` (who, the account's
-kind and name, the callback, the state and nonce, when it expires, and the sealed PKCE verifier).
+kind and name, the state, when it expires, and the sealed PKCE verifier), for sign-ins with a code
+shown at the vendor's page.
 Table `code_sign_ins` (who, the account's kind and name, the sealed device code and the code the
 person enters, when it expires, and when the vendor may be asked next).
 
@@ -102,30 +99,29 @@ background.
 `AgentAccountsSettings`, passed by the host (`PATTERNS.md`, entry 20), with the deployment's
 `EncryptionSettings`:
 
-- `AllowClaudePlans`, off: Anthropic's terms forbid storing Claude sign-in tokens without
-  its written permission, so turn it on only with that permission;
-- `AllowChatGptPlans`, off: OpenAI lets open-source and self-hosted deployments use Sign in with
-  ChatGPT; a hosted service for other people needs OpenAI's approval first. The AppHost turns it on,
-  since a local run is self-hosted;
+- `AllowClaudePlans` and `AllowChatGptPlans`, off: plans signed in as their vendors' own agents,
+  for people running agents on their own plans; a service offering them to other people should
+  agree it with the vendor first. The AppHost turns both on;
 - `CopilotClientId`, the GitHub OAuth app people sign in to for their Copilot plans: AiSloth's own
   unless the host names another;
-- `ChatGptAuthority` (Codex's sign-in too), `ChatGptApi`, `ChatGptBackend` (a Codex plan's calls, at
-  `/codex`, and its usage), `OpenRouterApi`, `CopilotApi`, `ClaudeApi`, and `ModelsDevUrl`,
-  the vendors' own by default; tests point them at fakes. GitHub itself is the host's `GitHubClient`'s.
+- `ChatGptAuthority` (Codex's sign-in), `ChatGptBackend` (a ChatGPT plan's calls, at `/codex`, and
+  its usage), `ClaudeAuthorizeUrl` and `ClaudeTokenUrl` (Claude Code's sign-in), `ClaudeApi`,
+  `OpenRouterApi`, `CopilotApi`, and `ModelsDevUrl`, the vendors' own by default; tests point them
+  at fakes. GitHub itself is the host's `GitHubClient`'s.
 
 ## Decisions and constraints
 
 - **A plan's limits, as its vendor counts them** (`PlanUsage`), asked of the vendor when someone
-  looks, where its own clients ask: a Codex plan's five-hour and weekly windows (ChatGPT's
-  `/wham/usage`, as Codex's `/status`), Copilot's quotas (requests used of those allowed, or the
-  credits a plan without limits spent), and a Claude plan's windows. No vendor documents these
-  answers. A ChatGPT plan signed in with ChatGPT has none: neither the API's answers to its token nor
-  ChatGPT's backend, which refuses that token, share them; ChatGPT's own page shows them.
-- **Two ways to a ChatGPT plan.** Sign in with ChatGPT is OpenAI's program for apps: its token calls
-  the API (`api.openai.com/v1`), for Codex and pi. A Codex plan signs in as Codex itself does, with
-  Codex's OAuth client: its token calls ChatGPT's Codex backend (`chatgpt.com/backend-api/codex`),
-  whose answers and usage carry the plan's limits, for Codex only. Both are renewed here, one renewal
-  at a time; neither enters a nook.
+  looks, where its own clients ask: a ChatGPT plan's five-hour and weekly windows (ChatGPT's
+  `/wham/usage`, as Codex's `/status`), a Claude plan's (Anthropic's `/api/oauth/usage`, as Claude
+  Code's `/usage`), and Copilot's quotas (requests used of those allowed, or the credits a plan
+  without limits spent). No vendor documents these answers.
+- **A plan signs in as its vendor's own agent,** with that agent's OAuth client, and runs only that
+  agent: a ChatGPT plan signs in as Codex, and its calls go to ChatGPT's Codex backend
+  (`chatgpt.com/backend-api/codex`) as Codex's do; a Claude plan signs in as Claude Code (Claude's
+  page shows a code the person pastes back, `code#state`), and Claude Code, which runs on Anthropic's
+  Agent SDK, calls Anthropic's API through the gateway with an OAuth token of its chat's, which the
+  gateway replaces with the plan's. The host keeps the session and renews it; it never enters a nook.
 
 - **One OpenRouter key, both APIs.** OpenRouter serves Anthropic's Messages API at its root
   (`/v1/messages`) and OpenAI's at `/v1`, so an OpenRouter key's endpoint is OpenRouter's root, with
@@ -154,15 +150,9 @@ background.
   whose text form leaves them out.
 - **Plans are personal.** Copilot, Claude, and ChatGPT plans can only be
   someone's own; a team shares a workspace's API key.
-- **Model APIs go through the gateway.** `UseAsync` gives an API key's or a plan's calls an endpoint
-  and the headers that pay for them (`ModelEndpoint`); only tokens tied to one harness go to it
-  (`HarnessToken`). An endpoint's address is checked for its shape here; which networks it may be on,
-  the gateway decides.
-- **Signing in with ChatGPT** registers the app for the person's ChatGPT account (named "AiSloth"),
-  with PKCE and no client secret. The ID token comes straight from OpenAI's token endpoint over TLS,
-  so its claims are checked (issuer, audience, nonce, expiry) without its signature, as OpenID Connect
-  allows. The person must allow the app to use their plan; a sign-in without it adds nothing. OpenAI
-  identifies each installation: this deployment's ID derives from its encryption key.
+- **Model APIs go through the gateway.** `UseAsync` gives every account's calls an endpoint and the
+  headers that pay for them (`ModelEndpoint`). An endpoint's address is checked for its shape here;
+  which networks it may be on, the gateway decides.
 - **A Copilot plan is Copilot's API, behind the gateway.** Copilot's CLI and pi call the gateway
   as an OpenAI-style provider, with their chat's token; the gateway calls Copilot's API with the
   plan's token and the headers Copilot's CLI sends (`CopilotApi.Headers`). Copilot doesn't document
@@ -172,15 +162,13 @@ background.
   reaches. The app, a GitHub OAuth app, asks for no scopes, so its token reaches the person's
   Copilot and public data only; it never expires, so this host never renews it, and its client ID is
   public, so every host uses AiSloth's own. A token that expires anyway is refused.
-- **One renewal at a time per account.** A plan's access token lasts an hour; it is renewed when
-  OpenAI asks (`earliest_refresh_at`), or shortly before it expires, on the next use. Every renewal
-  replaces the refresh token and OpenAI refuses one used twice, so the renewal locks the account's
-  row (`SELECT … FOR UPDATE`) while OpenAI answers, within the client's 30 seconds, and ignores the
-  caller's cancellation: a renewal OpenAI completed but this side dropped would end the sign-in.
-- **An ended sign-in** (OpenAI refuses a renewal, such as after the person disconnected the app)
-  clears the account's tokens and marks it; it runs no agents, and says so, until it is removed and
-  added again. A refresh token unused for 30 days ends it too.
-- **Removing a plan ends its session** at OpenAI. When OpenAI can't be reached the account goes
-  anyway, with a warning in the log.
-- **Removing an account** stops model-gateway calls at once; an agent holding a token directly, a
-  Claude plan's, keeps it until its process stops.
+- **One renewal at a time per account.** A ChatGPT or Claude plan's access token lasts hours; it is
+  renewed shortly before it expires, on the next use. Every renewal replaces the refresh token and
+  the vendor may refuse one used twice, so the renewal locks the account's row (`SELECT … FOR
+  UPDATE`) while the vendor answers, within the client's 30 seconds, and ignores the caller's
+  cancellation: a renewal the vendor completed but this side dropped would end the sign-in.
+- **An ended sign-in** (the vendor refuses a renewal, such as after the person signed out
+  everywhere) clears the account's tokens and marks it; it runs no agents, and says so, until it is
+  removed and added again.
+- **Removing an account** stops model-gateway calls at once. A plan's tokens go with it; the person
+  can also disconnect it at the vendor.

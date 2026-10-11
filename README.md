@@ -23,8 +23,8 @@ For Linux and Macs with Apple silicon; on Windows, in WSL. Then `sloth help`.
 - **Ready in seconds.** Set a repository up once; every new agent starts with everything installed.
 - **Close the lid.** Agents run in the cloud or on your machines, not in your terminal. Come back to
   pull requests.
-- **Any agent, your accounts.** Claude Code, Codex, GitHub Copilot and pi run natively. Your API keys
-  never enter an agent's computer.
+- **Any agent, your accounts.** Claude Code, Codex, GitHub Copilot and pi run natively, on your API
+  keys or your Claude, ChatGPT and Copilot plans, which never enter an agent's computer.
 - **Rewind any turn.** Every turn is saved; start a new agent from any of them.
 - **Made for teams.** Share a workspace, its repositories, secrets and instructions.
 

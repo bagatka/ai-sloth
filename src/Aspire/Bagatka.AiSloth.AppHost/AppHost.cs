@@ -31,9 +31,12 @@ string? inviteSignUp = builder.Configuration["Parameters:invite-sign-up"];
 IResourceBuilder<ParameterResource> modelPrivateNetworks = builder.AddParameter(
     "model-private-networks", builder.Configuration["Parameters:model-private-networks"] ?? "false");
 
-// Running AiSloth for yourself is the self-hosted use OpenAI allows ChatGPT plans for.
+// ChatGPT and Claude plans run their vendors' own agents for the people whose plans they are: running
+// AiSloth for yourself. Turn them off when other people use the host.
 IResourceBuilder<ParameterResource> allowChatGptPlans = builder.AddParameter(
     "allow-chatgpt-plans", builder.Configuration["Parameters:allow-chatgpt-plans"] is { Length: > 0 } allowed ? allowed : "true");
+IResourceBuilder<ParameterResource> allowClaudePlans = builder.AddParameter(
+    "allow-claude-plans", builder.Configuration["Parameters:allow-claude-plans"] is { Length: > 0 } allowedClaude ? allowedClaude : "true");
 
 // Encrypts agent accounts' secrets, people's GitHub tokens, and secrets' values at rest; losing it
 // makes them unreadable. Run here, it is generated once and kept in this project's user secrets.
@@ -298,6 +301,7 @@ foreach (IResourceBuilder<IResourceWithEnvironment> mode in modes)
         .WithEnvironment("Modules__Chats__ModelGatewayUrl", modelsUrl)
         .WithEnvironment("Encryption__Key", encryptionKey)
         .WithEnvironment("Modules__AgentAccounts__AllowChatGptPlans", allowChatGptPlans)
+        .WithEnvironment("Modules__AgentAccounts__AllowClaudePlans", allowClaudePlans)
         .WithEnvironment("ModelGateway__AllowPrivateNetworks", modelPrivateNetworks)
         .WithEnvironment("Modules__Nooks__DaemonUrl", daemonUrl)
         .WithEnvironment("Modules__Nooks__Image", Published(nookImage))

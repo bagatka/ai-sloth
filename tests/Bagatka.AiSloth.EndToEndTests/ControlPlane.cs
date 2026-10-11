@@ -39,6 +39,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
     private FakeModel? _model;
     private FakePostHog? _postHog;
     private FakeChatGpt? _chatGpt;
+    private FakeClaude? _claude;
     private FakeGitHub? _gitHub;
     private DistributedApplication? _app;
     private ResourceLogFiles? _logs;
@@ -87,7 +88,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
         }
     }
 
-    /// <summary>Sign in with ChatGPT, and the server ChatGPT plans' calls go to (<see cref="Model"/>).</summary>
+    /// <summary>Codex's sign-in at OpenAI; ChatGPT plans' calls go to <see cref="Model"/>.</summary>
     internal FakeChatGpt ChatGpt
     {
         get
@@ -98,6 +99,20 @@ public sealed partial class ControlPlane : IAsyncLifetime
             }
 
             return _chatGpt;
+        }
+    }
+
+    /// <summary>Claude Code's sign-in at Claude; Claude plans' calls go to <see cref="Model"/>.</summary>
+    internal FakeClaude Claude
+    {
+        get
+        {
+            if (_claude is null)
+            {
+                throw new InvalidOperationException("Claude hasn't started.");
+            }
+
+            return _claude;
         }
     }
 
@@ -154,6 +169,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
         _model = await FakeModel.StartAsync();
         _postHog = await FakePostHog.StartAsync();
         _chatGpt = await FakeChatGpt.StartAsync();
+        _claude = await FakeClaude.StartAsync();
         _gitHub = await FakeGitHub.StartAsync();
         IDistributedApplicationTestingBuilder appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Bagatka_AiSloth_AppHost>(
             [
@@ -167,6 +183,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
                 "Parameters:object-storage=" + ObjectStorage,
                 "Parameters:model-private-networks=true",
                 "Parameters:allow-chatgpt-plans=true",
+                "Parameters:allow-claude-plans=true",
                 "Parameters:github-app-client-id=" + FakeGitHub.ClientId,
                 "Parameters:github-app-client-secret=" + FakeGitHub.ClientSecret,
                 "Parameters:github-app-slug=" + FakeGitHub.AppSlug,
@@ -211,7 +228,9 @@ public sealed partial class ControlPlane : IAsyncLifetime
             .WithEnvironment("Host__SignInsPerMinute", "100000")
             .WithEnvironment("Modules__AgentAccounts__ChatGptAuthority", ChatGpt.Url.AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__ChatGptBackend", new Uri(Model.Url, "backend-api").AbsoluteUri)
-            .WithEnvironment("Modules__AgentAccounts__ChatGptApi", Model.OpenAIUrl.AbsoluteUri)
+            .WithEnvironment("Modules__AgentAccounts__ClaudeAuthorizeUrl", Claude.AuthorizeUrl.AbsoluteUri)
+            .WithEnvironment("Modules__AgentAccounts__ClaudeTokenUrl", Claude.TokenUrl.AbsoluteUri)
+            .WithEnvironment("Modules__AgentAccounts__ClaudeApi", Model.Url.AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__OpenRouterApi", Model.Url.AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__CopilotApi", new Uri(Model.Url, "copilot").AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__CopilotClientId", FakeGitHub.CopilotClientId)
@@ -433,6 +452,11 @@ public sealed partial class ControlPlane : IAsyncLifetime
         if (_chatGpt is not null)
         {
             await _chatGpt.DisposeAsync();
+        }
+
+        if (_claude is not null)
+        {
+            await _claude.DisposeAsync();
         }
 
         if (_gitHub is not null)

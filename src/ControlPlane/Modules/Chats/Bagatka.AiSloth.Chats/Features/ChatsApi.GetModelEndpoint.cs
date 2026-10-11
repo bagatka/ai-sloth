@@ -28,12 +28,6 @@ internal sealed partial class ChatsApi
             return new Result<ModelEndpoint>(account.Error);
         }
 
-        // A plan's token held by its harness never comes through the gateway.
-        if (account.Output.Access is not ModelEndpoint endpoint)
-        {
-            return new Result<ModelEndpoint>(Error.Unauthorized);
-        }
-
-        return new Result<ModelEndpoint>(endpoint);
+        return new Result<ModelEndpoint>(account.Output.Endpoint);
     }
 }

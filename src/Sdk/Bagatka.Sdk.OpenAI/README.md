@@ -1,52 +1,34 @@
 # Bagatka.Sdk.OpenAI
 
-Sign in with ChatGPT for open-source and self-hosted apps: the OAuth flow whose tokens call the
-OpenAI API on a person's ChatGPT plan. OpenAI's official .NET SDK calls the API but doesn't cover this
-sign-in. Beside it, `OpenAIModelsClient` lists the models an OpenAI API serves, with an API key or a
-plan's token: one call, which isn't worth the official SDK.
+A ChatGPT plan, signed in to the way Codex signs in, and the OpenAI API's models. OpenAI's official
+.NET SDK calls the API but covers neither.
 
-- **Docs:** [Sign in with ChatGPT, ChatGPT plan usage](https://developers.openai.com/siwc/token-sharing-open-source)
-  (registration and sign-in, token reference, errors and recovery, preview limitations), as of
-  October 2026.
-- **Endpoints:** `GET /api/accounts/authorize` (built as a URL for the person's browser),
-  `POST /api/accounts/oauth/token` (code exchange and refresh), `POST /api/accounts/oauth/revoke`, at
-  `https://auth.openai.com`.
-- **Auth:** a public client with PKCE (S256) and no secret. A first sign-in registers the app with the
-  client ID `dynamic_agent_client`, the app's name as `agent_name_hint`, and the installation's
-  `ext_agent_host_id`; the callback returns the client ID it issued, which every later call uses. The
-  scopes are `openid profile email offline_access resource.invoke chatgpt.tokens.use.direct`, for the
-  resource `https://api.openai.com/v1`.
-- **Rate limits:** none documented for the authorization server. Plan usage has a five-hour limit on
-  Plus, shared with every app, and a weekly cap per app the person sets.
-- **No retries:** every call changes state at OpenAI (a code works once, a refresh replaces the
-  refresh token), so the client owns one `HttpClient` and retries nothing.
-
-- **Models:** `GET /models` on the API (`https://api.openai.com/v1`, or another endpoint that speaks
-  it), with the caller's credentials.
+- **Codex's sign-in** (`CodexSignInClient`), as `codex login --device-auth` does it, for Codex's own
+  OAuth client `app_EMoamEEZ73f0CkXaXp7hrann` at `https://auth.openai.com`:
+  `POST /api/accounts/deviceauth/usercode` (a code the person enters at `/codex/device`),
+  `POST /api/accounts/deviceauth/token` (403 or 404 until they approve, then an authorization code
+  and PKCE verifier), `POST /oauth/token` (the code exchanged, as a form, with the redirect
+  `/deviceauth/callback`; renewals as JSON with the scope `openid profile email`). Undocumented:
+  Codex's own source (`codex-rs/login`) is the reference.
+- **ChatGPT's Codex backend** at `https://chatgpt.com/backend-api/codex`: the Responses API for
+  Codex's calls, and `GET /models?client_version=…`, the catalog Codex shows (`models`, each with a
+  `slug`, a `display_name`, a `visibility`, its `supported_reasoning_levels`, and its
+  `context_window`). Calls carry the plan's token and its ChatGPT account (`ChatGPT-Account-Id`, from
+  the ID token's `https://api.openai.com/auth` claim).
+- **The plan's usage** (`ChatGptUsageClient`): `GET https://chatgpt.com/backend-api/wham/usage`, as
+  Codex's `/status` reads it: `rate_limit.primary_window` and `secondary_window`, each with
+  `used_percent`, `limit_window_seconds`, and `reset_at`.
+- **Models of the API** (`OpenAIModelsClient`): `GET /models` at `https://api.openai.com/v1`, or
+  another endpoint that speaks it, with an API key.
+- **No retries:** a code works once and a renewal replaces the refresh token, so every client owns one
+  `HttpClient` and retries nothing.
 
 ## Quirks
 
+- The code's interval comes as a string; a code lasts fifteen minutes.
+- Renewals answer without `expires_in`: the access token's own `exp` claim says when it expires, about
+  an hour after it was issued. A renewal may leave out the refresh token, which then stays.
+- Refresh tokens are replaced on every renewal and a used one is refused (`refresh_token_reused`), so
+  renewals of one sign-in must never run at the same time.
 - `GET /models` answers an API key with every model the API serves (`data`, IDs only), for speech,
-  images, and embeddings too, and a ChatGPT plan's token with the plan's catalog (`models`, each with
-  a `slug`, a `display_name`, and a `visibility`, `list` for those to show), in the order to show
-  them.
-
-- The redirect must be an HTTP loopback address on `127.0.0.1` with the path `/auth/callback`; only
-  the port may change, and `localhost` isn't accepted. A remote host signs in through a browser on
-  the person's own computer and takes the tokens over.
-- Access tokens last an hour. Refresh tokens last 30 days and are replaced on every refresh; a used
-  one is refused (`refresh_token_reused`), so refreshes of one token set must never run at the same
-  time. In October 2026 a used one was still accepted once right after its refresh; don't rely on it.
-- Token responses carry `earliest_refresh_at`, when OpenAI would like the next refresh: about 54
-  minutes into the hour.
-- Refusals are OAuth errors with status 400 or 401 and a JSON `error`; the client returns them as
-  `openai.<error>` and throws for anything else.
-- The ID token isn't checked for its signature here: it comes straight from the token endpoint over
-  TLS, which OpenID Connect accepts in place of it. Callers check its issuer, audience, nonce, and
-  expiry.
-
-## Tests
-
-Through AgentAccounts' end-to-end tests, against a fake authorization server that is strict where
-OpenAI's is (`tests/Bagatka.AiSloth.EndToEndTests/FakeChatGpt.cs`). The client was tried once against
-the real server with a real ChatGPT plan, in October 2026.
+  images, and embeddings too.

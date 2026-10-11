@@ -16,7 +16,7 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261011190413_CodexSignIns";
+    public override string LastMigrationId => "20261011194950_OneWayPerPlan";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -145,12 +145,6 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("uuid")
                     .HasColumnName("id");
 
-                b.Property<string>("Callback")
-                    .IsRequired()
-                    .HasMaxLength(2048)
-                    .HasColumnType("character varying(2048)")
-                    .HasColumnName("callback");
-
                 b.Property<DateTimeOffset>("ExpiresAt")
                     .HasColumnType("timestamp with time zone")
                     .HasColumnName("expires_at");
@@ -166,12 +160,6 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(64)
                     .HasColumnType("character varying(64)")
                     .HasColumnName("name");
-
-                b.Property<string>("Nonce")
-                    .IsRequired()
-                    .HasMaxLength(64)
-                    .HasColumnType("character varying(64)")
-                    .HasColumnName("nonce");
 
                 b.Property<byte[]>("SealedVerifier")
                     .IsRequired()

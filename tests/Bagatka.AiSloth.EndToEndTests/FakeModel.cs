@@ -32,8 +32,9 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// stands in for OpenRouter too: its catalog of models, and OpenAI's chat API, which pi calls there,
 /// answering every call with a short text. One catalog of models answers OpenRouter's, OpenAI's, and
 /// Anthropic's list of models, with every field each reads. Under <c>/copilot</c> it is Copilot's API:
-/// its list of a plan's models, and OpenAI's two APIs for them, for a plan's token only. Its answers
-/// come compressed to callers that accept it.
+/// its list of a plan's models, and OpenAI's two APIs for them, for a plan's token only. A Claude plan's
+/// calls to Anthropic's API, and its usage, take a token from Claude Code's sign-in
+/// (<see cref="FakeClaude"/>). Its answers come compressed to callers that accept it.
 /// </summary>
 internal sealed class FakeModel : IAsyncDisposable
 {
@@ -139,10 +140,11 @@ internal sealed class FakeModel : IAsyncDisposable
         FakeModel model = new FakeModel(app);
         app.MapMethods("/api/hello", ["GET", "HEAD"], () => Results.Ok());
         app.MapPost("/v1/messages/count_tokens", () => Results.Json(new { input_tokens = 10 }));
-        app.MapPost("/v1/messages", model.MessagesAsync);
+        app.MapPost("/v1/messages", context => ClaudePlanCall(context) ? model.ClaudePlanAsync(context, model.MessagesAsync) : model.MessagesAsync(context));
+        app.MapGet("/api/oauth/usage", context => model.ClaudePlanAsync(context, ClaudeUsageAsync));
         app.MapPost("/v1/responses", model.ResponsesAsync);
         app.MapPost("/v1/chat/completions", model.ChatCompletionsAsync);
-        app.MapGet("/v1/models", ListModels);
+        app.MapGet("/v1/models", OpenRouterCatalog);
         app.MapGet("/copilot/models", model.CopilotModels);
         app.MapGet("/models-dev/api.json", ModelsDev);
         app.MapPost("/copilot/responses", context => model.CopilotAsync(context, model.ResponsesAsync));
@@ -320,6 +322,45 @@ internal sealed class FakeModel : IAsyncDisposable
         await context.Response.WriteAsJsonAsync(usage, context.RequestAborted);
     }
 
+    /// <summary>Each call on a Claude plan's token that Anthropic's API answered, by its path.</summary>
+    public ConcurrentQueue<string> ClaudePlanCalls { get; } = new ConcurrentQueue<string>();
+
+    private static bool ClaudePlanCall(HttpContext context)
+    {
+        return context.Request.Headers.Authorization.ToString().StartsWith("Bearer sk-ant-oat", StringComparison.Ordinal);
+    }
+
+    // Anthropic's API for a Claude plan's token, as Claude Code sends it: an unexpired one from Claude
+    // Code's sign-in, with the beta Anthropic wants for it.
+    private async Task ClaudePlanAsync(HttpContext context, Func<HttpContext, Task> answer)
+    {
+        string authorization = context.Request.Headers.Authorization.ToString();
+        bool genuine = ClaudePlanCall(context)
+            && FakeClaude.Unexpired(authorization["Bearer ".Length..])
+            && context.Request.Headers["anthropic-beta"].ToString().Split(',').Contains(FakeClaude.OAuthBeta, StringComparer.Ordinal);
+        if (!genuine)
+        {
+            JsonObject refusal = new JsonObject { ["type"] = "error", ["error"] = new JsonObject { ["type"] = "authentication_error", ["message"] = "OAuth authentication is currently not supported." } };
+            await Results.Json(refusal, statusCode: StatusCodes.Status401Unauthorized).ExecuteAsync(context);
+            return;
+        }
+
+        ClaudePlanCalls.Enqueue(context.Request.Path.Value ?? string.Empty);
+        await answer(context);
+    }
+
+    // The plan's five-hour and weekly windows, as Claude Code's /usage reads them.
+    private static async Task ClaudeUsageAsync(HttpContext context)
+    {
+        DateTimeOffset now = TimeProvider.System.GetUtcNow();
+        JsonObject usage = new JsonObject
+        {
+            ["five_hour"] = new JsonObject { ["utilization"] = 37, ["resets_at"] = now.AddHours(2).ToString("O", CultureInfo.InvariantCulture) },
+            ["seven_day"] = new JsonObject { ["utilization"] = 8, ["resets_at"] = now.AddDays(3).ToString("O", CultureInfo.InvariantCulture) },
+        };
+        await context.Response.WriteAsJsonAsync(usage, context.RequestAborted);
+    }
+
     // A streamed response with one short message, as OpenAI's Responses API streams it. Codex and pi
     // read the item events and end the call at response.completed.
     private async Task ResponsesAsync(HttpContext context)
@@ -368,29 +409,6 @@ internal sealed class FakeModel : IAsyncDisposable
         // has that event, as Codex does, goes before the stream ends.
         await context.Response.Body.FlushAsync(context.RequestAborted);
         await Task.WhenAny(Task.Delay(StreamLinger, context.RequestAborted));
-    }
-
-    // A ChatGPT plan's token, which the fake ChatGPT issues, gets the plan's catalog; any other caller
-    // the vendors' lists.
-    private static IResult ListModels(HttpContext context)
-    {
-        string? authorization = context.Request.Headers.Authorization.FirstOrDefault();
-        bool plan = authorization?.StartsWith("Bearer access-", StringComparison.Ordinal) == true;
-        return plan ? PlanCatalog() : OpenRouterCatalog();
-    }
-
-    // A ChatGPT plan's catalog, as OpenAI answers a plan's token: models to show, in order, and one
-    // to hide.
-    private static IResult PlanCatalog()
-    {
-        JsonObject catalog = new JsonObject
-        {
-            ["models"] = new JsonArray(
-                new JsonObject { ["slug"] = "gpt-6.1-sol", ["display_name"] = "GPT-6.1 Sol", ["visibility"] = "list" },
-                new JsonObject { ["slug"] = OpenAIModel, ["display_name"] = "GPT-5.6 Terra", ["visibility"] = "list" },
-                new JsonObject { ["slug"] = "codex-auto-review", ["display_name"] = "Auto review", ["visibility"] = "hide" }),
-        };
-        return Results.Text(catalog.ToJsonString(), "application/json");
     }
 
     // Copilot's API for a plan's token from a known integration, or the refusal of one: a token not

@@ -19,6 +19,9 @@ namespace Bagatka.Sdk.Anthropic;
 /// </summary>
 public sealed class ClaudePlanUsageClient : IDisposable
 {
+    /// <summary>The beta Anthropic's API wants with a Claude plan's sign-in token.</summary>
+    public const string OAuthBeta = "oauth-2025-04-20";
+
     private readonly HttpClient _http;
 
     /// <summary>Creates a client.</summary>
@@ -39,7 +42,7 @@ public sealed class ClaudePlanUsageClient : IDisposable
         ArgumentException.ThrowIfNullOrEmpty(token);
         using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(apiUrl.AbsoluteUri.TrimEnd('/') + "/api/oauth/usage"));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        request.Headers.TryAddWithoutValidation("anthropic-beta", "oauth-2025-04-20");
+        request.Headers.TryAddWithoutValidation("anthropic-beta", OAuthBeta);
         using HttpResponseMessage response = await _http.SendAsync(request, ct).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {

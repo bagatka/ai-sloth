@@ -49,7 +49,6 @@ internal static class PlanMeters
         return [.. windows.Select(window => new UsageMeter(window.Name, window.UsedPercent, 100, "percent", window.ResetsAt))];
     }
 
-
     // ChatGPT's windows by their length: five hours and a week on today's plans.
     private static string WindowName(TimeSpan? length)
     {

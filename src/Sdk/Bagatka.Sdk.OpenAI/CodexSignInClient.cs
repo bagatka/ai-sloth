@@ -144,7 +144,7 @@ public sealed class CodexSignInClient : IDisposable
 
         DateTimeOffset now = _time.GetUtcNow();
         DateTimeOffset expiresAt = ExpiryOf(tokens.AccessToken) ?? now + TimeSpan.FromSeconds(tokens.ExpiresIn ?? 3600);
-        return new ChatGptTokens(tokens.AccessToken, refresh, tokens.IdToken, string.Empty, expiresAt - now, EarliestRefreshAt: null);
+        return new ChatGptTokens(tokens.AccessToken, refresh, tokens.IdToken, expiresAt - now);
     }
 
     private static DateTimeOffset? ExpiryOf(string accessToken)

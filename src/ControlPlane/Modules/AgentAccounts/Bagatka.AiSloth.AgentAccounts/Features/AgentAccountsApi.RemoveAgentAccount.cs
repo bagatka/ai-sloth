@@ -1,5 +1,4 @@
 using Bagatka.AiSloth.AgentAccounts.Data;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
@@ -40,22 +39,6 @@ internal sealed partial class AgentAccountsApi
             if (access < AccessLevel.Manage)
             {
                 return new Result(Error.Forbidden);
-            }
-        }
-
-        // Signing out ends a Sign in with ChatGPT session at the vendor; Codex's sign-in has no way to
-        // end one but forgetting it. When the vendor can't be reached, the account goes anyway: its
-        // tokens are gone with it, and the person can disconnect the app at the vendor.
-        PlanSession? session = account.Session(box);
-        if (session is not null && account.Kind == AgentAccountKind.ChatGptPlan)
-        {
-            try
-            {
-                await chatGpt.RevokeAsync(session.ClientId, session.RefreshToken, ct);
-            }
-            catch (HttpRequestException exception)
-            {
-                Log.SignInNotEnded(logger, exception, account.Id.Value);
             }
         }
 

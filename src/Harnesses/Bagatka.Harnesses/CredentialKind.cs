@@ -17,10 +17,13 @@ public enum CredentialKind
     /// </summary>
     CopilotApi = 2,
 
-    /// <summary>A Claude subscription's OAuth token, as <c>claude setup-token</c> prints it, drawing on a Claude plan; it goes to the harness.</summary>
-    ClaudeOAuthToken = 3,
+    /// <summary>
+    /// Anthropic's Messages API on a Claude plan, through a model gateway: the harness signs in with a
+    /// plan's OAuth token, which the gateway swaps for the plan's own. For Claude Code only.
+    /// </summary>
+    ClaudePlanApi = 3,
 
-    /// <summary>OpenAI's Responses API, through a model gateway: an OpenAI API key, a ChatGPT plan, or another endpoint speaking it.</summary>
+    /// <summary>OpenAI's Responses API, through a model gateway: an OpenAI API key, or another endpoint speaking it.</summary>
     OpenAIApi = 4,
 
     /// <summary>

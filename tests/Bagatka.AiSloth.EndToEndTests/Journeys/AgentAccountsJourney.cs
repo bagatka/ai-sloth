@@ -11,24 +11,20 @@ using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
-using Microsoft.AspNetCore.WebUtilities;
 using Xunit;
 
 namespace Bagatka.AiSloth.EndToEndTests;
 
 /// <summary>
 /// Journey: Alice pays for agents. Her workspace's API key is never shown again, her own accounts serve
-/// only her, in every workspace, plans are personal and Claude's are off, a ChatGPT plan is added by
-/// signing in; Codex and pi answer through the model gateway on an OpenAI key, Codex on a model chosen
-/// from its list, one OpenRouter key runs
-/// pi and Claude Code each on the model chosen from OpenRouter's catalog, and she saves that choice as a
-/// preset; a ChatGPT plan is renewed one call at a time, and a plan whose sign-in ended says why.
+/// only her, in every workspace, and plans are personal; Codex and pi answer through the model gateway
+/// on an OpenAI key, Codex on a model chosen from its list, one OpenRouter key runs pi and Claude Code
+/// each on the model chosen from OpenRouter's catalog, and she saves that choice as a preset. Her
+/// Claude and ChatGPT plans sign in as Claude Code and Codex do, run them through the gateway, renewed
+/// one call at a time, and show their limits; a plan whose sign-in ended says why.
 /// </summary>
 public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
 {
-    // Where ChatGPT sends the browser back; a client such as sloth listens there.
-    private const string Callback = "http://127.0.0.1:1455/auth/callback";
-
     private readonly HttpClient _alice = app.ClientFor("alice-" + Guid.CreateVersion7());
     private readonly HttpClient _bob = app.ClientFor("bob-" + Guid.CreateVersion7());
 
@@ -44,8 +40,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         await OneOpenRouterKeyRunsEachAgentOnTheModelChosenForItsChatAsync();
         await ACopilotPlanRunsCopilotAndPiThroughTheGatewayAsync();
         await AChoiceOfHarnessAccountAndModelIsSavedAsAPresetAsync();
-        await AChatGptPlanIsAddedBySigningInAndRenewedOneCallAtATimeAsync();
-        await ACodexPlanRunsCodexOnChatGptsBackendAndShowsItsLimitsAsync();
+        await AClaudePlanRunsClaudeCodeThroughTheGatewayAndShowsItsLimitsAsync();
+        await AChatGptPlanRunsCodexOnChatGptsBackendAndShowsItsLimitsAsync();
     }
 
     public void Dispose()
@@ -142,8 +138,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Equal((0, 0, 0, 0, 0, 0), (listed, added, found, saved, presetsListed, copilotAdded));
         Assert.Matches("copilot-plan +GitHub Copilot +sign in with GitHub", kinds);
         Assert.Matches("^Open http\\S+ and enter [0-9A-F]+ to add your Copilot plan\\.\nAdded \"Copilot plan\": yours\\.", copilot);
-        Assert.Matches("chatgpt-plan +ChatGPT Plus or Pro +sign in with ChatGPT +Codex, pi", kinds);
-        Assert.Matches("claude-plan +Claude Pro or Max +not allowed on ", kinds);
+        Assert.Matches("(?m)chatgpt-plan +ChatGPT Plus or Pro +sign in with OpenAI +Codex$", kinds);
+        Assert.Matches("(?m)claude-plan +Claude Pro or Max +sign in with Claude +Claude Code$", kinds);
         Assert.Matches("anthropic-api-key +Anthropic's API.+Claude Code, pi", kinds);
         Assert.Matches("openrouter-api-key +Many vendors' models with one key +API key +Claude Code, pi", kinds);
         Assert.Matches(FakeModel.OpenRouterModel + " +OpenAI: GPT-6 Luna", models);
@@ -289,42 +285,50 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Equal([renamed], left);
     }
 
-    // Every token set the fake ChatGPT issues asks to be renewed at once, so each model call renews:
-    // two agents working at the same time on one plan must never use a refresh token twice. ChatGPT
-    // shares the plan's usage with no app, so it has no meters.
-    private async Task AChatGptPlanIsAddedBySigningInAndRenewedOneCallAtATimeAsync()
+    // A Claude plan signed in as Claude Code: Alice approves at Claude and pastes back the code its page
+    // shows. Claude Code calls Anthropic's API through the gateway with the plan's token, renewed one call
+    // at a time, and its calls are recorded; pi can't use it, and Anthropic says how much of the plan's
+    // five-hour and weekly windows is used. Once she signs out of Claude Code everywhere, the plan says
+    // why it runs no more agents.
+    private async Task AClaudePlanRunsClaudeCodeThroughTheGatewayAndShowsItsLimitsAsync()
     {
-        TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice, openAI: true);
-        SignInStarted declinedStart = await StartSignInAsync();
-        string state = QueryHelpers.ParseQuery(declinedStart.Url.Query)["state"].ToString();
-        Problem declined = await Api.ProblemAsync(
-            _alice.SendPostAsync(CompletePath(declinedStart), new { returnedTo = Callback + "?error=access_denied&state=" + state }), HttpStatusCode.BadRequest);
-        SignInStarted started = await StartSignInAsync();
-        Uri returnedTo = await FakeChatGpt.FollowAsync(started.Url);
-        SignInProgress signedIn = await Api.ReadAsync<SignInProgress>(_alice.SendPostAsync(CompletePath(started), new { returnedTo }), HttpStatusCode.OK);
+        TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice);
+        string person = "alice-claude-" + Guid.CreateVersion7();
+        SignInStarted started = await Api.ReadAsync<SignInStarted>(_alice.SendPostAsync("/agent-accounts/sign-ins", new { kind = "ClaudePlan", name = "My Claude" }), HttpStatusCode.OK);
+        string shown = await FakeClaude.ApproveAsync(started.Url, person);
+        Problem another = await Api.ProblemAsync(_alice.SendPostAsync(CompletePath(started), new { code = shown.Split('#')[0] + "#another-sign-in" }), HttpStatusCode.BadRequest);
+        SignInProgress signedIn = await Api.ReadAsync<SignInProgress>(_alice.SendPostAsync(CompletePath(started), new { code = shown }), HttpStatusCode.OK);
         AgentAccountSummary plan = signedIn.Account!;
-        Problem again = await Api.ProblemAsync(_alice.SendPostAsync(CompletePath(started), new { returnedTo }), HttpStatusCode.NotFound);
-        int renewalsBefore = app.ChatGpt.Renewals;
+        Problem again = await Api.ProblemAsync(_alice.SendPostAsync(CompletePath(started), new { code = shown }), HttpStatusCode.NotFound);
+        Problem pi = await Api.ProblemAsync(_alice.SendGetAsync(ModelsPath(workspace, "pi", plan.Id)), HttpStatusCode.BadRequest);
+        int renewalsBefore = app.Claude.Renewals;
 
-        IReadOnlyList<HarnessModel> planModels = await Api.ReadAsync<IReadOnlyList<HarnessModel>>(_alice.SendGetAsync(ModelsPath(workspace, "codex", plan.Id)), HttpStatusCode.OK);
-        JsonElement[] ended = await Task.WhenAll(TurnAsync(workspace, "codex", plan.Id), TurnAsync(workspace, "codex", plan.Id));
+        JsonElement[] ended = await Task.WhenAll(TurnAsync(workspace, "claude-code", plan.Id), TurnAsync(workspace, "claude-code", plan.Id));
+        Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(_alice.SendGetAsync(workspace.Path + "/chats"), HttpStatusCode.OK);
+        ChatUsage recorded = await Api.EventuallyAsync(async () =>
+        {
+            ChatUsage read = await Api.ReadAsync<ChatUsage>(_alice.SendGetAsync(Paths.Chat(chats.Items[0]) + "/usage"), HttpStatusCode.OK);
+            return read.Calls > 0 ? read : null;
+        });
         PlanUsage usage = await Api.ReadAsync<PlanUsage>(_alice.SendGetAsync(UsagePath(workspace.Id, plan.Id)), HttpStatusCode.OK);
-        ChatSummary later = await workspace.StartChatAsync("codex", plan.Id);
+        ChatSummary later = await workspace.StartChatAsync("claude-code", plan.Id);
         await using ChatWatch laterWatch = await ChatWatch.OpenAsync(workspace.Person, later);
-        app.ChatGpt.Disconnect(QueryHelpers.ParseQuery(returnedTo.Query)["client_id"].ToString());
+        app.Claude.SignOut(person);
         await workspace.SendAsync(later, "say hello");
-        JsonElement afterDisconnect = await laterWatch.NextAsync("turn-ended");
+        JsonElement afterSignOut = await laterWatch.NextAsync("turn-ended");
         IReadOnlyList<AgentAccountSummary> accounts = await ListAsync(_alice, workspace.Id);
 
-        Assert.Equal("The sign-in was declined.", declined.Errors?.GetValueOrDefault("returnedTo")?.Single());
-        Assert.Equal((AgentAccountKind.ChatGptPlan, false), (plan.Kind, plan.NeedsSignIn));
+        Assert.Equal("This code belongs to another sign-in; start again.", another.Errors?.GetValueOrDefault("code")?.Single());
+        Assert.Equal((AgentAccountKind.ClaudePlan, "My Claude", false), (plan.Kind, plan.Name, plan.NeedsSignIn));
         Assert.Equal(AgentAccountsErrors.SignInNotFound.Code, again.Code);
-        Assert.Equal([("gpt-6.1-sol", "GPT-6.1 Sol"), (FakeModel.OpenAIModel, "GPT-5.6 Terra")], planModels.Select(model => (model.Id, model.Name)));
+        Assert.True(pi.Errors?.ContainsKey("account"));
         Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
-        Assert.True(app.ChatGpt.Renewals > renewalsBefore);
-        Assert.Equal(0, app.ChatGpt.ReusedRefreshTokens);
-        Assert.Empty(usage.Meters);
-        Assert.Equal("The agent couldn't start: " + AgentAccountsErrors.SignInEnded.Message, afterDisconnect.GetProperty("failure").GetString());
+        Assert.Contains("/v1/messages", app.Model.ClaudePlanCalls, StringComparer.Ordinal);
+        Assert.True(recorded.Calls > 0);
+        Assert.True(app.Claude.Renewals > renewalsBefore);
+        Assert.Equal(0, app.Claude.ReusedRefreshTokens);
+        Assert.Equal([("5 hours", 37m, 100m), ("Week", 8m, 100m)], usage.Meters.Select(meter => (meter.Name, meter.Used, meter.Limit ?? 0)));
+        Assert.Equal("The agent couldn't start: " + AgentAccountsErrors.SignInEnded.Message, afterSignOut.GetProperty("failure").GetString());
         Assert.True(accounts.Single(found => found.Id == plan.Id).NeedsSignIn);
     }
 
@@ -332,11 +336,11 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
     // Codex backend with the plan's token and its ChatGPT account, the token renewed one call at a
     // time; its models are the backend's, pi can't use it, and ChatGPT says how much of the plan's
     // five-hour and weekly windows is used.
-    private async Task ACodexPlanRunsCodexOnChatGptsBackendAndShowsItsLimitsAsync()
+    private async Task AChatGptPlanRunsCodexOnChatGptsBackendAndShowsItsLimitsAsync()
     {
         TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice);
         string subject = "alice-codex-" + Guid.CreateVersion7();
-        SignInStarted started = await Api.ReadAsync<SignInStarted>(_alice.SendPostAsync("/agent-accounts/sign-ins", new { kind = "CodexPlan", name = "My Codex" }), HttpStatusCode.OK);
+        SignInStarted started = await Api.ReadAsync<SignInStarted>(_alice.SendPostAsync("/agent-accounts/sign-ins", new { kind = "ChatGptPlan", name = "My ChatGPT" }), HttpStatusCode.OK);
         SignInProgress pending = await Api.ReadAsync<SignInProgress>(_alice.SendPostAsync(CompletePath(started), new { }), HttpStatusCode.OK);
         app.ChatGpt.ApproveCodex(started.UserCode!, subject);
         SignInProgress approved = await Api.EventuallyAsync(async () =>
@@ -353,7 +357,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         PlanUsage usage = await Api.ReadAsync<PlanUsage>(_alice.SendGetAsync(UsagePath(workspace.Id, plan.Id)), HttpStatusCode.OK);
 
         Assert.Null(pending.Account);
-        Assert.Equal((AgentAccountKind.CodexPlan, "My Codex"), (plan.Kind, plan.Name));
+        Assert.Equal((AgentAccountKind.ChatGptPlan, "My ChatGPT"), (plan.Kind, plan.Name));
         Assert.Equal([(FakeModel.CodexModel, "GPT-6.1 Sol")], models.Select(model => (model.Id, model.Name)));
         Assert.Equal(["low", "medium", "high", "xhigh"], models[0].ThinkingLevels);
         Assert.Equal(272_000, models[0].Facts.ContextWindow);
@@ -363,12 +367,6 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.True(app.ChatGpt.CodexRenewals > renewalsBefore);
         Assert.Equal(0, app.ChatGpt.CodexReusedRefreshTokens);
         Assert.Equal([("5 hours", 42m, 100m), ("Week", 12m, 100m)], usage.Meters.Select(meter => (meter.Name, meter.Used, meter.Limit ?? 0)));
-    }
-
-    private async Task<SignInStarted> StartSignInAsync()
-    {
-        return await Api.ReadAsync<SignInStarted>(
-            _alice.SendPostAsync("/agent-accounts/sign-ins", new { kind = "ChatGptPlan", name = "My ChatGPT", callback = Callback }), HttpStatusCode.OK);
     }
 
     private static string CompletePath(SignInStarted started)

@@ -5,7 +5,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { seconds } from "../api"
 import { CopyableCode } from "./section"
 
-// Signing in at a vendor with a code, as connecting GitHub and adding a Copilot or Codex plan do: the
+// Signing in at a vendor with a code, as connecting GitHub and adding a Copilot or ChatGPT plan do: the
 // host gets a code, the person enters it at the vendor and approves, and the page asks the host
 // whether they have.
 

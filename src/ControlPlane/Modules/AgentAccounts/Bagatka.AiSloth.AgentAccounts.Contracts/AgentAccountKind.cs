@@ -15,9 +15,11 @@ public enum AgentAccountKind
     CopilotPlan = 2,
 
     /// <summary>
-    /// A Claude subscription's token, from <c>claude setup-token</c>, drawing on its owner's Claude
-    /// plan. Personal only, and only where the deployment allows it: Anthropic's terms forbid storing
-    /// these without its written permission.
+    /// A Claude plan (Pro or Max), added by signing in the way Claude Code does, approving at Claude and
+    /// bringing back the code its page shows (<see cref="IAgentAccountsApi.StartSignInAsync"/>): Claude
+    /// Code's calls go to Anthropic's API on the plan, which shares its five-hour and weekly limits.
+    /// Runs Claude Code only. Personal only, where the deployment allows Claude plans. It never enters
+    /// a nook.
     /// </summary>
     ClaudePlan = 3,
 
@@ -28,10 +30,10 @@ public enum AgentAccountKind
     OpenAIApiKey = 4,
 
     /// <summary>
-    /// A ChatGPT plan, added by signing in with ChatGPT (<see cref="IAgentAccountsApi.StartSignInAsync"/>),
-    /// drawing on its owner's plan. Personal only, and only where the deployment allows it: OpenAI lets
-    /// open-source and self-hosted apps use it, and a hosted service needs OpenAI's approval. It never
-    /// enters a nook.
+    /// A ChatGPT plan (Plus or Pro), added by signing in the way Codex does, with a code entered at
+    /// OpenAI (<see cref="IAgentAccountsApi.StartSignInAsync"/>): Codex's calls go to ChatGPT's Codex
+    /// backend, which shares the plan's five-hour and weekly limits. Runs Codex only. Personal only,
+    /// where the deployment allows ChatGPT plans. It never enters a nook.
     /// </summary>
     ChatGptPlan = 5,
 
@@ -40,13 +42,4 @@ public enum AgentAccountKind
     /// Anthropic's Messages API or OpenAI's APIs at OpenRouter. It never enters a nook.
     /// </summary>
     OpenRouterApiKey = 6,
-
-    /// <summary>
-    /// A ChatGPT plan, added by signing in the way Codex does, with a code entered at OpenAI
-    /// (<see cref="IAgentAccountsApi.StartSignInAsync"/>): Codex's calls go to ChatGPT's Codex backend,
-    /// whose answers carry the plan's five-hour and weekly limits, which ChatGPT also shares
-    /// (<see cref="IAgentAccountsApi.GetPlanUsageAsync"/>). Runs Codex only. Personal only, where the
-    /// deployment allows ChatGPT plans. It never enters a nook.
-    /// </summary>
-    CodexPlan = 7,
 }

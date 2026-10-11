@@ -83,8 +83,9 @@ Change `host.env`, then run `./host up` again. Its comments say what each settin
   `host.env`.
 - **Sign-in with your company's accounts,** through an OpenID Connect provider such as Microsoft
   Entra ID: set the four `SignIn__Provider__` settings.
-- **Other people on your host:** set `Modules__AgentAccounts__AllowChatGptPlans=false`. OpenAI
-  allows ChatGPT plans only when you run AiSloth for yourself.
+- **Other people on your host:** set `Modules__AgentAccounts__AllowChatGptPlans=false` and
+  `Modules__AgentAccounts__AllowClaudePlans=false`. ChatGPT and Claude plans are for running AiSloth
+  for yourself.
 - **Error reports and usage analytics** in your own PostHog project: set `PostHog__Host` and
   `PostHog__ProjectToken`. Without them, the host sends nothing anywhere. With them, `sloth` reports
   its commands there too, unless people set `DO_NOT_TRACK=1`.
@@ -407,7 +408,7 @@ deploy again without a push, run the workflow in Actions, or run
    | Variable | Value |
    |---|---|
    | `CUSTOM_DOMAIN`, `CUSTOM_DOMAIN_CERTIFICATE` | Your domain and the name of its certificate |
-   | `ALLOW_CHATGPT_PLANS` | `false` if other people use your host: OpenAI allows ChatGPT plans only for your own use |
+   | `ALLOW_CHATGPT_PLANS`, `ALLOW_CLAUDE_PLANS` | `false` if other people use your host: ChatGPT and Claude plans are for your own use |
    | `POSTHOG_HOST`, `POSTHOG_PROJECT_TOKEN` | Your PostHog project's host and project token |
 
 ### If something goes wrong

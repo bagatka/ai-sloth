@@ -3072,7 +3072,7 @@ export interface components {
          * @description What an agent account is at its vendor, and so which harnesses can use it.
          * @enum {unknown}
          */
-        AgentAccountKind: "AnthropicApiKey" | "CopilotPlan" | "ClaudePlan" | "OpenAIApiKey" | "ChatGptPlan" | "OpenRouterApiKey" | "CodexPlan";
+        AgentAccountKind: "AnthropicApiKey" | "CopilotPlan" | "ClaudePlan" | "OpenAIApiKey" | "ChatGptPlan" | "OpenRouterApiKey";
         /** @description A kind of account as this host offers it. */
         AgentAccountKindSummary: {
             /** @description The kind. */
@@ -3337,8 +3337,7 @@ export interface components {
             coAuthor: null | string;
         };
         CompleteSignInRequest: {
-            /** Format: uri */
-            returnedTo?: null | string;
+            code?: null | string;
         };
         CreateInviteRequest: {
             access: components["schemas"]["AccessLevel"];
@@ -4117,9 +4116,10 @@ export interface components {
         };
         /**
          * @description A sign-in in progress, until ExpiresAt: the person opens Url.
-         *     With a UserCode (a Copilot plan, at GitHub), they enter it there and approve,
-         *     while the caller completes the sign-in every Interval until it is done. Without one
-         *     (a ChatGPT plan), the caller completes it once, with the address the browser returned to.
+         *     With a UserCode (a Copilot plan, at GitHub; a ChatGPT plan, at OpenAI), they
+         *     enter it there and approve, while the caller completes the sign-in every Interval
+         *     until it is done. Without one (a Claude plan), they approve there and bring back the code the page
+         *     shows, which the caller completes the sign-in with, once.
          */
         SignInStarted: {
             /** @description The sign-in. */
@@ -4186,8 +4186,6 @@ export interface components {
         StartSignInRequest: {
             kind: components["schemas"]["AgentAccountKind"];
             name: string;
-            /** Format: uri */
-            callback?: null | string;
         };
         /** @description Tokens of model calls, added up; input counted once, as in ModelCallUsage. */
         TokenCounts: {

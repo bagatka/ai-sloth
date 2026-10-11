@@ -16,8 +16,9 @@ released sloth updates itself from its repository's releases.
   `Sloth.cs`. Each returns its exit code: 0 done, 1 failed, 2 called wrong.
 - **`HostApi`**: calls to one host as one session, or anonymously to sign in. A refusal or an
   unreachable host is an `HttpRequestException` with the host's words, which `sloth` prints.
-- **`LoopbackCallback`**: where a browser comes back after signing in, at `http://127.0.0.1:<port>/auth/callback`,
-  or the address pasted when the browser is on another computer.
+- **`LoopbackCallback`**: where a browser comes back after signing in to a host, at
+  `http://127.0.0.1:<port>/auth/callback`, or the address pasted when the browser is on another
+  computer.
 - **`Terminal`**: the person at the keyboard; secrets are read without echo at a console, or from
   standard input.
 - **`PrivateFile`**, **`HostsFile`**: what lasts between runs, readable by its owner only.

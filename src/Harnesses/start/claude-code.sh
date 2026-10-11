@@ -15,7 +15,9 @@ case "$HARNESS_CREDENTIAL" in
       ANTHROPIC_DEFAULT_SONNET_MODEL="~anthropic/claude-sonnet-latest" \
       ANTHROPIC_DEFAULT_HAIKU_MODEL="~anthropic/claude-haiku-latest"
     ;;
-  claude-oauth-token) export CLAUDE_CODE_OAUTH_TOKEN="$HARNESS_TOKEN" ;;
+  # A Claude plan: Claude Code signs in to the gateway as to Anthropic, with its chat's token as the
+  # plan's; the gateway calls Anthropic with the plan's own.
+  claude-plan) export ANTHROPIC_BASE_URL="$HARNESS_MODEL_URL" CLAUDE_CODE_OAUTH_TOKEN="$HARNESS_TOKEN" ;;
   *) echo "Claude Code doesn't take $HARNESS_CREDENTIAL." >&2; exit 64 ;;
 esac
 

@@ -18,7 +18,7 @@ public static class HarnessProfiles
     public static HarnessProfile ClaudeCode { get; } = new HarnessProfile(
         "claude-code",
         "Claude Code",
-        [CredentialKind.AnthropicApi, CredentialKind.OpenRouterApi, CredentialKind.ClaudeOAuthToken],
+        [CredentialKind.AnthropicApi, CredentialKind.OpenRouterApi, CredentialKind.ClaudePlanApi],
         SessionPaths: ["/root/.claude/projects"],
         InstructionsPath: "/root/.claude/CLAUDE.md",
         StatePaths: ["/root/.claude/memory"],

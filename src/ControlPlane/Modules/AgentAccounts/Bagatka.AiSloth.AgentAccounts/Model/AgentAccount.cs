@@ -108,12 +108,12 @@ internal sealed class AgentAccount
         Seal(session, box);
     }
 
-    // The token a Copilot or Claude plan was added with, for asking its vendor what the plan has used.
+    // The token a Copilot plan was added with, for asking Copilot what the plan has used.
     public string PlanToken(SecretBox box)
     {
-        if (Kind is not (AgentAccountKind.CopilotPlan or AgentAccountKind.ClaudePlan))
+        if (Kind != AgentAccountKind.CopilotPlan)
         {
-            throw new InvalidOperationException("Agent account " + Id.Value + " isn't a Copilot or Claude plan.");
+            throw new InvalidOperationException("Agent account " + Id.Value + " isn't a Copilot plan.");
         }
 
         return OpenSecret(box);
@@ -130,25 +130,22 @@ internal sealed class AgentAccount
         return new AgentAccountSummary(Id, Kind, Name.Value, WorkspaceId, OwnerId, AddedAt, Endpoint?.Value, NeedsSignIn);
     }
 
-    // What running an agent on the account takes. Model APIs are reached through the model gateway,
-    // which adds these headers, a Copilot plan's included; a Claude plan's token goes to its harness.
-    // OpenRouter's root serves Anthropic's Messages API at /v1/messages and OpenAI's at /v1, so each
-    // harness picks its own.
-    // Not handled: Claude plans through the gateway; moving their token there needs a test against
-    // Anthropic.
+    // What running an agent on the account takes: the model gateway adds these headers to its calls,
+    // a plan's token included. OpenRouter's root serves Anthropic's Messages API at /v1/messages and
+    // OpenAI's at /v1, so each harness picks its own. A ChatGPT plan's calls go to ChatGPT's Codex
+    // backend, a Claude plan's to Anthropic's API, as their own agents' do.
     public AgentAccountCredential ToCredential(SecretBox box, AgentAccountsSettings settings)
     {
-        AgentAccountAccess access = Kind switch
+        ModelEndpoint endpoint = Kind switch
         {
             AgentAccountKind.AnthropicApiKey => Through(Endpoint?.Value ?? AnthropicApi, "x-api-key", OpenSecret(box)),
             AgentAccountKind.OpenAIApiKey => Through(Endpoint?.Value ?? OpenAIApi, "Authorization", "Bearer " + OpenSecret(box)),
             AgentAccountKind.OpenRouterApiKey => Through(settings.OpenRouterApi, "Authorization", "Bearer " + OpenSecret(box)),
-            AgentAccountKind.ChatGptPlan => Through(settings.ChatGptApi, "Authorization", "Bearer " + OpenSession(box).AccessToken),
-            AgentAccountKind.CodexPlan => new AgentAccountAccess(new ModelEndpoint(settings.CodexApi, CodexHeaders(OpenSession(box)))),
-            AgentAccountKind.CopilotPlan => new AgentAccountAccess(new ModelEndpoint(settings.CopilotApi, CopilotApi.Headers(OpenSecret(box)))),
-            AgentAccountKind.ClaudePlan => new AgentAccountAccess(new HarnessToken(OpenSecret(box))),
+            AgentAccountKind.ChatGptPlan => new ModelEndpoint(settings.CodexApi, CodexHeaders(OpenSession(box))),
+            AgentAccountKind.CopilotPlan => new ModelEndpoint(settings.CopilotApi, CopilotApi.Headers(OpenSecret(box))),
+            AgentAccountKind.ClaudePlan => Through(settings.ClaudeApi, "Authorization", "Bearer " + OpenSession(box).AccessToken),
         };
-        return new AgentAccountCredential(Id, Kind, OwnerId, access);
+        return new AgentAccountCredential(Id, Kind, OwnerId, endpoint);
     }
 
     // Where models.dev's catalog has the account's models, and how they're priced: at the vendor's
@@ -161,14 +158,14 @@ internal sealed class AgentAccount
             AgentAccountKind.AnthropicApiKey => new CatalogPricing(ModelCatalog.Anthropic, Estimate: false, Priced: Endpoint is null),
             AgentAccountKind.OpenAIApiKey => new CatalogPricing(ModelCatalog.OpenAI, Estimate: false, Priced: Endpoint is null),
             AgentAccountKind.OpenRouterApiKey => new CatalogPricing(ModelCatalog.OpenRouter, Estimate: false, Priced: true),
-            AgentAccountKind.ChatGptPlan or AgentAccountKind.CodexPlan => new CatalogPricing(ModelCatalog.OpenAI, Estimate: true, Priced: true),
+            AgentAccountKind.ChatGptPlan => new CatalogPricing(ModelCatalog.OpenAI, Estimate: true, Priced: true),
             AgentAccountKind.CopilotPlan => new CatalogPricing(ModelCatalog.Copilot, Estimate: true, Priced: true),
             AgentAccountKind.ClaudePlan => new CatalogPricing(ModelCatalog.Anthropic, Estimate: true, Priced: true),
         };
     }
 
-    // The ChatGPT plans a session signs in to, renewed by this host.
-    private bool Signs => Kind is AgentAccountKind.ChatGptPlan or AgentAccountKind.CodexPlan;
+    // The plans a session signs in to, renewed by this host.
+    private bool Signs => Kind is AgentAccountKind.ChatGptPlan or AgentAccountKind.ClaudePlan;
 
     // What ChatGPT's Codex backend takes, as Codex sends it: the plan's token and its ChatGPT account.
     private static Dictionary<string, string> CodexHeaders(PlanSession session)
@@ -182,10 +179,10 @@ internal sealed class AgentAccount
         return headers;
     }
 
-    private static AgentAccountAccess Through(Uri url, string header, string value)
+    private static ModelEndpoint Through(Uri url, string header, string value)
     {
         Dictionary<string, string> headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [header] = value };
-        return new AgentAccountAccess(new ModelEndpoint(url, headers));
+        return new ModelEndpoint(url, headers);
     }
 
     private string OpenSecret(SecretBox box)

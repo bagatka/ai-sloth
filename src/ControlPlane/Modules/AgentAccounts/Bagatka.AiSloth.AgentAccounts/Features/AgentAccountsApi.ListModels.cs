@@ -74,16 +74,7 @@ internal sealed partial class AgentAccountsApi
     // The vendor's list of the account's models, with what the vendor states of each.
     private async Task<IReadOnlyList<Offered>> OfferedAsync(AgentAccountCredential used, CancellationToken ct)
     {
-        // A Claude plan's token, which goes to its harness, lists the plan's own models.
-        if (used.Access is HarnessToken token)
-        {
-            return await ClaudePlanModelsAsync(token.Value, ct);
-        }
-
-        if (used.Access is not ModelEndpoint endpoint)
-        {
-            return [];
-        }
+        ModelEndpoint endpoint = used.Endpoint;
 
         // OpenRouter's catalog is public; batch variants are for batch jobs, never an agent's calls.
         if (used.Kind == AgentAccountKind.OpenRouterApiKey)
@@ -99,43 +90,31 @@ internal sealed partial class AgentAccountsApi
             return [.. listed.Select(Offered.Of)];
         }
 
-        // A Codex plan's models are those ChatGPT's Codex backend offers the Codex the nooks run.
-        if (used.Kind == AgentAccountKind.CodexPlan)
+        // A ChatGPT plan's models are those ChatGPT's Codex backend offers the Codex the nooks run.
+        if (used.Kind == AgentAccountKind.ChatGptPlan)
         {
             IReadOnlyList<OpenAIModel> codexModels = await openAI.ListCodexModelsAsync(endpoint.Url, endpoint.Headers, NookCodexVersion, ct);
             return [.. codexModels.Select(model => new Offered(model.Id, model.DisplayName ?? model.Id, UsesTools: true, CodexFacts(model)))];
         }
 
-        if (used.Kind == AgentAccountKind.AnthropicApiKey)
+        // A Claude plan's token lists the plan's models, as Claude Code's sign-in reads them.
+        if (used.Kind is AgentAccountKind.AnthropicApiKey or AgentAccountKind.ClaudePlan)
         {
-            IReadOnlyList<AnthropicModel> served = await anthropic.ListModelsAsync(endpoint.Url, endpoint.Headers, ct);
+            Dictionary<string, string> headers = new Dictionary<string, string>(endpoint.Headers, StringComparer.OrdinalIgnoreCase);
+            if (used.Kind == AgentAccountKind.ClaudePlan)
+            {
+                headers["anthropic-beta"] = ClaudePlanUsageClient.OAuthBeta;
+            }
+
+            IReadOnlyList<AnthropicModel> served = await anthropic.ListModelsAsync(endpoint.Url, headers, ct);
             return [.. served.Select(model => new Offered(model.Id, model.DisplayName, UsesTools: true, VendorFacts: null))];
         }
 
-        // A ChatGPT plan's catalog holds the models it runs, named and in order; an OpenAI API key's
-        // list holds every model the API serves, by ID.
+        // An OpenAI API key's list holds every model the API serves, by ID.
         IReadOnlyList<OpenAIModel> openAIModels = await openAI.ListModelsAsync(endpoint.Url, endpoint.Headers, ct);
-        if (used.Kind == AgentAccountKind.ChatGptPlan)
-        {
-            return [.. openAIModels.Select(model => new Offered(model.Id, model.DisplayName ?? model.Id, UsesTools: true, VendorFacts: null))];
-        }
-
         return [.. openAIModels
             .OrderByDescending(model => model.Created)
             .Select(model => new Offered(model.Id, model.Id, RunsAgents(model.Id), VendorFacts: null))];
-    }
-
-    // Not handled: a Claude plan's models (off unless Anthropic allowed this host) are asked of
-    // Anthropic's API with the plan's sign-in token, which no test or plan here confirms.
-    private async Task<IReadOnlyList<Offered>> ClaudePlanModelsAsync(string token, CancellationToken ct)
-    {
-        Dictionary<string, string> signedIn = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["Authorization"] = "Bearer " + token,
-            ["anthropic-beta"] = "oauth-2025-04-20",
-        };
-        IReadOnlyList<AnthropicModel> served = await anthropic.ListModelsAsync(settings.ClaudeApi, signedIn, ct);
-        return [.. served.Select(model => new Offered(model.Id, model.DisplayName, UsesTools: true, VendorFacts: null))];
     }
 
     // What the Codex backend states of a model: how hard it reasons, and its context.
