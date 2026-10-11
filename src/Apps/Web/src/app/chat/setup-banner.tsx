@@ -57,10 +57,22 @@ export function SetupBanner({
 
   const fix = transcript.setupFix
   const fixing = fix?.fixingIn === chatId
-  const setupOf = setupName(setup.scripts)
+  const repository = repositoryOf(setup.scripts)
+  // Whose setup it is, to start a sentence and within one.
+  const setupOf = repository ? `${repository}'s setup` : "The setup"
+  const theSetup = repository ? `${repository}'s setup` : "the setup"
   // The first run shows in the transcript as it runs.
   if (!setup.ended) {
-    return setup.again ? <Working>Running the setup again…</Working> : null
+    if (!setup.again) {
+      return null
+    }
+    return (
+      <Working>
+        {fixing
+          ? `Checking the fix: running ${theSetup} again…`
+          : "Running the setup again…"}
+      </Working>
+    )
   }
   if (setup.exitCode === 0) {
     return fixing && setup.again ? (
@@ -73,7 +85,7 @@ export function SetupBanner({
   if (fixing && transcript.setupRunAsked) {
     return (
       <Working>
-        {`Fixing ${setupOf.toLowerCase()}. It runs again once ${agent} is done.`}
+        {`${agent} is fixing ${theSetup}. When it's done, AiSloth runs the setup again to check the fix.`}
       </Working>
     )
   }
@@ -295,13 +307,13 @@ function Banner({ children }: { children: ReactNode }) {
   )
 }
 
-// Whose setup it is: a repository's, by its folder in the nook's files, when it's one repository's.
-function setupName(scripts: readonly string[]): string {
+// The repository whose setup it is, by its folder in the nook's files, when it's one repository's.
+function repositoryOf(scripts: readonly string[]): string | null {
   const [script] = scripts
   if (scripts.length !== 1 || !script.includes("/.agents/")) {
-    return "The setup"
+    return null
   }
-  return `${script.slice(0, script.indexOf("/.agents/"))}'s setup`
+  return script.slice(0, script.indexOf("/.agents/"))
 }
 
 // Terminal output as a terminal leaves it: without its color and cursor codes, and each line as its

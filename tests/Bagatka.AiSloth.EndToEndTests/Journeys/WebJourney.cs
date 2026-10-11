@@ -34,8 +34,9 @@ public sealed partial class WebJourney(ControlPlane app)
     // What the model holds on in this journey; ChatJourney, on the same host, holds on its own.
     private const string Wait = "wait a moment";
 
-    // What a chat that fixes a setup asks its agent, which the model holds on while the journey fixes it.
-    private const string FixRequest = "Fix the setup that failed, and commit the fix.";
+    // How a chat that fixes the setup of Acme's repository asks its agent, and its title; the model
+    // holds on it while the journey fixes the setup.
+    private const string FixRequest = "Fix api's setup";
 
     [Fact]
     public async Task Someone_starts_follows_and_steers_chats_in_the_web_app()
@@ -203,7 +204,7 @@ public sealed partial class WebJourney(ControlPlane app)
 
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = FixRequest })).ToBeVisibleAsync(WebBrowser.Shown);
         await app.Model.HeldAsync(FixRequest);
-        await Assertions.Expect(page.GetByText("Fixing api's setup. It runs again once Claude Code is done.")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(page.GetByText("Claude Code is fixing api's setup. When it's done, AiSloth runs the setup again to check the fix.")).ToBeVisibleAsync(WebBrowser.Shown);
         await WebBrowser.ShotAsync(page, "setup-fixing");
         Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(acme.Person.SendGetAsync(acme.Path + "/chats"), HttpStatusCode.OK);
         ChatSummary fixing = Assert.Single(chats.Items, found => string.Equals(found.Title, FixRequest, StringComparison.Ordinal));

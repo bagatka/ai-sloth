@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,14 +8,16 @@ using Bagatka.AiSloth.Chats.Model;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
+using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Chats;
 
 internal sealed partial class ChatsApi
 {
-    // What the agent of a chat that fixes another's setup is asked first, as whoever started it; AiSloth's
-    // instructions tell it the setup failed and where its output is.
-    private const string SetupFixRequest = "Fix the setup that failed, and commit the fix.";
+    // What the agent of a chat that fixes another's setup is asked first, as whoever started it, after a
+    // first line that names the setup, which lists show as the chat's title; AiSloth's instructions
+    // tell it the setup failed and where its output is.
+    private const string SetupFixRequest = "It failed in another chat. Commit the fix, so new chats start set up.";
 
     public async Task<Result<ChatSummary>> FixSetupAsync(Actor actor, ChatId id, CancellationToken ct)
     {
@@ -43,7 +46,8 @@ internal sealed partial class ChatsApi
         }
 
         ChatId fix = started.Output.Id;
-        Result<ChatMessage> sent = await SendAsync(actor, new SendMessage(fix, SetupFixRequest, Proposal: null), ct);
+        string setup = await SetupNameAsync(db, id, ct);
+        Result<ChatMessage> sent = await SendAsync(actor, new SendMessage(fix, "Fix " + setup + "\n\n" + SetupFixRequest, Proposal: null), ct);
         if (sent.Failed)
         {
             return new Result<ChatSummary>(sent.Error);
@@ -74,6 +78,29 @@ internal sealed partial class ChatsApi
         signals.Notify(fix);
         ChatSummary summary = await SummaryAsync(db, inFix.Output, ct);
         return new Result<ChatSummary>(summary);
+    }
+
+    // Whose setup the chat's latest run was: a repository's, by its folder in the nook's files, when it
+    // ran one repository's script; otherwise the nook's.
+    private static async Task<string> SetupNameAsync(ChatsDbContext db, ChatId id, CancellationToken ct)
+    {
+        StoredEvent? latest = await db.Events.AsNoTracking()
+            .Where(found => found.ChatId == id && found.Kind == "setup-started")
+            .OrderByDescending(found => found.Sequence)
+            .FirstOrDefaultAsync(ct);
+        if (latest is null)
+        {
+            return "the setup";
+        }
+
+        ChatEventBody body = latest.ToContract().Body;
+        if (body is not SetupStarted { Scripts: [string script] })
+        {
+            return "the setup";
+        }
+
+        int folder = script.IndexOf("/.agents/", StringComparison.Ordinal);
+        return folder > 0 ? script[..folder] + "'s setup" : "the setup";
     }
 
     // A chat like the one whose setup failed: the same repositories, harness, account, model, and
