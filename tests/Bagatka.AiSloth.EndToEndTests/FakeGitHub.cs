@@ -305,6 +305,8 @@ internal sealed class FakeGitHub : IAsyncDisposable
         return new JsonObject { ["access_token"] = access, ["scope"] = string.Empty, ["token_type"] = "bearer" };
     }
 
+    // A GitHub App's user token, which lasts eight hours at GitHub; here it is due for renewal at once,
+    // so every use renews it and refreshes the refresh token, which works only once.
     private JsonObject IssueTokens(string login)
     {
         string access = Random("ghu_");
@@ -315,7 +317,7 @@ internal sealed class FakeGitHub : IAsyncDisposable
             _tokens[refresh] = login;
         }
 
-        return new JsonObject { ["access_token"] = access, ["expires_in"] = 28800, ["refresh_token"] = refresh, ["refresh_token_expires_in"] = 15897600, ["token_type"] = "bearer" };
+        return new JsonObject { ["access_token"] = access, ["expires_in"] = 300, ["refresh_token"] = refresh, ["refresh_token_expires_in"] = 15897600, ["token_type"] = "bearer" };
     }
 
     // Whom the request's token acts as, from Authorization: Bearer for the API or Basic for git.

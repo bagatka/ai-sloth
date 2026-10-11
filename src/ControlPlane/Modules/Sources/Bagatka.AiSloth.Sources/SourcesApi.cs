@@ -80,8 +80,9 @@ internal sealed partial class SourcesApi(
         }
 
         await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(CancellationToken.None);
+        // The row's version, xmin, isn't one of its columns, so * leaves it out.
         GitHubConnection? connection = await db.GitHubConnections
-            .FromSql($"SELECT * FROM sources.github_connections WHERE user_id = {userId.Value} FOR UPDATE")
+            .FromSql($"SELECT *, xmin FROM sources.github_connections WHERE user_id = {userId.Value} FOR UPDATE")
             .SingleOrDefaultAsync(CancellationToken.None);
         DateTimeOffset now = time.GetUtcNow();
         if (connection is null)
