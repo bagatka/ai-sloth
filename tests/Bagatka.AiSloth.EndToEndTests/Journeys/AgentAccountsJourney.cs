@@ -12,6 +12,7 @@ using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Xunit;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.EndToEndTests;
 
@@ -102,7 +103,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         await Api.ProblemAsync(_bob.SendGetAsync(UsagePath(bobs.Id, own.Id)), HttpStatusCode.NotFound);
 
         Assert.Null(pending.Account);
-        Assert.Equal(("My Copilot", AgentAccountKind.CopilotPlan), (own.Name, own.Kind));
+        Assert.Equal(("My Copilot", ModelAccessKind.CopilotPlan), (own.Name, own.Kind));
         Assert.True(withToken.Errors?.ContainsKey("kind"));
         Assert.Contains(inAcme, found => found.Id == own.Id);
         Assert.Contains(inPersonal, found => found.Id == own.Id);
@@ -319,7 +320,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         IReadOnlyList<AgentAccountSummary> accounts = await ListAsync(_alice, workspace.Id);
 
         Assert.Equal("This code belongs to another sign-in; start again.", another.Errors?.GetValueOrDefault("code")?.Single());
-        Assert.Equal((AgentAccountKind.ClaudePlan, "My Claude", false), (plan.Kind, plan.Name, plan.NeedsSignIn));
+        Assert.Equal((ModelAccessKind.ClaudePlan, "My Claude", false), (plan.Kind, plan.Name, plan.NeedsSignIn));
         Assert.Equal(AgentAccountsErrors.SignInNotFound.Code, again.Code);
         Assert.True(pi.Errors?.ContainsKey("account"));
         Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
@@ -357,7 +358,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         PlanUsage usage = await Api.ReadAsync<PlanUsage>(_alice.SendGetAsync(UsagePath(workspace.Id, plan.Id)), HttpStatusCode.OK);
 
         Assert.Null(pending.Account);
-        Assert.Equal((AgentAccountKind.ChatGptPlan, "My ChatGPT"), (plan.Kind, plan.Name));
+        Assert.Equal((ModelAccessKind.ChatGptPlan, "My ChatGPT"), (plan.Kind, plan.Name));
         Assert.Equal([(FakeModel.CodexModel, "GPT-6.1 Sol")], models.Select(model => (model.Id, model.Name)));
         Assert.Equal(["low", "medium", "high", "xhigh"], models[0].ThinkingLevels);
         Assert.Equal(272_000, models[0].Facts.ContextWindow);

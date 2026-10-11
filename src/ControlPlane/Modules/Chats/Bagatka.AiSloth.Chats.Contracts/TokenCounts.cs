@@ -1,3 +1,4 @@
+using Bagatka.ModelAccess;
 namespace Bagatka.AiSloth.Chats.Contracts;
 
 /// <summary>Tokens of model calls, added up; input counted once, as in <see cref="ModelCallUsage"/>.</summary>

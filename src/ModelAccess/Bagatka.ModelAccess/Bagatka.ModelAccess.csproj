@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Foundation\Bagatka.Foundation\Bagatka.Foundation.csproj" />
+    <ProjectReference Include="..\..\Sdk\Bagatka.Sdk.Anthropic\Bagatka.Sdk.Anthropic.csproj" />
+    <ProjectReference Include="..\..\Sdk\Bagatka.Sdk.GitHub\Bagatka.Sdk.GitHub.csproj" />
+    <ProjectReference Include="..\..\Sdk\Bagatka.Sdk.OpenAI\Bagatka.Sdk.OpenAI.csproj" />
+    <ProjectReference Include="..\..\Sdk\Bagatka.Sdk.OpenRouter\Bagatka.Sdk.OpenRouter.csproj" />
+  </ItemGroup>
+
+  <!-- The catalog a host starts from until it reads models.dev itself (Catalog/update-models-dev.sh). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Catalog\models-dev.json" LogicalName="Bagatka.ModelAccess.Catalog.models-dev.json" />
+  </ItemGroup>
+
+</Project>

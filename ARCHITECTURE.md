@@ -82,13 +82,41 @@ web, mobile, sloth CLI, MCP clients ──▶ control plane ──lifecycle─�
 - **Return on effort decides scope.** A feature that buys a little and slows every later change is
   declined. Prefer the version that removes concepts.
 
+## Layers
+
+Each level is changed by reading it and the contracts of the level beneath, never more.
+
+```
+hosts         WebApi, slothd, sloth            translate: HTTP, gRPC, the command line
+                    │
+product       Bagatka.AiSloth.<Module>         AiSloth's state, who may do what, and glue
+                    │
+capabilities  Bagatka.<Capability>             general: Harnesses, ModelAccess, Sandboxing,
+                    │                          ObjectStorage, Sdk.<Vendor>
+foundation    Bagatka.Foundation               results, errors, actors, typed IDs
+```
+
+- **A capability is general and deep.** It knows nothing of AiSloth (workspaces, chats, nooks),
+  hides much behind a small contract, and is tested on its own; another product could use it with
+  glue of its own. Logic that isn't AiSloth's lives here: driving an agent over ACP, paying for a
+  vendor's models with a key or a plan, reading a model call's usage, running sandboxes.
+- **A module is AiSloth's state and glue.** It keeps what AiSloth knows, decides who may do what,
+  and composes capabilities into product behavior. Logic in a module that another product could use
+  moves down into a capability.
+- **A host translates.** The WebApi maps HTTP to contracts and back and composes responses from
+  several modules; it holds no rules of its own.
+- **Contracts stay small.** A module offers one interface per concept, each fitting on a screen,
+  all implemented by the module. A capability's plain records, such as `ModelEndpoint`, appear in
+  contracts as they are, never copied into look-alikes.
+
 ## Parts
 
 | Part | Projects | Purpose | Status |
 |---|---|---|---|
 | WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Sign-in, public API for users, workspaces, machines, nooks, agent accounts, and chats, the gRPC endpoint daemons and machines dial, the model gateway, `migrate` |
 | Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, Machines, Nooks, Secrets, AgentAccounts, and Chats built |
-| Harnesses | `Bagatka.Harnesses` | The programs that run coding agents, how to start and pay for each, and the client's side of ACP | Claude Code, Codex, pi, and GitHub Copilot |
+| Harnesses | `Bagatka.Harnesses` | The programs that run coding agents, how to start and pay for each, and an agent's session over ACP: what to write it and what it said | Claude Code, Codex, pi, and GitHub Copilot; the session's logic moves here from Chats' runner |
+| ModelAccess | `Bagatka.ModelAccess` | Paying for model vendors' models: with an API key, or with a plan signed in as its vendor's own agent (renewed, its limits read); each vendor's models with what's known of them (models.dev); and the usage a model call reports | Claude, ChatGPT, and Copilot plans; Anthropic, OpenAI, and OpenRouter API keys |
 | Sandboxing | `Bagatka.Sandboxing` + `.<Provider>`, `.Remote` | Provider contract, conformance tests, one project per compute backend, remote calls | Contract, Docker and Azure providers, remote calls |
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |
 | CLI | `Bagatka.AiSloth.MachineProtocol`, `Bagatka.AiSloth.Cli` (`sloth`) | Native AOT command line over the public HTTP API: hosts, sign-in, agent accounts, secrets, and chats; its machine mode runs nooks on people's own computers (`src/Cli/README.md`) | Built |
@@ -151,7 +179,10 @@ src/
     Bagatka.AiSloth.Cli/           sloth: hosts, accounts, secrets, chats, and machine mode
   Harnesses/
     README.md
-    Bagatka.Harnesses/             harness profiles and the client's side of ACP
+    Bagatka.Harnesses/             harness profiles, ACP, and agent sessions
+  ModelAccess/
+    README.md
+    Bagatka.ModelAccess/           API keys and plans of model vendors, their models, call usage
   Sandboxing/
     README.md
     Bagatka.Sandboxing/            the provider contract
@@ -212,10 +243,10 @@ their registration in `Program.cs`. Everything else in a module is `internal` an
 It also hosts an HTTP/2-only gRPC endpoint that every nook's daemon and every machine dial, the
 model gateway agents in nooks call their model through (on its own plain HTTP endpoint, forwarding
 each call to the chat's agent account's endpoint with the headers that pay for it, so no nook holds a
-key or a plan's token; endpoints are people's choice, so it reaches only public ones unless the
-deployment allows private networks, PATTERNS.md entry 29), and will host the MCP endpoint, which
-exposes the same public operations as HTTP. Run with the single argument
-`migrate`, it applies every module's migrations and exits. `Program.cs` is the composition root:
+key or a plan's token, and reading its usage with `ModelAccess`; endpoints are people's choice, so
+it reaches only public ones unless the deployment allows private networks, PATTERNS.md entry 29),
+and will host the MCP endpoint, which exposes the same public operations as HTTP. Run with the
+single argument `migrate`, it applies every module's migrations and exits. `Program.cs` is the composition root:
 the only code that reads configuration, one visible registration per module, provider, and endpoint
 group.
 
@@ -224,9 +255,10 @@ group.
 
 A capability with one contract, `I<Module>Api`.
 
-- **Contracts project:** holds the interface, its command and DTO records, typed IDs,
-  integration events, and errors. It contains plain data only and depends on nothing but
-  `Bagatka.Foundation`, so it can later become a client package.
+- **Contracts project:** holds the module's interfaces, one per concept, their command and DTO
+  records, typed IDs, integration events, and errors. It contains plain data only and depends on
+  nothing but `Bagatka.Foundation` and the plain records of the capabilities it names, so it can
+  later become a client package.
 - **Module project:** holds everything else, all `internal`, except the public registration
   class `<Module>Module` and, when the module needs settings, the `<Module>Settings` record the
   host builds. It does not reference ASP.NET Core, so HTTP concerns cannot leak into business
@@ -328,13 +360,14 @@ only a socket it shares with the WebApi, and Caddy gives a public address HTTPS.
 | Project | May reference | Must not reference |
 |---|---|---|
 | WebApi | Contracts, module projects (registration only), `Foundation`, `Foundation.Modules` (`migrate` only), `Foundation.Web`, `ServiceDefaults`, `DaemonProtocol`, `MachineProtocol`, sandbox providers and object storage (registration only) | module internals (enforced by `internal`) |
-| Module | its Contracts, other modules' Contracts, `Foundation`, `Foundation.Modules`, `Sandboxing`, `Harnesses`, `ObjectStorage`, Sdk clients | other module projects, ASP.NET Core, `Foundation.Web` |
-| Contracts | `Foundation`, the Contracts of modules its module asks; Machines' also `Sandboxing.Remote` (below) | everything else |
+| Module | its Contracts, other modules' Contracts, `Foundation`, `Foundation.Modules`, capabilities (`Sandboxing`, `Harnesses`, `ModelAccess`, `ObjectStorage`), Sdk clients | other module projects, ASP.NET Core, `Foundation.Web` |
+| Contracts | `Foundation`, capabilities whose plain records it names (`ModelAccess`), the Contracts of modules its module asks; Machines' also `Sandboxing.Remote` (below) | everything else |
 | Daemon | `DaemonProtocol`, `Foundation`, .NET | everything else |
 | CLI | `MachineProtocol`, `Sandboxing` and its providers, `Foundation`, .NET | modules, the WebApi |
 | `Foundation.Modules`, `Foundation.Web`, `ServiceDefaults` | `Foundation`, .NET, approved packages | `Bagatka.AiSloth.*` |
 | `Foundation` | .NET only | everything else |
 | `Sandboxing`, `Sandboxing.Remote`, `Harnesses`, `ObjectStorage`, Sdk client | `Foundation`, .NET, approved packages | `Bagatka.AiSloth.*`, `Foundation.Modules`, `Foundation.Web` |
+| `ModelAccess` | `Foundation`, Sdk clients, .NET | `Bagatka.AiSloth.*`, `Foundation.Modules`, `Foundation.Web`, ASP.NET Core |
 | Sandbox provider, object storage backend | its contract, `Foundation`, its vendor's SDK or Sdk client | `Bagatka.AiSloth.*`, `Foundation.Modules`, `Foundation.Web` |
 
 The "asks" graph is acyclic: if module A calls `I<B>Api`, B never calls `I<A>Api`. When B
@@ -477,10 +510,10 @@ this table in the same change.
 |---|---|---|---|---|
 | Users | People, their sessions on each device, sign-in codes | — | — | `users` |
 | Workspaces | Workspaces, and who may do what with them and their nooks: access levels, invites | — | — | `workspaces` |
-| Nooks | Nooks, where each runs, their lifecycle and recovery, processes, their copies of sources, running setups, checkpoints, ready copies, kept folders, daemon connections | Workspaces, Sources, Machines, Secrets | Machines | `nooks` |
+| Nooks | Nooks, where each runs, their lifecycle and recovery, processes, their copies of sources, running setups, checkpoints, ready copies, kept folders, daemon connections: `INooksApi`, `INookProcessesApi`, `INookFilesApi` | Workspaces, Sources, Machines, Secrets | Machines | `nooks` |
 | Secrets | Workspaces' environment variables for every process in their nooks, their sealed values | Workspaces | — | `secrets` |
 | Sources | GitHub repositories a workspace connected, people's GitHub connections and git settings, copying in and pushing out, push policy; folders (planned) | Workspaces | — | `sources` |
-| AgentAccounts | Accounts at agent vendors that pay for agents: a workspace's and people's own, their sealed secrets | Workspaces | — | `agent_accounts` |
-| Chats | ACP conversations in nooks, their messages, proposals, and events, the agents' runners, the instructions agents get, people's harness state | Nooks, AgentAccounts, Workspaces | — | `chats` |
+| AgentAccounts | Accounts that pay for agents: a workspace's and people's own, who may use them, which kinds this host allows, their sealed credentials, sign-ins in progress; what each kind is at its vendor is `ModelAccess`'s | Workspaces | — | `agent_accounts` |
+| Chats | Conversations with agents in nooks, their messages, proposals, and events, and the runners that drive each agent's session (`Harnesses`): `IChatsApi`; presets, instructions, and harness state: `IChatSettingsApi`; what chats used of their models: `IChatUsageApi` | Nooks, AgentAccounts, Workspaces | — | `chats` |
 | Machines | Computers workspaces add to run nooks, their credentials and connections, the `machine` provider | Workspaces | — | `machines` |
 | Projects (planned, extension) | Groups of nooks, chats, and sources, shared context, project chat | Nooks, Chats, Sources, Workspaces | Nooks, Chats | `projects` |

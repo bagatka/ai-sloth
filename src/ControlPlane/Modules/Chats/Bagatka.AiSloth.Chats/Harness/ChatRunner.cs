@@ -19,6 +19,7 @@ using Bagatka.Harnesses;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.Logging;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.Chats.Harness;
 
@@ -88,7 +89,7 @@ internal sealed class ChatRunner(
     // said, and the kind of account it runs on, as its last turn found it, for product analytics.
     // A session's model can be "default", the agent's own choice, until a model answers.
     private string? _model;
-    private AgentAccountKind? _accountKind;
+    private ModelAccessKind? _accountKind;
 
     // When this runner last kept the chat's nook awake.
     private DateTimeOffset _keptAwakeAt = DateTimeOffset.MinValue;
@@ -504,7 +505,7 @@ internal sealed class ChatRunner(
             facts["model"] = new ProductFact(_model);
         }
 
-        if (_accountKind is AgentAccountKind kind)
+        if (_accountKind is ModelAccessKind kind)
         {
             facts["account_kind"] = new ProductFact(kind.ToString());
         }

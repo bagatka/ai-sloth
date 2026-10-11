@@ -1,3 +1,4 @@
+using Bagatka.ModelAccess;
 namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 
 /// <summary>A kind of account as this host offers it.</summary>
@@ -7,4 +8,4 @@ namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 /// their own. Otherwise it is an API key, added with its secret, a workspace's or someone's own.
 /// </param>
 /// <param name="Allowed">Whether this host allows adding it.</param>
-public sealed record AgentAccountKindSummary(AgentAccountKind Kind, bool Plan, bool Allowed);
+public sealed record AgentAccountKindSummary(ModelAccessKind Kind, bool Plan, bool Allowed);

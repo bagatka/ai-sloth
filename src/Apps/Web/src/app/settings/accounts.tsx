@@ -45,7 +45,7 @@ import { NoRows, RemoveButton, Row, Rows, Section } from "./section"
 // Code does.
 
 type Workspace = Schemas["WorkspaceSummary"]
-type Kind = Schemas["AgentAccountKind"]
+type Kind = Schemas["ModelAccessKind"]
 
 // How each kind is named and asked for, as sloth does: a plan after the product people subscribe
 // to, an API key after the API it calls.

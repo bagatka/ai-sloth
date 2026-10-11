@@ -184,7 +184,9 @@ public sealed record UserSummary(UserId Id, string DisplayName);
 public sealed record UserProfile(UserId Id, string DisplayName, DateTimeOffset CreatedAt);
 ```
 
-- **One interface per module.** `I<Module>Api` lists every feature, and every caller uses it.
+- **One interface per concept.** A module's contract is a few interfaces, each one concept that fits
+  on a screen, all implemented by the module: `IChatsApi`, `IChatSettingsApi`, `IChatUsageApi`.
+  Every caller uses them; a small module has one, `I<Module>Api`.
 - **Signature shape.** `Actor` first, `CancellationToken ct` last, always async.
 - **Inputs.**
   - State-changing features take one input record.
@@ -200,15 +202,14 @@ public sealed record UserProfile(UserId Id, string DisplayName, DateTimeOffset C
     first, then streams. Cancelling the token ends the stream.
 - **Contracts are plain data.** They hold interfaces, records, unions, enums, typed IDs, events,
   and errors. No `IQueryable`, no entities, no EF or ASP.NET types, no logic.
-- **References.** A Contracts project references `Bagatka.Foundation`, plus the Contracts of
-  modules its own module asks, for their typed IDs. Nothing else, with one known exception
-  (`ARCHITECTURE.md`, "Dependency rules").
+- **References.** A Contracts project references `Bagatka.Foundation`, the capabilities whose plain
+  records it names as they are (`ModelAccess`'s `ModelEndpoint`), and the Contracts of modules its
+  own module asks, for their typed IDs. Nothing else, with one known exception (`ARCHITECTURE.md`,
+  "Dependency rules").
 - **Contracts are documented.** Every public member has an XML doc comment; the build fails
   without one.
-- **Size is a signal.** If the interface no longer fits on one screen, either the module is too
-  big or the contract should split into a few cohesive interfaces implemented by the same class,
-  for example by caller: `INooksApi` for people and agents, `INookDaemonsApi` for the daemon
-  endpoint only.
+- **Size is a signal.** If an interface no longer fits on one screen, it holds more than one
+  concept, or logic that isn't the product's belongs in a capability (`ARCHITECTURE.md`, "Layers").
 
 ## 6. Module registration
 

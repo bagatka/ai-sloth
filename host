@@ -223,7 +223,7 @@ Modules__AgentAccounts__AllowClaudePlans=true
 # Copilot plans, which people add with a code at GitHub, sign in to AiSloth's own GitHub OAuth app.
 # To use your own instead: an OAuth app (github.com/settings/applications/new) with Enable Device
 # Flow on and Expire user access tokens off; it asks for no scopes. Its client ID:
-#Modules__AgentAccounts__CopilotClientId=
+#ModelAccess__CopilotClientId=
 
 # Agent accounts whose model runs on this computer or its network, such as with Ollama: the host
 # forwards agents' model calls only to public addresses unless this is true.

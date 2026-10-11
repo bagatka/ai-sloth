@@ -5,6 +5,7 @@ using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Model;
 using Bagatka.Foundation;
 using Microsoft.EntityFrameworkCore;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.Chats;
 

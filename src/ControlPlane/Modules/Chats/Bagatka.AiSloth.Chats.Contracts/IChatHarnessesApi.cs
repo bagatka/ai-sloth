@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.Foundation;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.Chats.Contracts;
 

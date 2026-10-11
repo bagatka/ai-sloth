@@ -1,13 +1,12 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Bagatka.AiSloth.AgentAccounts.Catalog;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Data;
-using Bagatka.AiSloth.AgentAccounts.Kinds;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.AgentAccounts;
 
@@ -25,17 +24,7 @@ internal sealed partial class AgentAccountsApi
         // The vendor's list says what the account can use, and what the vendor states of each model
         // stands over the catalog's word.
         AgentAccount account = usable.Output;
-        IAccountKind kind = kinds.Of(account.Kind);
-        IReadOnlyList<Offered> offered = await kind.OfferedAsync(CredentialOf(account).Endpoint, ct);
-        CatalogPricing pricing = kind.Pricing(account.Endpoint is not null);
-        List<AgentModel> models = [];
-        foreach (Offered model in offered)
-        {
-            ModelsDev.Model? cataloged = await catalog.FindAsync(pricing.Vendor, model.Id, ct);
-            ModelFacts facts = ModelCatalog.Facts(pricing.Vendor, model.Id, cataloged, pricing.Estimate, pricing.Priced);
-            models.Add(new AgentModel(model.Id, model.Name, model.UsesTools, model.With(facts)));
-        }
-
+        IReadOnlyList<AgentModel> models = await vendors.ListModelsAsync(account.Kind, account.OpenCredential(box), account.Endpoint?.Value, ct);
         return new Result<IReadOnlyList<AgentModel>>(models);
     }
 
@@ -55,8 +44,7 @@ internal sealed partial class AgentAccountsApi
             return new Result<ModelFacts>(AgentAccountsErrors.NotFound);
         }
 
-        CatalogPricing pricing = kinds.Of(account.Kind).Pricing(account.Endpoint is not null);
-        ModelsDev.Model? cataloged = await catalog.FindAsync(pricing.Vendor, model, ct);
-        return new Result<ModelFacts>(ModelCatalog.Facts(pricing.Vendor, model, cataloged, pricing.Estimate, pricing.Priced));
+        ModelFacts facts = await vendors.FactsAsync(account.Kind, model, account.Endpoint is not null, ct);
+        return new Result<ModelFacts>(facts);
     }
 }

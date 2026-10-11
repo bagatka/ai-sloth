@@ -83,6 +83,10 @@
     <Project Path="src/Storage/Bagatka.ObjectStorage.AzureBlob/Bagatka.ObjectStorage.AzureBlob.csproj" />
     <Project Path="src/Storage/Bagatka.ObjectStorage/Bagatka.ObjectStorage.csproj" />
   </Folder>
+  <Folder Name="/src/ModelAccess/">
+    <File Path="src/ModelAccess/README.md" />
+    <Project Path="src/ModelAccess/Bagatka.ModelAccess/Bagatka.ModelAccess.csproj" />
+  </Folder>
   <Folder Name="/src/Sdk/">
     <File Path="src/Sdk/README.md" />
     <Project Path="src/Sdk/Bagatka.Azure.Sandboxes/Bagatka.Azure.Sandboxes.csproj" />

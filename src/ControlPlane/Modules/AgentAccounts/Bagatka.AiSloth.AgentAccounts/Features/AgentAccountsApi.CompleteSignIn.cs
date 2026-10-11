@@ -3,11 +3,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Data;
-using Bagatka.AiSloth.AgentAccounts.Kinds;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.AgentAccounts;
 
@@ -38,14 +38,13 @@ internal sealed partial class AgentAccountsApi
             return new Result<SignInProgress>(new SignInProgress(Account: null, wait));
         }
 
-        IPlanKind plan = (IPlanKind)kinds.Of(signIn.Kind);
-        Result<SignInStep> step = await plan.ContinueSignInAsync(signIn.Id, signIn.UserCode, signIn.Secret(box), command.Code, ct);
+        Result<SignInStep> step = await vendors.ContinueSignInAsync(signIn.Kind, StateOf(signIn.Id), signIn.UserCode, signIn.Secret(box), command.Code, ct);
         if (step.Failed)
         {
             return new Result<SignInProgress>(step.Error);
         }
 
-        if (step.Output.Credential is not Credential credential)
+        if (step.Output.Credential is not ModelCredential credential)
         {
             signIn.Polled(step.Output.Interval, now);
             _ = await db.SaveAsync(ct);

@@ -2,6 +2,7 @@ using System;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.AgentAccounts.Model;
 
@@ -13,7 +14,7 @@ internal sealed class SignIn
     public const int MaxUserCodeLength = 64;
 
     // Used by Start and by EF: parameter names match property names.
-    private SignIn(SignInId id, UserId userId, AgentAccountKind kind, AgentAccountName name, string? userCode, DateTimeOffset expiresAt, TimeSpan interval, DateTimeOffset nextPollAt)
+    private SignIn(SignInId id, UserId userId, ModelAccessKind kind, AgentAccountName name, string? userCode, DateTimeOffset expiresAt, TimeSpan interval, DateTimeOffset nextPollAt)
     {
         Id = id;
         UserId = userId;
@@ -29,7 +30,7 @@ internal sealed class SignIn
 
     public UserId UserId { get; private set; }
 
-    public AgentAccountKind Kind { get; private set; }
+    public ModelAccessKind Kind { get; private set; }
 
     public AgentAccountName Name { get; private set; }
 
@@ -43,7 +44,7 @@ internal sealed class SignIn
 
     public byte[] SealedSecret { get; private set; } = [];
 
-    public static SignIn Start(SignInId id, UserId userId, AgentAccountKind kind, AgentAccountName name, string? userCode, TimeSpan expiresIn, TimeSpan interval, string secret, SecretBox box, TimeProvider time)
+    public static SignIn Start(SignInId id, UserId userId, ModelAccessKind kind, AgentAccountName name, string? userCode, TimeSpan expiresIn, TimeSpan interval, string secret, SecretBox box, TimeProvider time)
     {
         DateTimeOffset now = time.GetUtcNow();
         SignIn signIn = new SignIn(id, userId, kind, name, userCode, now + expiresIn, interval, now + interval);

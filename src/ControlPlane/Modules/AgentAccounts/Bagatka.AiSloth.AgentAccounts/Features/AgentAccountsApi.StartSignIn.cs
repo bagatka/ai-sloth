@@ -4,11 +4,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Data;
-using Bagatka.AiSloth.AgentAccounts.Kinds;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.AgentAccounts;
 
@@ -21,13 +21,12 @@ internal sealed partial class AgentAccountsApi
             return new Result<SignInStarted>(Error.Forbidden);
         }
 
-        IAccountKind? kind = kinds.Find(command.Kind);
-        if (kind is not IPlanKind plan)
+        if (!vendors.Kinds.Contains(command.Kind) || !vendors.IsPlan(command.Kind))
         {
-            return new Result<SignInStarted>(Error.Validation("kind", kind is null ? "Unknown kind of account." : "An API key is added with its secret."));
+            return new Result<SignInStarted>(Error.Validation("kind", "Only a plan is added by signing in; an API key is added with its secret."));
         }
 
-        if (!plan.Allowed)
+        if (!Allowed(command.Kind))
         {
             return new Result<SignInStarted>(Error.Validation("kind", "This host doesn't allow this kind of account."));
         }
@@ -45,7 +44,7 @@ internal sealed partial class AgentAccountsApi
         await db.SignIns.Where(old => old.UserId == user.UserId && old.ExpiresAt <= now).ExecuteDeleteAsync(ct);
 
         SignInId id = SignInId.New();
-        PendingSignIn pending = await plan.StartSignInAsync(id, ct);
+        PendingSignIn pending = await vendors.StartSignInAsync(command.Kind, StateOf(id), ct);
         SignIn signIn = SignIn.Start(id, user.UserId, command.Kind, name.Output, pending.UserCode, pending.ExpiresIn, pending.Interval, pending.Secret, box, time);
         db.SignIns.Add(signIn);
         Result saved = await db.SaveAsync(ct);

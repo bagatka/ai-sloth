@@ -4,6 +4,7 @@ using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.AgentAccounts.Data;
 
@@ -28,7 +29,7 @@ internal sealed class AgentAccountsDbContext(DbContextOptions<AgentAccountsDbCon
         configurationBuilder.Properties<SignInId>().HaveConversion<TypedIdConverter<SignInId>>();
         configurationBuilder.Properties<WorkspaceId>().HaveConversion<TypedIdConverter<WorkspaceId>>();
         configurationBuilder.Properties<UserId>().HaveConversion<TypedIdConverter<UserId>>();
-        configurationBuilder.Properties<AgentAccountKind>().HaveConversion<string>().HaveMaxLength(StoredEnums.MaxLength);
+        configurationBuilder.Properties<ModelAccessKind>().HaveConversion<string>().HaveMaxLength(StoredEnums.MaxLength);
         configurationBuilder.Properties<AgentAccountName>()
             .HaveConversion<AgentAccountNameConverter>()
             .HaveMaxLength(AgentAccountName.MaxLength);

@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Bagatka.AiSloth.AgentAccounts.Contracts;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.Chats.Contracts;
 
@@ -11,4 +11,4 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <param name="Accepts">The kinds of agent account it can run on.</param>
 /// <param name="ThinkingLevels">How hard it can think, in its own words, such as <c>high</c>, lightest first.</param>
 /// <param name="DefaultThinking">The level, one of its levels, a new chat thinks at unless someone chooses another.</param>
-public sealed record HarnessSummary(string Id, string Name, IReadOnlyList<AgentAccountKind> Accepts, IReadOnlyList<string> ThinkingLevels, string DefaultThinking);
+public sealed record HarnessSummary(string Id, string Name, IReadOnlyList<ModelAccessKind> Accepts, IReadOnlyList<string> ThinkingLevels, string DefaultThinking);

@@ -2820,7 +2820,7 @@
         "type": "object",
         "properties": {
           "kind": {
-            "$ref": "#/components/schemas/AgentAccountKind"
+            "$ref": "#/components/schemas/ModelAccessKind"
           },
           "name": {
             "type": "string"
@@ -2893,17 +2893,6 @@
         "description": "Identifies an agent account.",
         "format": "uuid"
       },
-      "AgentAccountKind": {
-        "enum": [
-          "AnthropicApiKey",
-          "CopilotPlan",
-          "ClaudePlan",
-          "OpenAIApiKey",
-          "ChatGptPlan",
-          "OpenRouterApiKey"
-        ],
-        "description": "What an agent account is at its vendor, and so which harnesses can use it."
-      },
       "AgentAccountKindSummary": {
         "required": [
           "kind",
@@ -2914,7 +2903,7 @@
         "properties": {
           "kind": {
             "description": "The kind.",
-            "$ref": "#/components/schemas/AgentAccountKind"
+            "$ref": "#/components/schemas/ModelAccessKind"
           },
           "plan": {
             "type": "boolean",
@@ -2946,7 +2935,7 @@
           },
           "kind": {
             "description": "What it is at its vendor.",
-            "$ref": "#/components/schemas/AgentAccountKind"
+            "$ref": "#/components/schemas/ModelAccessKind"
           },
           "name": {
             "type": "string",
@@ -3859,7 +3848,7 @@
           "accepts": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/AgentAccountKind"
+              "$ref": "#/components/schemas/ModelAccessKind"
             },
             "description": "The kinds of agent account it can run on."
           },
@@ -4060,6 +4049,17 @@
         "type": "string",
         "description": "Identifies a message in a chat.",
         "format": "uuid"
+      },
+      "ModelAccessKind": {
+        "enum": [
+          "AnthropicApiKey",
+          "CopilotPlan",
+          "ClaudePlan",
+          "OpenAIApiKey",
+          "ChatGptPlan",
+          "OpenRouterApiKey"
+        ],
+        "description": "A way to pay for a vendor\u0027s models: an API key, added with its secret, or a person\u0027s plan, signed in\nas the vendor\u0027s own agent signs in. Stored by name."
       },
       "ModelFacts": {
         "required": [
@@ -5442,7 +5442,7 @@
         "type": "object",
         "properties": {
           "kind": {
-            "$ref": "#/components/schemas/AgentAccountKind"
+            "$ref": "#/components/schemas/ModelAccessKind"
           },
           "name": {
             "type": "string"

@@ -1,5 +1,5 @@
-using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.Harnesses;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.Chats.Harness;
 
@@ -7,16 +7,16 @@ namespace Bagatka.AiSloth.Chats.Harness;
 // other; this is where they meet.
 internal static class AccountCredentials
 {
-    public static CredentialKind KindOf(AgentAccountKind kind)
+    public static CredentialKind KindOf(ModelAccessKind kind)
     {
         return kind switch
         {
-            AgentAccountKind.AnthropicApiKey => CredentialKind.AnthropicApi,
-            AgentAccountKind.OpenRouterApiKey => CredentialKind.OpenRouterApi,
-            AgentAccountKind.OpenAIApiKey => CredentialKind.OpenAIApi,
-            AgentAccountKind.CopilotPlan => CredentialKind.CopilotApi,
-            AgentAccountKind.ChatGptPlan => CredentialKind.CodexApi,
-            AgentAccountKind.ClaudePlan => CredentialKind.ClaudePlanApi,
+            ModelAccessKind.AnthropicApiKey => CredentialKind.AnthropicApi,
+            ModelAccessKind.OpenRouterApiKey => CredentialKind.OpenRouterApi,
+            ModelAccessKind.OpenAIApiKey => CredentialKind.OpenAIApi,
+            ModelAccessKind.CopilotPlan => CredentialKind.CopilotApi,
+            ModelAccessKind.ChatGptPlan => CredentialKind.CodexApi,
+            ModelAccessKind.ClaudePlan => CredentialKind.ClaudePlanApi,
         };
     }
 }

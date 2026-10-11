@@ -1,7 +1,7 @@
 using System;
-using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.Chats.Model;
 

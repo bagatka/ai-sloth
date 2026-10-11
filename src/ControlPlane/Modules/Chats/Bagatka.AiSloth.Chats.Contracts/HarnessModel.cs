@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Bagatka.AiSloth.AgentAccounts.Contracts;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.Chats.Contracts;
 

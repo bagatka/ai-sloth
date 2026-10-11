@@ -3,13 +3,13 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
-using Bagatka.AiSloth.AgentAccounts.Kinds;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.AgentAccounts;
 
@@ -29,7 +29,7 @@ internal sealed partial class AgentAccountsApi
     // What running an agent on the account takes: where its calls go, and the headers that pay for them.
     private AgentAccountCredential CredentialOf(AgentAccount account)
     {
-        ModelEndpoint endpoint = kinds.Of(account.Kind).Endpoint(account.OpenCredential(box), account.Endpoint?.Value);
+        ModelEndpoint endpoint = vendors.Endpoint(account.Kind, account.OpenCredential(box), account.Endpoint?.Value);
         return new AgentAccountCredential(account.Id, account.Kind, account.OwnerId, endpoint);
     }
 
@@ -105,8 +105,7 @@ internal sealed partial class AgentAccountsApi
             return new Result<AgentAccount>(account);
         }
 
-        IPlanKind plan = (IPlanKind)kinds.Of(account.Kind);
-        Result<Credential> renewed = await plan.RenewAsync(account.OpenCredential(box), CancellationToken.None);
+        Result<ModelCredential> renewed = await vendors.RenewAsync(account.Kind, account.OpenCredential(box), CancellationToken.None);
         if (renewed.Failed)
         {
             // Every refusal means the sign-in is over, such as after the person signed out everywhere.

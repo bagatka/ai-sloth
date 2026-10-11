@@ -3044,7 +3044,7 @@ export interface components {
          */
         AccessLevel: "Read" | "Write" | "Manage";
         AddAgentAccountRequest: {
-            kind: components["schemas"]["AgentAccountKind"];
+            kind: components["schemas"]["ModelAccessKind"];
             name: string;
             secret: string;
             /** Format: uri */
@@ -3068,15 +3068,10 @@ export interface components {
          * @description Identifies an agent account.
          */
         AgentAccountId: string;
-        /**
-         * @description What an agent account is at its vendor, and so which harnesses can use it.
-         * @enum {unknown}
-         */
-        AgentAccountKind: "AnthropicApiKey" | "CopilotPlan" | "ClaudePlan" | "OpenAIApiKey" | "ChatGptPlan" | "OpenRouterApiKey";
         /** @description A kind of account as this host offers it. */
         AgentAccountKindSummary: {
             /** @description The kind. */
-            kind: components["schemas"]["AgentAccountKind"];
+            kind: components["schemas"]["ModelAccessKind"];
             /**
              * @description Whether it is a plan: a person's subscription, added by signing in at its vendor and only ever
              *     their own. Otherwise it is an API key, added with its secret, a workspace's or someone's own.
@@ -3093,7 +3088,7 @@ export interface components {
             /** @description The account. */
             id: components["schemas"]["AgentAccountId"];
             /** @description What it is at its vendor. */
-            kind: components["schemas"]["AgentAccountKind"];
+            kind: components["schemas"]["ModelAccessKind"];
             /** @description Its name for people, such as `Team key`. */
             name: string;
             workspaceId: null | components["schemas"]["WorkspaceId"];
@@ -3486,7 +3481,7 @@ export interface components {
             /** @description Its name for people. */
             name: string;
             /** @description The kinds of agent account it can run on. */
-            accepts: components["schemas"]["AgentAccountKind"][];
+            accepts: components["schemas"]["ModelAccessKind"][];
             /** @description How hard it can think, in its own words, such as `high`, lightest first. */
             thinkingLevels: string[];
             /** @description The level, one of its levels, a new chat thinks at unless someone chooses another. */
@@ -3585,6 +3580,12 @@ export interface components {
          * @description Identifies a message in a chat.
          */
         MessageId: string;
+        /**
+         * @description A way to pay for a vendor's models: an API key, added with its secret, or a person's plan, signed in
+         *     as the vendor's own agent signs in. Stored by name.
+         * @enum {unknown}
+         */
+        ModelAccessKind: "AnthropicApiKey" | "CopilotPlan" | "ClaudePlan" | "OpenAIApiKey" | "ChatGptPlan" | "OpenRouterApiKey";
         /**
          * @description What's known of a model at an account: from the account's vendor, where it says, and otherwise from
          *     models.dev's open catalog. What isn't known is `null`, never a guess.
@@ -4184,7 +4185,7 @@ export interface components {
             };
         };
         StartSignInRequest: {
-            kind: components["schemas"]["AgentAccountKind"];
+            kind: components["schemas"]["ModelAccessKind"];
             name: string;
         };
         /** @description Tokens of model calls, added up; input counted once, as in ModelCallUsage. */

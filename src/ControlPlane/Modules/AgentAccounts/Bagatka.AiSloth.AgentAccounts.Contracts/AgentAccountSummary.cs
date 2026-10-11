@@ -1,6 +1,7 @@
 using System;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 
@@ -21,7 +22,7 @@ namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 /// </param>
 public sealed record AgentAccountSummary(
     AgentAccountId Id,
-    AgentAccountKind Kind,
+    ModelAccessKind Kind,
     string Name,
     WorkspaceId? WorkspaceId,
     UserId? OwnerId,

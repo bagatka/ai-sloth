@@ -67,7 +67,8 @@
         "type": "Project",
         "dependencies": {
           "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
-          "Bagatka.Foundation": "[1.0.0, )"
+          "Bagatka.Foundation": "[1.0.0, )",
+          "Bagatka.ModelAccess": "[1.0.0, )"
         }
       },
       "bagatka.aisloth.chats.contracts": {
@@ -76,7 +77,8 @@
           "Bagatka.AiSloth.AgentAccounts.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Nooks.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
-          "Bagatka.Foundation": "[1.0.0, )"
+          "Bagatka.Foundation": "[1.0.0, )",
+          "Bagatka.ModelAccess": "[1.0.0, )"
         }
       },
       "bagatka.aisloth.nooks.contracts": {
@@ -113,6 +115,40 @@
       },
       "bagatka.harnesses": {
         "type": "Project"
+      },
+      "bagatka.modelaccess": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )",
+          "Bagatka.Sdk.Anthropic": "[1.0.0, )",
+          "Bagatka.Sdk.GitHub": "[1.0.0, )",
+          "Bagatka.Sdk.OpenAI": "[1.0.0, )",
+          "Bagatka.Sdk.OpenRouter": "[1.0.0, )"
+        }
+      },
+      "bagatka.sdk.anthropic": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
+      "bagatka.sdk.github": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
+      "bagatka.sdk.openai": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
+      "bagatka.sdk.openrouter": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
       },
       "EFCore.NamingConventions": {
         "type": "CentralTransitive",

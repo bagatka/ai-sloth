@@ -1,8 +1,8 @@
 using Bagatka.AiSloth.AgentAccounts.Data;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
-using Bagatka.AiSloth.AgentAccounts.Kinds;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
@@ -78,23 +78,22 @@ internal sealed partial class AgentAccountsApi
     // API keys only: a plan is added by signing in. Only some kinds name an endpoint of their own.
     private Error? Refusal(AddAgentAccount command)
     {
-        IAccountKind? kind = kinds.Find(command.Kind);
-        if (kind is null)
+        if (!vendors.Kinds.Contains(command.Kind))
         {
             return Error.Validation("kind", "Unknown kind of account.");
         }
 
-        if (kind is IPlanKind)
+        if (vendors.IsPlan(command.Kind))
         {
             return Error.Validation("kind", "A plan is added by signing in at its vendor, as your own account.");
         }
 
-        if (!kind.Allowed)
+        if (!Allowed(command.Kind))
         {
             return Error.Validation("kind", "This host doesn't allow this kind of account.");
         }
 
-        bool endpointRefused = command.Endpoint is not null && !kind.TakesEndpoint;
+        bool endpointRefused = command.Endpoint is not null && !vendors.TakesEndpoint(command.Kind);
         return endpointRefused ? Error.Validation("endpoint", "Only an Anthropic or OpenAI API key names an endpoint.") : null;
     }
 }

@@ -14,6 +14,7 @@ using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.Harnesses;
 using Microsoft.EntityFrameworkCore;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.Chats;
 
@@ -144,7 +145,7 @@ internal sealed partial class ChatsApi
 
     // A chat started, for product analytics. It has no message yet: people who leave before writing
     // one show as starts without a first message_sent.
-    private void CaptureStarted(UserActor user, StartChat command, HarnessProfile harness, AgentAccountKind accountKind)
+    private void CaptureStarted(UserActor user, StartChat command, HarnessProfile harness, ModelAccessKind accountKind)
     {
         productEvents.Capture(new ProductEvent("chat_started", user.UserId, command.WorkspaceId.Value, new Dictionary<string, ProductFact>(StringComparer.Ordinal)
         {

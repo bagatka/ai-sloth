@@ -19,6 +19,7 @@ using Bagatka.AiSloth.Workspaces;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.Foundation.Web;
+using Bagatka.ModelAccess;
 using Bagatka.ObjectStorage;
 using Bagatka.ObjectStorage.AzureBlob;
 using Bagatka.PostHog;
@@ -86,6 +87,7 @@ EncryptionSettings encryption = builder.Configuration.GetRequired<EncryptionSett
 NooksSettings configuredNooks = builder.Configuration.GetRequired<NooksSettings>("Modules:Nooks");
 NooksSettings nooks = postHog is null ? configuredNooks : configuredNooks with { CrashReportsHost = postHog.Host, CrashReportsToken = postHog.ProjectToken };
 AgentAccountsSettings agentAccounts = builder.Configuration.GetRequired<AgentAccountsSettings>("Modules:AgentAccounts");
+ModelAccessSettings modelAccess = builder.Configuration.GetSection("ModelAccess").Exists() ? builder.Configuration.GetRequired<ModelAccessSettings>("ModelAccess") : new ModelAccessSettings();
 SourcesSettings sources = builder.Configuration.GetSection("Modules:Sources").Exists() ? builder.Configuration.GetRequired<SourcesSettings>("Modules:Sources") : new SourcesSettings();
 GitHubSettings gitHub = builder.Configuration.GetSection("GitHub").Exists() ? builder.Configuration.GetRequired<GitHubSettings>("GitHub") : GitHubSettings.Public;
 ChatsSettings chats = builder.Configuration.GetRequired<ChatsSettings>("Modules:Chats");
@@ -184,8 +186,11 @@ builder.Services.AddAuthorizationBuilder()
 builder.Services.AddRateLimits(host);
 
 // Sources copies repositories in and pushes them out with people's GitHub connections, through the
-// host's GitHub App, running git on this computer.
+// host's GitHub App, running git on this computer; Copilot plans sign in at GitHub too.
 builder.Services.AddGitHubClient(gitHub);
+
+// Agent accounts pay for models through the vendors' APIs and sign-ins, the vendors' own by default.
+builder.Services.AddModelAccess(modelAccess);
 
 // Checkpoints are kept in a folder of this computer, or in Azure Blob Storage when hosted.
 if (folderStorage is not null)

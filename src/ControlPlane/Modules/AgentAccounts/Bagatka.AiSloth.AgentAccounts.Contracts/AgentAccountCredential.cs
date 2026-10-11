@@ -1,4 +1,5 @@
 using Bagatka.Foundation;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 
@@ -11,4 +12,4 @@ namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 /// <param name="Kind">What it is at its vendor.</param>
 /// <param name="OwnerId">The person it belongs to, for a personal account.</param>
 /// <param name="Endpoint">The endpoint and its headers.</param>
-public sealed record AgentAccountCredential(AgentAccountId Id, AgentAccountKind Kind, UserId? OwnerId, ModelEndpoint Endpoint);
+public sealed record AgentAccountCredential(AgentAccountId Id, ModelAccessKind Kind, UserId? OwnerId, ModelEndpoint Endpoint);

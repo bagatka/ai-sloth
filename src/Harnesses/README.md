@@ -1,8 +1,8 @@
 # Harnesses
 
 A general-purpose library for running coding agents: which programs exist (harnesses), how to start
-each and pay for its model, and the client's side of the Agent Client Protocol (ACP) they all
-speak. Nothing here knows AiSloth; Chats is its caller.
+each and pay for its model, the client's side of the Agent Client Protocol (ACP) they all speak, and
+an agent's session over it. Nothing here knows AiSloth; Chats is its caller.
 
 ## Contract
 
@@ -60,6 +60,21 @@ switch (read?.Value)
     case AcpPromptEnded ended: ...; break;                   // ended.Prompt == messageId
     case AcpStartFailed failed: ...; break;                  // failed.Error: "Authentication required"
 }
+```
+
+- `AgentSession` is one agent's conversation over ACP as plain state, and what to do next: given
+  what the harness wrote, or what the caller wants (a prompt, a message steered into the running
+  turn, a stop), it answers with the lines to write to the harness and what happened. It starts a
+  session or loads the earlier one, answers the harness's requests, gives a lost agent's turn to the
+  next one, and matches every answer to its prompt. It does no I/O and keeps nothing: the caller
+  stores the state with what it saves, so another process can continue the session from it.
+
+```csharp
+AgentStep step = AgentSession.Start(earlierSessionId, "/work");               // initialize, then session/new or load
+step = AgentSession.Read(step.Session, line);                                  // each line the harness writes
+step = AgentSession.Send(step.Session, messageKey, "Add a README");            // a new turn, or steered into the running one
+// step.Lines: write them to the harness; step.Events: AgentUpdate, TurnEnded(key, reason), Steered(key),
+// AgentRestarted(remembers), StartFailed(error); step.Session: save it with them.
 ```
 
 ## Rules

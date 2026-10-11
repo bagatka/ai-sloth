@@ -27,13 +27,20 @@ folders).
 
 ## Contract
 
-`IChatsApi`: members list the harnesses and the models each can run on with an account, start chats
-(each creating its nook, with the workspace's repositories or another chat's files, now or at a
-checkpoint, and that chat's conversation when it continues it), list chats or watch the list as it changes, send
-messages and send proposals on, say what chats and a workspace's chats used of their models, change the model and account a chat runs on, stop the agent, run a
-chat's setup again, start a chat that fixes it and bring its fix in, watch a chat's events from any sequence number, set
-and read the instructions every agent gets, list and forget their harness state, and keep presets. `IChatHarnessesApi` is the
-model gateway's side.
+Four interfaces, one per concept, implemented by the module:
+
+- `IChatsApi`, the chats themselves: list the harnesses and the models each can run on with an
+  account, start, list, watch, and read chats, send messages and proposals, stop the agent, change
+  the model and account, and run a chat's setup again or fix it in a chat of its own.
+- `IChatSettingsApi`, what people keep for their chats: presets, the instructions every agent gets
+  (a workspace's and a person's own), and the harness state agents keep.
+- `IChatUsageApi`, what chats used of their models: a chat's, and a workspace's by day and chat.
+- `IChatHarnessesApi`, the model gateway's side: a chat's token to its account's endpoint, and
+  recording each call.
+
+Each chat's agent is driven by a runner (`Harness/ChatRunner.cs`): the session's logic is
+`Bagatka.Harnesses`' `AgentSession`; the runner keeps its state, saves what happened, runs setups,
+keeps the nook awake, and takes checkpoints.
 
 ```csharp
 Result<ChatSummary> started = await chats.StartAsync(alice, new StartChat(workspaceId, "docker", "pi", openRouterKeyId, "openai/gpt-6-luna", "medium", [new NookRepository(apiRepositoryId)], CopyOf: null, Checkpoint: null, WithConversation: false), ct);

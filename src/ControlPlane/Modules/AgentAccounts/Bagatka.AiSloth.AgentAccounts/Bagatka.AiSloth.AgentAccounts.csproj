@@ -3,15 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Bagatka.AiSloth.AgentAccounts.Contracts\Bagatka.AiSloth.AgentAccounts.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\Foundation\Bagatka.Foundation.Modules\Bagatka.Foundation.Modules.csproj" />
-    <ProjectReference Include="..\..\..\..\Sdk\Bagatka.Sdk.Anthropic\Bagatka.Sdk.Anthropic.csproj" />
-    <ProjectReference Include="..\..\..\..\Sdk\Bagatka.Sdk.GitHub\Bagatka.Sdk.GitHub.csproj" />
-    <ProjectReference Include="..\..\..\..\Sdk\Bagatka.Sdk.OpenAI\Bagatka.Sdk.OpenAI.csproj" />
-    <ProjectReference Include="..\..\..\..\Sdk\Bagatka.Sdk.OpenRouter\Bagatka.Sdk.OpenRouter.csproj" />
-  </ItemGroup>
-
-  <!-- The catalog a host starts from until it reads models.dev itself (Catalog/update-models-dev.sh). -->
-  <ItemGroup>
-    <EmbeddedResource Include="Catalog\models-dev.json" LogicalName="Bagatka.AiSloth.AgentAccounts.Catalog.models-dev.json" />
+    <ProjectReference Include="..\..\..\..\ModelAccess\Bagatka.ModelAccess\Bagatka.ModelAccess.csproj" />
   </ItemGroup>
 
 </Project>

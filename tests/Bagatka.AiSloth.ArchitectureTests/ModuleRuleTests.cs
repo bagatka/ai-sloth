@@ -20,8 +20,11 @@ public sealed class ModuleRuleTests
     // is another module's contract.
     private static readonly string[] ModuleMayUse =
     [
-        "Bagatka.Foundation", "Bagatka.Foundation.Modules", "Bagatka.Sandboxing", "Bagatka.Harnesses", "Bagatka.ObjectStorage",
+        "Bagatka.Foundation", "Bagatka.Foundation.Modules", "Bagatka.Sandboxing", "Bagatka.Harnesses", "Bagatka.ObjectStorage", "Bagatka.ModelAccess",
     ];
+
+    // Capabilities whose plain records contracts name as they are (ARCHITECTURE.md, "Layers").
+    private static readonly string[] ContractsMayUse = ["Bagatka.ModelAccess"];
 
     // Machines' contract relays the remote provider's call messages unchanged (ARCHITECTURE.md, "Dependency rules").
     private static readonly (string Project, string Reference) KnownException = ("Bagatka.AiSloth.Machines.Contracts", "Bagatka.Sandboxing.Remote");
@@ -147,6 +150,11 @@ public sealed class ModuleRuleTests
         }
 
         if (string.Equals(project.Name, KnownException.Project, StringComparison.Ordinal) && string.Equals(reference, KnownException.Reference, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (ContractsMayUse.Contains(reference, StringComparer.Ordinal))
         {
             return true;
         }

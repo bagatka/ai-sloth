@@ -5,6 +5,7 @@ using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.AgentAccounts.Model;
 
@@ -15,7 +16,7 @@ internal sealed class AgentAccount
     public const int MaxSecretLength = 4096;
 
     // Used by the factories and by EF: parameter names match property names.
-    private AgentAccount(AgentAccountId id, AgentAccountKind kind, AgentAccountName name, WorkspaceId? workspaceId, UserId? ownerId, DateTimeOffset addedAt, ApiEndpoint? endpoint)
+    private AgentAccount(AgentAccountId id, ModelAccessKind kind, AgentAccountName name, WorkspaceId? workspaceId, UserId? ownerId, DateTimeOffset addedAt, ApiEndpoint? endpoint)
     {
         Id = id;
         Kind = kind;
@@ -28,7 +29,7 @@ internal sealed class AgentAccount
 
     public AgentAccountId Id { get; private set; }
 
-    public AgentAccountKind Kind { get; private set; }
+    public ModelAccessKind Kind { get; private set; }
 
     public AgentAccountName Name { get; private set; }
 
@@ -50,7 +51,7 @@ internal sealed class AgentAccount
     public bool NeedsSignIn => SignInEndedAt is not null;
 
     // An API key, added with its secret.
-    public static Result<AgentAccount> Add(WorkspaceId? workspaceId, UserId? ownerId, AgentAccountKind kind, AgentAccountName name, string? secret, ApiEndpoint? endpoint, SecretBox box, TimeProvider time)
+    public static Result<AgentAccount> Add(WorkspaceId? workspaceId, UserId? ownerId, ModelAccessKind kind, AgentAccountName name, string? secret, ApiEndpoint? endpoint, SecretBox box, TimeProvider time)
     {
         string trimmed = (secret ?? string.Empty).Trim();
         if (trimmed.Length is 0 or > MaxSecretLength)
@@ -60,26 +61,26 @@ internal sealed class AgentAccount
         }
 
         AgentAccount account = new AgentAccount(AgentAccountId.New(), kind, name, workspaceId, ownerId, time.GetUtcNow(), endpoint);
-        account.Seal(new Credential(trimmed), box);
+        account.Seal(new ModelCredential(trimmed), box);
         return new Result<AgentAccount>(account);
     }
 
     // A person's plan, added by signing in.
-    public static AgentAccount SignedIn(UserId ownerId, AgentAccountKind kind, AgentAccountName name, Credential credential, SecretBox box, TimeProvider time)
+    public static AgentAccount SignedIn(UserId ownerId, ModelAccessKind kind, AgentAccountName name, ModelCredential credential, SecretBox box, TimeProvider time)
     {
         AgentAccount account = new AgentAccount(AgentAccountId.New(), kind, name, workspaceId: null, ownerId, time.GetUtcNow(), endpoint: null);
         account.Seal(credential, box);
         return account;
     }
 
-    public Credential OpenCredential(SecretBox box)
+    public ModelCredential OpenCredential(SecretBox box)
     {
         if (NeedsSignIn)
         {
             throw new InvalidOperationException("Agent account " + Id.Value + " has no credential: its sign-in ended.");
         }
 
-        Credential? credential = JsonSerializer.Deserialize<Credential>(box.Open(SealedSecret, Id.Value), FoundationJson.Options);
+        ModelCredential? credential = JsonSerializer.Deserialize<ModelCredential>(box.Open(SealedSecret, Id.Value), FoundationJson.Options);
         if (credential is null)
         {
             throw new InvalidOperationException("Agent account " + Id.Value + " has no credential.");
@@ -94,7 +95,7 @@ internal sealed class AgentAccount
         return !NeedsSignIn && OpenCredential(box).RenewalDue(now);
     }
 
-    public void Renewed(Credential credential, SecretBox box)
+    public void Renewed(ModelCredential credential, SecretBox box)
     {
         Seal(credential, box);
     }
@@ -110,7 +111,7 @@ internal sealed class AgentAccount
         return new AgentAccountSummary(Id, Kind, Name.Value, WorkspaceId, OwnerId, AddedAt, Endpoint?.Value, NeedsSignIn);
     }
 
-    private void Seal(Credential credential, SecretBox box)
+    private void Seal(ModelCredential credential, SecretBox box)
     {
         SealedSecret = box.Seal(JsonSerializer.Serialize(credential, FoundationJson.Options), Id.Value);
     }

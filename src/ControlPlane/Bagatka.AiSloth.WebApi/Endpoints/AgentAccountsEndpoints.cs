@@ -13,14 +13,15 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class AgentAccountsEndpoints
 {
-    internal sealed record AddAgentAccountRequest(AgentAccountKind Kind, string Name, string Secret, Uri? Endpoint = null);
+    internal sealed record AddAgentAccountRequest(ModelAccessKind Kind, string Name, string Secret, Uri? Endpoint = null);
 
-    internal sealed record StartSignInRequest(AgentAccountKind Kind, string Name);
+    internal sealed record StartSignInRequest(ModelAccessKind Kind, string Name);
 
     internal sealed record CompleteSignInRequest(string? Code = null);
 

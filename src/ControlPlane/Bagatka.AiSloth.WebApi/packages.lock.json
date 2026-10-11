@@ -377,17 +377,15 @@
         "dependencies": {
           "Bagatka.AiSloth.AgentAccounts.Contracts": "[1.0.0, )",
           "Bagatka.Foundation.Modules": "[1.0.0, )",
-          "Bagatka.Sdk.Anthropic": "[1.0.0, )",
-          "Bagatka.Sdk.GitHub": "[1.0.0, )",
-          "Bagatka.Sdk.OpenAI": "[1.0.0, )",
-          "Bagatka.Sdk.OpenRouter": "[1.0.0, )"
+          "Bagatka.ModelAccess": "[1.0.0, )"
         }
       },
       "bagatka.aisloth.agentaccounts.contracts": {
         "type": "Project",
         "dependencies": {
           "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
-          "Bagatka.Foundation": "[1.0.0, )"
+          "Bagatka.Foundation": "[1.0.0, )",
+          "Bagatka.ModelAccess": "[1.0.0, )"
         }
       },
       "bagatka.aisloth.chats": {
@@ -404,7 +402,8 @@
           "Bagatka.AiSloth.AgentAccounts.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Nooks.Contracts": "[1.0.0, )",
           "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
-          "Bagatka.Foundation": "[1.0.0, )"
+          "Bagatka.Foundation": "[1.0.0, )",
+          "Bagatka.ModelAccess": "[1.0.0, )"
         }
       },
       "bagatka.aisloth.daemonprotocol": {
@@ -537,6 +536,16 @@
       },
       "bagatka.harnesses": {
         "type": "Project"
+      },
+      "bagatka.modelaccess": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )",
+          "Bagatka.Sdk.Anthropic": "[1.0.0, )",
+          "Bagatka.Sdk.GitHub": "[1.0.0, )",
+          "Bagatka.Sdk.OpenAI": "[1.0.0, )",
+          "Bagatka.Sdk.OpenRouter": "[1.0.0, )"
+        }
       },
       "bagatka.objectstorage": {
         "type": "Project"

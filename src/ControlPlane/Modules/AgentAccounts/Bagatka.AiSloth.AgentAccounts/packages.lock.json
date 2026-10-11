@@ -67,7 +67,8 @@
         "type": "Project",
         "dependencies": {
           "Bagatka.AiSloth.Workspaces.Contracts": "[1.0.0, )",
-          "Bagatka.Foundation": "[1.0.0, )"
+          "Bagatka.Foundation": "[1.0.0, )",
+          "Bagatka.ModelAccess": "[1.0.0, )"
         }
       },
       "bagatka.aisloth.workspaces.contracts": {
@@ -85,6 +86,16 @@
           "Bagatka.Foundation": "[1.0.0, )",
           "EFCore.NamingConventions": "[10.0.1, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[11.0.0-rc.1.1, )"
+        }
+      },
+      "bagatka.modelaccess": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )",
+          "Bagatka.Sdk.Anthropic": "[1.0.0, )",
+          "Bagatka.Sdk.GitHub": "[1.0.0, )",
+          "Bagatka.Sdk.OpenAI": "[1.0.0, )",
+          "Bagatka.Sdk.OpenRouter": "[1.0.0, )"
         }
       },
       "bagatka.sdk.anthropic": {

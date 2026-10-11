@@ -5,7 +5,6 @@ using System.Threading;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.Foundation;
 using Microsoft.AspNetCore.Builder;
@@ -14,6 +13,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.WebApi.Endpoints;
 

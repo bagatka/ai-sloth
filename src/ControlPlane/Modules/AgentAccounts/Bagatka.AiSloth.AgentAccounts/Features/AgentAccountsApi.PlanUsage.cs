@@ -2,10 +2,10 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
-using Bagatka.AiSloth.AgentAccounts.Kinds;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.AgentAccounts;
 
@@ -21,12 +21,12 @@ internal sealed partial class AgentAccountsApi
         }
 
         AgentAccount account = usable.Output;
-        if (kinds.Of(account.Kind) is not IPlanKind plan)
+        if (!vendors.IsPlan(account.Kind))
         {
             return new Result<PlanUsage>(PlanUsage.None);
         }
 
-        IReadOnlyList<UsageMeter> meters = await plan.MetersAsync(account.OpenCredential(box), ct);
+        IReadOnlyList<UsageMeter> meters = await vendors.LimitsAsync(account.Kind, account.OpenCredential(box), ct);
         return new Result<PlanUsage>(new PlanUsage(meters, time.GetUtcNow()));
     }
 }

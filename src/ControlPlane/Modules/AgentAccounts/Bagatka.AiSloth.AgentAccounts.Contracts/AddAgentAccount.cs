@@ -1,5 +1,6 @@
 using System;
 using Bagatka.AiSloth.Workspaces.Contracts;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 
@@ -14,4 +15,4 @@ namespace Bagatka.AiSloth.AgentAccounts.Contracts;
 /// For an Anthropic or OpenAI API key, the API's base URL when it isn't the vendor's own, such as a
 /// company's gateway that speaks it; <see langword="null"/> for the vendor's. Other kinds take none.
 /// </param>
-public sealed record AddAgentAccount(WorkspaceId? WorkspaceId, AgentAccountKind Kind, string Name, string Secret, Uri? Endpoint);
+public sealed record AddAgentAccount(WorkspaceId? WorkspaceId, ModelAccessKind Kind, string Name, string Secret, Uri? Endpoint);

@@ -8,6 +8,7 @@ using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Harnesses;
+using Bagatka.ModelAccess;
 
 namespace Bagatka.AiSloth.Chats;
 

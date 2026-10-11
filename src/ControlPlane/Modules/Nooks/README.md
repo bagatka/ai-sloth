@@ -26,10 +26,15 @@ computers (Machines, to this module one more provider, `machine`).
 
 ## Contract
 
-`INooksApi`: people and the control plane create, list, and delete nooks, run and watch processes in
-them, take, list, and download checkpoints, copy files in and out, show the changes in a nook's
-repositories for review and export a source's changes for pushing, see and run their setup, wake
-them, and sync a folder of a nook with a kept folder.
+Three interfaces, one per concept, implemented by the module, and the daemons' side:
+
+- `INooksApi`, the nooks themselves: create, list, read, wake, and delete them, the providers a
+  workspace may use, and their setup, seen and run.
+- `INookProcessesApi`, what runs in them: start processes, list and watch them, feed and stop them.
+- `INookFilesApi`, their files: download them, copy them in and out, take and list checkpoints, show
+  the changes in its repositories and export a source's for pushing, and sync a folder with a kept
+  folder, list and delete kept folders.
+- `INookDaemonsApi`, the daemon endpoint's side.
 `INookDaemonsApi` is the daemon endpoint's side. Every operation wakes a sleeping nook first, except
 reading its changes, which never does, and every operation on its files puts them in place first, so
 callers only notice latency.
