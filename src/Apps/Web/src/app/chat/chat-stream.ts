@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react"
 
-import { apiElsewhere, apiUrl } from "../host"
+import { apiUrl } from "../host"
+import { LiveEvents } from "../live-events"
 import {
   emptyTranscript,
   fold,
@@ -10,8 +11,9 @@ import {
 
 // A chat as it happens: the host's event stream for it (GET /chats/{id}/events), folded into its
 // transcript. The connection opens when someone looks at the chat and closes a little after the last
-// one stops; the browser reconnects by itself after a dropped connection, resuming after the last
-// event it got. Events arrive in bursts while an agent streams, so they're folded once per frame.
+// one stops. It reconnects after a dropped connection or a restart of the host, resuming after the
+// last event it got (LiveEvents). Events arrive in bursts while an agent streams, so they're folded
+// once per frame.
 
 export type PendingMessage = {
   /** This browser's name for it until the host names it. */
@@ -27,8 +29,8 @@ export type ChatState = {
   pending: readonly PendingMessage[]
   /** Whether events arrive as they happen; false while connecting or reconnecting. */
   live: boolean
-  /** Whether the host refused the stream: the chat is gone or the browser is signed out. */
-  refused: boolean
+  /** Whether the connection dropped and the stream is reconnecting: what happens meanwhile comes after. */
+  reconnecting: boolean
   /**
    * Whether what changed last arrived as it happened, for a moment after: not the history the
    * stream replays as it opens, nor a chat shown again later.
@@ -73,11 +75,11 @@ class ChatStream {
     transcript: emptyTranscript,
     pending: [],
     live: false,
-    refused: false,
+    reconnecting: false,
     arriving: false,
   }
   private readonly listeners = new Set<() => void>()
-  private source: EventSource | null = null
+  private readonly events: LiveEvents
   private queue: ChatEvent[] = []
   private frame = 0
   private openedAt = 0
@@ -88,6 +90,26 @@ class ChatStream {
 
   constructor(chatId: string) {
     this.chatId = chatId
+    this.events = new LiveEvents(
+      () => {
+        const url = new URL(`chats/${this.chatId}/events`, apiUrl)
+        url.searchParams.set("after", String(this.state.transcript.sequence))
+        return url
+      },
+      (source) => {
+        for (const kind of kinds) {
+          source.addEventListener(kind, (message) =>
+            this.receive(kind, (message as MessageEvent<string>).data)
+          )
+        }
+      },
+      (live) => {
+        if (live) {
+          this.openedAt = performance.now()
+        }
+        this.set({ live, reconnecting: !live })
+      }
+    )
   }
 
   subscribe = (listener: () => void) => {
@@ -107,12 +129,6 @@ class ChatStream {
 
   get watched() {
     return this.listeners.size > 0
-  }
-
-  /** Follows the chat again after the host refused it, such as after signing in again. */
-  retry() {
-    this.close()
-    this.open()
   }
 
   /** Shows a message as sent at once, before the host reports it. */
@@ -144,41 +160,16 @@ class ChatStream {
   }
 
   private open() {
-    if (this.source) {
-      return
-    }
-
-    this.openedAt = performance.now()
-    const url = new URL(`chats/${this.chatId}/events`, apiUrl)
-    url.searchParams.set("after", String(this.state.transcript.sequence))
-    const source = new EventSource(url, { withCredentials: apiElsewhere })
-    for (const kind of kinds) {
-      source.addEventListener(kind, (message) =>
-        this.receive(kind, (message as MessageEvent<string>).data)
-      )
-    }
-    source.onopen = () => this.set({ live: true, refused: false })
-    source.onerror = () => {
-      // Closed means the host answered with something other than a stream; otherwise the browser
-      // is already reconnecting.
-      if (source.readyState === EventSource.CLOSED) {
-        this.source = null
-        this.set({ live: false, refused: true })
-      } else {
-        this.set({ live: false })
-      }
-    }
-    this.source = source
+    this.events.open()
   }
 
   private close() {
-    this.source?.close()
-    this.source = null
+    this.events.close()
     window.cancelAnimationFrame(this.frame)
     this.frame = 0
     this.flush()
     window.clearTimeout(this.arrivingTimer)
-    this.set({ live: false, arriving: false })
+    this.set({ live: false, reconnecting: false, arriving: false })
   }
 
   private receive(kind: string, data: string) {

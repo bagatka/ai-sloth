@@ -63,6 +63,7 @@ public sealed partial class WebJourney(ControlPlane app)
             await AChatStartedElsewhereShowsUpAtOnceAsync(page, acme);
             await AMessageStartsTheNextTurnAsync(page);
             await AMessageCopiesAsItsTextAsync(page, context);
+            await TheChatFollowsOnThroughARestartAsync(page);
             await AMessageWhileTheAgentWorksGoesIntoItsTurnAsync(page);
             await EscStopsTheTurnAsync(page);
             await TheTranscriptFollowsOnlyWhileAtItsEndAsync(page, acme, chat);
@@ -419,6 +420,22 @@ public sealed partial class WebJourney(ControlPlane app)
         Assert.Equal(before, after, 1);
         Assert.True(atEnd);
         Assert.True(followedAgain);
+    }
+
+    // A host that answers a chat's events with something other than a stream, as while it restarts,
+    // doesn't lose the chat: it says it's reconnecting, and follows on once the host is back, which the
+    // steps after show.
+    private static async Task TheChatFollowsOnThroughARestartAsync(IPage page)
+    {
+        const string Events = "**/chats/*/events?*";
+        await page.RouteAsync(Events, route => route.FulfillAsync(new RouteFulfillOptions { Status = 503 }));
+        await page.ReloadAsync();
+        ILocator reconnecting = page.GetByText("Reconnecting to the host.");
+        await Assertions.Expect(reconnecting).ToBeVisibleAsync(WebBrowser.Shown);
+        await page.UnrouteAsync(Events);
+
+        await Assertions.Expect(reconnecting).ToBeHiddenAsync(new LocatorAssertionsToBeHiddenOptions { Timeout = 30_000 });
+        await Assertions.Expect(page.GetByText("say hello", new PageGetByTextOptions { Exact = true })).ToBeVisibleAsync();
     }
 
     // The model holds a call that says Wait, so the turn runs until it's released.

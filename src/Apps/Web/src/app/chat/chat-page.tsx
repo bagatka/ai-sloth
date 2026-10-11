@@ -31,7 +31,7 @@ import {
   nooks,
   people,
 } from "../queries"
-import { chatStream, useChat } from "./chat-stream"
+import { useChat } from "./chat-stream"
 import { BoxLine } from "./box-line"
 import { ChangesPanel, DownloadFiles } from "./changes-panel"
 import { Composer } from "./composer"
@@ -151,24 +151,22 @@ export function ChatPage() {
       {/* The transcript and the message box share one scroller: sending follows the newest output
           again. A chat gets its own, starting at its end. */}
       <MessageScrollerProvider key={chatId} autoScroll>
-        {state.refused ? (
-          <Missing
-            title="Can't follow this chat"
-            description="The host stopped sending its events. Try again in a moment."
-            retry={() => chatStream(chatId).retry()}
-          />
-        ) : (
-          <TranscriptView
-            state={state}
-            me={person.id}
-            names={nameOf}
-            agent={agent}
-            start={
-              chat.data.continues && (
-                <ContinuesLine chatId={chat.data.continues} />
-              )
-            }
-          />
+        <TranscriptView
+          state={state}
+          me={person.id}
+          names={nameOf}
+          agent={agent}
+          start={
+            chat.data.continues && (
+              <ContinuesLine chatId={chat.data.continues} />
+            )
+          }
+        />
+        {state.reconnecting && (
+          <BoxLine tone="warning">
+            Reconnecting to the host. What happens meanwhile shows once it's
+            back.
+          </BoxLine>
         )}
         {state.transcript.workFailing && (
           <BoxLine tone="warning">

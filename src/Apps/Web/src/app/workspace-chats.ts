@@ -1,12 +1,14 @@
 import { useSyncExternalStore } from "react"
 
 import type { Schemas } from "./api"
-import { apiElsewhere, apiUrl } from "./host"
+import { apiUrl } from "./host"
+import { LiveEvents } from "./live-events"
 
 // A workspace's chats as they change: the host's live list (GET /workspaces/{id}/chats/live). Each
 // connection starts with the newest chats, then sends the ones that change, each replacing what the
 // list had for it. The connection opens while someone looks at the list and closes a little after;
-// the browser reconnects by itself, and the host starts over with the newest chats.
+// it reconnects after a dropped connection or a restart of the host (LiveEvents), and the host starts
+// over with the newest chats.
 
 type ChatSummary = Schemas["ChatSummary"]
 
@@ -24,13 +26,27 @@ class WorkspaceChatsStream {
   private readonly workspaceId: string
   private state: WorkspaceChats = { chats: [], loaded: false }
   private readonly listeners = new Set<() => void>()
-  private source: EventSource | null = null
+  private readonly events: LiveEvents
   private closeTimer = 0
   // Whether the next list is a connection's first, which replaces the whole list.
   private starting = true
 
   constructor(workspaceId: string) {
     this.workspaceId = workspaceId
+    this.events = new LiveEvents(
+      () => new URL(`workspaces/${this.workspaceId}/chats/live`, apiUrl),
+      (source) =>
+        source.addEventListener("chats", (message) =>
+          this.receive(
+            JSON.parse((message as MessageEvent<string>).data) as ChatSummary[]
+          )
+        ),
+      (live) => {
+        if (live) {
+          this.starting = true
+        }
+      }
+    )
   }
 
   subscribe = (listener: () => void) => {
@@ -48,33 +64,11 @@ class WorkspaceChatsStream {
   getSnapshot = () => this.state
 
   private open() {
-    if (this.source) {
-      return
-    }
-
-    const url = new URL(`workspaces/${this.workspaceId}/chats/live`, apiUrl)
-    const source = new EventSource(url, { withCredentials: apiElsewhere })
-    source.addEventListener("chats", (message) =>
-      this.receive(
-        JSON.parse((message as MessageEvent<string>).data) as ChatSummary[]
-      )
-    )
-    source.onopen = () => {
-      this.starting = true
-    }
-    // Closed means the host answered with something other than a stream, such as for a workspace
-    // the person left; the list stays as it was. Otherwise the browser is already reconnecting.
-    source.onerror = () => {
-      if (source.readyState === EventSource.CLOSED) {
-        this.source = null
-      }
-    }
-    this.source = source
+    this.events.open()
   }
 
   private close() {
-    this.source?.close()
-    this.source = null
+    this.events.close()
   }
 
   private receive(changed: ChatSummary[]) {
