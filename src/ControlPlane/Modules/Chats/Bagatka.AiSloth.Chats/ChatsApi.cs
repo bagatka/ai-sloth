@@ -144,7 +144,8 @@ internal sealed partial class ChatsApi(
         return chat.ToSummary(waiting, firstMessage);
     }
 
-    // A chat's runner saves the chat too; a save it made meanwhile is read again, this many times.
+    // A chat's runner saves the chat too; a save it made meanwhile, which shows as a conflict or as an
+    // event already saved with the sequence number taken, is read again, this many times.
     private const int ChangeAttempts = 3;
 
     // Changes the chat as it is now, and saves the event that tells it when the change changed anything.
@@ -165,7 +166,8 @@ internal sealed partial class ChatsApi(
                 return new Result<Chat>(chat);
             }
 
-            if (saved.Error != ModuleDbContextExtensions.ConcurrencyConflict || attempt == ChangeAttempts)
+            bool changedMeanwhile = saved.Error == ModuleDbContextExtensions.ConcurrencyConflict || saved.Error == ModuleDbContextExtensions.AlreadyExists;
+            if (!changedMeanwhile || attempt == ChangeAttempts)
             {
                 return new Result<Chat>(saved.Error);
             }

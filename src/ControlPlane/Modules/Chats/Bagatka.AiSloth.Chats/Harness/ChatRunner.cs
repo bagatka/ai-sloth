@@ -167,6 +167,16 @@ internal sealed class ChatRunner(
             await HandleAsync(batch, ct);
             return false;
         }
+        catch (DbUpdateConcurrencyException) when (!ct.IsCancellationRequested)
+        {
+            // The chat changed meanwhile: the runner reads it again at once. Lines already queued were
+            // read past the saved offset; the next reader reads them again.
+            while (_inputs.Reader.TryRead(out _))
+            {
+            }
+
+            return false;
+        }
         catch (Exception exception) when (!ct.IsCancellationRequested)
         {
             // A draft that went with its nook fails what its runner was doing; the next try retires it.
@@ -969,10 +979,18 @@ internal sealed class ChatRunner(
             && (chat.Property(found => found.TurnMessageId).IsModified || db.ChangeTracker.Entries<Message>().Any(entry => entry.State is EntityState.Added or EntityState.Modified))
             ? chat.Entity.WorkspaceId
             : null;
+        // People change the chat too (ChatsApi.ChangeChatAsync): one who saved first shows as a conflict,
+        // or as an event already saved with the sequence number the runner took. The runner then does
+        // its work again from what's saved.
         Result saved = await db.SaveAsync(ct);
+        bool changedMeanwhile = saved.Error == ModuleDbContextExtensions.ConcurrencyConflict || saved.Error == ModuleDbContextExtensions.AlreadyExists;
+        if (changedMeanwhile)
+        {
+            throw new DbUpdateConcurrencyException("Chat " + chatId.Value + " changed while its runner worked on it.");
+        }
+
         if (saved.Failed)
         {
-            // The runner is the chat's only writer, so a conflict is a defect.
             throw new InvalidOperationException("Saving chat " + chatId.Value + " failed: " + saved.Error.Message);
         }
 
