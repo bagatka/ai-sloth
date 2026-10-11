@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Bagatka.Sdk.OpenAI;
 
 /// <summary>
-/// Registers <see cref="ChatGptSignInClient"/>.
+/// Registers <see cref="ChatGptSignInClient"/> and <see cref="OpenAIModelsClient"/>.
 /// </summary>
 public static class ChatGptSignInRegistration
 {
@@ -17,6 +17,17 @@ public static class ChatGptSignInRegistration
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(settings);
         services.AddSingleton(_ => new ChatGptSignInClient(settings));
+        return services;
+    }
+
+    /// <summary>
+    /// Registers one <see cref="OpenAIModelsClient"/> for the whole application, disposed with the
+    /// service provider. Call it once.
+    /// </summary>
+    public static IServiceCollection AddOpenAIModelsClient(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddSingleton(_ => new OpenAIModelsClient());
         return services;
     }
 }

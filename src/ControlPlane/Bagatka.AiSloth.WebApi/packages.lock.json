@@ -377,6 +377,7 @@
         "dependencies": {
           "Bagatka.AiSloth.AgentAccounts.Contracts": "[1.0.0, )",
           "Bagatka.Foundation.Modules": "[1.0.0, )",
+          "Bagatka.Sdk.Anthropic": "[1.0.0, )",
           "Bagatka.Sdk.OpenAI": "[1.0.0, )",
           "Bagatka.Sdk.OpenRouter": "[1.0.0, )"
         }
@@ -574,6 +575,12 @@
         "dependencies": {
           "Bagatka.Sandboxing": "[1.0.0, )",
           "Google.Protobuf": "[3.36.2, )"
+        }
+      },
+      "bagatka.sdk.anthropic": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
         }
       },
       "bagatka.sdk.docker": {

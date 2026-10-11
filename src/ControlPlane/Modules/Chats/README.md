@@ -83,7 +83,7 @@ minutes unless given).
   requests get their broadest allow.
 - **A model is the vendor's ID.** A chat runs on a model as its account's vendor names it, such as
   `openai/gpt-6-luna` at OpenRouter, or on its harness's default. Only harnesses whose start script
-  takes one get it (`HarnessProfile.TakesModel`: Claude Code and pi). The models offered are the
+  takes one get it (`HarnessProfile.TakesModel`: Claude Code, Codex, and pi). The models offered are the
   vendor's that can call tools; a chat's model isn't checked against them, so a model the vendor
   doesn't know fails its turns with the vendor's answer.
 - **Presets are personal.** A preset is someone's saved harness, account, and model, offered first

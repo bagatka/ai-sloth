@@ -400,9 +400,12 @@ function ModelPicker({
             <ComboboxItem key={model.id} value={model}>
               <span className="flex min-w-0 flex-col">
                 <span className="truncate">{model.name}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {model.id}
-                </span>
+                {/* OpenAI names its models by their IDs alone. */}
+                {model.name !== model.id && (
+                  <span className="truncate text-xs text-muted-foreground">
+                    {model.id}
+                  </span>
+                )}
               </span>
             </ComboboxItem>
           )}

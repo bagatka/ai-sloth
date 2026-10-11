@@ -15,7 +15,7 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <param name="Model">
 /// The model its agent runs on, as the account's vendor names it, such as <c>openai/gpt-6-luna</c>
 /// (<see cref="IChatsApi.ListModelsAsync"/>); or <see langword="null"/> for the harness's default.
-/// Only for harnesses that take one, such as Claude Code and pi.
+/// Only for harnesses that take one: Claude Code, Codex, and pi.
 /// </param>
 /// <param name="Repositories">The workspace's repositories its nook starts with, each at <c>/work/&lt;name&gt;</c>; empty for none.</param>
 /// <param name="CopyOf">

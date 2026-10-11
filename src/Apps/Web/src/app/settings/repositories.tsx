@@ -301,7 +301,7 @@ function aborted(error: unknown): boolean {
 }
 
 // Adding repositories the person's GitHub connection reaches. One that isn't listed needs the
-// host's GitHub App installed on it first, at GitHub.
+// host's GitHub App installed on it first, at GitHub; coming back to the page lists it.
 function AddRepository({
   workspace,
   added,
@@ -334,7 +334,8 @@ function AddRepository({
         description: messageOf(error),
       }),
   })
-  const shown = (available.data?.repositories ?? []).filter(
+  const reachable = available.data?.repositories ?? []
+  const shown = reachable.filter(
     (repository) =>
       !added.includes(repository.fullName) &&
       repository.fullName.toLowerCase().includes(filter.trim().toLowerCase())
@@ -372,6 +373,23 @@ function AddRepository({
             <li className="px-2 py-2 text-label text-destructive">
               {messageOf(available.error)}
             </li>
+          ) : reachable.length === 0 ? (
+            <li className="flex flex-col items-start gap-3 px-2 py-2">
+              <p className="text-label text-pretty text-muted-foreground">
+                The app isn't installed on any of your repositories yet. Install
+                it at GitHub on the ones agents should work in, then come back
+                here.
+              </p>
+              <a
+                href={available.data.installUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonVariants({ size: "sm" })}
+              >
+                Install on GitHub
+                <ArrowSquareOutIcon data-icon="inline-end" />
+              </a>
+            </li>
           ) : shown.length === 0 ? (
             <li className="px-2 py-2 text-label text-muted-foreground">
               {filter.trim()
@@ -407,7 +425,7 @@ function AddRepository({
             ))
           )}
         </ul>
-        {available.data && (
+        {available.data && reachable.length > 0 && (
           <p className="text-label text-muted-foreground">
             Not here?{" "}
             <a

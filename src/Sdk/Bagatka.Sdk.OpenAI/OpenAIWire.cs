@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -6,6 +7,10 @@ namespace Bagatka.Sdk.OpenAI;
 // The shapes of OpenAI's authorization server responses, as it sends them.
 internal static class OpenAIWire
 {
+    internal sealed record ModelList([property: JsonPropertyName("data")] IReadOnlyList<Model> Data);
+
+    internal sealed record Model([property: JsonPropertyName("id")] string Id, [property: JsonPropertyName("created")] long? Created);
+
     internal sealed record TokenResponse(
         [property: JsonPropertyName("access_token")] string? AccessToken,
         [property: JsonPropertyName("refresh_token")] string? RefreshToken,

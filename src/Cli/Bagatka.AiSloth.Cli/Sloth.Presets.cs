@@ -154,7 +154,9 @@ internal sealed partial class Sloth
         int width = matching.Max(model => model.Id.Length);
         foreach (Wire.Model model in matching)
         {
-            await terminal.WriteLineAsync(model.Id.PadRight(width) + "  " + model.Name);
+            // OpenAI names its models by their IDs alone.
+            string name = string.Equals(model.Name, model.Id, StringComparison.Ordinal) ? string.Empty : "  " + model.Name;
+            await terminal.WriteLineAsync((model.Id.PadRight(width) + name).TrimEnd());
         }
 
         return 0;

@@ -87,6 +87,12 @@
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[11.0.0-rc.1.1, )"
         }
       },
+      "bagatka.sdk.anthropic": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
       "bagatka.sdk.openai": {
         "type": "Project",
         "dependencies": {

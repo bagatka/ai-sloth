@@ -2,7 +2,8 @@
 
 Sign in with ChatGPT for open-source and self-hosted apps: the OAuth flow whose tokens call the
 OpenAI API on a person's ChatGPT plan. OpenAI's official .NET SDK calls the API but doesn't cover this
-sign-in.
+sign-in. Beside it, `OpenAIModelsClient` lists the models an OpenAI API serves, with an API key or a
+plan's token: one call, which isn't worth the official SDK.
 
 - **Docs:** [Sign in with ChatGPT, ChatGPT plan usage](https://developers.openai.com/siwc/token-sharing-open-source)
   (registration and sign-in, token reference, errors and recovery, preview limitations), as of
@@ -20,7 +21,14 @@ sign-in.
 - **No retries:** every call changes state at OpenAI (a code works once, a refresh replaces the
   refresh token), so the client owns one `HttpClient` and retries nothing.
 
+- **Models:** `GET /models` on the API (`https://api.openai.com/v1`, or another endpoint that speaks
+  it), with the caller's credentials.
+
 ## Quirks
+
+- `GET /models` lists every model the API serves, for speech, images, and embeddings too, without
+  names or what each can do. With a ChatGPT plan's token it isn't the plan's entitlements: in
+  October 2026 it didn't list `gpt-6.1-sol`, which the plan ran.
 
 - The redirect must be an HTTP loopback address on `127.0.0.1` with the path `/auth/callback`; only
   the port may change, and `localhost` isn't accepted. A remote host signs in through a browser on

@@ -33,7 +33,7 @@ public static class HarnessProfiles
         SessionPaths: ["/root/.codex/sessions"],
         InstructionsPath: "/root/.codex/AGENTS.md",
         StatePaths: [],
-        TakesModel: false);
+        TakesModel: true);
 
     /// <summary>pi through its ACP adapter, on OpenAI's or Anthropic's API, OpenRouter, or a Copilot plan.</summary>
     public static HarnessProfile Pi { get; } = new HarnessProfile(

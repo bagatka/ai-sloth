@@ -18,8 +18,9 @@ a nook: the model gateway adds them to each call.
   deployment allows. What each kind is at its vendor: where its calls go and which headers pay for
   them, or that its token goes to its harness.
 - **Integrations:** Sign in with ChatGPT, through `Bagatka.Sdk.OpenAI`: registering, exchanging the
-  code, renewing a plan's access token, and ending its session on removal. OpenRouter's catalog of
-  models, through `Bagatka.Sdk.OpenRouter`.
+  code, renewing a plan's access token, and ending its session on removal. The vendors' lists of
+  models: OpenAI's through `Bagatka.Sdk.OpenAI`, Anthropic's through `Bagatka.Sdk.Anthropic`, and
+  OpenRouter's catalog through `Bagatka.Sdk.OpenRouter`.
 
 ## Does not own
 
@@ -99,10 +100,12 @@ None. A plan's access token is renewed when it is used and due, never in the bac
   (`/v1/messages`) and OpenAI's at `/v1`, so an OpenRouter key's endpoint is OpenRouter's root, with
   its key as a bearer token, and each harness calls the API it speaks. Only Anthropic and OpenAI API
   keys name an endpoint of their own.
-- **Models are listed for OpenRouter only.** Its catalog is public and read on each call, about 60 ms
-  for 750 KB, without its batch variants; other kinds list none yet, and their agents start on their
-  harness's default model.
-
+- **Models come from each vendor's list.** OpenRouter's catalog is public, read on each call (about
+  60 ms for 750 KB), without its batch variants. Anthropic's and OpenAI's lists are asked at the
+  account's endpoint with its credentials; OpenAI's holds every model its API serves, so only its GPT,
+  o-series, and Codex models are offered, and with a ChatGPT plan's token it can leave out models the
+  plan runs. Copilot and Claude plans list none yet, and their agents start on their harness's default
+  model.
 - **Secrets at rest** are sealed with AES-256-GCM under the deployment's encryption key, bound to
   their row's ID (`PATTERNS.md`, entry 13). They leave the module only through `UseAsync`, in records
   whose text form leaves them out.

@@ -30,7 +30,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// gets a short text. It speaks
 /// OpenAI's Responses API well enough for Codex and pi, answering every call with a short text. It
 /// stands in for OpenRouter too: its catalog of models, and OpenAI's chat API, which pi calls there,
-/// answering every call with a short text.
+/// answering every call with a short text. One catalog of models answers OpenRouter's, OpenAI's, and
+/// Anthropic's list of models, with every field each reads.
 /// </summary>
 internal sealed class FakeModel : IAsyncDisposable
 {
@@ -45,6 +46,9 @@ internal sealed class FakeModel : IAsyncDisposable
 
     /// <summary>Another model in its OpenRouter catalog that can call tools.</summary>
     public const string OpenRouterClaude = "anthropic/claude-opus-5.5";
+
+    /// <summary>A model as OpenAI's API names it, which an agent can run on; not Codex's default.</summary>
+    public const string OpenAIModel = "gpt-5.6-terra";
 
     private readonly WebApplication _app;
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
@@ -274,8 +278,8 @@ internal sealed class FakeModel : IAsyncDisposable
         await context.Response.WriteAsync(EventStream(events), context.RequestAborted);
     }
 
-    // OpenRouter's catalog, as it lists models: two that can call tools, one only for batches, and one
-    // that can't call tools.
+    // The vendors' lists of models, as each lists them: models that can call tools, one only for
+    // batches, one that can't call tools, and one of OpenAI's for audio.
     private static IResult OpenRouterCatalog()
     {
         JsonObject catalog = new JsonObject
@@ -284,7 +288,9 @@ internal sealed class FakeModel : IAsyncDisposable
                 CatalogModel(OpenRouterModel, "OpenAI: GPT-6 Luna", "tools", "max_tokens"),
                 CatalogModel(OpenRouterModel + ":batch", "OpenAI: GPT-6 Luna (batch)", "tools", "max_tokens"),
                 CatalogModel(OpenRouterClaude, "Anthropic: Claude Opus 5.5", "tools", "max_tokens"),
-                CatalogModel("example/writer", "Example: Writer", "max_tokens")),
+                CatalogModel("example/writer", "Example: Writer", "max_tokens"),
+                CatalogModel(OpenAIModel, "OpenAI: GPT-5.6 Terra", "tools", "max_tokens"),
+                CatalogModel("gpt-4o-audio-preview", "OpenAI: GPT-4o Audio", "max_tokens")),
         };
         return Results.Text(catalog.ToJsonString(), "application/json");
     }
@@ -295,6 +301,8 @@ internal sealed class FakeModel : IAsyncDisposable
         {
             ["id"] = id,
             ["name"] = name,
+            ["display_name"] = name,
+            ["created"] = 1_790_000_000,
             ["supported_parameters"] = new JsonArray([.. parameters.Select(parameter => (JsonNode)parameter)]),
         };
     }

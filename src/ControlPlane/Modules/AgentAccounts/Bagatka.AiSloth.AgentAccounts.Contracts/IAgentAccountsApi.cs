@@ -58,12 +58,17 @@ public interface IAgentAccountsApi
     public Task<Result<IReadOnlyList<AgentAccountSummary>>> ListAsync(Actor actor, WorkspaceId workspaceId, CancellationToken ct);
 
     /// <summary>
-    /// The models the account's vendor offers, for choosing one per chat, newest first: OpenRouter's
-    /// catalog, without its batch variants. Other kinds list none yet, and their agents start on their
-    /// harness's default model. Reads the vendor's catalog each time, which throws when it can't be
+    /// The models the account's vendor offers, for choosing one per chat: OpenRouter's catalog without
+    /// its batch variants, and the lists of Anthropic's and OpenAI's APIs at the account's endpoint,
+    /// asked with its credentials, newest first. A ChatGPT plan's list is OpenAI's API's, which may
+    /// leave out models the plan runs. Copilot and Claude plans list none yet; their agents start on
+    /// their harness's default model. Asks the vendor each time, which throws when it can't be
     /// reached; try again later.
     /// </summary>
-    /// <returns>The models; or not found for anyone who may not use the account in the workspace.</returns>
+    /// <returns>
+    /// The models; <see cref="AgentAccountsErrors.SignInEnded"/>; or not found for anyone who may not
+    /// use the account in the workspace.
+    /// </returns>
     public Task<Result<IReadOnlyList<AgentModel>>> ListModelsAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct);
 
     /// <summary>
