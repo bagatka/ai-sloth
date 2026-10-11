@@ -164,6 +164,19 @@ public interface IChatsApi
     public Task<Result<ChatSummary>> FixSetupAsync(Actor actor, ChatId id, CancellationToken ct);
 
     /// <summary>
+    /// Brings the fix of the chat's failed setup, from the chat that fixed it (<see cref="FixSetupAsync"/>),
+    /// into the chat's nook, then runs its setup again (<see cref="RunSetupAgainAsync"/>): each
+    /// repository's changes there are applied to its copy here, all of them or none, keeping the chat's
+    /// own changes, and become part of the chat's changes.
+    /// </summary>
+    /// <returns>
+    /// Nothing; <see cref="ChatsErrors.NoSetupFix"/>; <see cref="ChatsErrors.SetupNotFixed"/> until the
+    /// other chat's setup ran again and worked; <see cref="ChatsErrors.SetupFixDoesNotApply"/>;
+    /// forbidden for anyone who may only read the chat; or not found.
+    /// </returns>
+    public Task<Result> UseSetupFixAsync(Actor actor, ChatId id, CancellationToken ct);
+
+    /// <summary>
     /// The harness state the actor's agents in the workspace get, for each harness that keeps any: what
     /// its agents write for themselves to use later, such as Claude Code's memory, saved after each
     /// turn that changed it and given to the next agents. It follows who may direct the agents: the

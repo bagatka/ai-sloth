@@ -22,8 +22,9 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// at once. A message they write starts the next turn, one written while the agent works goes into
 /// that turn, and Esc stops a turn. They start a chat in the app with Acme's repository, choosing its
 /// agent and its model, switch the chat to another model, see that the repository's setup failed and
-/// fix it in a chat of its own, which runs the setup again and offers its fix as a pull request, review
-/// what changed in the repository, download its files, and open a pull request. The app
+/// fix it in a chat of its own, which runs the setup again and offers its fix as a pull request, then
+/// bring the fix into the chat, review what changed in the repository, the fix too, download its files,
+/// and open a pull request. The app
 /// runs under the host's content security policy without a violation, and its session is a cookie no
 /// script can read. On another computer, a link to the chat signs them in through the host's provider
 /// and opens it. Only the model and GitHub are fake; the app is src/Apps/Web as last built, and
@@ -60,6 +61,7 @@ public sealed partial class WebJourney(ControlPlane app)
             await FindsTheChatAndSeesItsTurnAsync(page);
             await AChatStartedElsewhereShowsUpAtOnceAsync(page, acme);
             await AMessageStartsTheNextTurnAsync(page);
+            await AMessageCopiesAsItsTextAsync(page, context);
             await AMessageWhileTheAgentWorksGoesIntoItsTurnAsync(page);
             await EscStopsTheTurnAsync(page);
             ChatSummary started = await StartsAChatWithTheRepositoryInTheAppAsync(page, acme);
@@ -183,8 +185,9 @@ public sealed partial class WebJourney(ControlPlane app)
 
     // The repository's setup failed before the agent started: the transcript says so in a line, and the
     // message box what that means, with its output. One click starts a chat that fixes it, and the chat
-    // goes on as it is, linking to it. There the agent fixes it (here the journey does, as it would),
-    // the setup runs again, and the fix is offered as a pull request. Then they go back to the chat.
+    // goes on as it is, following it. There the agent fixes it (here the journey does, as it would),
+    // the setup runs again, and the fix is offered as a pull request. Back in the chat, they bring the
+    // fix in, and the setup runs again there too.
     private async Task AFailedSetupIsFixedInAChatOfItsOwnAsync(IPage page, TestWorkspace acme)
     {
         ILocator failed = page.GetByRole(AriaRole.Alert).Filter(new LocatorFilterOptions { HasText = "api's setup failed" });
@@ -204,7 +207,7 @@ public sealed partial class WebJourney(ControlPlane app)
 
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = FixRequest })).ToBeVisibleAsync(WebBrowser.Shown);
         await app.Model.HeldAsync(FixRequest);
-        await Assertions.Expect(page.GetByText("Claude Code is fixing api's setup. When it's done, AiSloth runs the setup again to check the fix.")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(page.GetByText("Fixing api's setup. AiSloth then runs it again to check the fix.")).ToBeVisibleAsync(WebBrowser.Shown);
         await WebBrowser.ShotAsync(page, "setup-fixing");
         Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(acme.Person.SendGetAsync(acme.Path + "/chats"), HttpStatusCode.OK);
         ChatSummary fixing = Assert.Single(chats.Items, found => string.Equals(found.Title, FixRequest, StringComparison.Ordinal));
@@ -217,18 +220,24 @@ public sealed partial class WebJourney(ControlPlane app)
         await WebBrowser.ShotAsync(page, "setup-works");
 
         await page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Please write hello.txt in a new chat" }).ClickAsync();
-        await Assertions.Expect(elsewhere).ToBeVisibleAsync(WebBrowser.Shown);
+        ILocator fixedElsewhere = page.GetByRole(AriaRole.Alert).Filter(new LocatorFilterOptions { HasText = "api's setup is fixed in another chat" });
+        await Assertions.Expect(fixedElsewhere).ToBeVisibleAsync(WebBrowser.Shown);
+        await WebBrowser.ShotAsync(page, "setup-fixed-in-another-chat");
+        await fixedElsewhere.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Use the fix here" }).ClickAsync();
+        await Assertions.Expect(page.GetByText("Set up again in ", new PageGetByTextOptions { Exact = false })).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(page.GetByRole(AriaRole.Alert).Filter(new LocatorFilterOptions { HasText = "setup" })).ToHaveCountAsync(0);
+        await WebBrowser.ShotAsync(page, "setup-fix-used");
     }
 
-    // The agent changes the repository (here the journey does, as it would); the changes show as a
-    // diff, the files download, and a pull request opens on GitHub with them.
+    // The agent changes the repository (here the journey does, as it would); the changes, the setup's
+    // fix among them, show as a diff, the files download, and a pull request opens on GitHub with them.
     private async Task ReviewsTheChangesDownloadsTheFilesAndOpensAPullRequestAsync(IPage page, TestWorkspace acme, ChatSummary chat, string owner)
     {
         await acme.ChangeAsync(chat.NookId, "echo 'hello from the review' > /work/api/CHANGE.md");
 
         await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Changes" }).ClickAsync();
         ILocator panel = page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "Changes" });
-        await Assertions.Expect(panel.GetByText("1 file in api")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(panel.GetByText("2 files in api")).ToBeVisibleAsync(WebBrowser.Shown);
         await Assertions.Expect(panel.GetByText("hello from the review")).ToBeVisibleAsync(WebBrowser.Shown);
         await WebBrowser.ShotAsync(page, "changes");
         IDownload download = await page.RunAndWaitForDownloadAsync(() => panel.GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = "Download files" }).ClickAsync());
@@ -239,11 +248,14 @@ public sealed partial class WebJourney(ControlPlane app)
         await page.GetByRole(AriaRole.Menuitem, new PageGetByRoleOptions { Name = "Open a pull request" }).ClickAsync();
         await Assertions.Expect(page.GetByText("Pushed to aisloth/")).ToBeVisibleAsync(WebBrowser.Shown);
         await WebBrowser.ShotAsync(page, "pushed");
-        string? file = await app.GitHub.ReadAsync(owner, "api", "show", "aisloth/" + chat.Id.Value.ToString("N", CultureInfo.InvariantCulture)[^6..] + ":CHANGE.md");
+        string branch = "aisloth/" + chat.Id.Value.ToString("N", CultureInfo.InvariantCulture)[^6..];
+        string? file = await app.GitHub.ReadAsync(owner, "api", "show", branch + ":CHANGE.md");
+        string? setup = await app.GitHub.ReadAsync(owner, "api", "show", branch + ":.agents/setup");
 
         Assert.EndsWith(".tar.gz", download.SuggestedFilename, StringComparison.Ordinal);
         Assert.True(new FileInfo(archive).Length > 0);
         Assert.Equal("hello from the review", file);
+        Assert.Equal("#!/bin/sh\necho installed", setup);
         Assert.Single(app.GitHub.PullRequests(owner, "api"));
     }
 
@@ -256,6 +268,18 @@ public sealed partial class WebJourney(ControlPlane app)
         await Assertions.Expect(page.GetByText(TurnEnded())).ToHaveCountAsync(2, new LocatorAssertionsToHaveCountOptions { Timeout = 60_000 });
     }
 
+    // Selecting a whole message, as three clicks do, copies its text alone, without the line break
+    // after it that the selection takes in.
+    private static async Task AMessageCopiesAsItsTextAsync(IPage page, IBrowserContext context)
+    {
+        await context.GrantPermissionsAsync(["clipboard-read", "clipboard-write"]);
+        await page.GetByText("say hello", new PageGetByTextOptions { Exact = true }).ClickAsync(new LocatorClickOptions { ClickCount = 3 });
+        await page.Keyboard.PressAsync("ControlOrMeta+C");
+
+        string copied = await page.EvaluateAsync<string>("() => navigator.clipboard.readText()");
+        Assert.Equal("say hello", copied);
+    }
+
     // The model holds a call that says Wait, so the turn runs until it's released.
     private async Task AMessageWhileTheAgentWorksGoesIntoItsTurnAsync(IPage page)
     {
@@ -263,7 +287,7 @@ public sealed partial class WebJourney(ControlPlane app)
         await Composer(page).FillAsync(Wait);
         await page.Keyboard.PressAsync("Enter");
         await app.Model.HeldAsync(Wait);
-        await Assertions.Expect(page.GetByRole(AriaRole.Status).GetByText("is working")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(page.GetByRole(AriaRole.Status).Filter(new LocatorFilterOptions { HasText = "Working" })).ToBeVisibleAsync(WebBrowser.Shown);
 
         await Composer(page).FillAsync("and then say hello");
         await page.Keyboard.PressAsync("Enter");
@@ -278,12 +302,12 @@ public sealed partial class WebJourney(ControlPlane app)
     {
         await Composer(page).FillAsync(Wait);
         await page.Keyboard.PressAsync("Enter");
-        await Assertions.Expect(page.GetByRole(AriaRole.Status).GetByText("is working")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(page.GetByRole(AriaRole.Status).Filter(new LocatorFilterOptions { HasText = "Working" })).ToBeVisibleAsync(WebBrowser.Shown);
 
         await Composer(page).PressAsync("Escape");
 
         await Assertions.Expect(page.GetByText("The turn was stopped")).ToBeVisibleAsync(WebBrowser.Shown);
-        await Assertions.Expect(page.GetByRole(AriaRole.Status).GetByText("is working")).ToBeHiddenAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Status).Filter(new LocatorFilterOptions { HasText = "Working" })).ToBeHiddenAsync();
     }
 
     private static async Task TheSessionIsACookieNoScriptReadsAndNothingBrokeThePolicyAsync(IPage page, IBrowserContext context)

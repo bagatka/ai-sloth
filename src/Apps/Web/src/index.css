@@ -231,7 +231,6 @@
     --primary-edge: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 0 0 1px #346a1a, 0 1px 2px oklch(0.205 0.006 115 / 0.24);
     --primary-fill-pressed: linear-gradient(180deg, #387119 0%, #3f7d20 100%);
     --primary-edge-pressed: inset 0 1px 2px rgb(0 0 0 / 0.25), 0 0 0 1px #346a1a;
-    --panel: linear-gradient(180deg, #d3e9a8 0%, #8fc25a 42%, #4f8d2b 72%, #2f6316 100%);
 }
 
 .dark {
@@ -278,7 +277,6 @@
     --primary-edge: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 0 0 1px #84b555, 0 1px 2px rgb(0 0 0 / 0.5);
     --primary-fill-pressed: linear-gradient(180deg, #8fc25d 0%, #9ccf6a 100%);
     --primary-edge-pressed: inset 0 1px 2px rgb(0 0 0 / 0.3), 0 0 0 1px #84b555;
-    --panel: linear-gradient(180deg, #b7da8b 0%, #78b246 42%, #427f22 72%, #24510f 100%);
 }
 
 @layer base {
@@ -520,52 +518,6 @@
   }
 }
 
-/* The landing page's algae panel, with its fine grain: the one bold surface in the app. The gradient
-   and the grain are painted once into their own layer; drifting only moves that layer, so the GPU
-   does it without repainting anything. */
-@utility algae-panel {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  &::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background-image:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.22'/%3E%3C/svg%3E"),
-      var(--panel);
-    background-size:
-      160px 160px,
-      100% 100%;
-    background-blend-mode: soft-light, normal;
-  }
-}
-
-/* While an agent works, its algae drifts slowly; still when motion is reduced. */
-@utility algae-alive {
-  &::before {
-    inset: 0 0 auto;
-    height: 260%;
-    will-change: translate;
-    animation: algae-drift 7s ease-in-out infinite alternate;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    &::before {
-      animation: none;
-    }
-  }
-}
-
-@keyframes algae-drift {
-  from {
-    translate: 0 0;
-  }
-  to {
-    translate: 0 -61.5%;
-  }
-}
-
 @keyframes halo {
   from {
     scale: 1;
@@ -573,12 +525,6 @@
   }
   to {
     scale: 2.8;
-    opacity: 0;
-  }
-}
-
-@keyframes blink {
-  50% {
     opacity: 0;
   }
 }

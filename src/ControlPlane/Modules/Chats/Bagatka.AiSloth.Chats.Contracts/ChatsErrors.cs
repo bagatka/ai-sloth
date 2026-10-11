@@ -22,4 +22,16 @@ public static class ChatsErrors
     /// <summary>The chat's setup didn't fail, so there is nothing to fix.</summary>
     public static readonly Error SetupNotFailed = Error.Conflict("chats.setup_not_failed", "This chat's setup didn't fail; there is nothing to fix.");
 
+    /// <summary>No chat fixes the chat's setup: start one with <see cref="IChatsApi.FixSetupAsync"/>.</summary>
+    public static readonly Error NoSetupFix = Error.Conflict("chats.no_setup_fix", "No chat fixes this chat's setup yet.");
+
+    /// <summary>The chat that fixes the setup hasn't yet run it again and seen it work.</summary>
+    public static readonly Error SetupNotFixed = Error.Conflict("chats.setup_not_fixed", "The other chat hasn't fixed the setup yet.");
+
+    /// <summary>
+    /// The fix doesn't apply to the chat's files, as when the chat changed the same lines: its agent can
+    /// bring it in.
+    /// </summary>
+    public static readonly Error SetupFixDoesNotApply = Error.Conflict("chats.setup_fix_does_not_apply", "The fix doesn't apply to this chat's files, as when this chat changed the same lines; ask its agent to bring the fix in.");
+
 }

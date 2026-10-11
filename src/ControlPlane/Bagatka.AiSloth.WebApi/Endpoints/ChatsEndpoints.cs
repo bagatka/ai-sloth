@@ -59,6 +59,7 @@ internal static class ChatsEndpoints
         chats.MapPost("/{id:guid}/stop", Stop);
         chats.MapPost("/{id:guid}/setup", RunSetupAgain);
         chats.MapPost("/{id:guid}/setup/fix", FixSetup);
+        chats.MapPost("/{id:guid}/setup/use-fix", UseSetupFix);
         chats.MapPut("/{id:guid}/model", ChangeModel);
         chats.MapGet("/{id:guid}/events", Watch);
         chats.MapPost("/{id:guid}/push", Push);
@@ -374,6 +375,22 @@ internal static class ChatsEndpoints
     {
         Result<ChatSummary> result = await api.FixSetupAsync(principal.ToActor(), ChatId.From(id), ct);
         return result.ToOk();
+    }
+
+    /// <summary>
+    /// Brings the fix of the chat's failed setup, from the chat that fixed it, into the chat's nook,
+    /// then runs its setup again once the agent answered what was sent before: each repository's
+    /// changes there are applied here, all of them or none, keeping the chat's own changes. People with
+    /// Write only.
+    /// </summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> UseSetupFix(
+        [FromRoute] Guid id,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result result = await api.UseSetupFixAsync(principal.ToActor(), ChatId.From(id), ct);
+        return result.ToNoContent();
     }
 
     /// <summary>

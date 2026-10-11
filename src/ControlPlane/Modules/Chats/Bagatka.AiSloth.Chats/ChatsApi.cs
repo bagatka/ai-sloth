@@ -25,6 +25,7 @@ internal sealed partial class ChatsApi(
     INooksApi nooks,
     IAgentAccountsApi accounts,
     ChatRunners runners,
+    NookSetups setups,
     ChatSignals signals,
     ActiveInstance active,
     IProductEvents productEvents,

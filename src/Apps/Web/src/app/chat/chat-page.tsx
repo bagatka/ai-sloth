@@ -143,7 +143,6 @@ export function ChatPage() {
       <SetupBanner
         chatId={chatId}
         transcript={state.transcript}
-        agent={agent}
         proposing={proposing !== null}
       />
       <Composer

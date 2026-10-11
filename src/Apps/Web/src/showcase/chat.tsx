@@ -216,17 +216,7 @@ export function Chat() {
 
 function TranscriptRow({ row }: { row: Row }) {
   if (row.kind === "working") {
-    return (
-      <AgentWorking
-        agent="Claude Code"
-        since={turnStarted}
-        activity={{
-          command: "npm test -- orders",
-          output:
-            " PASS  src/orders/refund.test.ts\n RUNS  src/orders/export.test.ts",
-        }}
-      />
-    )
+    return <AgentWorking since={turnStarted} />
   }
 
   if (row.kind === "marker") {

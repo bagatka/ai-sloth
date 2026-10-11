@@ -19,15 +19,15 @@ import {
 } from "@/components/ui/collapsible"
 import { toast } from "@/components/ui/toast"
 import { answer, api, messageOf } from "../api"
-import { chatStream } from "./chat-stream"
+import { chatStream, useChat } from "./chat-stream"
 import { usePush } from "./push-menu"
 import type { Row, Transcript } from "./transcript"
 
 // The nook's setup on the message box, where people look next, while it needs them. A failed setup is
 // fixed in a chat of its own, so the chat it failed in goes on as it is: one click starts it, and the
-// chat links to it. The chat that fixes it shows the fix as it goes: the agent fixes it, the setup
-// runs again, and once it works, a pull request takes the fix to new chats. The transcript keeps a
-// line for each run.
+// chat follows it, then brings its fix in when it works, running the setup again with it. The chat
+// that fixes it shows the fix as it goes: the agent fixes it, the setup runs again, and once it works,
+// a pull request takes the fix to new chats. The transcript keeps a line for each run.
 
 // What "Try again" asks the agent of a chat that fixes a setup, as the person.
 const tryAgainRequest = "The setup still fails. Fix it, and commit the fix."
@@ -37,13 +37,10 @@ type Setup = Extract<Row, { kind: "setup" }>
 export function SetupBanner({
   chatId,
   transcript,
-  agent,
   proposing,
 }: {
   chatId: string
   transcript: Transcript
-  /** The agent's name, such as "pi". */
-  agent: string
   /** Whether the signed-in person's messages are only proposals, which can't direct the agent. */
   proposing: boolean
 }) {
@@ -57,6 +54,10 @@ export function SetupBanner({
 
   const fix = transcript.setupFix
   const fixing = fix?.fixingIn === chatId
+  // The chat fixing this one's setup, when it started after this run did; a later run's failure isn't
+  // the one it fixes.
+  const fixedIn =
+    fix && !fixing && fix.sequence > Number(setup.key) ? fix.fixingIn : null
   const repository = repositoryOf(setup.scripts)
   // Whose setup it is, to start a sentence and within one.
   const setupOf = repository ? `${repository}'s setup` : "The setup"
@@ -79,14 +80,25 @@ export function SetupBanner({
       <Fixed chatId={chatId} setupOf={setupOf} proposing={proposing} />
     ) : null
   }
-  if (fix && !fixing) {
-    return <FixedElsewhere fixingIn={fix.fixingIn} setupOf={setupOf} />
-  }
-  if (fixing && transcript.setupRunAsked) {
+  if (transcript.setupRunAsked) {
     return (
       <Working>
-        {`${agent} is fixing ${theSetup}. When it's done, AiSloth runs the setup again to check the fix.`}
+        {fixing
+          ? `Fixing ${theSetup}. AiSloth then runs it again to check the fix.`
+          : fixedIn
+            ? "Using the fix: the setup runs again once the agent is done."
+            : "The setup runs again once the agent is done."}
       </Working>
+    )
+  }
+  if (fixedIn) {
+    return (
+      <FixedElsewhere
+        chatId={chatId}
+        fixingIn={fixedIn}
+        setupOf={setupOf}
+        proposing={proposing}
+      />
     )
   }
   return (
@@ -222,26 +234,74 @@ function Failed({
   )
 }
 
+// Follows the chat fixing the setup, as it goes, and once its setup works, brings its fix here.
 function FixedElsewhere({
+  chatId,
   fixingIn,
   setupOf,
+  proposing,
 }: {
+  chatId: string
   fixingIn: string
   setupOf: string
+  proposing: boolean
 }) {
+  const other = useChat(fixingIn).transcript
+  const theirs = other.rows
+    .filter((row): row is Setup => row.kind === "setup")
+    .at(-1)
+  const ranAgain = theirs?.ended === true && theirs.again
+  const fixed = ranAgain && theirs.exitCode === 0
+  const failed = ranAgain && theirs.exitCode !== 0 && !other.setupRunAsked
+  const use = useMutation({
+    mutationFn: () =>
+      answer(
+        api.POST("/chats/{id}/setup/use-fix", {
+          params: { path: { id: chatId } },
+        })
+      ),
+    onError: (error) =>
+      toast.add({
+        type: "error",
+        title: "Not used",
+        description: messageOf(error),
+      }),
+  })
+
   return (
     <Banner>
-      <Alert>
-        <WrenchIcon />
-        <AlertTitle>{setupOf} is being fixed in another chat</AlertTitle>
+      <Alert className={fixed ? "*:[svg]:text-primary" : undefined}>
+        {fixed ? <CheckCircleIcon /> : <WrenchIcon />}
+        <AlertTitle>
+          {fixed
+            ? `${setupOf} is fixed in another chat`
+            : failed
+              ? `${setupOf} still fails in another chat`
+              : `${setupOf} is being fixed in another chat`}
+        </AlertTitle>
         <AlertDescription>
-          This chat goes on without what it installs.
+          {fixed
+            ? "Use the fix here to run the setup with it."
+            : "This chat goes on without what it installs."}
         </AlertDescription>
-        <div className="col-start-2 mt-2">
+        <div className="col-start-2 mt-2 flex items-center gap-2">
+          {fixed && !proposing && (
+            <Button
+              size="sm"
+              loading={use.isPending}
+              onClick={() => use.mutate()}
+            >
+              <WrenchIcon data-icon="inline-start" />
+              Use the fix here
+            </Button>
+          )}
           <Link
             to="/chats/$chatId"
             params={{ chatId: fixingIn }}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            className={buttonVariants({
+              variant: fixed ? "ghost" : "outline",
+              size: "sm",
+            })}
           >
             Open it
           </Link>

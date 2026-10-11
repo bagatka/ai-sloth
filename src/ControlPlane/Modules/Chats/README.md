@@ -31,7 +31,7 @@ folders).
 (each creating its nook, with the workspace's repositories or another chat's files, now or at a
 checkpoint, on a model or the harness's default), list chats or watch the list as it changes, send
 messages and send proposals on, change the model and account a chat runs on, stop the agent, run a
-chat's setup again or start a chat that fixes it, watch a chat's events from any sequence number, set
+chat's setup again, start a chat that fixes it and bring its fix in, watch a chat's events from any sequence number, set
 and read the instructions every agent gets, list and forget their harness state, and keep presets. `IChatHarnessesApi` is the
 model gateway's side.
 

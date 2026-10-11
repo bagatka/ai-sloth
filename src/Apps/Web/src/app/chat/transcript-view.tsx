@@ -18,7 +18,7 @@ import {
 } from "@phosphor-icons/react"
 import { cn } from "cn"
 
-import { AgentWorking, type AgentActivity } from "@/components/agent-working"
+import { AgentWorking } from "@/components/agent-working"
 import { Diff, preloadCode } from "@/components/code"
 import { Markdown } from "@/components/markdown"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -79,11 +79,7 @@ export function TranscriptView({ state, me, names, agent }: Props) {
               ))}
               {transcript.working && transcript.turnStartedAt && (
                 <MessageScrollerItem messageId="working">
-                  <AgentWorking
-                    agent={agent}
-                    since={Date.parse(transcript.turnStartedAt)}
-                    activity={activityOf(transcript.rows)}
-                  />
+                  <AgentWorking since={Date.parse(transcript.turnStartedAt)} />
                 </MessageScrollerItem>
               )}
               {/* Messages for later turns wait after the agent's work, then those still sending. */}
@@ -175,6 +171,16 @@ function TranscriptRow({
             <Bubble
               variant="secondary"
               className={cn(row.state === "cancelled" && "opacity-60")}
+              // Selecting a whole message, as a double or triple click does, takes in the line break
+              // after it, which copying would keep; the copy is the text without it.
+              onCopy={(event) => {
+                const selected = window.getSelection()?.toString() ?? ""
+                const text = selected.replace(/\n+$/, "")
+                if (text !== selected) {
+                  event.preventDefault()
+                  event.clipboardData.setData("text/plain", text)
+                }
+              }}
             >
               <BubbleContent
                 className={cn(
@@ -450,33 +456,6 @@ function RowTrigger({
       </span>
     </CollapsibleTrigger>
   )
-}
-
-// What the agent is doing now: its running tool call, with the end of its output.
-function activityOf(rows: readonly Row[]): AgentActivity {
-  for (let index = rows.length - 1; index >= 0; index--) {
-    const row = rows[index]
-    if (row.kind === "turn-ended" || row.kind === "message") {
-      break
-    }
-    if (
-      row.kind === "tool" &&
-      (row.status === "pending" || row.status === "in_progress")
-    ) {
-      const output = row.content
-        .flatMap((item) => (item.type === "text" ? [item.text] : []))
-        .join("\n")
-      const tail = output.trimEnd().split("\n").slice(-4).join("\n")
-      const title = row.title.replace(/^`(.*)`$/, "$1")
-      return row.toolKind === "execute"
-        ? { command: title, output: tail }
-        : { doing: title, output: tail }
-    }
-    if (row.kind === "agent-text") {
-      return { doing: "Writing" }
-    }
-  }
-  return { doing: "Thinking" }
 }
 
 function turnEnding(row: Extract<Row, { kind: "turn-ended" }>): string {

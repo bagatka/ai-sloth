@@ -89,8 +89,11 @@ export type Transcript = {
   queued: readonly MessageRow[]
   /** Whether someone asked to run the setup again, until it runs again. */
   setupRunAsked: boolean
-  /** The chat that fixes a failed setup and the chat it failed in, when this chat is either. */
-  setupFix: { failedIn: string; fixingIn: string } | null
+  /**
+   * The chat that fixes a failed setup and the chat it failed in, when this chat is either, and the
+   * event that told it.
+   */
+  setupFix: { failedIn: string; fixingIn: string; sequence: number } | null
   /** Whether the agent is on a turn. */
   working: boolean
   /** When the running turn started. */
@@ -207,7 +210,11 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
     case "setup-fix-started":
       return {
         ...next,
-        setupFix: { failedIn: body.failedIn, fixingIn: body.fixingIn },
+        setupFix: {
+          failedIn: body.failedIn,
+          fixingIn: body.fixingIn,
+          sequence: chatEvent.sequence,
+        },
       }
     case "model-changed":
       return append(next, {

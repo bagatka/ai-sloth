@@ -521,17 +521,7 @@ function TranscriptRow({ row }: { row: Row }) {
         </Marker>
       )
     case "working":
-      return (
-        <AgentWorking
-          agent="Claude Code"
-          since={turnStarted}
-          activity={{
-            command: "npm test -- orders",
-            output:
-              " PASS  src/orders/refund.test.ts\n RUNS  src/orders/export.test.ts",
-          }}
-        />
-      )
+      return <AgentWorking since={turnStarted} />
   }
 }
 
