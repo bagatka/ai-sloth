@@ -311,11 +311,9 @@ internal sealed class Chat
 
     /// <param name="messagesWaiting">Whether messages wait for the agent.</param>
     /// <param name="firstMessage">The start of its first message, if anyone wrote in it.</param>
-    /// <param name="cost">What its model calls cost so far, as far as known.</param>
-    /// <param name="costEstimate">Whether the cost is an estimate.</param>
-    public ChatSummary ToSummary(bool messagesWaiting, string? firstMessage, decimal? cost, bool costEstimate)
+    public ChatSummary ToSummary(bool messagesWaiting, string? firstMessage)
     {
-        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, AgentChangeWaiting ? NextModel : Model, AgentChangeWaiting ? NextThinking! : Thinking, AgentChangeWaiting ? NextAgentAccountId!.Value : AgentAccountId, AccountOwnerId, TitleFrom(firstMessage), ContinuesFrom, cost, costEstimate);
+        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, AgentChangeWaiting ? NextModel : Model, AgentChangeWaiting ? NextThinking! : Thinking, AgentChangeWaiting ? NextAgentAccountId!.Value : AgentAccountId, AccountOwnerId, TitleFrom(firstMessage), ContinuesFrom);
     }
 
     private static bool Same(AgentAccountId account, string? model, string? thinking, AgentAccountId otherAccount, string? otherModel, string? otherThinking)

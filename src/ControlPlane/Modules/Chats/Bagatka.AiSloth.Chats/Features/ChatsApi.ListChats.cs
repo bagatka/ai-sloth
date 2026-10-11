@@ -63,15 +63,6 @@ internal sealed partial class ChatsApi
                 Text = chatMessages.OrderBy(message => message.SentAt).ThenBy(message => message.Id).Select(message => message.Text.Substring(0, FirstMessageStart)).First(),
             })
             .ToDictionaryAsync(first => first.ChatId, first => first.Text, ct);
-        Dictionary<ChatId, Spent<ChatId>> spent = await db.ModelCalls
-            .Where(call => ids.Contains(call.ChatId))
-            .GroupBy(call => call.ChatId)
-            .Select(SpentOf<ChatId>())
-            .ToDictionaryAsync(chatSpent => chatSpent.Key, ct);
-        return [.. chats.Select(chat => chat.ToSummary(
-            waiting.Contains(chat.Id),
-            firstMessages.GetValueOrDefault(chat.Id),
-            spent.GetValueOrDefault(chat.Id)?.Cost(),
-            spent.GetValueOrDefault(chat.Id)?.Estimate == true))];
+        return [.. chats.Select(chat => chat.ToSummary(waiting.Contains(chat.Id), firstMessages.GetValueOrDefault(chat.Id)))];
     }
 }

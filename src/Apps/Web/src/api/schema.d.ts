@@ -3245,14 +3245,6 @@ export interface components {
              */
             title: null | string;
             continues: null | components["schemas"]["ChatId"];
-            /**
-             * Format: double
-             * @description What its agents' model calls have cost so far, in US dollars, as far as their prices are known
-             *     (decimal? ChatUsage.Cost); `null` before any priced call.
-             */
-            cost: null | number;
-            /** @description Whether the cost is a plan's estimate at the vendor's API prices. */
-            costEstimate: boolean;
         };
         /**
          * @description What a chat's agents have used of their models: every call the model gateway saw, added up and by

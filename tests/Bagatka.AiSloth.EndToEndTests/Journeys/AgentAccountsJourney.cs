@@ -209,7 +209,6 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
             ChatUsage read = await Api.ReadAsync<ChatUsage>(_alice.SendGetAsync(Paths.Chat(piChat) + "/usage"), HttpStatusCode.OK);
             return read.Calls > 0 && read.Turns.Sum(turn => turn.Calls) == read.Calls ? read : null;
         });
-        Page<ChatSummary> listed = await Api.ReadAsync<Page<ChatSummary>>(_alice.SendGetAsync(workspace.Path + "/chats"), HttpStatusCode.OK);
         WorkspaceUsage week = await Api.ReadAsync<WorkspaceUsage>(_alice.SendGetAsync(workspace.Path + "/usage?days=7&timeZone=Pacific/Kiritimati"), HttpStatusCode.OK);
         Problem nowhere = await Api.ProblemAsync(_alice.SendGetAsync(workspace.Path + "/usage?days=7&timeZone=Mars/Olympus"), HttpStatusCode.BadRequest);
         (DateOnly first, DateOnly last) = (Kiritimati(before), Kiritimati(TimeProvider.System.GetUtcNow()));
@@ -220,7 +219,6 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Equal([272_000], models[0].Facts.Price?.Tiers.Select(tier => tier.AboveInputTokens));
         Assert.Contains(anthropic, model => model is { Id: FakeModel.OpenRouterClaude, Name: "Anthropic: Claude Opus 5.5" });
         Assert.Equal((piUsage.Calls * 0.0000025m, false), (piUsage.Cost, piUsage.Estimate));
-        Assert.Equal(piUsage.Cost, listed.Items.Single(chat => chat.Id == piChat.Id).Cost);
         Assert.Equal(7, week.Days.Count);
         Assert.InRange(week.Days[^1].Day, first, last);
         Assert.True(week.Days.Where(day => day.Day >= first && day.Day <= last).Sum(day => day.Calls) >= piUsage.Calls);

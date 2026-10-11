@@ -3184,9 +3184,7 @@
           "account",
           "accountOwner",
           "title",
-          "continues",
-          "cost",
-          "costEstimate"
+          "continues"
         ],
         "type": "object",
         "properties": {
@@ -3262,18 +3260,6 @@
                 "$ref": "#/components/schemas/ChatId"
               }
             ]
-          },
-          "cost": {
-            "type": [
-              "null",
-              "number"
-            ],
-            "description": "What its agents\u0027 model calls have cost so far, in US dollars, as far as their prices are known\n(decimal? ChatUsage.Cost); \u0060null\u0060 before any priced call.",
-            "format": "double"
-          },
-          "costEstimate": {
-            "type": "boolean",
-            "description": "Whether the cost is a plan\u0027s estimate at the vendor\u0027s API prices."
           }
         },
         "description": "A chat as the people with access to its nook see it."
