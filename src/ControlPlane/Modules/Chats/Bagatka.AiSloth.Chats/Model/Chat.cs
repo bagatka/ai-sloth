@@ -80,6 +80,9 @@ internal sealed class Chat
 
     public int? SetupExitCode { get; private set; }
 
+    // Someone asked to run its nook's setup again, which runs once the agent answered what was sent
+    // before, with the agent stopped.
+    public bool SetupRunWaiting { get; private set; }
 
     // The agent's process, while it runs, and the SHA-256 of the token its model calls carry.
     public ProcessId? HarnessProcessId { get; private set; }
@@ -191,6 +194,25 @@ internal sealed class Chat
         SetupRunId = run;
         SetupExitCode = null;
         return true;
+    }
+
+    // Asks to run its nook's setup again; returns whether that's news.
+    public bool AskSetupRun()
+    {
+        if (SetupRunWaiting)
+        {
+            return false;
+        }
+
+        SetupRunWaiting = true;
+        return true;
+    }
+
+    // The setup runs again, as asked: an agent starts after it, as after the first run.
+    public void SetupRunAgain()
+    {
+        SetupRunWaiting = false;
+        StartsAgent = true;
     }
 
     // Whether the agent still waits for the run it saw to end.

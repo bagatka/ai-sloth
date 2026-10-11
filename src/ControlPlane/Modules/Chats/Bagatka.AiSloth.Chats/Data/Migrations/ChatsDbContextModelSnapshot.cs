@@ -16,7 +16,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261011095401_ThinkingLevels";
+    public override string LastMigrationId => "20261011111928_RunningASetupAgain";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -112,6 +112,10 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.Property<Guid?>("SetupRunId")
                     .HasColumnType("uuid")
                     .HasColumnName("setup_run_id");
+
+                b.Property<bool>("SetupRunWaiting")
+                    .HasColumnType("boolean")
+                    .HasColumnName("setup_run_waiting");
 
                 b.Property<DateTimeOffset>("StartedAt")
                     .HasColumnType("timestamp with time zone")

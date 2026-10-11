@@ -77,15 +77,6 @@ export function TranscriptView({ state, me, names, agent }: Props) {
                   />
                 </MessageScrollerItem>
               ))}
-              {pending.map((message) => (
-                <MessageScrollerItem
-                  key={message.key}
-                  messageId={message.key}
-                  scrollAnchor
-                >
-                  <PendingRow message={message} />
-                </MessageScrollerItem>
-              ))}
               {transcript.working && transcript.turnStartedAt && (
                 <MessageScrollerItem messageId="working">
                   <AgentWorking
@@ -95,6 +86,30 @@ export function TranscriptView({ state, me, names, agent }: Props) {
                   />
                 </MessageScrollerItem>
               )}
+              {/* Messages for later turns wait after the agent's work, then those still sending. */}
+              {transcript.queued.map((message) => (
+                <MessageScrollerItem
+                  key={message.key}
+                  messageId={message.key}
+                  scrollAnchor={message.sentBy === me}
+                >
+                  <TranscriptRow
+                    row={message}
+                    me={me}
+                    names={names}
+                    working={transcript.working}
+                  />
+                </MessageScrollerItem>
+              ))}
+              {pending.map((message) => (
+                <MessageScrollerItem
+                  key={message.key}
+                  messageId={message.key}
+                  scrollAnchor
+                >
+                  <PendingRow message={message} />
+                </MessageScrollerItem>
+              ))}
             </MessageScrollerContent>
           </MessageScrollerViewport>
           <MessageScrollerButton />
@@ -245,15 +260,13 @@ function TranscriptRow({
           />
         )
       }
-      // A failed setup's output and fix are in the chat's header, as the nook's state.
+      // A failed setup's output and its fix are on the message box (SetupBanner).
       return (
         <Marker variant="separator" className="py-3 text-caption">
           <MarkerContent>
             {row.exitCode !== 0
-              ? `The setup failed (exit code ${row.exitCode})`
-              : row.took === null
-                ? "Set up"
-                : `Set up in ${duration(row.took)}`}
+              ? `The setup failed${row.again ? " again" : ""} (exit code ${row.exitCode})`
+              : `Set up${row.again ? " again" : ""}${row.took === null ? "" : ` in ${duration(row.took)}`}`}
           </MarkerContent>
         </Marker>
       )

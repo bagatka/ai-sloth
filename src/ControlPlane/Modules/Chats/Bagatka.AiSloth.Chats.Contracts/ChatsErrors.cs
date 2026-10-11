@@ -19,4 +19,7 @@ public static class ChatsErrors
     /// <summary>The actor has as many presets as a person may: remove one first.</summary>
     public static readonly Error TooManyPresets = Error.Conflict("chats.too_many_presets", "You have 20 presets, as many as a person may; remove one first.");
 
+    /// <summary>The chat's setup didn't fail, so there is nothing to fix.</summary>
+    public static readonly Error SetupNotFailed = Error.Conflict("chats.setup_not_failed", "This chat's setup didn't fail; there is nothing to fix.");
+
 }

@@ -6,17 +6,12 @@ using Bagatka.AiSloth.Chats.Data;
 using Bagatka.AiSloth.Chats.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
-using Bagatka.Foundation.Modules;
 using Bagatka.Harnesses;
-using Microsoft.EntityFrameworkCore;
 
 namespace Bagatka.AiSloth.Chats;
 
 internal sealed partial class ChatsApi
 {
-    // The chat's runner saves the chat too; a save it made meanwhile is read again, this many times.
-    private const int ChangeAttempts = 3;
-
     public async Task<Result<ChatSummary>> ChangeModelAsync(Actor actor, ChangeModel command, CancellationToken ct)
     {
         await using ChatsDbContext db = await databases.CreateDbContextAsync(ct);
@@ -54,7 +49,12 @@ internal sealed partial class ChatsApi
             return new Result<ChatSummary>(Error.Validation("account", message));
         }
 
-        Result<Chat> changed = await SaveChangeAsync(db, command, user, ct);
+        Result<Chat> changed = await ChangeChatAsync(
+            db,
+            command.ChatId,
+            chat => chat.ChangeAgent(command.Account, command.Model, command.Thinking),
+            new ChatEventBody(new ModelChanged(command.Account, command.Model, command.Thinking, user.UserId)),
+            ct);
         if (changed.Failed)
         {
             return new Result<ChatSummary>(changed.Error);
@@ -65,32 +65,5 @@ internal sealed partial class ChatsApi
         signals.Notify(changed.Output.WorkspaceId);
         ChatSummary summary = await SummaryAsync(db, changed.Output, ct);
         return new Result<ChatSummary>(summary);
-    }
-
-    // Saves the change, and the event that tells it, with the chat as it is now.
-    private async Task<Result<Chat>> SaveChangeAsync(ChatsDbContext db, ChangeModel command, UserActor user, CancellationToken ct)
-    {
-        for (int attempt = 1; ; attempt++)
-        {
-            Chat chat = await db.Chats.SingleAsync(found => found.Id == command.ChatId, ct);
-            bool changed = chat.ChangeAgent(command.Account, command.Model, command.Thinking);
-            if (changed)
-            {
-                db.Events.Add(chat.Record(new ChatEventBody(new ModelChanged(command.Account, command.Model, command.Thinking, user.UserId)), time));
-            }
-
-            Result saved = await db.SaveAsync(ct);
-            if (!saved.Failed)
-            {
-                return new Result<Chat>(chat);
-            }
-
-            if (saved.Error != ModuleDbContextExtensions.ConcurrencyConflict || attempt == ChangeAttempts)
-            {
-                return new Result<Chat>(saved.Error);
-            }
-
-            db.ChangeTracker.Clear();
-        }
     }
 }

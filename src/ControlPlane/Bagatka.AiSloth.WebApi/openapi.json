@@ -2132,6 +2132,59 @@
         }
       }
     },
+    "/chats/{id}/setup": {
+      "post": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/chats/{id}/setup/fix": {
+      "post": {
+        "tags": [
+          "Chats"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chats/{id}/model": {
       "put": {
         "tags": [
@@ -2956,10 +3009,16 @@
             "$ref": "#/components/schemas/SetupEnded"
           },
           {
+            "$ref": "#/components/schemas/SetupRunAsked"
+          },
+          {
+            "$ref": "#/components/schemas/SetupFixStarted"
+          },
+          {
             "$ref": "#/components/schemas/DiskNearlyFull"
           }
         ],
-        "description": "What happened in a chat. A message is sent, then either starts a turn, goes into the running\nturn (steered), or is cancelled. A turn shows the agent\u0027s updates and ends with a stop reason,\nthen a checkpoint of the nook\u0027s files. A proposal stays with the people in the chat until the\naccount\u0027s owner sends it on. An agent that had to be started again says whether it remembers.\nSomeone may change the agent\u0027s model or account, from the next turn on.\nThe nook\u0027s setup, when its files have one, starts and ends before its agent starts."
+        "description": "What happened in a chat. A message is sent, then either starts a turn, goes into the running\nturn (steered), or is cancelled. A turn shows the agent\u0027s updates and ends with a stop reason,\nthen a checkpoint of the nook\u0027s files. A proposal stays with the people in the chat until the\naccount\u0027s owner sends it on. An agent that had to be started again says whether it remembers.\nSomeone may change the agent\u0027s model or account, from the next turn on.\nThe nook\u0027s setup, when its files have one, starts and ends before its agent starts; someone may ask\nto run it again, which it does once the agent answered what was sent before, or start a chat that\nfixes it."
       },
       "ChatEventData": {
         "required": [
@@ -4764,6 +4823,25 @@
           }
         }
       },
+      "SetupFixStarted": {
+        "required": [
+          "failedIn",
+          "fixingIn",
+          "startedBy"
+        ],
+        "type": "object",
+        "properties": {
+          "failedIn": {
+            "$ref": "#/components/schemas/ChatId"
+          },
+          "fixingIn": {
+            "$ref": "#/components/schemas/ChatId"
+          },
+          "startedBy": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
       "SetupRun": {
         "required": [
           "process",
@@ -4800,6 +4878,17 @@
           }
         },
         "description": "A run of a nook\u0027s setup scripts: one process, whose output says what each script did. It fails\nwith the first failing script\u0027s exit code, 124 for one that ran out of time, after the others ran."
+      },
+      "SetupRunAsked": {
+        "required": [
+          "askedBy"
+        ],
+        "type": "object",
+        "properties": {
+          "askedBy": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
       },
       "SetupStarted": {
         "required": [

@@ -59,6 +59,10 @@ export type Row =
   | {
       kind: "setup"
       key: string
+      /** The scripts it runs, as paths in the nook's files. */
+      scripts: string[]
+      /** Whether the setup ran in this chat before. */
+      again: boolean
       ended: boolean
       exitCode: number | null
       output: string | null
@@ -74,8 +78,19 @@ export type Row =
       switched?: boolean
     }
 
+type MessageRow = Extract<Row, { kind: "message" }>
+
 export type Transcript = {
   rows: readonly Row[]
+  /**
+   * Messages sent while the agent worked on another's turn, which wait for a turn of their own after
+   * its work, until their turn starts, they go into the running turn, or they're cancelled.
+   */
+  queued: readonly MessageRow[]
+  /** Whether someone asked to run the setup again, until it runs again. */
+  setupRunAsked: boolean
+  /** The chat that fixes a failed setup and the chat it failed in, when this chat is either. */
+  setupFix: { failedIn: string; fixingIn: string } | null
   /** Whether the agent is on a turn. */
   working: boolean
   /** When the running turn started. */
@@ -86,6 +101,9 @@ export type Transcript = {
 
 export const emptyTranscript: Transcript = {
   rows: [],
+  queued: [],
+  setupRunAsked: false,
+  setupFix: null,
   working: false,
   turnStartedAt: null,
   sequence: 0,
@@ -101,8 +119,8 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
   const body = chatEvent.event
   const key = String(chatEvent.sequence)
   switch (chatEvent.kind) {
-    case "message-sent":
-      return append(next, {
+    case "message-sent": {
+      const message: MessageRow = {
         kind: "message",
         key,
         id: body.messageId,
@@ -110,7 +128,11 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
         text: body.text,
         state: "waiting",
         proposal: false,
-      })
+      }
+      return next.working
+        ? { ...next, queued: [...next.queued, message] }
+        : append(next, message)
+    }
     case "message-proposed":
       return append(next, {
         kind: "message",
@@ -123,14 +145,14 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
       })
     case "turn-started":
       return {
-        ...setMessageState(next, body.messageId, "answered"),
+        ...placeMessage(next, body.messageId, "answered"),
         working: true,
         turnStartedAt: chatEvent.at,
       }
     case "message-steered":
-      return setMessageState(next, body.messageId, "steered")
+      return placeMessage(next, body.messageId, "steered")
     case "message-cancelled":
-      return setMessageState(next, body.messageId, "cancelled")
+      return placeMessage(next, body.messageId, "cancelled")
     case "agent-update":
       return foldUpdate(next, body.update ?? body, key, chatEvent.at)
     case "turn-ended": {
@@ -149,27 +171,44 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
         turnStartedAt: null,
       }
     }
-    case "setup-started":
-      return append(next, {
-        kind: "setup",
-        key,
-        ended: false,
-        exitCode: null,
-        output: null,
-        took: null,
-      })
+    case "setup-started": {
+      const again = next.rows.some((row) => row.kind === "setup")
+      return append(
+        { ...next, setupRunAsked: next.setupRunAsked && !again },
+        {
+          kind: "setup",
+          key,
+          scripts: body.scripts,
+          again,
+          ended: false,
+          exitCode: null,
+          output: null,
+          took: null,
+        }
+      )
+    }
     case "setup-ended": {
       const index = findLast(next.rows, (row) => row.kind === "setup")
+      const started = index >= 0 ? next.rows[index] : null
       const ended: Row = {
         kind: "setup",
-        key: index >= 0 ? next.rows[index].key : key,
+        key: started ? started.key : key,
+        scripts: started?.kind === "setup" ? started.scripts : [],
+        again: started?.kind === "setup" && started.again,
         ended: true,
         exitCode: body.exitCode,
         output: body.output ?? null,
         took: seconds(body.took),
       }
-      return index >= 0 ? replace(next, index, ended) : append(next, ended)
+      return started ? replace(next, index, ended) : append(next, ended)
     }
+    case "setup-run-asked":
+      return { ...next, setupRunAsked: true }
+    case "setup-fix-started":
+      return {
+        ...next,
+        setupFix: { failedIn: body.failedIn, fixingIn: body.fixingIn },
+      }
     case "model-changed":
       return append(next, {
         kind: "notice",
@@ -183,10 +222,15 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
         switched: true,
       })
     case "agent-restarted": {
-      // An agent taking over after a switch, with the conversation, is the switch itself.
+      // An agent taking over after a switch or the setup running again, with the conversation, is
+      // part of them.
       const notice = findLast(next.rows, (row) => row.kind === "notice")
       const last = notice >= 0 ? next.rows[notice] : null
-      if (body.remembers && last?.kind === "notice" && last.switched) {
+      const afterSetup = next.rows.at(-1)?.kind === "setup"
+      if (
+        body.remembers &&
+        (afterSetup || (last?.kind === "notice" && last.switched))
+      ) {
         return next
       }
       return append(next, {
@@ -344,6 +388,24 @@ function setMessageState(
   }
   const message = transcript.rows[index] as Extract<Row, { kind: "message" }>
   return replace(transcript, index, { ...message, state })
+}
+
+// A message that waited after the running turn's work takes its place in the conversation now; any
+// other changes where it is.
+function placeMessage(
+  transcript: Transcript,
+  messageId: string,
+  state: MessageState
+): Transcript {
+  const waited = transcript.queued.find((message) => message.id === messageId)
+  if (!waited) {
+    return setMessageState(transcript, messageId, state)
+  }
+  return {
+    ...transcript,
+    queued: transcript.queued.filter((message) => message !== waited),
+    rows: [...transcript.rows, { ...waited, state }],
+  }
 }
 
 function append(transcript: Transcript, row: Row): Transcript {

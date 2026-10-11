@@ -57,6 +57,8 @@ internal static class ChatsEndpoints
         chats.MapGet("/{id:guid}", Get);
         chats.MapPost("/{id:guid}/messages", Send);
         chats.MapPost("/{id:guid}/stop", Stop);
+        chats.MapPost("/{id:guid}/setup", RunSetupAgain);
+        chats.MapPost("/{id:guid}/setup/fix", FixSetup);
         chats.MapPut("/{id:guid}/model", ChangeModel);
         chats.MapGet("/{id:guid}/events", Watch);
         chats.MapPost("/{id:guid}/push", Push);
@@ -340,6 +342,38 @@ internal static class ChatsEndpoints
     {
         Result result = await api.StopAsync(principal.ToActor(), ChatId.From(id), ct);
         return result.ToNoContent();
+    }
+
+    /// <summary>
+    /// Runs the chat's nook's setup again, as its scripts are now, such as after its agent fixed them:
+    /// once the agent answered every message sent before, it stops, the setup runs, and an agent starts
+    /// again with what the setup installed, continuing the conversation. The chat's events tell each
+    /// step. People with Write only.
+    /// </summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> RunSetupAgain(
+        [FromRoute] Guid id,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result result = await api.RunSetupAgainAsync(principal.ToActor(), ChatId.From(id), ct);
+        return result.ToNoContent();
+    }
+
+    /// <summary>
+    /// Starts a chat that fixes the chat's failed setup, leaving the chat as it is: the same
+    /// repositories and agent in a new nook, whose agent is asked, as you, to fix the setup and commit
+    /// the fix, after which its setup runs again. Both chats' events tell it. The fix reaches new
+    /// nooks once it's pushed and merged. Returns the new chat. People with Write only.
+    /// </summary>
+    private static async Task<Results<Ok<ChatSummary>, ProblemHttpResult>> FixSetup(
+        [FromRoute] Guid id,
+        ClaimsPrincipal principal,
+        [FromServices] IChatsApi api,
+        CancellationToken ct)
+    {
+        Result<ChatSummary> result = await api.FixSetupAsync(principal.ToActor(), ChatId.From(id), ct);
+        return result.ToOk();
     }
 
     /// <summary>

@@ -65,7 +65,8 @@ internal sealed class ChatRunner(
     private bool _agentFinishedTurn;
     private int _stopRequested;
 
-    // The agent stopped for another account or model chosen meanwhile, until its exit arrives.
+    // The agent stopped for another account or model chosen meanwhile, or for its nook's setup to run
+    // again, until its exit arrives.
     private ProcessId? _stoppedForChange;
 
     // The trace of the turn the chat works on, from when a message waits for the agent, its start
@@ -279,7 +280,7 @@ internal sealed class ChatRunner(
         await SaveAsync(db, ct);
         await SendAsync(chat, outgoing, ct);
         bool idle = chat.TurnMessageId is null && !waiting.Any(message => message.Waiting) && !chat.StartsAgent && !chat.AgentChangeWaiting
-            && (chat.HarnessProcessId is null || chat.SessionId is not null);
+            && !chat.SetupRunWaiting && (chat.HarnessProcessId is null || chat.SessionId is not null);
         if (!idle)
         {
             await KeepAwakeAsync(chat, ct);
@@ -296,9 +297,16 @@ internal sealed class ChatRunner(
     }
 
     // Starts the agent when there's work for it, stops it between turns when another account or model
-    // was chosen, and otherwise hands it what waits.
+    // was chosen, or once it answered everything when the setup is to run again, and otherwise hands it
+    // what waits. The setup runs again with the agent stopped, and the next agent starts after it.
     private async Task DriveAgentAsync(ChatsDbContext db, Chat chat, List<Message> queued, Waits waits, List<string> outgoing, CancellationToken ct)
     {
+        bool answeredAll = chat.TurnMessageId is null && queued.Count == 0;
+        if (chat.SetupRunWaiting && answeredAll && chat.HarnessProcessId is null)
+        {
+            await RunSetupAgainAsync(chat, ct);
+        }
+
         if (chat.HarnessProcessId is null && (queued.Count > 0 || chat.TurnMessageId is not null || chat.StartsAgent))
         {
             bool setUp = await SetUpAsync(db, chat, queued.FirstOrDefault(), waits, ct);
@@ -307,10 +315,10 @@ internal sealed class ChatRunner(
                 await StartHarnessAsync(db, chat, queued.FirstOrDefault(), outgoing, ct);
             }
         }
-        else if (chat.AgentChangeWaiting && chat.TurnMessageId is null && chat.HarnessProcessId is ProcessId running)
+        else if ((chat.AgentChangeWaiting || (chat.SetupRunWaiting && answeredAll)) && chat.TurnMessageId is null && chat.HarnessProcessId is ProcessId running)
         {
             // When the stopped agent's exit arrives, the next one starts on the account and model chosen,
-            // and continues the conversation.
+            // after the setup when it runs again, and continues the conversation.
             if (_stoppedForChange != running)
             {
                 _stoppedForChange = running;
@@ -638,6 +646,22 @@ internal sealed class ChatRunner(
             ["from_ready_copy"] = new ProductFact(setup.Output.ReadyCopyMadeAt is not null),
         }));
         return true;
+    }
+
+    // Starts the nook's setup again, as asked; the next agent starts once it ended, as after the first
+    // run. A run already going, such as a woken nook's resume, takes the place of the one asked for.
+    private async Task RunSetupAgainAsync(Chat chat, CancellationToken ct)
+    {
+        Result<NookSetup> again = await nooks.RunSetupAsync(SystemActors.Harness, chat.NookId, ct);
+
+        // Not handled: a nook that can't run it now, as one gone or out of reach, starts the agent
+        // without it, and the log says why; the person can ask again.
+        if (again.Failed && again.Error != NooksErrors.SetupRunning)
+        {
+            Log.SetupNotRunAgain(logger, chatId.Value, again.Error.Message);
+        }
+
+        chat.SetupRunAgain();
     }
 
     // Background work wakes the runner when it ends, so the chat moves on.

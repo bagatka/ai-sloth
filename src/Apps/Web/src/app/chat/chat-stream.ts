@@ -46,6 +46,8 @@ const kinds = [
   "model-changed",
   "setup-started",
   "setup-ended",
+  "setup-run-asked",
+  "setup-fix-started",
   "disk-nearly-full",
 ] as const
 

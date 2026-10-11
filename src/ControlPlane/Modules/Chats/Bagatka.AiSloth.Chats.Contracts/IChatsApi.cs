@@ -140,6 +140,30 @@ public interface IChatsApi
     public Task<Result> StopAsync(Actor actor, ChatId id, CancellationToken ct);
 
     /// <summary>
+    /// Runs the chat's nook's setup again, as its scripts are now, such as after its agent fixed them:
+    /// once the agent answered every message sent before, it stops, the setup runs, and an agent starts
+    /// again with what the setup installed, continuing the conversation. The chat tells each step
+    /// (<see cref="SetupRunAsked"/>, <see cref="SetupStarted"/>, <see cref="SetupEnded"/>). Asking again
+    /// before it runs changes nothing.
+    /// </summary>
+    /// <returns>Nothing; forbidden for anyone who may only read the chat; or not found.</returns>
+    public Task<Result> RunSetupAgainAsync(Actor actor, ChatId id, CancellationToken ct);
+
+    /// <summary>
+    /// Starts a chat that fixes the chat's failed setup, leaving the chat as it is: with the same
+    /// repositories, harness, account, model, and thinking, in a new nook on the same provider, its
+    /// agent is asked, as the actor, to fix the setup and commit the fix, then its setup runs again
+    /// (<see cref="RunSetupAgainAsync"/>). Both chats tell it (<see cref="SetupFixStarted"/>). The fix
+    /// reaches new nooks once it's pushed and merged.
+    /// </summary>
+    /// <returns>
+    /// The chat that fixes it; <see cref="ChatsErrors.SetupNotFailed"/>; what starting a chat or
+    /// sending a message refuses, such as an account the actor may not use; forbidden for anyone who
+    /// may only read the chat; or not found.
+    /// </returns>
+    public Task<Result<ChatSummary>> FixSetupAsync(Actor actor, ChatId id, CancellationToken ct);
+
+    /// <summary>
     /// The harness state the actor's agents in the workspace get, for each harness that keeps any: what
     /// its agents write for themselves to use later, such as Claude Code's memory, saved after each
     /// turn that changed it and given to the next agents. It follows who may direct the agents: the

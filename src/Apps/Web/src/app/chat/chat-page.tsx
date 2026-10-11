@@ -25,8 +25,8 @@ import { chat as chatQuery, harnesses, me, nooks, people } from "../queries"
 import { chatStream, useChat } from "./chat-stream"
 import { ChangesPanel, DownloadFiles } from "./changes-panel"
 import { Composer } from "./composer"
-import { FailedSetup } from "./failed-setup"
 import { PushMenu } from "./push-menu"
+import { SetupBanner } from "./setup-banner"
 import { TranscriptView } from "./transcript-view"
 
 // One chat as it happens: who wrote what, what the agent did, and a box to write to it.
@@ -113,11 +113,6 @@ export function ChatPage() {
             {agentLabel(agent, chat.data.model, chat.data.thinking)}
           </p>
         </div>
-        <FailedSetup
-          chat={chat.data}
-          nook={nook}
-          rows={state.transcript.rows}
-        />
         <div className="hidden sm:block">
           <NookState state={nookState} />
         </div>
@@ -145,6 +140,12 @@ export function ChatPage() {
           agent={agent}
         />
       )}
+      <SetupBanner
+        chatId={chatId}
+        transcript={state.transcript}
+        agent={agent}
+        proposing={proposing !== null}
+      />
       <Composer
         key={chatId}
         chat={chat.data}

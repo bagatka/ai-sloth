@@ -48,6 +48,8 @@ internal sealed class StoredEvent
             ModelChanged changed => ("model-changed", JsonSerializer.Serialize(changed, FoundationJson.Options)),
             SetupStarted started => ("setup-started", JsonSerializer.Serialize(started, FoundationJson.Options)),
             SetupEnded ended => ("setup-ended", JsonSerializer.Serialize(ended, FoundationJson.Options)),
+            SetupRunAsked asked => ("setup-run-asked", JsonSerializer.Serialize(asked, FoundationJson.Options)),
+            SetupFixStarted fix => ("setup-fix-started", JsonSerializer.Serialize(fix, FoundationJson.Options)),
             DiskNearlyFull full => ("disk-nearly-full", JsonSerializer.Serialize(full, FoundationJson.Options)),
         };
         return new StoredEvent(chatId, sequence, at, kind, data);
@@ -70,6 +72,8 @@ internal sealed class StoredEvent
             "model-changed" => new ChatEventBody(Read<ModelChanged>()),
             "setup-started" => new ChatEventBody(Read<SetupStarted>()),
             "setup-ended" => new ChatEventBody(Read<SetupEnded>()),
+            "setup-run-asked" => new ChatEventBody(Read<SetupRunAsked>()),
+            "setup-fix-started" => new ChatEventBody(Read<SetupFixStarted>()),
             "disk-nearly-full" => new ChatEventBody(Read<DiskNearlyFull>()),
             _ => throw new InvalidOperationException("Chat " + ChatId.Value + " has an event of unknown kind " + Kind + "."),
         };

@@ -2371,6 +2371,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chats/{id}/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats/{id}/setup/fix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChatSummary"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/chats/{id}/model": {
         parameters: {
             query?: never;
@@ -2937,9 +3009,11 @@ export interface components {
          *     then a checkpoint of the nook's files. A proposal stays with the people in the chat until the
          *     account's owner sends it on. An agent that had to be started again says whether it remembers.
          *     Someone may change the agent's model or account, from the next turn on.
-         *     The nook's setup, when its files have one, starts and ends before its agent starts.
+         *     The nook's setup, when its files have one, starts and ends before its agent starts; someone may ask
+         *     to run it again, which it does once the agent answered what was sent before, or start a chat that
+         *     fixes it.
          */
-        ChatEventBody: components["schemas"]["MessageSent"] | components["schemas"]["MessageProposed"] | components["schemas"]["TurnStarted"] | components["schemas"]["MessageSteered"] | components["schemas"]["MessageCancelled"] | components["schemas"]["AgentUpdate"] | components["schemas"]["TurnEnded"] | components["schemas"]["CheckpointSaved"] | components["schemas"]["CheckpointFailed"] | components["schemas"]["AgentRestarted"] | components["schemas"]["ModelChanged"] | components["schemas"]["SetupStarted"] | components["schemas"]["SetupEnded"] | components["schemas"]["DiskNearlyFull"];
+        ChatEventBody: components["schemas"]["MessageSent"] | components["schemas"]["MessageProposed"] | components["schemas"]["TurnStarted"] | components["schemas"]["MessageSteered"] | components["schemas"]["MessageCancelled"] | components["schemas"]["AgentUpdate"] | components["schemas"]["TurnEnded"] | components["schemas"]["CheckpointSaved"] | components["schemas"]["CheckpointFailed"] | components["schemas"]["AgentRestarted"] | components["schemas"]["ModelChanged"] | components["schemas"]["SetupStarted"] | components["schemas"]["SetupEnded"] | components["schemas"]["SetupRunAsked"] | components["schemas"]["SetupFixStarted"] | components["schemas"]["DiskNearlyFull"];
         ChatEventData: {
             /** Format: int64 */
             sequence: number;
@@ -3671,6 +3745,11 @@ export interface components {
             took: string;
             output: null | string;
         };
+        SetupFixStarted: {
+            failedIn: components["schemas"]["ChatId"];
+            fixingIn: components["schemas"]["ChatId"];
+            startedBy: components["schemas"]["UserId"];
+        };
         /**
          * @description A run of a nook's setup scripts: one process, whose output says what each script did. It fails
          *     with the first failing script's exit code, 124 for one that ran out of time, after the others ran.
@@ -3693,6 +3772,9 @@ export interface components {
              * @description How it ended, or `null` while it runs: 0 when every script succeeded.
              */
             exitCode: null | number;
+        };
+        SetupRunAsked: {
+            askedBy: components["schemas"]["UserId"];
         };
         SetupStarted: {
             scripts: string[];

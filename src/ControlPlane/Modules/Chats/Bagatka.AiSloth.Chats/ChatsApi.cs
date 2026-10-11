@@ -140,4 +140,34 @@ internal sealed partial class ChatsApi(
             .FirstOrDefaultAsync(ct);
         return chat.ToSummary(waiting, firstMessage);
     }
+
+    // A chat's runner saves the chat too; a save it made meanwhile is read again, this many times.
+    private const int ChangeAttempts = 3;
+
+    // Changes the chat as it is now, and saves the event that tells it when the change changed anything.
+    private async Task<Result<Chat>> ChangeChatAsync(ChatsDbContext db, ChatId id, Func<Chat, bool> change, ChatEventBody told, CancellationToken ct)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            Chat chat = await db.Chats.SingleAsync(found => found.Id == id, ct);
+            bool changed = change(chat);
+            if (changed)
+            {
+                db.Events.Add(chat.Record(told, time));
+            }
+
+            Result saved = await db.SaveAsync(ct);
+            if (!saved.Failed)
+            {
+                return new Result<Chat>(chat);
+            }
+
+            if (saved.Error != ModuleDbContextExtensions.ConcurrencyConflict || attempt == ChangeAttempts)
+            {
+                return new Result<Chat>(saved.Error);
+            }
+
+            db.ChangeTracker.Clear();
+        }
+    }
 }

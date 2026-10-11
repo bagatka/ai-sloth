@@ -24,8 +24,35 @@ import { ApiError, answer, api, messageOf, type Schemas } from "../api"
 type Pushed = Schemas["PushedSource"]
 
 export function PushMenu({ chatId }: { chatId: string }) {
+  const push = usePush(chatId)
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<Button size="sm" loading={push.isPending} />}
+      >
+        <UploadSimpleIcon data-icon="inline-start" />
+        Push
+        <CaretDownIcon data-icon="inline-end" className="opacity-70" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-auto min-w-52">
+        <DropdownMenuItem onClick={() => push.mutate(true)}>
+          <GitPullRequestIcon />
+          Open a pull request
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => push.mutate(false)}>
+          <GitBranchIcon />
+          Push to a branch
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+/** Pushes the chat's changes, with a pull request when asked, and says how it went. */
+export function usePush(chatId: string) {
   const navigate = useNavigate()
-  const push = useMutation({
+  return useMutation({
     mutationFn: (pullRequest: boolean) =>
       answer(
         api.POST("/chats/{id}/push", {
@@ -50,28 +77,6 @@ export function PushMenu({ chatId }: { chatId: string }) {
             : undefined,
       }),
   })
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<Button size="sm" loading={push.isPending} />}
-      >
-        <UploadSimpleIcon data-icon="inline-start" />
-        Push
-        <CaretDownIcon data-icon="inline-end" className="opacity-70" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-auto min-w-52">
-        <DropdownMenuItem onClick={() => push.mutate(true)}>
-          <GitPullRequestIcon />
-          Open a pull request
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => push.mutate(false)}>
-          <GitBranchIcon />
-          Push to a branch
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
 }
 
 // What happened to each repository, in one toast: a link to the pull request or branch when one

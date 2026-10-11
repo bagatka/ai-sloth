@@ -12,6 +12,9 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Warning, Message = "A turn of chat {ChatId} failed: {Reason}")]
     public static partial void AgentFailed(ILogger logger, Guid chatId, string reason);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't run the setup of chat {ChatId}'s nook again; its agent starts without it: {Reason}")]
+    public static partial void SetupNotRunAgain(ILogger logger, Guid chatId, string reason);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Couldn't sync the harness state of chat {ChatId}; its agent works with its nook's, and the next sync tries again: {Reason}")]
     public static partial void HarnessStateNotSynced(ILogger logger, Guid chatId, string reason);
 

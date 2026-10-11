@@ -30,7 +30,8 @@ folders).
 `IChatsApi`: members list the harnesses and the models each can run on with an account, start chats
 (each creating its nook, with the workspace's repositories or another chat's files, now or at a
 checkpoint, on a model or the harness's default), list chats or watch the list as it changes, send
-messages and send proposals on, change the model and account a chat runs on, stop the agent, watch a chat's events from any sequence number, set
+messages and send proposals on, change the model and account a chat runs on, stop the agent, run a
+chat's setup again or start a chat that fixes it, watch a chat's events from any sequence number, set
 and read the instructions every agent gets, list and forget their harness state, and keep presets. `IChatHarnessesApi` is the
 model gateway's side.
 
@@ -51,7 +52,7 @@ AgentAccounts (the account a chat runs on, and who may use it).
 ## Data
 
 Schema `chats`: `chats` (one per nook; its harness, account, and model, and another account and
-model chosen while an agent ran; the agent's process, session,
+model chosen while an agent ran; whether its setup is to run again; the agent's process, session,
 and how far its output is read; the turn in progress; `xmin` as concurrency token), `messages`,
 `events` (sequence numbers per chat; an agent update is stored as the agent sent it), `drafts`,
 `workspace_instructions`, `personal_instructions`, and `presets` (a person's harness, account, and
@@ -60,7 +61,8 @@ model, each once).
 ## Background work
 
 - **Runners** (`Harness/ChatRunners.cs`, `Harness/ChatRunner.cs`): one per chat with work, on the
-  active instance. A runner starts the agent once the nook's setup ended, keeps the nook awake while
+  active instance. A runner starts the agent once the nook's setup ended, runs the setup again when
+  asked once the agent answered everything and stopped, then starts it again, keeps the nook awake while
   the chat has work, delivers messages, answers the agent's requests, and saves each batch of events
   with the offset of the agent's output it has read, so a restart continues where it stopped. A turn
   ends with a checkpoint of the nook's files, then `TurnEnded`, then a harness state sync.
