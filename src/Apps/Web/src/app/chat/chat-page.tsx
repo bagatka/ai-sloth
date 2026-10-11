@@ -121,7 +121,12 @@ export function ChatPage() {
         {/* Repositories' changes are reviewed and pushed; other files are downloaded. */}
         {nook && nook.sources.length > 0 ? (
           <>
-            <ChangesPanel nookId={nook.id} counted={state.transcript.changes} />
+            <ChangesPanel
+              nookId={nook.id}
+              checkpoint={state.transcript.checkpoint}
+              counted={state.transcript.changes}
+              working={working}
+            />
             <PushMenu chatId={chatId} />
           </>
         ) : (

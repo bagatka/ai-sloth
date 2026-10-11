@@ -63,6 +63,9 @@ export default function DiffList({
   // A file the reader picked that no scroll position can make the one being read (when the whole
   // list fits on screen). It stays picked until the list scrolls.
   const picked = React.useRef<{ path: string; scrollTop: number } | null>(null)
+  // Where the reader is: the file being read and how far into it the list is scrolled. When the
+  // files change around it, as new changes arrive, the list scrolls back to the same place.
+  const place = React.useRef<{ path: string; offset: number } | null>(null)
   const items: CodeViewDiffItem[] = files.map((file) => ({
     id: file.path,
     type: "diff",
@@ -124,6 +127,9 @@ export default function DiffList({
       picked.current = null
     const current =
       picked.current?.path ?? files[fileAt(readingLine(top, size))].path
+    const currentTop = viewer.getTopForItem(current)
+    if (currentTop !== undefined)
+      place.current = { path: current, offset: top - currentTop }
     const onScreen: string[] = []
     for (let index = fileAt(top); index < files.length; index++) {
       if (onScreen.length > 0 && tops[index] > bottom - seenHeight) break
@@ -148,11 +154,26 @@ export default function DiffList({
         ref={(node) => {
           if (!node || !content) return
           const observer = new ResizeObserver((entries) => {
+            let resized = false
             for (const entry of entries) {
               if (entry.target === node)
                 viewportHeight.current = entry.contentRect.height
-              if (entry.target === content)
+              if (entry.target === content) {
+                resized = contentHeight.current !== entry.contentRect.height
                 contentHeight.current = entry.contentRect.height
+              }
+            }
+            // Files above the reader grew or shrank: back to the same place in the same file.
+            const viewer = view.current?.getInstance()
+            const kept = place.current
+            if (resized && viewer && kept) {
+              const keptTop = viewer.getTopForItem(kept.path)
+              const target = (keptTop ?? 0) + kept.offset
+              if (
+                keptTop !== undefined &&
+                Math.abs(viewer.getScrollTop() - target) > 1
+              )
+                scroller.current?.scrollTo({ top: target, behavior: "instant" })
             }
             reportView()
           })

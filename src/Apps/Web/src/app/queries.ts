@@ -1,4 +1,4 @@
-import { queryOptions } from "@tanstack/react-query"
+import { keepPreviousData, queryOptions } from "@tanstack/react-query"
 
 import { ApiError, answer, api } from "./api"
 
@@ -139,11 +139,13 @@ export function repositories(workspaceId: string) {
 
 /**
  * What the nook's repositories changed, read when someone looks: live from an awake nook, otherwise
- * as its latest checkpoint kept them. Asking never wakes a nook.
+ * as its latest checkpoint kept them. Asking never wakes a nook. Each checkpoint is read anew, the
+ * last reading showing until the new one is in.
  */
-export function changes(nookId: string) {
+export function changes(nookId: string, checkpoint: number) {
   return queryOptions({
-    queryKey: ["nooks", nookId, "changes"],
+    queryKey: ["nooks", nookId, "changes", checkpoint],
+    placeholderData: keepPreviousData,
     queryFn: () =>
       answer(
         api.GET("/nooks/{id}/changes", { params: { path: { id: nookId } } })

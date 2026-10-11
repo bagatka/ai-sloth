@@ -42,19 +42,33 @@ import { changedFiles, type ChangedFile } from "./changes"
 
 // A chat's changes on demand: every changed file's diff in one scroll, beside a tree of the files
 // that selects the one being read, marks the ones on screen, and jumps to the one picked. The host
-// reads them each time the panel opens, never waking the nook. The button says how much changed: as
-// the panel read it, or else as the latest checkpoint kept it.
+// reads them when the panel opens, never waking the nook, and again while it's open: after each
+// turn's checkpoint, and every few seconds while the agent works. The reader keeps their place. The
+// button says how much changed: as the panel read it, or else as the latest checkpoint kept it.
+
+// How often an open panel reads the changes again while the agent works.
+const whileWorking = 3000
 
 export function ChangesPanel({
   nookId,
+  checkpoint,
   counted,
+  working,
 }: {
   nookId: string
+  /** The nook's latest checkpoint: the changes are read again after each. */
+  checkpoint: number
   /** How much had changed at the nook's latest checkpoint, when it kept that. */
   counted: { additions: number; deletions: number } | null
+  /** Whether the agent works, changing files as it goes. */
+  working: boolean
 }) {
   const [open, setOpen] = React.useState(false)
-  const read = useQuery({ ...changesQuery(nookId), enabled: open })
+  const read = useQuery({
+    ...changesQuery(nookId, checkpoint),
+    enabled: open,
+    refetchInterval: open && working ? whileWorking : false,
+  })
   const sources = read.data ?? []
   // With several repositories, each file's path starts with its repository's name.
   const several = sources.length > 1

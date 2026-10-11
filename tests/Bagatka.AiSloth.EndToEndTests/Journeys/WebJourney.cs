@@ -67,6 +67,7 @@ public sealed partial class WebJourney(ControlPlane app)
             await TheTranscriptFollowsOnlyWhileAtItsEndAsync(page, acme, chat);
             ChatSummary started = await StartsAChatWithTheRepositoryInTheAppAsync(page, acme);
             await AFailedSetupIsFixedInAChatOfItsOwnAsync(page, acme);
+            await TheChangesStayLiveAndKeepTheReadersPlaceAsync(page, acme, started);
             await ReviewsTheChangesDownloadsTheFilesAndOpensAPullRequestAsync(page, acme, started, owner);
             await TheSessionIsACookieNoScriptReadsAndNothingBrokeThePolicyAsync(page, context);
             await ALinkToTheChatSignsInThroughTheProviderAsync(browser, chat, alice);
@@ -230,6 +231,34 @@ public sealed partial class WebJourney(ControlPlane app)
         await WebBrowser.ShotAsync(page, "setup-fix-used");
     }
 
+    // The changes panel reads the changes again while it's open and the agent works. Someone reading
+    // a long file, picked in the tree, stays at the same line as a file above it grows (here the journey
+    // changes the files, as the agent would, while the model holds its turn).
+    private async Task TheChangesStayLiveAndKeepTheReadersPlaceAsync(IPage page, TestWorkspace acme, ChatSummary chat)
+    {
+        await acme.ChangeAsync(chat.NookId, "mkdir -p /work/api/notes && echo 'first note' > /work/api/notes/a.txt && seq 1 150 | sed 's/^/line /' > /work/api/notes/long.txt");
+        await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Changes" }).ClickAsync();
+        ILocator panel = page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "Changes" });
+        await Assertions.Expect(panel.GetByText("3 files in api")).ToBeVisibleAsync(WebBrowser.Shown);
+        await panel.GetByRole(AriaRole.Treeitem, new LocatorGetByRoleOptions { Name = "long.txt" }).ClickAsync();
+        ILocator read = panel.GetByText("line 20", new LocatorGetByTextOptions { Exact = true });
+        LocatorBoundingBoxResult? before = await read.BoundingBoxAsync();
+
+        app.Model.HoldOn(Wait);
+        await acme.SendAsync(chat, Wait);
+        await app.Model.HeldAsync(Wait);
+        await acme.ChangeAsync(chat.NookId, "seq 1 40 | sed 's/^/more of the first note /' >> /work/api/notes/a.txt");
+        await Assertions.Expect(panel.GetByText("+192", new LocatorGetByTextOptions { Exact = true }).First).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
+        LocatorBoundingBoxResult? after = await read.BoundingBoxAsync();
+        await WebBrowser.ShotAsync(page, "changes-live");
+        app.Model.Release(Wait);
+        await page.Keyboard.PressAsync("Escape");
+
+        Assert.NotNull(before);
+        Assert.NotNull(after);
+        Assert.Equal(before.Y, after.Y, 2);
+    }
+
     // The agent changes the repository (here the journey does, as it would); the changes, the setup's
     // fix among them, show as a diff, the files download, and a pull request opens on GitHub with them.
     private async Task ReviewsTheChangesDownloadsTheFilesAndOpensAPullRequestAsync(IPage page, TestWorkspace acme, ChatSummary chat, string owner)
@@ -238,7 +267,8 @@ public sealed partial class WebJourney(ControlPlane app)
 
         await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Changes" }).ClickAsync();
         ILocator panel = page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "Changes" });
-        await Assertions.Expect(panel.GetByText("2 files in api")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(panel.GetByText("4 files in api")).ToBeVisibleAsync(WebBrowser.Shown);
+        await panel.GetByRole(AriaRole.Treeitem, new LocatorGetByRoleOptions { Name = "CHANGE.md" }).ClickAsync();
         await Assertions.Expect(panel.GetByText("hello from the review")).ToBeVisibleAsync(WebBrowser.Shown);
         await WebBrowser.ShotAsync(page, "changes");
         IDownload download = await page.RunAndWaitForDownloadAsync(() => panel.GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = "Download files" }).ClickAsync());

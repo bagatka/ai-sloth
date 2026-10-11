@@ -87,16 +87,10 @@ export type Transcript = {
    * its work, until their turn starts, they go into the running turn, or they're cancelled.
    */
   queued: readonly MessageRow[]
-  /**
-   * How much the nook's repositories had changed at its latest checkpoint, when it kept that, and
-   * the checkpoint's number.
-   */
-  changes: {
-    checkpoint: number
-    files: number
-    additions: number
-    deletions: number
-  } | null
+  /** The number of the nook's latest checkpoint, taken after each turn; 0 before any. */
+  checkpoint: number
+  /** How much the nook's repositories had changed at its latest checkpoint, when it kept that. */
+  changes: { files: number; additions: number; deletions: number } | null
   /** Whether someone asked to run the setup again, until it runs again. */
   setupRunAsked: boolean
   /**
@@ -115,6 +109,7 @@ export type Transcript = {
 export const emptyTranscript: Transcript = {
   rows: [],
   queued: [],
+  checkpoint: 0,
   changes: null,
   setupRunAsked: false,
   setupFix: null,
@@ -217,17 +212,17 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
       return started ? replace(next, index, ended) : append(next, ended)
     }
     case "checkpoint-saved":
-      return body.changes
-        ? {
-            ...next,
-            changes: {
-              checkpoint: body.number,
+      return {
+        ...next,
+        checkpoint: body.number,
+        changes: body.changes
+          ? {
               files: body.changes.files,
               additions: body.changes.additions,
               deletions: body.changes.deletions,
-            },
-          }
-        : next
+            }
+          : next.changes,
+      }
     case "setup-run-asked":
       return { ...next, setupRunAsked: true }
     case "setup-fix-started":
