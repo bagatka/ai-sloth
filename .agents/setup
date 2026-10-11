@@ -4,6 +4,17 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
+# As root, as in an AiSloth nook: Nix's single-user installer would create /nix with sudo, root has
+# no build users, which every nix command must know, and Nix's profile script needs USER.
+if [[ "$(id -u)" == 0 ]]; then
+  mkdir -p /etc/nix
+  [[ -d /nix ]] || mkdir -m 0755 /nix
+  if ! grep -Fqx 'build-users-group =' /etc/nix/nix.conf 2>/dev/null; then
+    echo 'build-users-group =' >> /etc/nix/nix.conf
+  fi
+  export USER="${USER:-root}"
+fi
+
 printf '\n==> Install Nix if missing\n'
 if [[ ! -x "$HOME/.nix-profile/bin/nix" ]]; then
   installer="$(mktemp)"
@@ -31,6 +42,7 @@ if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
 
 $profile_marker
 if [[ -z "\${IN_NIX_SHELL:-}" && ( "\$PWD" == "$repo_root" || "\$PWD" == "$repo_root/"* ) ]]; then
+  export USER="\${USER:-\$(id -un)}"
   source "\$HOME/.nix-profile/etc/profile.d/nix.sh"
   export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
   eval "\$("\$HOME/.nix-profile/bin/nix" --extra-experimental-features 'nix-command flakes' print-dev-env --no-write-lock-file "$repo_root")"

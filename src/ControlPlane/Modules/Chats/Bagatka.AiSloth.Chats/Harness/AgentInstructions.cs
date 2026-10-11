@@ -79,8 +79,9 @@ internal sealed class AgentInstructions(IDbContextFactory<ChatsDbContext> databa
         }
 
         return nook + string.Create(CultureInfo.InvariantCulture, $"\n\nBefore you started, the setup failed with exit code {exitCode}; ")
-            + "its output is in /var/log/aisloth/setup.log. Fix the cause where you can, in the scripts too. "
-            + "When people must do something, such as add a secret with `sloth secret set <NAME>`, tell them.";
+            + "its output is in /var/log/aisloth/setup.log. Tell the person in a sentence what failed and offer to fix it; fix it only "
+            + "when they ask, or when the failure stops what they asked for. When people must do something, such as add a secret with "
+            + "`sloth secret set <NAME>`, tell them.";
     }
 
     private static string Compose(string nook, string workspace, string personal)

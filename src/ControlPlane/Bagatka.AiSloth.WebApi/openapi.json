@@ -2959,7 +2959,7 @@
             "$ref": "#/components/schemas/DiskNearlyFull"
           }
         ],
-        "description": "What happened in a chat. A message is sent, then either starts a turn, goes into the running\nturn (steered), or is cancelled. A turn shows the agent\u0027s updates and ends with a stop reason,\nthen a checkpoint of the nook\u0027s files. A proposal stays with the people in the chat until the\naccount\u0027s owner sends it on. An agent that had to be started again says whether it remembers.\nSomeone may change the agent\u0027s model or account, from the next turn on.\nThe nook\u0027s setup, when its files have one, starts and ends before its agent starts; a setup the\nagent wrote is tested in a fresh nook after its turn."
+        "description": "What happened in a chat. A message is sent, then either starts a turn, goes into the running\nturn (steered), or is cancelled. A turn shows the agent\u0027s updates and ends with a stop reason,\nthen a checkpoint of the nook\u0027s files. A proposal stays with the people in the chat until the\naccount\u0027s owner sends it on. An agent that had to be started again says whether it remembers.\nSomeone may change the agent\u0027s model or account, from the next turn on.\nThe nook\u0027s setup, when its files have one, starts and ends before its agent starts."
       },
       "ChatEventData": {
         "required": [

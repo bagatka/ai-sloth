@@ -43,9 +43,10 @@ RUN npm install --global --prefix /opt/harness @github/copilot@1.0.91
 # the provider runs its own init as PID 1, as a subreaper (-s).
 # Docker is Ubuntu's; it runs without privileges because providers run nooks under Sysbox or in VMs.
 # systemd is there only for systemd-socket-activate, which starts Docker on first use; tini stays init.
+# xz and unzip unpack what setups download, such as Nix's installer and release archives.
 FROM ubuntu:26.04 AS nook
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tini git ca-certificates curl libssl3t64 \
+    && apt-get install -y --no-install-recommends tini git ca-certificates curl libssl3t64 xz-utils unzip \
         docker.io docker-compose-v2 docker-buildx systemd \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/Bagatka.AiSloth.Daemon /usr/local/bin/slothd
