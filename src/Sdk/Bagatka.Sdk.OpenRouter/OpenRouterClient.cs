@@ -61,7 +61,28 @@ public sealed class OpenRouterClient : IDisposable
             throw new HttpRequestException("OpenRouter answered with nothing.");
         }
 
-        return [.. list.Data.Select(model => new OpenRouterModel(model.Id, model.Name ?? model.Id, model.SupportedParameters ?? []))];
+        return [.. list.Data.Select(model => new OpenRouterModel(
+            model.Id,
+            model.Name ?? model.Id,
+            model.SupportedParameters ?? [],
+            model.ContextLength is > 0 and <= int.MaxValue ? (int)model.ContextLength : null,
+            PriceOf(model.Pricing)))];
+    }
+
+    // A price OpenRouter sets ahead: an input and an output price that aren't negative.
+    private static OpenRouterPrice? PriceOf(OpenRouterWire.Pricing? pricing)
+    {
+        decimal? prompt = Dollars(pricing?.Prompt);
+        decimal? completion = Dollars(pricing?.Completion);
+        return prompt is decimal input && completion is decimal output
+            ? new OpenRouterPrice(input, output, Dollars(pricing?.InputCacheRead), Dollars(pricing?.InputCacheWrite))
+            : null;
+    }
+
+    private static decimal? Dollars(string? text)
+    {
+        bool read = decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out decimal dollars);
+        return read && dollars >= 0 ? dollars : null;
     }
 
     /// <inheritdoc />

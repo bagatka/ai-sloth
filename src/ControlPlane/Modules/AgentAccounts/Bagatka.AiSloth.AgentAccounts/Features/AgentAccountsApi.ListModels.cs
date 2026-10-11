@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Bagatka.AiSloth.AgentAccounts.Catalog;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
+using Bagatka.AiSloth.AgentAccounts.Data;
+using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Sdk.Anthropic;
@@ -22,62 +25,98 @@ internal sealed partial class AgentAccountsApi
     public async Task<Result<IReadOnlyList<AgentModel>>> ListModelsAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct)
     {
         // Asking the vendor takes what an agent's calls take, a plan's token renewed when it's due.
-        Result<AgentAccountCredential> used = await UseAsync(actor, id, workspaceId, ct);
-        if (used.Failed)
+        Result<AgentAccount> usable = await UsableAsync(actor, id, workspaceId, ct);
+        if (usable.Failed)
         {
-            return new Result<IReadOnlyList<AgentModel>>(used.Error);
+            return new Result<IReadOnlyList<AgentModel>>(usable.Error);
         }
 
+        // The vendor's list says what the account can use, and what the vendor states of each model
+        // stands over the catalog's word.
+        IReadOnlyList<Offered> offered = await OfferedAsync(usable.Output.ToCredential(box, settings), ct);
+        CatalogPricing pricing = usable.Output.Pricing();
+        List<AgentModel> models = [];
+        foreach (Offered model in offered)
+        {
+            ModelsDev.Model? cataloged = await catalog.FindAsync(pricing.Vendor, model.Id, ct);
+            ModelFacts facts = ModelCatalog.Facts(pricing.Vendor, model.Id, cataloged, pricing.Estimate, pricing.Priced);
+            models.Add(new AgentModel(model.Id, model.Name, model.UsesTools, model.With(facts)));
+        }
+
+        return new Result<IReadOnlyList<AgentModel>>(models);
+    }
+
+    public async Task<Result<ModelFacts>> GetModelFactsAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, string model, CancellationToken ct)
+    {
+        await using AgentAccountsDbContext db = await databases.CreateDbContextAsync(ct);
+
+        AgentAccount? account = await FindInWorkspaceAsync(db, id, workspaceId, ct);
+        if (account is null)
+        {
+            return new Result<ModelFacts>(AgentAccountsErrors.NotFound);
+        }
+
+        bool allowed = await AllowedAsync(actor, account, workspaceId, ct);
+        if (!allowed)
+        {
+            return new Result<ModelFacts>(AgentAccountsErrors.NotFound);
+        }
+
+        CatalogPricing pricing = account.Pricing();
+        ModelsDev.Model? cataloged = await catalog.FindAsync(pricing.Vendor, model, ct);
+        return new Result<ModelFacts>(ModelCatalog.Facts(pricing.Vendor, model, cataloged, pricing.Estimate, pricing.Priced));
+    }
+
+    // The vendor's list of the account's models, with what the vendor states of each.
+    private async Task<IReadOnlyList<Offered>> OfferedAsync(AgentAccountCredential used, CancellationToken ct)
+    {
         // A Claude plan's token, which goes to its harness, lists the plan's own models.
-        if (used.Output.Access is HarnessToken token)
+        if (used.Access is HarnessToken token)
         {
-            IReadOnlyList<AgentModel> planModels = await ClaudePlanModelsAsync(token.Value, ct);
-            return new Result<IReadOnlyList<AgentModel>>(planModels);
+            return await ClaudePlanModelsAsync(token.Value, ct);
         }
 
-        if (used.Output.Access is not ModelEndpoint endpoint)
+        if (used.Access is not ModelEndpoint endpoint)
         {
-            return new Result<IReadOnlyList<AgentModel>>([]);
+            return [];
         }
 
         // OpenRouter's catalog is public; batch variants are for batch jobs, never an agent's calls.
-        if (used.Output.Kind == AgentAccountKind.OpenRouterApiKey)
+        if (used.Kind == AgentAccountKind.OpenRouterApiKey)
         {
-            IReadOnlyList<OpenRouterModel> catalog = await openRouter.ListModelsAsync(ct);
-            return new Result<IReadOnlyList<AgentModel>>([.. catalog
-                .Where(model => !model.Id.EndsWith(":batch", StringComparison.Ordinal))
-                .Select(model => new AgentModel(model.Id, model.Name, model.SupportedParameters.Contains("tools", StringComparer.Ordinal)))]);
+            IReadOnlyList<OpenRouterModel> listed = await openRouter.ListModelsAsync(ct);
+            return [.. listed.Where(model => !model.Id.EndsWith(":batch", StringComparison.Ordinal)).Select(Offered.Of)];
         }
 
         // A Copilot plan's models are Copilot's to list, for the plan.
-        if (used.Output.Kind == AgentAccountKind.CopilotPlan)
+        if (used.Kind == AgentAccountKind.CopilotPlan)
         {
-            IReadOnlyList<CopilotModel> offered = await copilot.ListModelsAsync(endpoint.Url, endpoint.Headers, ct);
-            return new Result<IReadOnlyList<AgentModel>>([.. offered.Select(model => new AgentModel(model.Id, model.Name, model.UsesTools))]);
+            IReadOnlyList<CopilotModel> listed = await copilot.ListModelsAsync(endpoint.Url, endpoint.Headers, ct);
+            return [.. listed.Select(Offered.Of)];
         }
 
-        if (used.Output.Kind == AgentAccountKind.AnthropicApiKey)
+        if (used.Kind == AgentAccountKind.AnthropicApiKey)
         {
             IReadOnlyList<AnthropicModel> served = await anthropic.ListModelsAsync(endpoint.Url, endpoint.Headers, ct);
-            return new Result<IReadOnlyList<AgentModel>>([.. served.Select(model => new AgentModel(model.Id, model.DisplayName, UsesTools: true))]);
+            return [.. served.Select(model => new Offered(model.Id, model.DisplayName, UsesTools: true, VendorFacts: null))];
         }
 
         // A ChatGPT plan's catalog holds the models it runs, named and in order; an OpenAI API key's
         // list holds every model the API serves, by ID.
         IReadOnlyList<OpenAIModel> openAIModels = await openAI.ListModelsAsync(endpoint.Url, endpoint.Headers, ct);
-        if (used.Output.Kind == AgentAccountKind.ChatGptPlan)
+        if (used.Kind == AgentAccountKind.ChatGptPlan)
         {
-            return new Result<IReadOnlyList<AgentModel>>([.. openAIModels.Select(model => new AgentModel(model.Id, model.DisplayName ?? model.Id, UsesTools: true))]);
+            return [.. openAIModels.Select(model => new Offered(model.Id, model.DisplayName ?? model.Id, UsesTools: true, VendorFacts: null))];
         }
 
-        return new Result<IReadOnlyList<AgentModel>>([.. openAIModels
+        return [.. openAIModels
             .OrderByDescending(model => model.Created)
-            .Select(model => new AgentModel(model.Id, model.Id, RunsAgents(model.Id)))]);
+            .Select(model => new Offered(model.Id, model.Id, RunsAgents(model.Id), VendorFacts: null))];
     }
 
     // Not handled: a Claude plan's models (off unless Anthropic allowed this host) are asked of
     // Anthropic's API with the plan's sign-in token, which no test or plan here confirms.
-    private async Task<IReadOnlyList<AgentModel>> ClaudePlanModelsAsync(string token, CancellationToken ct)
+    private async Task<IReadOnlyList<Offered>> ClaudePlanModelsAsync(string token, CancellationToken ct)
     {
         Dictionary<string, string> signedIn = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -85,7 +124,7 @@ internal sealed partial class AgentAccountsApi
             ["anthropic-beta"] = "oauth-2025-04-20",
         };
         IReadOnlyList<AnthropicModel> served = await anthropic.ListModelsAsync(new Uri("https://api.anthropic.com"), signedIn, ct);
-        return [.. served.Select(model => new AgentModel(model.Id, model.DisplayName, UsesTools: true))];
+        return [.. served.Select(model => new Offered(model.Id, model.DisplayName, UsesTools: true, VendorFacts: null))];
     }
 
     private static bool RunsAgents(string model)

@@ -47,3 +47,44 @@ export function agentLabel(
     .filter(Boolean)
     .join(" · ")
 }
+
+/**
+ * The thinking level a model runs at: the one chosen when the model takes it, the agent's default when
+ * the model takes that, and the middle of the model's levels otherwise. A model that doesn't reason
+ * (no levels) keeps the one chosen, which doesn't apply to it.
+ */
+export function fitThinking(
+  chosen: string | null,
+  levels: readonly string[],
+  fallback: string
+): string {
+  if (chosen && (levels.length === 0 || levels.includes(chosen))) {
+    return chosen
+  }
+  if (levels.length === 0 || levels.includes(fallback)) {
+    return fallback
+  }
+  return levels[Math.floor((levels.length - 1) / 2)]
+}
+
+/** A count of tokens as people read it, such as 128k or 1M. */
+export function tokensLabel(tokens: number): string {
+  if (tokens >= 1_000_000) {
+    return `${trimmed(tokens / 1_000_000)}M`
+  }
+  if (tokens >= 1_000) {
+    return `${trimmed(tokens / 1_000)}k`
+  }
+  return String(tokens)
+}
+
+/** Dollars as people read them: $12.40, $0.84, $0.0031, with a leading ≈ for an estimate. */
+export function dollarsLabel(dollars: number, estimate = false): string {
+  const digits = dollars >= 1 || dollars === 0 ? 2 : dollars >= 0.01 ? 3 : 4
+  const amount = `$${dollars.toFixed(digits)}`
+  return estimate ? `≈ ${amount}` : amount
+}
+
+function trimmed(value: number): string {
+  return value >= 100 ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, "")
+}

@@ -22,6 +22,7 @@ a nook: the model gateway adds them to each call.
   the host's Copilot app, through `Bagatka.Sdk.GitHub`. The vendors' lists of
   models: OpenAI's through `Bagatka.Sdk.OpenAI`, Anthropic's through `Bagatka.Sdk.Anthropic`,
   Copilot's through `Bagatka.Sdk.GitHub`, and OpenRouter's catalog through `Bagatka.Sdk.OpenRouter`.
+  models.dev's open catalog of what each model takes, holds, and costs (`Catalog/`).
 
 ## Does not own
 
@@ -87,6 +88,8 @@ and when GitHub may be asked next).
 ## Background work
 
 None. A plan's access token is renewed when it is used and due, never in the background.
+models.dev's catalog is read again once a day old, by the next caller that needs it, never in the
+background.
 
 ## Configuration
 
@@ -100,8 +103,8 @@ None. A plan's access token is renewed when it is used and due, never in the bac
   since a local run is self-hosted;
 - `CopilotClientId`, the GitHub OAuth app people sign in to for their Copilot plans: AiSloth's own
   unless the host names another;
-- `ChatGptAuthority`, `ChatGptApi`, `OpenRouterApi`, and `CopilotApi`, the vendors' own by
-  default; tests point them at fakes. GitHub itself is the host's `GitHubClient`'s.
+- `ChatGptAuthority`, `ChatGptApi`, `OpenRouterApi`, `CopilotApi`, and `ModelsDevUrl`, the
+  vendors' own by default; tests point them at fakes. GitHub itself is the host's `GitHubClient`'s.
 
 ## Decisions and constraints
 
@@ -109,6 +112,16 @@ None. A plan's access token is renewed when it is used and due, never in the bac
   (`/v1/messages`) and OpenAI's at `/v1`, so an OpenRouter key's endpoint is OpenRouter's root, with
   its key as a bearer token, and each harness calls the API it speaks. Only Anthropic and OpenAI API
   keys name an endpoint of their own.
+- **What's known of a model** (`ModelFacts`): how it reasons, its context and output limits, its
+  price per million tokens with any long-context tiers, and how long its vendor keeps a prompt's
+  cache. Each vendor's list says what an account can use, and what the vendor states stands over the
+  catalog's word: Copilot's reasoning efforts and limits, OpenRouter's prices, context, and whether a
+  model reasons. models.dev's catalog (MIT, `Catalog/models-dev.LICENSE`) says the rest: a snapshot
+  built in (`Catalog/update-models-dev.sh`), read again from models.dev daily, keeping what it has
+  when that fails. An API key pays its vendor's price; a plan pays none per token, so its price is
+  an estimate at the vendor's API prices; an endpoint of an account's own has no price we can know.
+  What isn't known stays unknown. Cache lifetimes are the vendors' rules: Anthropic's five minutes,
+  OpenAI's five (of five to ten) or thirty for GPT-5.6 and later; Copilot's isn't known.
 - **Models come from each vendor's list.** OpenRouter's catalog is public, read on each call (about
   60 ms for 750 KB), without its batch variants. Anthropic's and OpenAI's lists are asked at the
   account's endpoint with its credentials; OpenAI's holds every model its API serves, so only its GPT,

@@ -116,7 +116,7 @@ internal static class ChatsEndpoints
     /// made for first, then in the vendor's order. A new chat starts on the first unless someone
     /// chooses another.
     /// </summary>
-    private static async Task<Results<Ok<IReadOnlyList<AgentModel>>, ProblemHttpResult>> ListModels(
+    private static async Task<Results<Ok<IReadOnlyList<HarnessModel>>, ProblemHttpResult>> ListModels(
         [FromRoute] Guid workspaceId,
         [FromQuery] string harness,
         [FromQuery] Guid account,
@@ -124,7 +124,7 @@ internal static class ChatsEndpoints
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        Result<IReadOnlyList<AgentModel>> result = await api.ListModelsAsync(principal.ToActor(), WorkspaceId.From(workspaceId), harness, AgentAccountId.From(account), ct);
+        Result<IReadOnlyList<HarnessModel>> result = await api.ListModelsAsync(principal.ToActor(), WorkspaceId.From(workspaceId), harness, AgentAccountId.From(account), ct);
         return result.ToOk();
     }
 

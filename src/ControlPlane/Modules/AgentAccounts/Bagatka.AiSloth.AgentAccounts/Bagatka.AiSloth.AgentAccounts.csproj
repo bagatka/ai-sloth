@@ -9,4 +9,9 @@
     <ProjectReference Include="..\..\..\..\Sdk\Bagatka.Sdk.OpenRouter\Bagatka.Sdk.OpenRouter.csproj" />
   </ItemGroup>
 
+  <!-- The catalog a host starts from until it reads models.dev itself (Catalog/update-models-dev.sh). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Catalog\models-dev.json" LogicalName="Bagatka.AiSloth.AgentAccounts.Catalog.models-dev.json" />
+  </ItemGroup>
+
 </Project>

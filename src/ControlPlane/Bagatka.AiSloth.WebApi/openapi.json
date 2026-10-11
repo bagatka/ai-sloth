@@ -2530,7 +2530,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/AgentModel"
+                    "$ref": "#/components/schemas/HarnessModel"
                   }
                 }
               }
@@ -2882,29 +2882,6 @@
           }
         },
         "description": "An agent account as people see it; its secret is never shown. A workspace\u0027s account has a\nWorkspaceId; a person\u0027s own has an OwnerId."
-      },
-      "AgentModel": {
-        "required": [
-          "id",
-          "name",
-          "usesTools"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Its ID at the vendor, such as \u0060openai/gpt-6-luna\u0060 at OpenRouter."
-          },
-          "name": {
-            "type": "string",
-            "description": "Its name for people, as the vendor gives it, such as \u0060OpenAI: GPT-6 Luna\u0060."
-          },
-          "usesTools": {
-            "type": "boolean",
-            "description": "Whether it can call tools, which every coding agent needs."
-          }
-        },
-        "description": "A model an account\u0027s vendor offers, which a chat\u0027s agent can run on."
       },
       "AgentRestarted": {
         "required": [
@@ -3626,6 +3603,37 @@
         },
         "description": "Someone given access to a resource directly, not through what it is in."
       },
+      "HarnessModel": {
+        "required": [
+          "id",
+          "name",
+          "thinkingLevels",
+          "facts"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Its ID at the account\u0027s vendor, such as \u0060openai/gpt-6-luna\u0060."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name for people, as the vendor gives it."
+          },
+          "thinkingLevels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The harness\u0027s thinking levels the model takes, in the harness\u0027s words, lightest first; empty when\nthe model doesn\u0027t reason, so no level applies."
+          },
+          "facts": {
+            "description": "What\u0027s known of it at the account: its limits, its price, and its cache\u0027s lifetime.",
+            "$ref": "#/components/schemas/ModelFacts"
+          }
+        },
+        "description": "A model a harness can run on with an account, as a chat\u0027s model."
+      },
       "HarnessStateSummary": {
         "required": [
           "harness",
@@ -3985,6 +3993,120 @@
             "$ref": "#/components/schemas/UserId"
           }
         }
+      },
+      "ModelFacts": {
+        "required": [
+          "reasons",
+          "efforts",
+          "contextWindow",
+          "maxOutput",
+          "price",
+          "cacheLifetime"
+        ],
+        "type": "object",
+        "properties": {
+          "reasons": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Whether it reasons (thinks before answering)."
+          },
+          "efforts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The reasoning efforts it takes, in its vendor\u0027s words, such as \u0060low\u0060 and \u0060high\u0060; empty when\nit takes a thinking budget or a switch instead, or doesn\u0027t reason."
+          },
+          "contextWindow": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The most tokens its context holds.",
+            "format": "int32"
+          },
+          "maxOutput": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The most tokens it writes in one answer.",
+            "format": "int32"
+          },
+          "price": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "What its tokens cost at this account.",
+                "$ref": "#/components/schemas/ModelPrice"
+              }
+            ]
+          },
+          "cacheLifetime": {
+            "pattern": "^-?(\\d\u002B\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "How long the vendor keeps a prompt\u0027s cache after its last use, at least: Anthropic\u0027s five minutes,\nOpenAI\u0027s five, or thirty for its newest models."
+          }
+        },
+        "description": "What\u0027s known of a model at an account: from the account\u0027s vendor, where it says, and otherwise from\nmodels.dev\u0027s open catalog. What isn\u0027t known is \u0060null\u0060, never a guess."
+      },
+      "ModelPrice": {
+        "required": [
+          "input",
+          "output",
+          "cacheRead",
+          "cacheWrite",
+          "tiers",
+          "estimate"
+        ],
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "number",
+            "description": "Each input token not read from a cache.",
+            "format": "double"
+          },
+          "output": {
+            "type": "number",
+            "description": "Each output token, reasoning included.",
+            "format": "double"
+          },
+          "cacheRead": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Each input token read from a cache, when the vendor prices it apart.",
+            "format": "double"
+          },
+          "cacheWrite": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Each input token written to a cache, when the vendor prices it apart.",
+            "format": "double"
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceTier"
+            },
+            "description": "Higher prices for calls with more input than each tier\u0027s threshold, lowest first."
+          },
+          "estimate": {
+            "type": "boolean",
+            "description": "Whether it\u0027s a plan\u0027s estimate at the vendor\u0027s API prices rather than a price paid."
+          }
+        },
+        "description": "What a model\u0027s tokens cost, in US dollars per million: what an API key pays its vendor, or, for a\nplan, which pays no price per token, what the same tokens would cost at the vendor\u0027s API."
       },
       "NookId": {
         "type": "string",
@@ -4424,6 +4546,50 @@
           }
         },
         "description": "A person\u0027s saved choice of how a chat runs, a shortcut when they start one: a harness, the agent\naccount that pays, the model, and how hard it thinks."
+      },
+      "PriceTier": {
+        "required": [
+          "aboveInputTokens",
+          "input",
+          "output",
+          "cacheRead",
+          "cacheWrite"
+        ],
+        "type": "object",
+        "properties": {
+          "aboveInputTokens": {
+            "type": "integer",
+            "description": "The threshold, counting every input token, cached or not.",
+            "format": "int32"
+          },
+          "input": {
+            "type": "number",
+            "description": "Each input token not read from a cache.",
+            "format": "double"
+          },
+          "output": {
+            "type": "number",
+            "description": "Each output token.",
+            "format": "double"
+          },
+          "cacheRead": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Each input token read from a cache.",
+            "format": "double"
+          },
+          "cacheWrite": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Each input token written to a cache.",
+            "format": "double"
+          }
+        },
+        "description": "The prices of calls with more input tokens than AboveInputTokens."
       },
       "ProblemDetails": {
         "type": "object",

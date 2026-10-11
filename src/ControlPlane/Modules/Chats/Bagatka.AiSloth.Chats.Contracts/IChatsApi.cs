@@ -45,14 +45,15 @@ public interface IChatsApi
     /// <summary>
     /// The models a chat's agent can run on with the harness and the account (<see cref="StartChat.Model"/>):
     /// those of the account's vendor that can call tools, the ones the harness is made for first, then
-    /// in the vendor's order. A new chat starts on the first unless someone chooses another. Reads the
-    /// vendor's catalog each time, which throws when it can't be reached; try again later.
+    /// in the vendor's order. A new chat starts on the first unless someone chooses another. Each says
+    /// which of the harness's thinking levels it takes. Reads the vendor's catalog each time, which
+    /// throws when it can't be reached; try again later.
     /// </summary>
     /// <returns>
     /// The models; a validation error for an unknown harness, or an account the actor can't use or the
     /// harness doesn't take; or not found when the actor has no access to the workspace.
     /// </returns>
-    public Task<Result<IReadOnlyList<AgentModel>>> ListModelsAsync(Actor actor, WorkspaceId workspaceId, string harness, AgentAccountId account, CancellationToken ct);
+    public Task<Result<IReadOnlyList<HarnessModel>>> ListModelsAsync(Actor actor, WorkspaceId workspaceId, string harness, AgentAccountId account, CancellationToken ct);
 
     /// <summary>
     /// The actor's presets that can start chats in the workspace, oldest first: those on the

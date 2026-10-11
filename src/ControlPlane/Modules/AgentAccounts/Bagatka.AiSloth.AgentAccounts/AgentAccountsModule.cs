@@ -1,3 +1,4 @@
+using Bagatka.AiSloth.AgentAccounts.Catalog;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Data;
 using Bagatka.Foundation.Modules;
@@ -26,6 +27,7 @@ public static class AgentAccountsModule
         services.AddOpenAIModelsClient();
         services.AddAnthropicModelsClient();
         services.AddCopilotModelsClient();
+        services.AddSingleton<ModelCatalog>();
         services.AddOpenRouterClient(new OpenRouterSettings(settings.OpenRouterApi));
         services.AddModuleDbContext<AgentAccountsDbContext>(AgentAccountsDbContext.Schema);
         services.AddSingleton<IAgentAccountsApi, AgentAccountsApi>();

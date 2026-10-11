@@ -68,13 +68,21 @@ public interface IAgentAccountsApi
     /// its batch variants, and the lists of Anthropic's and OpenAI's APIs at the account's endpoint,
     /// asked with its credentials, newest first; a ChatGPT plan's catalog in its own order; a Copilot
     /// plan's chat models from Copilot's API; and a Claude plan's from Anthropic's. Asks the vendor each
-    /// time, which throws when it can't be reached; try again later.
+    /// time, which throws when it can't be reached; try again later. Each comes with what's known of it
+    /// (<see cref="ModelFacts"/>).
     /// </summary>
     /// <returns>
     /// The models; <see cref="AgentAccountsErrors.SignInEnded"/>; or not found for anyone who may not
     /// use the account in the workspace.
     /// </returns>
     public Task<Result<IReadOnlyList<AgentModel>>> ListModelsAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct);
+
+    /// <summary>
+    /// What's known of a model at the account, from models.dev's catalog alone, without asking the
+    /// vendor: for pricing an agent's calls as they happen. The catalog is read again daily.
+    /// </summary>
+    /// <returns>The facts, <see cref="ModelFacts.Unknown"/> for a model the catalog lacks; or not found for anyone who may not use the account.</returns>
+    public Task<Result<ModelFacts>> GetModelFactsAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, string model, CancellationToken ct);
 
     /// <summary>
     /// Removes an account: a personal one by its owner, a workspace's by its managers. Agents already

@@ -36,7 +36,13 @@ import {
 } from "@/components/ui/tooltip"
 import { ApiError, answer, api, messageOf, type Schemas } from "../api"
 import { accountsFor, ModelPicker } from "../model-picker"
-import { modelLabel, thinkingLabel, type Choice, type Chosen } from "../models"
+import {
+  fitThinking,
+  modelLabel,
+  thinkingLabel,
+  type Choice,
+  type Chosen,
+} from "../models"
 import {
   agentAccounts,
   harnesses as harnessesQuery,
@@ -273,22 +279,30 @@ function PresetForm({
     enabled: !!choice,
   })
   const model = choice?.model ?? models.data?.[0]?.id ?? null
+  const picked = models.data?.find((found) => found.id === model)
+  // The levels the model takes, the agent's own until its list is in.
+  const levels = picked?.thinkingLevels ?? harness?.thinkingLevels ?? []
   const ready: Chosen | null =
     choice && harness && model
       ? {
           ...choice,
           model,
-          thinking: choice.thinking ?? harness.defaultThinking,
+          thinking: fitThinking(
+            choice.thinking,
+            levels,
+            harness.defaultThinking
+          ),
         }
       : null
-  const picked = models.data?.find((found) => found.id === ready?.model)
   const defaultName =
     harness && ready
       ? [
           harness.name,
           picked ? spokenName(picked.name) : modelLabel(ready.model),
-          thinkingLabel(ready.thinking),
-        ].join(" · ")
+          levels.length > 0 && thinkingLabel(ready.thinking),
+        ]
+          .filter(Boolean)
+          .join(" · ")
       : ""
 
   const save = useMutation({
@@ -399,11 +413,11 @@ function PresetForm({
             </FieldError>
           )}
         </Field>
-        {ready && (
+        {ready && levels.length > 0 && (
           <Field data-invalid={!!error?.fields.thinking || undefined}>
             <FieldLabel>Thinking</FieldLabel>
             <Select
-              items={harness.thinkingLevels.map((level) => ({
+              items={levels.map((level) => ({
                 value: level,
                 label: thinkingLabel(level),
               }))}
@@ -417,7 +431,7 @@ function PresetForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {harness.thinkingLevels.map((level) => (
+                {levels.map((level) => (
                   <SelectItem key={level} value={level}>
                     {thinkingLabel(level)}
                   </SelectItem>

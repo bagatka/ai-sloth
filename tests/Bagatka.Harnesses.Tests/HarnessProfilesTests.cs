@@ -48,6 +48,18 @@ public sealed class HarnessProfilesTests
         Assert.All(HarnessProfiles.All, harness => Assert.Contains(harness.DefaultThinking, harness.ThinkingLevels, StringComparer.Ordinal));
     }
 
+    // A model takes the harness's levels its vendor names (none for pi's off), every level when it
+    // takes a budget or isn't known, and none when it doesn't reason.
+    [Fact]
+    public void A_model_takes_the_thinking_levels_its_vendor_names()
+    {
+        Assert.Equal(["low", "medium", "high"], HarnessProfiles.Copilot.LevelsFor(reasons: true, ["low", "medium", "high"]));
+        Assert.Equal(["off", "low", "high"], HarnessProfiles.Pi.LevelsFor(reasons: true, ["none", "low", "high"]));
+        Assert.Equal(HarnessProfiles.ClaudeCode.ThinkingLevels, HarnessProfiles.ClaudeCode.LevelsFor(reasons: true, []));
+        Assert.Equal(HarnessProfiles.Codex.ThinkingLevels, HarnessProfiles.Codex.LevelsFor(reasons: null, []));
+        Assert.Empty(HarnessProfiles.Copilot.LevelsFor(reasons: false, []));
+    }
+
     // A model's ID goes into start scripts' files as it is, so it can't carry anything to quote.
     [Theory]
     [InlineData("openai/gpt-6-luna", true)]

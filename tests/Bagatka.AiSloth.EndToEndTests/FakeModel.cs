@@ -138,6 +138,7 @@ internal sealed class FakeModel : IAsyncDisposable
         app.MapPost("/v1/chat/completions", model.ChatCompletionsAsync);
         app.MapGet("/v1/models", ListModels);
         app.MapGet("/copilot/models", model.CopilotModels);
+        app.MapGet("/models-dev/api.json", ModelsDev);
         app.MapPost("/copilot/responses", context => model.CopilotAsync(context, model.ResponsesAsync));
         app.MapPost("/copilot/chat/completions", context => model.CopilotAsync(context, model.ChatCompletionsAsync));
         await app.StartAsync();
@@ -350,8 +351,8 @@ internal sealed class FakeModel : IAsyncDisposable
     }
 
     // Copilot's list of a plan's models: a Claude model that speaks OpenAI's chat API, a GPT model that
-    // speaks only its Responses API and reasons, one the plan has turned off, Copilot's own without a
-    // policy, and one for embeddings.
+    // speaks only its Responses API and reasons, one that doesn't reason, one the plan has turned off,
+    // Copilot's own without a policy, and one for embeddings.
     private IResult CopilotModels(HttpContext context)
     {
         IResult? refusal = CopilotRefusal(context);
@@ -365,6 +366,7 @@ internal sealed class FakeModel : IAsyncDisposable
             ["data"] = new JsonArray(
                 CopilotModel(CopilotClaude, "Claude Opus 5.5", "chat", "enabled", ["/chat/completions", "/v1/messages"], reasons: false),
                 CopilotModel(CopilotGpt, "GPT-6.1 Sol", "chat", "enabled", ["/responses", "ws:/responses"], reasons: true),
+                CopilotModel("gpt-4.1", "GPT-4.1", "chat", "enabled", [], reasons: false),
                 CopilotModel("gpt-5-mini", "GPT-5 mini", "chat", "disabled", ["/chat/completions", "/responses"], reasons: true),
                 CopilotModel("exec-agent-a", "Agent A", "chat", policy: null, ["/chat/completions"], reasons: false),
                 CopilotModel("text-embedding-3-small", "Embedding V3 small", "embeddings", policy: null, [], reasons: false)),
@@ -403,7 +405,7 @@ internal sealed class FakeModel : IAsyncDisposable
         JsonObject catalog = new JsonObject
         {
             ["data"] = new JsonArray(
-                CatalogModel(OpenRouterModel, "OpenAI: GPT-6 Luna", "tools", "max_tokens"),
+                CatalogModel(OpenRouterModel, "OpenAI: GPT-6 Luna", "tools", "max_tokens", "reasoning"),
                 CatalogModel(OpenRouterModel + ":batch", "OpenAI: GPT-6 Luna (batch)", "tools", "max_tokens"),
                 CatalogModel(OpenRouterClaude, "Anthropic: Claude Opus 5.5", "tools", "max_tokens"),
                 CatalogModel("example/writer", "Example: Writer", "max_tokens"),
@@ -413,9 +415,10 @@ internal sealed class FakeModel : IAsyncDisposable
         return Results.Text(catalog.ToJsonString(), "application/json");
     }
 
+    // OpenRouter's own word on GPT-6 Luna, which stands over models.dev's: its context and prices.
     private static JsonObject CatalogModel(string id, string name, params string[] parameters)
     {
-        return new JsonObject
+        JsonObject model = new JsonObject
         {
             ["id"] = id,
             ["name"] = name,
@@ -423,6 +426,38 @@ internal sealed class FakeModel : IAsyncDisposable
             ["created"] = 1_790_000_000,
             ["supported_parameters"] = new JsonArray([.. parameters.Select(parameter => (JsonNode)parameter)]),
         };
+        if (string.Equals(id, OpenRouterModel, StringComparison.Ordinal))
+        {
+            model["context_length"] = 400_000;
+            model["pricing"] = new JsonObject { ["prompt"] = "0.0000001", ["completion"] = "0.0000005", ["input_cache_read"] = "0.00000001" };
+        }
+
+        return model;
+    }
+
+    // models.dev's catalog, as its api.json writes it, for the models journeys price: a Copilot plan's
+    // three (one that takes a thinking budget, one whose efforts Copilot names, one that doesn't
+    // reason), and OpenRouter's GPT-6 Luna, which costs more above 272k input tokens.
+    private static IResult ModelsDev()
+    {
+        const string catalog = """
+            {
+              "github-copilot": { "models": {
+                "claude-opus-5.5": { "id": "claude-opus-5.5", "name": "Claude Opus 5.5", "reasoning": true, "reasoning_options": [{ "type": "budget_tokens", "min": 1024 }], "tool_call": true,
+                  "limit": { "context": 200000, "output": 64000 }, "cost": { "input": 4, "output": 20, "cache_read": 0.2, "cache_write": 5 } },
+                "gpt-6.1-sol": { "id": "gpt-6.1-sol", "name": "GPT-6.1 Sol", "reasoning": true, "reasoning_options": [{ "type": "effort", "values": ["none", "low", "medium", "high", "xhigh"] }], "tool_call": true,
+                  "limit": { "context": 1050000, "output": 128000 }, "cost": { "input": 2.5, "output": 15, "cache_read": 0.25 } },
+                "gpt-4.1": { "id": "gpt-4.1", "name": "GPT-4.1", "reasoning": false, "tool_call": true,
+                  "limit": { "context": 128000, "output": 16384 }, "cost": { "input": 2, "output": 8, "cache_read": 0.5 } } } },
+              "openrouter": { "models": {
+                "openai/gpt-6-luna": { "id": "openai/gpt-6-luna", "name": "OpenAI: GPT-6 Luna", "reasoning": true, "reasoning_options": [{ "type": "effort", "values": ["none", "low", "medium", "high", "xhigh", "max"] }], "tool_call": true,
+                  "limit": { "context": 1050000, "output": 128000 },
+                  "cost": { "input": 0.1, "output": 0.5, "cache_read": 0.01, "tiers": [{ "tier": { "type": "context", "size": 272000 }, "input": 0.2, "output": 0.75, "cache_read": 0.02 }] } } } },
+              "openai": { "models": {} },
+              "anthropic": { "models": {} }
+            }
+            """;
+        return Results.Text(catalog, "application/json");
     }
 
     // OpenAI's chat API, as pi calls it at OpenRouter: every call gets a short text, streamed or not.

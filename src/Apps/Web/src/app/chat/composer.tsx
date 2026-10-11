@@ -12,7 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { ApiError, answer, api, messageOf, type Schemas } from "../api"
-import { ModelPicker, ThinkingPicker } from "../model-picker"
+import { ModelPicker, ThinkingPicker, useListedModel } from "../model-picker"
 import { type Choice, type Chosen } from "../models"
 import { chat as chatQuery, presets as presetsQuery } from "../queries"
 import { chatStream } from "./chat-stream"
@@ -215,6 +215,13 @@ function ChatModel({
   }
 
   const model = current.model
+  // The levels of the chat's model, once its account's list is in; the agent's own until then.
+  const listed = useListedModel(
+    chat.workspaceId,
+    chat.harness,
+    current.account,
+    model
+  )
   return (
     <>
       <ModelPicker
@@ -227,7 +234,7 @@ function ChatModel({
       />
       {model && (
         <ThinkingPicker
-          levels={harness.thinkingLevels}
+          levels={listed?.thinkingLevels ?? harness.thinkingLevels}
           value={current.thinking ?? harness.defaultThinking}
           onChange={(thinking) =>
             change.mutate({ ...current, model, thinking })

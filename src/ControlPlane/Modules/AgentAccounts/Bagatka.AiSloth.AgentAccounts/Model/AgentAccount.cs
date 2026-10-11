@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
+using Bagatka.AiSloth.AgentAccounts.Catalog;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
@@ -136,6 +137,22 @@ internal sealed class AgentAccount
             AgentAccountKind.ClaudePlan => new AgentAccountAccess(new HarnessToken(OpenSecret(box))),
         };
         return new AgentAccountCredential(Id, Kind, OwnerId, access);
+    }
+
+    // Where models.dev's catalog has the account's models, and how they're priced: at the vendor's
+    // price for an API key at its endpoint, as an estimate at the vendor's API price for a plan, which
+    // pays none per token, and not at all for an endpoint of the account's own, whose price is its own.
+    public CatalogPricing Pricing()
+    {
+        return Kind switch
+        {
+            AgentAccountKind.AnthropicApiKey => new CatalogPricing(ModelCatalog.Anthropic, Estimate: false, Priced: Endpoint is null),
+            AgentAccountKind.OpenAIApiKey => new CatalogPricing(ModelCatalog.OpenAI, Estimate: false, Priced: Endpoint is null),
+            AgentAccountKind.OpenRouterApiKey => new CatalogPricing(ModelCatalog.OpenRouter, Estimate: false, Priced: true),
+            AgentAccountKind.ChatGptPlan => new CatalogPricing(ModelCatalog.OpenAI, Estimate: true, Priced: true),
+            AgentAccountKind.CopilotPlan => new CatalogPricing(ModelCatalog.Copilot, Estimate: true, Priced: true),
+            AgentAccountKind.ClaudePlan => new CatalogPricing(ModelCatalog.Anthropic, Estimate: true, Priced: true),
+        };
     }
 
     private static AgentAccountAccess Through(Uri url, string header, string value)

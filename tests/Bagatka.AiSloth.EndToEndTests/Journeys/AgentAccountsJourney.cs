@@ -93,7 +93,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         IReadOnlyList<AgentAccountSummary> inAcme = await ListAsync(_alice, acme.Id);
         IReadOnlyList<AgentAccountSummary> inPersonal = await ListAsync(_alice, personal.Id);
         IReadOnlyList<AgentAccountSummary> inBobs = await ListAsync(_bob, bobs.Id);
-        IReadOnlyList<AgentModel> copilot = await Api.ReadAsync<IReadOnlyList<AgentModel>>(
+        IReadOnlyList<HarnessModel> copilot = await Api.ReadAsync<IReadOnlyList<HarnessModel>>(
             _alice.SendGetAsync(string.Create(CultureInfo.InvariantCulture, $"{Paths.Workspace(acme.Id)}/models?harness=copilot&account={own.Id.Value}")), HttpStatusCode.OK);
         await Api.ProblemAsync(_bob.DeleteAsync(new Uri(Paths.Account(own.Id), UriKind.Relative), Ct), HttpStatusCode.NotFound);
         Problem sharedPlan = await Api.ProblemAsync(
@@ -107,7 +107,11 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Contains(inAcme, found => found.Id == own.Id);
         Assert.Contains(inPersonal, found => found.Id == own.Id);
         Assert.DoesNotContain(inBobs, found => found.Id == own.Id);
-        Assert.Equal(["claude-opus-5.5", "gpt-6.1-sol"], copilot.Select(model => model.Id), StringComparer.Ordinal);
+        Assert.Equal(["claude-opus-5.5", "gpt-6.1-sol", "gpt-4.1"], copilot.Select(model => model.Id), StringComparer.Ordinal);
+        Assert.Equal(["none", "minimal", "low", "medium", "high", "xhigh", "max"], copilot[0].ThinkingLevels);
+        Assert.Equal(["low", "medium", "high"], copilot[1].ThinkingLevels);
+        Assert.Empty(copilot[2].ThinkingLevels);
+        Assert.Equal((200_000, 4m, true), (copilot[0].Facts.ContextWindow, copilot[0].Facts.Price?.Input, copilot[0].Facts.Price?.Estimate));
         Assert.True(sharedPlan.Errors?.ContainsKey("kind"));
         Assert.True(claudePlan.Errors?.ContainsKey("kind"));
     }
@@ -147,7 +151,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
     private async Task CodexAndPiAnswerThroughTheGatewayOnAnOpenAIKeyAsync()
     {
         TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice, openAI: true);
-        IReadOnlyList<AgentModel> models = await Api.ReadAsync<IReadOnlyList<AgentModel>>(_alice.SendGetAsync(ModelsPath(workspace, "codex", workspace.Account)), HttpStatusCode.OK);
+        IReadOnlyList<HarnessModel> models = await Api.ReadAsync<IReadOnlyList<HarnessModel>>(_alice.SendGetAsync(ModelsPath(workspace, "codex", workspace.Account)), HttpStatusCode.OK);
         AgentAccountSummary own = await Api.ReadAsync<AgentAccountSummary>(
             _alice.SendPostAsync("/agent-accounts", new { kind = "OpenAIApiKey", name = "Mine", secret = FakeModel.ApiKey, endpoint = app.Model.OpenAIUrl }), HttpStatusCode.Created);
         ChatSummary codex = await workspace.StartChatAsync("codex", workspace.Account);
@@ -186,8 +190,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice);
         AgentAccountSummary key = await Api.ReadAsync<AgentAccountSummary>(
             _alice.SendPostAsync(workspace.Path + "/agent-accounts", new { kind = "OpenRouterApiKey", name = "OpenRouter", secret = FakeModel.OpenRouterKey }), HttpStatusCode.Created);
-        IReadOnlyList<AgentModel> models = await Api.ReadAsync<IReadOnlyList<AgentModel>>(_alice.SendGetAsync(ModelsPath(workspace, "pi", key.Id)), HttpStatusCode.OK);
-        IReadOnlyList<AgentModel> anthropic = await Api.ReadAsync<IReadOnlyList<AgentModel>>(_alice.SendGetAsync(ModelsPath(workspace, "claude-code", workspace.Account)), HttpStatusCode.OK);
+        IReadOnlyList<HarnessModel> models = await Api.ReadAsync<IReadOnlyList<HarnessModel>>(_alice.SendGetAsync(ModelsPath(workspace, "pi", key.Id)), HttpStatusCode.OK);
+        IReadOnlyList<HarnessModel> anthropic = await Api.ReadAsync<IReadOnlyList<HarnessModel>>(_alice.SendGetAsync(ModelsPath(workspace, "claude-code", workspace.Account)), HttpStatusCode.OK);
         Problem codex = await Api.ProblemAsync(_alice.SendGetAsync(ModelsPath(workspace, "codex", key.Id)), HttpStatusCode.BadRequest);
 
         JsonElement[] ended = await Task.WhenAll(
@@ -195,6 +199,9 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
             TurnAsync(workspace, "claude-code", key.Id, FakeModel.OpenRouterClaude));
 
         Assert.Equal([FakeModel.OpenRouterModel, FakeModel.OpenRouterClaude, FakeModel.OpenAIModel], models.Select(model => model.Id), StringComparer.Ordinal);
+        Assert.Equal(["off", "low", "medium", "high", "xhigh", "max"], models[0].ThinkingLevels);
+        Assert.Equal((400_000, 0.1m, 0.5m, false), (models[0].Facts.ContextWindow, models[0].Facts.Price?.Input, models[0].Facts.Price?.Output, models[0].Facts.Price?.Estimate));
+        Assert.Equal([272_000], models[0].Facts.Price?.Tiers.Select(tier => tier.AboveInputTokens));
         Assert.Contains(anthropic, model => model is { Id: FakeModel.OpenRouterClaude, Name: "Anthropic: Claude Opus 5.5" });
         Assert.True(codex.Errors?.ContainsKey("account"));
         Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
@@ -266,7 +273,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Problem again = await Api.ProblemAsync(_alice.SendPostAsync(CompletePath(started), new { returnedTo }), HttpStatusCode.NotFound);
         int renewalsBefore = app.ChatGpt.Renewals;
 
-        IReadOnlyList<AgentModel> planModels = await Api.ReadAsync<IReadOnlyList<AgentModel>>(_alice.SendGetAsync(ModelsPath(workspace, "codex", plan.Id)), HttpStatusCode.OK);
+        IReadOnlyList<HarnessModel> planModels = await Api.ReadAsync<IReadOnlyList<HarnessModel>>(_alice.SendGetAsync(ModelsPath(workspace, "codex", plan.Id)), HttpStatusCode.OK);
         JsonElement[] ended = await Task.WhenAll(TurnAsync(workspace, "codex", plan.Id), TurnAsync(workspace, "codex", plan.Id));
         ChatSummary later = await workspace.StartChatAsync("codex", plan.Id);
         await using ChatWatch laterWatch = await ChatWatch.OpenAsync(workspace.Person, later);

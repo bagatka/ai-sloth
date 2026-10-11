@@ -33,8 +33,9 @@ import {
   HarnessPicker,
   ModelPicker,
   ThinkingPicker,
+  useListedModel,
 } from "./model-picker"
-import { type Choice, type Chosen } from "./models"
+import { fitThinking, type Choice, type Chosen } from "./models"
 import {
   agentAccounts,
   harnesses as harnessesQuery,
@@ -125,8 +126,14 @@ function NewChat({ workspace }: { workspace: Workspace }) {
     ...modelsQuery(workspace.id, setup?.harness ?? "", setup?.account ?? ""),
     enabled: setup !== null && setup.model === null,
   })
-  const firstModel = listed.data?.[0]?.id ?? null
+  const firstModel = listed.data?.[0] ?? null
   const ready = readyOf(setup, harness, firstModel)
+  const listedModel = useListedModel(
+    workspace.id,
+    setup?.harness ?? "",
+    setup?.account ?? "",
+    ready?.model ?? null
+  )
 
   // Another agent comes back to the account, model, and thinking last used with it, or its first
   // preset, or its first account on its own defaults.
@@ -308,7 +315,9 @@ function NewChat({ workspace }: { workspace: Workspace }) {
                       onChange={chooseModel}
                     />
                     <ThinkingPicker
-                      levels={harness.thinkingLevels}
+                      levels={
+                        listedModel?.thinkingLevels ?? harness.thinkingLevels
+                      }
                       value={setup.thinking ?? harness.defaultThinking}
                       onChange={(thinking) =>
                         chooseModel({
@@ -609,16 +618,25 @@ function PlacePicker({
 }
 
 // The setup with its model and thinking level filled in, from the choices or else the first model
-// listed and the agent's default level; null while the model is still to be listed.
+// listed and the agent's default level, or one the first model takes; null while the model is still
+// to be listed.
 function readyOf(
   setup: Setup | null,
   harness: Harness | undefined,
-  firstModel: string | null
+  firstModel: Schemas["HarnessModel"] | null
 ): Ready | null {
-  const model = setup?.model ?? firstModel
-  return setup && harness && model
-    ? { ...setup, model, thinking: setup.thinking ?? harness.defaultThinking }
-    : null
+  const model = setup?.model ?? firstModel?.id
+  if (!setup || !harness || !model) {
+    return null
+  }
+  const thinking = setup.model
+    ? (setup.thinking ?? harness.defaultThinking)
+    : fitThinking(
+        setup.thinking,
+        firstModel?.thinkingLevels ?? [],
+        harness.defaultThinking
+      )
+  return { ...setup, model, thinking }
 }
 
 // The choices as they can be made now: each one kept while it's still offered, otherwise the first

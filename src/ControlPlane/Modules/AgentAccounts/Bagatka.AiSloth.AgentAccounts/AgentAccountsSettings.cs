@@ -27,6 +27,10 @@ public sealed record AgentAccountsSettings
     /// which is public; <see langword="null"/> for AiSloth's own. It asks for no scopes, so its tokens
     /// reach nothing but the person's Copilot, and they never expire, so this host never renews them.
     /// </param>
+    /// <param name="modelsDevUrl">
+    /// models.dev's catalog of models, read daily for what's known of each model; <see langword="null"/>
+    /// for <c>https://models.dev/api.json</c>. Tests change it.
+    /// </param>
     public AgentAccountsSettings(
         bool allowClaudePlans = false,
         bool allowChatGptPlans = false,
@@ -34,8 +38,10 @@ public sealed record AgentAccountsSettings
         Uri? chatGptApi = null,
         Uri? openRouterApi = null,
         Uri? copilotApi = null,
-        string? copilotClientId = null)
+        string? copilotClientId = null,
+        Uri? modelsDevUrl = null)
     {
+        ModelsDevUrl = modelsDevUrl ?? new Uri("https://models.dev/api.json");
         CopilotClientId = string.IsNullOrWhiteSpace(copilotClientId) ? AiSlothCopilotApp : copilotClientId;
         CopilotApi = copilotApi ?? Bagatka.Sdk.GitHub.CopilotApi.Public;
         AllowClaudePlans = allowClaudePlans;
@@ -69,6 +75,9 @@ public sealed record AgentAccountsSettings
 
     /// <summary>The GitHub OAuth app people sign in to for their Copilot plans, by its client ID.</summary>
     public string CopilotClientId { get; }
+
+    /// <summary>models.dev's catalog of models, read daily.</summary>
+    public Uri ModelsDevUrl { get; }
 
     // AiSloth's GitHub OAuth app for Copilot plans: no scopes, tokens that never expire, device flow on.
     private const string AiSlothCopilotApp = "Ov23li6XFDuFcx4wXfCZ";

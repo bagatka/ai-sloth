@@ -17,39 +17,45 @@ internal sealed partial class AgentAccountsApi
 {
     public async Task<Result<AgentAccountCredential>> UseAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct)
     {
+        Result<AgentAccount> account = await UsableAsync(actor, id, workspaceId, ct);
+        if (account.Failed)
+        {
+            return new Result<AgentAccountCredential>(account.Error);
+        }
+
+        return new Result<AgentAccountCredential>(account.Output.ToCredential(box, settings));
+    }
+
+    // The account, if the actor may use it in the workspace, with its plan's token renewed when due.
+    private async Task<Result<AgentAccount>> UsableAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct)
+    {
         await using AgentAccountsDbContext db = await databases.CreateDbContextAsync(ct);
 
         AgentAccount? account = await FindInWorkspaceAsync(db, id, workspaceId, ct);
         if (account is null)
         {
-            return new Result<AgentAccountCredential>(AgentAccountsErrors.NotFound);
+            return new Result<AgentAccount>(AgentAccountsErrors.NotFound);
         }
 
         bool allowed = await AllowedAsync(actor, account, workspaceId, ct);
         if (!allowed)
         {
-            return new Result<AgentAccountCredential>(AgentAccountsErrors.NotFound);
+            return new Result<AgentAccount>(AgentAccountsErrors.NotFound);
         }
 
         // Not handled: signing in again while keeping the account; its owner removes it and adds it again.
         if (account.NeedsSignIn)
         {
-            return new Result<AgentAccountCredential>(AgentAccountsErrors.SignInEnded);
+            return new Result<AgentAccount>(AgentAccountsErrors.SignInEnded);
         }
 
         bool renewalDue = account.RenewalDue(box, time.GetUtcNow());
         if (renewalDue)
         {
-            Result<AgentAccount> renewed = await RenewAsync(db, id);
-            if (renewed.Failed)
-            {
-                return new Result<AgentAccountCredential>(renewed.Error);
-            }
-
-            account = renewed.Output;
+            return await RenewAsync(db, id);
         }
 
-        return new Result<AgentAccountCredential>(account.ToCredential(box, settings));
+        return new Result<AgentAccount>(account);
     }
 
     public async Task<bool?> MayUseAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct)

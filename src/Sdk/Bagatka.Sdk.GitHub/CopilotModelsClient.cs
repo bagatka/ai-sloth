@@ -72,7 +72,19 @@ public sealed class CopilotModelsClient : IDisposable
         // answer, and telling it apart needs the plan's billing, which the list doesn't show.
         return [.. list.Data
             .Where(model => model is { Capabilities.Type: "chat", Policy.State: "enabled" })
-            .Select(model => new CopilotModel(model.Id, model.Name ?? model.Id, model.Capabilities?.Supports?.ToolCalls == true))];
+            .Select(model => new CopilotModel(
+                model.Id,
+                model.Name ?? model.Id,
+                model.Capabilities?.Supports?.ToolCalls == true,
+                model.Capabilities?.Supports?.ReasoningEffort ?? [],
+                Tokens(model.Capabilities?.Limits?.MaxContextWindowTokens),
+                Tokens(model.Capabilities?.Limits?.MaxOutputTokens),
+                model.SupportedEndpoints ?? []))];
+    }
+
+    private static int? Tokens(long? count)
+    {
+        return count is > 0 and <= int.MaxValue ? (int)count : null;
     }
 
     /// <inheritdoc />

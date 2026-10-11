@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Bagatka.AiSloth.AgentAccounts.Catalog;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Data;
 using Bagatka.AiSloth.AgentAccounts.Model;
@@ -27,6 +28,7 @@ internal sealed partial class AgentAccountsApi(
     AnthropicModelsClient anthropic,
     CopilotModelsClient copilot,
     GitHubClient github,
+    ModelCatalog catalog,
     OpenRouterClient openRouter,
     IProductEvents productEvents,
     TimeProvider time,

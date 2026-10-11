@@ -2763,7 +2763,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AgentModel"][];
+                        "application/json": components["schemas"]["HarnessModel"][];
                     };
                 };
             };
@@ -2997,15 +2997,6 @@ export interface components {
              *     ChatGPT: it runs no agents until it is removed and added again.
              */
             needsSignIn: boolean;
-        };
-        /** @description A model an account's vendor offers, which a chat's agent can run on. */
-        AgentModel: {
-            /** @description Its ID at the vendor, such as `openai/gpt-6-luna` at OpenRouter. */
-            id: string;
-            /** @description Its name for people, as the vendor gives it, such as `OpenAI: GPT-6 Luna`. */
-            name: string;
-            /** @description Whether it can call tools, which every coding agent needs. */
-            usesTools: boolean;
         };
         AgentRestarted: {
             remembers: boolean;
@@ -3268,6 +3259,20 @@ export interface components {
             /** @description How much they may do. */
             access: components["schemas"]["AccessLevel"];
         };
+        /** @description A model a harness can run on with an account, as a chat's model. */
+        HarnessModel: {
+            /** @description Its ID at the account's vendor, such as `openai/gpt-6-luna`. */
+            id: string;
+            /** @description Its name for people, as the vendor gives it. */
+            name: string;
+            /**
+             * @description The harness's thinking levels the model takes, in the harness's words, lightest first; empty when
+             *     the model doesn't reason, so no level applies.
+             */
+            thinkingLevels: string[];
+            /** @description What's known of it at the account: its limits, its price, and its cache's lifetime. */
+            facts: components["schemas"]["ModelFacts"];
+        };
         /** @description Harness state for one harness, as the list of a workspace's harness state shows it. */
         HarnessStateSummary: {
             /** @description The harness, such as `claude-code`. */
@@ -3418,6 +3423,65 @@ export interface components {
             model: string;
             thinking: string;
             changedBy: components["schemas"]["UserId"];
+        };
+        /**
+         * @description What's known of a model at an account: from the account's vendor, where it says, and otherwise from
+         *     models.dev's open catalog. What isn't known is `null`, never a guess.
+         */
+        ModelFacts: {
+            /** @description Whether it reasons (thinks before answering). */
+            reasons: null | boolean;
+            /**
+             * @description The reasoning efforts it takes, in its vendor's words, such as `low` and `high`; empty when
+             *     it takes a thinking budget or a switch instead, or doesn't reason.
+             */
+            efforts: string[];
+            /**
+             * Format: int32
+             * @description The most tokens its context holds.
+             */
+            contextWindow: null | number;
+            /**
+             * Format: int32
+             * @description The most tokens it writes in one answer.
+             */
+            maxOutput: null | number;
+            price: null | components["schemas"]["ModelPrice"];
+            /**
+             * @description How long the vendor keeps a prompt's cache after its last use, at least: Anthropic's five minutes,
+             *     OpenAI's five, or thirty for its newest models.
+             */
+            cacheLifetime: null | string;
+        };
+        /**
+         * @description What a model's tokens cost, in US dollars per million: what an API key pays its vendor, or, for a
+         *     plan, which pays no price per token, what the same tokens would cost at the vendor's API.
+         */
+        ModelPrice: {
+            /**
+             * Format: double
+             * @description Each input token not read from a cache.
+             */
+            input: number;
+            /**
+             * Format: double
+             * @description Each output token, reasoning included.
+             */
+            output: number;
+            /**
+             * Format: double
+             * @description Each input token read from a cache, when the vendor prices it apart.
+             */
+            cacheRead: null | number;
+            /**
+             * Format: double
+             * @description Each input token written to a cache, when the vendor prices it apart.
+             */
+            cacheWrite: null | number;
+            /** @description Higher prices for calls with more input than each tier's threshold, lowest first. */
+            tiers: components["schemas"]["PriceTier"][];
+            /** @description Whether it's a plan's estimate at the vendor's API prices rather than a price paid. */
+            estimate: boolean;
         };
         /**
          * Format: uuid
@@ -3606,6 +3670,34 @@ export interface components {
              * @description When it was saved.
              */
             addedAt: string;
+        };
+        /** @description The prices of calls with more input tokens than AboveInputTokens. */
+        PriceTier: {
+            /**
+             * Format: int32
+             * @description The threshold, counting every input token, cached or not.
+             */
+            aboveInputTokens: number;
+            /**
+             * Format: double
+             * @description Each input token not read from a cache.
+             */
+            input: number;
+            /**
+             * Format: double
+             * @description Each output token.
+             */
+            output: number;
+            /**
+             * Format: double
+             * @description Each input token read from a cache.
+             */
+            cacheRead: null | number;
+            /**
+             * Format: double
+             * @description Each input token written to a cache.
+             */
+            cacheWrite: null | number;
         };
         ProblemDetails: {
             type?: null | string;

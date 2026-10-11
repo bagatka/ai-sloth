@@ -52,6 +52,26 @@ public sealed record HarnessProfile(
     /// <summary>The longest model ID a harness takes.</summary>
     public const int MaxModelLength = 200;
 
+    /// <summary>
+    /// Its <see cref="ThinkingLevels"/> a model takes: none when the model doesn't reason; those the
+    /// model's reasoning efforts name, in its vendor's words (<c>none</c> for the harness's <c>off</c>);
+    /// and all of them when the model takes a thinking budget or a switch instead, or isn't known, or
+    /// its vendor names none of the harness's.
+    /// </summary>
+    /// <param name="reasons">Whether the model reasons; null when unknown.</param>
+    /// <param name="efforts">The reasoning efforts the model takes, as its vendor names them.</param>
+    public IReadOnlyList<string> LevelsFor(bool? reasons, IReadOnlyList<string> efforts)
+    {
+        ArgumentNullException.ThrowIfNull(efforts);
+        if (reasons is false)
+        {
+            return [];
+        }
+
+        List<string> taken = [.. ThinkingLevels.Where(level => efforts.Contains(string.Equals(level, "off", StringComparison.Ordinal) ? "none" : level, StringComparer.Ordinal))];
+        return taken.Count > 0 ? taken : ThinkingLevels;
+    }
+
     /// <summary>Whether the harness takes this kind of credential.</summary>
     public bool Accepts(CredentialKind kind)
     {

@@ -24,7 +24,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { type Schemas } from "./api"
-import { modelLabel, thinkingLabel, type Choice, type Chosen } from "./models"
+import {
+  dollarsLabel,
+  fitThinking,
+  modelLabel,
+  thinkingLabel,
+  tokensLabel,
+  type Choice,
+  type Chosen,
+} from "./models"
 import { agentAccounts, models as modelsQuery } from "./queries"
 
 // What a chat runs on, picked in its message box the way coding agents' own pickers work: one click
@@ -41,6 +49,8 @@ type Item = {
   key: string
   label: string
   detail: string | null
+  /** What's known of a listed model, shown at the item's end. */
+  model?: Schemas["HarnessModel"]
   choice: Chosen | null
 }
 type Group = { value: string; label: string; items: Item[] }
@@ -111,12 +121,16 @@ export function ModelPicker({
   }
   accounts.forEach((account, index) => {
     const list = lists[index]
-    // Another model keeps how hard the agent thinks.
-    const choiceOf = (model: string): Chosen => ({
+    // Another model keeps how hard the agent thinks, when it takes that level.
+    const choiceOf = (model: Schemas["HarnessModel"]): Chosen => ({
       harness: harness.id,
       account: account.id,
-      model,
-      thinking: value.thinking ?? harness.defaultThinking,
+      model: model.id,
+      thinking: fitThinking(
+        value.thinking,
+        model.thinkingLevels,
+        harness.defaultThinking
+      ),
     })
     const items: Item[] = []
     if (list?.isPending) {
@@ -139,7 +153,8 @@ export function ModelPicker({
           key: `${account.id}:${model.id}`,
           label: model.name,
           detail: model.name === model.id ? null : model.id,
-          choice: choiceOf(model.id),
+          model,
+          choice: choiceOf(model),
         })
       }
     }
@@ -220,7 +235,7 @@ export function ModelPicker({
                     value={item}
                     disabled={!item.choice}
                   >
-                    <span className="flex min-w-0 flex-col">
+                    <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate">{item.label}</span>
                       {item.detail && (
                         <span className="truncate text-xs text-muted-foreground">
@@ -228,6 +243,7 @@ export function ModelPicker({
                         </span>
                       )}
                     </span>
+                    {item.model && <ModelMeta facts={item.model.facts} />}
                   </ComboboxItem>
                 )}
               </ComboboxCollection>
@@ -237,6 +253,47 @@ export function ModelPicker({
       </ComboboxContent>
     </Combobox>
   )
+}
+
+// A model's context and price per million input and output tokens, at the end of its item. A plan's
+// price is an estimate at the vendor's API prices.
+function ModelMeta({ facts }: { facts: Schemas["ModelFacts"] }) {
+  const price = facts.price
+  if (!facts.contextWindow && !price) {
+    return null
+  }
+  return (
+    <span className="flex shrink-0 flex-col items-end text-xs text-muted-foreground tabular-nums">
+      {facts.contextWindow && (
+        <span>{tokensLabel(facts.contextWindow)} context</span>
+      )}
+      {price && (
+        <span
+          title={`Per million tokens: ${dollarsLabel(price.input)} in, ${dollarsLabel(price.output)} out${price.estimate ? ", at the API's prices" : ""}`}
+        >
+          {dollarsLabel(price.input, price.estimate)} /{" "}
+          {dollarsLabel(price.output)}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/**
+ * The chat's model as its account lists it, with its thinking levels and facts; undefined while the
+ * list loads or when it lacks the model. The pickers' list, so it costs no other call.
+ */
+export function useListedModel(
+  workspaceId: string,
+  harness: string,
+  account: string,
+  model: string | null
+): Schemas["HarnessModel"] | undefined {
+  const listed = useQuery({
+    ...modelsQuery(workspaceId, harness, account),
+    enabled: !!model,
+  })
+  return listed.data?.find((found) => found.id === model)
 }
 
 /** The agent a new chat runs, among those some account can run; a chat's nook keeps it after. */
@@ -288,7 +345,10 @@ export function HarnessPicker({
   )
 }
 
-/** How hard the agent thinks, among its harness's levels. */
+/**
+ * How hard the agent thinks, among the levels the chat's model takes; a model that doesn't reason says
+ * so in its place.
+ */
 export function ThinkingPicker({
   levels,
   value,
@@ -298,6 +358,17 @@ export function ThinkingPicker({
   value: string
   onChange: (thinking: string) => void
 }) {
+  if (levels.length === 0) {
+    return (
+      <span
+        className="flex h-8 items-center gap-1.5 px-2.5 text-sm text-muted-foreground"
+        title="This model doesn't reason"
+      >
+        <BrainIcon />
+        No thinking
+      </span>
+    )
+  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger

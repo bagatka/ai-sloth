@@ -14,6 +14,7 @@ they are: the catalog of the models OpenRouter offers. There is no official .NET
 ## Quirks
 
 - The catalog lists about 450 models in about 750 KB, and changes often; it isn't paged.
+- Prices are dollars per token, as decimal strings; its router's are -1, as it prices each call.
 - Models come in variants with a suffix, such as `:batch` for batch processing and `:free`, each
   listed as a model of its own.
 - Names start with the vendor, such as `OpenAI: GPT-6 Luna`.
