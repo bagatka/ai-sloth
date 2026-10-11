@@ -49,9 +49,14 @@ internal sealed partial class AgentAccountsApi
             return new Result<IReadOnlyList<AgentModel>>([.. served.Select(model => new AgentModel(model.Id, model.DisplayName, UsesTools: true))]);
         }
 
-        // An OpenAI API key or a ChatGPT plan. A plan's list isn't what it may use: it may run models
-        // the API doesn't list, which a chat can still name.
+        // A ChatGPT plan's catalog holds the models it runs, named and in order; an OpenAI API key's
+        // list holds every model the API serves, by ID.
         IReadOnlyList<OpenAIModel> openAIModels = await openAI.ListModelsAsync(endpoint.Url, endpoint.Headers, ct);
+        if (used.Output.Kind == AgentAccountKind.ChatGptPlan)
+        {
+            return new Result<IReadOnlyList<AgentModel>>([.. openAIModels.Select(model => new AgentModel(model.Id, model.DisplayName ?? model.Id, UsesTools: true))]);
+        }
+
         return new Result<IReadOnlyList<AgentModel>>([.. openAIModels
             .OrderByDescending(model => model.Created)
             .Select(model => new AgentModel(model.Id, model.Id, RunsAgents(model.Id)))]);

@@ -52,7 +52,7 @@ internal sealed partial class ChatsApi
             return new Result<PresetSummary>(person.Error);
         }
 
-        Result<HarnessProfile> found = HarnessWith(command.Harness, command.Model);
+        Result<HarnessProfile> found = HarnessWith(command.Harness, command.Model, command.Thinking);
         if (found.Failed)
         {
             return new Result<PresetSummary>(found.Error);
@@ -66,7 +66,7 @@ internal sealed partial class ChatsApi
             return new Result<PresetSummary>(account.Error);
         }
 
-        Result<Preset> saved = Preset.Save(person.Output, command.Name, harness, command.Account, command.Model, time);
+        Result<Preset> saved = Preset.Save(person.Output, command.Name, harness, command.Account, command.Model, command.Thinking, time);
         if (saved.Failed)
         {
             return new Result<PresetSummary>(saved.Error);
@@ -80,7 +80,7 @@ internal sealed partial class ChatsApi
             return new Result<PresetSummary>(ChatsErrors.TooManyPresets);
         }
 
-        bool exists = await db.Presets.AnyAsync(preset => preset.OwnerId == person.Output && preset.Harness == harness.Id && preset.AgentAccountId == command.Account && preset.Model == command.Model, ct);
+        bool exists = await db.Presets.AnyAsync(preset => preset.OwnerId == person.Output && preset.Harness == harness.Id && preset.AgentAccountId == command.Account && preset.Model == command.Model && preset.Thinking == command.Thinking, ct);
         if (exists)
         {
             return new Result<PresetSummary>(ChatsErrors.PresetExists);

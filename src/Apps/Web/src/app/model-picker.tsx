@@ -1,5 +1,5 @@
 import { useQueries, useQuery } from "@tanstack/react-query"
-import { CaretDownIcon } from "@phosphor-icons/react"
+import { BrainIcon, CaretDownIcon } from "@phosphor-icons/react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -24,25 +24,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { type Schemas } from "./api"
+import { modelLabel, thinkingLabel, type Choice } from "./models"
 import { agentAccounts, models as modelsQuery } from "./queries"
 
 // What a chat runs on, picked in its message box the way coding agents' own pickers work: one click
 // opens every model of every account the agent can run on, grouped by account, with the person's
-// presets first; typing narrows it by name or ID, and one click picks. Before a chat starts, its agent
-// (harness) is picked too; once its nook runs one, only the model and account change.
-
-/** What a chat runs on: its agent (harness), the account that pays, and the model, or the harness's default. */
-export type Choice = { harness: string; account: string; model: string | null }
-
-/** A model as chats show it: its ID without the vendor, such as gpt-6-luna. */
-export function modelLabel(model: string) {
-  return model.slice(model.lastIndexOf("/") + 1)
-}
-
-/** What a chat runs as one line, such as "pi · gpt-6-luna". */
-export function agentLabel(harnessName: string, model: string | null) {
-  return model ? `${harnessName} · ${modelLabel(model)}` : harnessName
-}
+// presets first; typing narrows it by name or ID, and one click picks. How hard the agent thinks is
+// picked beside it. Before a chat starts, its agent (harness) is picked too; once its nook runs one,
+// the model, thinking, and account still change, for the next turn.
 
 type Account = Schemas["AgentAccountSummary"]
 type Harness = Schemas["HarnessSummary"]
@@ -115,16 +104,19 @@ export function ModelPicker({
           harness: preset.harness,
           account: preset.account,
           model: preset.model,
+          thinking: preset.thinking,
         },
       })),
     })
   }
   accounts.forEach((account, index) => {
     const list = lists[index]
+    // Another model keeps how hard the agent thinks.
     const choiceOf = (model: string | null): Choice => ({
       harness: harness.id,
       account: account.id,
       model,
+      thinking: value.thinking,
     })
     const items: Item[] = [
       {
@@ -294,6 +286,59 @@ export function HarnessPicker({
                 closeOnClick
               >
                 {harness.name}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+/** How hard the agent thinks, among its harness's levels; nothing to pick for a harness without any. */
+export function ThinkingPicker({
+  levels,
+  value,
+  onChange,
+}: {
+  levels: readonly string[]
+  value: string | null
+  onChange: (thinking: string | null) => void
+}) {
+  if (levels.length === 0) {
+    return null
+  }
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            className="min-w-0"
+            aria-label="Thinking"
+          />
+        }
+      >
+        <BrainIcon />
+        <span className="truncate">
+          {value ? thinkingLabel(value) : "Default"}
+        </span>
+        <CaretDownIcon className="text-muted-foreground" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-auto min-w-44">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Thinking</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={value ?? ""}
+            onValueChange={(level: string) => onChange(level || null)}
+          >
+            <DropdownMenuRadioItem value="" closeOnClick>
+              Default
+            </DropdownMenuRadioItem>
+            {levels.map((level) => (
+              <DropdownMenuRadioItem key={level} value={level} closeOnClick>
+                {thinkingLabel(level)}
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>

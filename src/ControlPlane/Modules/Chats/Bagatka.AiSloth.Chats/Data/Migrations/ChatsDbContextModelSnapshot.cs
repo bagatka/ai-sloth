@@ -16,7 +16,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261011093002_ChangingAChatsModel";
+    public override string LastMigrationId => "20261011095401_ThinkingLevels";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -82,6 +82,11 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("character varying(200)")
                     .HasColumnName("next_model");
 
+                b.Property<string>("NextThinking")
+                    .HasMaxLength(16)
+                    .HasColumnType("character varying(16)")
+                    .HasColumnName("next_thinking");
+
                 b.Property<Guid>("NookId")
                     .HasColumnType("uuid")
                     .HasColumnName("nook_id");
@@ -123,6 +128,11 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                 b.Property<bool>("SupportsSteering")
                     .HasColumnType("boolean")
                     .HasColumnName("supports_steering");
+
+                b.Property<string>("Thinking")
+                    .HasMaxLength(16)
+                    .HasColumnType("character varying(16)")
+                    .HasColumnName("thinking");
 
                 b.Property<Guid?>("TurnMessageId")
                     .HasColumnType("uuid")
@@ -290,12 +300,17 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("uuid")
                     .HasColumnName("owner_id");
 
+                b.Property<string>("Thinking")
+                    .HasMaxLength(16)
+                    .HasColumnType("character varying(16)")
+                    .HasColumnName("thinking");
+
                 b.HasKey("Id")
                     .HasName("pk_presets");
 
-                var index = b.HasIndex("OwnerId", "Harness", "AgentAccountId", "Model")
+                var index = b.HasIndex("OwnerId", "Harness", "AgentAccountId", "Model", "Thinking")
                     .IsUnique()
-                    .HasDatabaseName("ix_presets_owner_id_harness_agent_account_id_model");
+                    .HasDatabaseName("ix_presets_owner_id_harness_agent_account_id_model_thinking");
 
                 NpgsqlIndexBuilderExtensions.AreNullsDistinct(index, false);
 

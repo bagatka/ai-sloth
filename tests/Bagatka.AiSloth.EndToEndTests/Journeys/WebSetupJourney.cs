@@ -184,7 +184,8 @@ public sealed class WebSetupJourney(ControlPlane app)
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "What should Claude Code work on?" })).ToBeVisibleAsync(WebBrowser.Shown);
     }
 
-    // The new chat page offers the preset first, and the repository.
+    // The new chat page starts on the preset, offers the repository, and saves another choice as a
+    // preset with one click.
     private static async Task AChatCanStartWithTheRepositoryAsync(IPage page)
     {
         await page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "New chat" }).ClickAsync();
@@ -192,13 +193,20 @@ public sealed class WebSetupJourney(ControlPlane app)
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "What should pi work on?" })).ToBeVisibleAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "No repository" })).ToBeVisibleAsync();
         ILocator model = page.GetByRole(AriaRole.Combobox, new PageGetByRoleOptions { Name = "Model", Exact = true });
+        ILocator presets = page.GetByRole(AriaRole.Group, new PageGetByRoleOptions { Name = "Presets", Exact = true });
         await Assertions.Expect(model).ToContainTextAsync("gpt-6-luna");
+        await Assertions.Expect(presets.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "pi · GPT-6 Luna", Pressed = true })).ToBeVisibleAsync();
         await model.ClickAsync();
-        await Assertions.Expect(page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "pi · GPT-6 Luna" })).ToBeVisibleAsync();
         await WebBrowser.ShotAsync(page, "setup-new-chat-models");
         await page.GetByLabel("Search models").FillAsync("terra");
         await OpenRouterGroup(page).GetByRole(AriaRole.Option, new LocatorGetByRoleOptions { Name = "OpenAI: GPT-5.6 Terra" }).ClickAsync();
         await Assertions.Expect(model).ToContainTextAsync("gpt-5.6-terra");
+        await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Thinking" }).ClickAsync();
+        await page.GetByRole(AriaRole.Menuitemradio, new PageGetByRoleOptions { Name = "Max" }).ClickAsync();
+        await presets.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Save as preset" }).ClickAsync();
+
+        await Assertions.Expect(presets.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "pi · gpt-5.6-terra · max", Pressed = true })).ToBeVisibleAsync(WebBrowser.Shown);
+        await WebBrowser.ShotAsync(page, "setup-new-chat-presets");
     }
 
     // The model picker's models on the OpenRouter key; the fake's one catalog lists them for the

@@ -12,7 +12,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { ApiError, answer, api, messageOf, type Schemas } from "../api"
-import { ModelPicker, type Choice } from "../model-picker"
+import { ModelPicker, ThinkingPicker } from "../model-picker"
+import { type Choice } from "../models"
 import { chat as chatQuery, presets as presetsQuery } from "../queries"
 import { chatStream } from "./chat-stream"
 import { MessageBox } from "./message-box"
@@ -182,7 +183,11 @@ function ChatModel({
       answer(
         api.PUT("/chats/{id}/model", {
           params: { path: { id: chat.id } },
-          body: { account: choice.account, model: choice.model },
+          body: {
+            account: choice.account,
+            model: choice.model,
+            thinking: choice.thinking,
+          },
         })
       ),
     onSuccess: (changed) =>
@@ -190,26 +195,32 @@ function ChatModel({
     onError: (error) =>
       toast.add({
         type: "error",
-        title: "Model not changed",
+        title: "Not changed",
         description: messageOf(error),
       }),
   })
-  const pending = change.isPending ? change.variables : null
+  const current: Choice = (change.isPending ? change.variables : null) ?? {
+    harness: chat.harness,
+    account: chat.account,
+    model: chat.model,
+    thinking: chat.thinking,
+  }
 
   return (
-    <ModelPicker
-      workspaceId={chat.workspaceId}
-      harness={harness}
-      value={
-        pending ?? {
-          harness: chat.harness,
-          account: chat.account,
-          model: chat.model,
-        }
-      }
-      owner={chat.accountOwner ?? null}
-      presets={presets}
-      onChange={(choice) => change.mutate(choice)}
-    />
+    <>
+      <ModelPicker
+        workspaceId={chat.workspaceId}
+        harness={harness}
+        value={current}
+        owner={chat.accountOwner ?? null}
+        presets={presets}
+        onChange={(choice) => change.mutate(choice)}
+      />
+      <ThinkingPicker
+        levels={harness.thinkingLevels}
+        value={current.thinking}
+        onChange={(thinking) => change.mutate({ ...current, thinking })}
+      />
+    </>
   )
 }

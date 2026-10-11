@@ -160,8 +160,11 @@ public sealed partial class WebJourney(ControlPlane app)
         await WebBrowser.ShotAsync(page, "model-picker");
         await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "Default" }).ClickAsync();
         await Assertions.Expect(page.GetByText("Switched to the agent's default model.")).ToBeVisibleAsync(WebBrowser.Shown);
+        await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Thinking" }).ClickAsync();
+        await page.GetByRole(AriaRole.Menuitemradio, new PageGetByRoleOptions { Name = "Extra high" }).ClickAsync();
+        await Assertions.Expect(page.GetByText("Switched to the agent's default model, thinking extra high.")).ToBeVisibleAsync(WebBrowser.Shown);
         Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(acme.Person.SendGetAsync(acme.Path + "/chats"), HttpStatusCode.OK);
-        Assert.Null(chats.Items[0].Model);
+        Assert.Equal((null, "xhigh"), (chats.Items[0].Model, chats.Items[0].Thinking));
         return chats.Items[0];
     }
 

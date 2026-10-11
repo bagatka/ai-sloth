@@ -33,7 +33,8 @@ internal sealed partial class Sloth
         foreach (Wire.Preset preset in presets)
         {
             string account = accounts.FirstOrDefault(found => found.Id == preset.Account)?.Name ?? "an account";
-            await terminal.WriteLineAsync(preset.Name.PadRight(width) + "  " + preset.Harness + " · " + (preset.Model ?? "default model") + " · " + account);
+            string thinking = preset.Thinking is null ? string.Empty : " · " + preset.Thinking;
+            await terminal.WriteLineAsync(preset.Name.PadRight(width) + "  " + preset.Harness + " · " + (preset.Model ?? "default model") + thinking + " · " + account);
         }
 
         return 0;
@@ -41,7 +42,7 @@ internal sealed partial class Sloth
 
     private async Task<int> AddPresetAsync(string[] words, CancellationToken ct)
     {
-        CommandLine? line = CommandLine.Parse(words, ["--harness", "--account", "--model", "--name"], []);
+        CommandLine? line = CommandLine.Parse(words, ["--harness", "--account", "--model", "--thinking", "--name"], []);
         if (line is not { Arguments: [] })
         {
             return await UsageAsync();
@@ -54,8 +55,8 @@ internal sealed partial class Sloth
         }
 
         using HostApi api = ApiFor(host);
-        (Wire.Account Account, Wire.Harness Harness, string? Model)? agent = await ChooseAgentAsync(api, host, workspace, line.Value("--account"), line.Value("--harness"), ct);
-        if (agent is not (Wire.Account account, Wire.Harness harness, _))
+        AgentChoice? agent = await ChooseAgentAsync(api, host, workspace, line.Value("--account"), line.Value("--harness"), ct);
+        if (agent is null)
         {
             return 1;
         }
@@ -63,7 +64,7 @@ internal sealed partial class Sloth
         Wire.Preset preset = await api.SendAsync(
             HttpMethod.Post,
             "/workspaces/" + workspace + "/presets",
-            new Wire.AddPreset(harness.Id, account.Id, line.Value("--model"), line.Value("--name")),
+            new Wire.AddPreset(agent.Harness.Id, agent.Account.Id, line.Value("--model"), line.Value("--thinking"), line.Value("--name")),
             CliJsonContext.Default.AddPreset,
             CliJsonContext.Default.Preset,
             ct);
@@ -129,12 +130,13 @@ internal sealed partial class Sloth
         }
 
         using HostApi api = ApiFor(host);
-        (Wire.Account Account, Wire.Harness Harness, string? Model)? agent = await ChooseAgentAsync(api, host, workspace, line.Value("--account"), line.Value("--harness"), ct);
-        if (agent is not (Wire.Account account, Wire.Harness harness, _))
+        AgentChoice? agent = await ChooseAgentAsync(api, host, workspace, line.Value("--account"), line.Value("--harness"), ct);
+        if (agent is null)
         {
             return 1;
         }
 
+        (Wire.Account account, Wire.Harness harness, _, _) = agent;
         string path = string.Create(CultureInfo.InvariantCulture, $"/workspaces/{workspace}/models?harness={Uri.EscapeDataString(harness.Id)}&account={account.Id}");
         IReadOnlyList<Wire.Model> models = await api.GetAsync(path, CliJsonContext.Default.IReadOnlyListModel, ct);
         if (models.Count == 0)

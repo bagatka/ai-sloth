@@ -62,7 +62,7 @@ internal sealed partial class ChatsApi
             return new Result<ChatSummary>(created.Error);
         }
 
-        Chat chat = Chat.Start(created.Output.Id, command.WorkspaceId, user.UserId, harness.Id, command.Model, account, time);
+        Chat chat = Chat.Start(created.Output.Id, command.WorkspaceId, user.UserId, harness.Id, command.Model, command.Thinking, account, time);
         db.Chats.Add(chat);
         db.Drafts.Add(Draft.Of(chat));
         Result saved = await db.SaveAsync(ct);
@@ -82,7 +82,7 @@ internal sealed partial class ChatsApi
     // use it and the harness takes its kind.
     private async Task<Result<(HarnessProfile Harness, AgentAccountCredential Account)>> RunsWithAsync(Actor actor, StartChat command, CancellationToken ct)
     {
-        Result<HarnessProfile> harness = HarnessWith(command.Harness, command.Model);
+        Result<HarnessProfile> harness = HarnessWith(command.Harness, command.Model, command.Thinking);
         if (harness.Failed)
         {
             return new Result<(HarnessProfile, AgentAccountCredential)>(harness.Error);
@@ -108,6 +108,7 @@ internal sealed partial class ChatsApi
         {
             ["harness"] = new ProductFact(harness.Id),
             ["model_chosen"] = new ProductFact(command.Model is not null),
+            ["thinking"] = new ProductFact(command.Thinking ?? "default"),
             ["provider"] = new ProductFact(command.Provider),
             ["account_kind"] = new ProductFact(accountKind.ToString()),
             ["repositories"] = new ProductFact(command.Repositories.Count),

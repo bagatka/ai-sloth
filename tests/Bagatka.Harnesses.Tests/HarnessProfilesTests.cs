@@ -12,15 +12,16 @@ public sealed class HarnessProfilesTests
     [Fact]
     public void A_model_api_goes_through_a_gateway_and_a_harnesss_own_token_goes_alone()
     {
-        IReadOnlyDictionary<string, string> openAI = HarnessProfile.EnvironmentFor(CredentialKind.OpenAIApi, "chat-token", Gateway, model: null);
-        IReadOnlyDictionary<string, string> openRouter = HarnessProfile.EnvironmentFor(CredentialKind.OpenRouterApi, "chat-token", Gateway, "openai/gpt-6-luna");
-        IReadOnlyDictionary<string, string> copilot = HarnessProfile.EnvironmentFor(CredentialKind.GitHubToken, "github_pat_x", gateway: null, model: null);
+        IReadOnlyDictionary<string, string> openAI = HarnessProfiles.Codex.EnvironmentFor(CredentialKind.OpenAIApi, "chat-token", Gateway, model: null, thinking: null);
+        IReadOnlyDictionary<string, string> openRouter = HarnessProfiles.Pi.EnvironmentFor(CredentialKind.OpenRouterApi, "chat-token", Gateway, "openai/gpt-6-luna", "xhigh");
+        IReadOnlyDictionary<string, string> copilot = HarnessProfiles.Copilot.EnvironmentFor(CredentialKind.GitHubToken, "github_pat_x", gateway: null, model: null, thinking: null);
 
         Assert.Equal("openai", openAI["HARNESS_CREDENTIAL"]);
         Assert.Equal("http://host.docker.internal:5172/models", openAI["HARNESS_MODEL_URL"]);
         Assert.Equal("chat-token", openAI["HARNESS_TOKEN"]);
         Assert.False(openAI.ContainsKey("HARNESS_MODEL"));
-        Assert.Equal(("openrouter", "openai/gpt-6-luna"), (openRouter["HARNESS_CREDENTIAL"], openRouter["HARNESS_MODEL"]));
+        Assert.Equal(("openrouter", "openai/gpt-6-luna", "xhigh"), (openRouter["HARNESS_CREDENTIAL"], openRouter["HARNESS_MODEL"], openRouter["HARNESS_THINKING"]));
+        Assert.False(openAI.ContainsKey("HARNESS_THINKING"));
         Assert.Equal("github-token", copilot["HARNESS_CREDENTIAL"]);
         Assert.Equal("github_pat_x", copilot["HARNESS_TOKEN"]);
         Assert.False(copilot.ContainsKey("HARNESS_MODEL_URL"));
@@ -30,8 +31,17 @@ public sealed class HarnessProfilesTests
     [Fact]
     public void A_model_api_without_a_gateway_or_a_token_with_one_is_refused()
     {
-        Assert.Throws<ArgumentException>(() => HarnessProfile.EnvironmentFor(CredentialKind.AnthropicApi, "sk-ant-key", gateway: null, model: null));
-        Assert.Throws<ArgumentException>(() => HarnessProfile.EnvironmentFor(CredentialKind.GitHubToken, "github_pat_x", Gateway, model: null));
+        Assert.Throws<ArgumentException>(() => HarnessProfiles.ClaudeCode.EnvironmentFor(CredentialKind.AnthropicApi, "sk-ant-key", gateway: null, model: null, thinking: null));
+        Assert.Throws<ArgumentException>(() => HarnessProfiles.Copilot.EnvironmentFor(CredentialKind.GitHubToken, "github_pat_x", Gateway, model: null, thinking: null));
+    }
+
+    // Each harness thinks at the levels its own settings name; others are refused before it starts.
+    [Fact]
+    public void A_harness_thinks_only_at_its_own_levels()
+    {
+        Assert.Throws<ArgumentException>(() => HarnessProfiles.Codex.EnvironmentFor(CredentialKind.OpenAIApi, "chat-token", Gateway, model: null, thinking: "max"));
+        Assert.Throws<ArgumentException>(() => HarnessProfiles.Copilot.EnvironmentFor(CredentialKind.GitHubToken, "github_pat_x", gateway: null, model: null, thinking: "high"));
+        Assert.Equal("max", HarnessProfiles.ClaudeCode.EnvironmentFor(CredentialKind.AnthropicApi, "chat-token", Gateway, model: null, thinking: "max")["HARNESS_THINKING"]);
     }
 
     // A model's ID goes into start scripts' files as it is, so it can't carry anything to quote.

@@ -559,11 +559,11 @@ internal sealed class ChatRunner(
         IReadOnlyDictionary<string, string> environment;
         if (account.Access is HarnessToken token)
         {
-            environment = HarnessProfile.EnvironmentFor(kind, token.Value, gateway: null, chat.Model);
+            environment = harness.EnvironmentFor(kind, token.Value, gateway: null, chat.Model, chat.Thinking);
         }
         else
         {
-            environment = HarnessProfile.EnvironmentFor(kind, chat.IssueHarnessToken(), settings.ModelGatewayUrl, chat.Model);
+            environment = harness.EnvironmentFor(kind, chat.IssueHarnessToken(), settings.ModelGatewayUrl, chat.Model, chat.Thinking);
         }
 
         await SaveAsync(db, ct);

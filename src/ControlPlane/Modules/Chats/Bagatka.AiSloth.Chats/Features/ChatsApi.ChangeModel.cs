@@ -32,7 +32,7 @@ internal sealed partial class ChatsApi
             return new Result<ChatSummary>(Error.Forbidden);
         }
 
-        Result<HarnessProfile> harness = HarnessWith(found.Output.Harness, command.Model);
+        Result<HarnessProfile> harness = HarnessWith(found.Output.Harness, command.Model, command.Thinking);
         if (harness.Failed)
         {
             return new Result<ChatSummary>(harness.Error);
@@ -73,10 +73,10 @@ internal sealed partial class ChatsApi
         for (int attempt = 1; ; attempt++)
         {
             Chat chat = await db.Chats.SingleAsync(found => found.Id == command.ChatId, ct);
-            bool changed = chat.ChangeAgent(command.Account, command.Model);
+            bool changed = chat.ChangeAgent(command.Account, command.Model, command.Thinking);
             if (changed)
             {
-                db.Events.Add(chat.Record(new ChatEventBody(new ModelChanged(command.Account, command.Model, user.UserId)), time));
+                db.Events.Add(chat.Record(new ChatEventBody(new ModelChanged(command.Account, command.Model, command.Thinking, user.UserId)), time));
             }
 
             Result saved = await db.SaveAsync(ct);

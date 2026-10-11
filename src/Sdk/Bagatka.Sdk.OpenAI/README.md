@@ -26,9 +26,10 @@ plan's token: one call, which isn't worth the official SDK.
 
 ## Quirks
 
-- `GET /models` lists every model the API serves, for speech, images, and embeddings too, without
-  names or what each can do. With a ChatGPT plan's token it isn't the plan's entitlements: in
-  October 2026 it didn't list `gpt-6.1-sol`, which the plan ran.
+- `GET /models` answers an API key with every model the API serves (`data`, IDs only), for speech,
+  images, and embeddings too, and a ChatGPT plan's token with the plan's catalog (`models`, each with
+  a `slug`, a `display_name`, and a `visibility`, `list` for those to show), in the order to show
+  them.
 
 - The redirect must be an HTTP loopback address on `127.0.0.1` with the path `/auth/callback`; only
   the port may change, and `localhost` isn't accepted. A remote host signs in through a browser on

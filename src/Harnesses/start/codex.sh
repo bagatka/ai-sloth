@@ -11,11 +11,18 @@ esac
 # also asks a second model to review every command it runs.
 export NO_BROWSER=1 INITIAL_AGENT_MODE=agent-full-access
 
-# The chat's model, when one was chosen, merged into Codex's settings. HARNESS_MODEL needs no quoting:
-# its host allows letters, digits, and . _ - : / ~ @ + only.
+# The chat's model and how hard it reasons, when chosen, merged into Codex's settings. Neither needs
+# quoting: its host allows a model's ID letters, digits, and . _ - : / ~ @ + only, and reasoning low,
+# medium, high, or xhigh.
+config=""
 if [ -n "${HARNESS_MODEL:-}" ]; then
-  CODEX_CONFIG=$(printf '{"model":"%s"}' "$HARNESS_MODEL")
-  export CODEX_CONFIG
+  config=$(printf '"model":"%s"' "$HARNESS_MODEL")
+fi
+if [ -n "${HARNESS_THINKING:-}" ]; then
+  config="${config:+$config,}$(printf '"model_reasoning_effort":"%s"' "$HARNESS_THINKING")"
+fi
+if [ -n "$config" ]; then
+  export CODEX_CONFIG="{$config}"
 fi
 
 # The adapter signs Codex in to the gateway as its custom gateway when Codex needs a sign-in.

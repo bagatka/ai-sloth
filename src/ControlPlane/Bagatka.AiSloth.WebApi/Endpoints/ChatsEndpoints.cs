@@ -24,13 +24,13 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class ChatsEndpoints
 {
-    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account, string? Model = null, IReadOnlyList<NookRepository>? Repositories = null, ChatId? CopyOf = null, int? Checkpoint = null);
+    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account, string? Model = null, string? Thinking = null, IReadOnlyList<NookRepository>? Repositories = null, ChatId? CopyOf = null, int? Checkpoint = null);
 
-    internal sealed record AddPresetRequest(string Harness, AgentAccountId Account, string? Model = null, string? Name = null);
+    internal sealed record AddPresetRequest(string Harness, AgentAccountId Account, string? Model = null, string? Thinking = null, string? Name = null);
 
     internal sealed record PresetNameRequest(string Name);
 
-    internal sealed record ChangeModelRequest(AgentAccountId Account, string? Model = null);
+    internal sealed record ChangeModelRequest(AgentAccountId Account, string? Model = null, string? Thinking = null);
 
     internal sealed record PushRequest(IReadOnlyList<string>? Sources = null, string? Branch = null, bool PullRequest = false, string? Message = null);
 
@@ -102,7 +102,7 @@ internal static class ChatsEndpoints
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        StartChat command = new StartChat(WorkspaceId.From(workspaceId), request.Provider, request.Harness, request.Account, request.Model, request.Repositories ?? [], request.CopyOf, request.Checkpoint);
+        StartChat command = new StartChat(WorkspaceId.From(workspaceId), request.Provider, request.Harness, request.Account, request.Model, request.Thinking, request.Repositories ?? [], request.CopyOf, request.Checkpoint);
         Result<ChatSummary> result = await api.StartAsync(principal.ToActor(), command, ct);
         return result.ToCreated(chat => string.Create(CultureInfo.InvariantCulture, $"/chats/{chat.Id.Value}"));
     }
@@ -149,7 +149,7 @@ internal static class ChatsEndpoints
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        AddPreset command = new AddPreset(WorkspaceId.From(workspaceId), request.Harness, request.Account, request.Model, request.Name);
+        AddPreset command = new AddPreset(WorkspaceId.From(workspaceId), request.Harness, request.Account, request.Model, request.Thinking, request.Name);
         Result<PresetSummary> result = await api.AddPresetAsync(principal.ToActor(), command, ct);
         return result.ToCreated(preset => string.Create(CultureInfo.InvariantCulture, $"/presets/{preset.Id.Value}"));
     }
@@ -213,7 +213,7 @@ internal static class ChatsEndpoints
     }
 
     /// <summary>
-    /// Runs the chat's agent on another model, or on another account of the same owner's (the
+    /// Runs the chat's agent on another model or thinking level, or on another account of the same owner's (the
     /// workspace's, or the chat's owner's own), from its next turn: an agent working on a turn finishes
     /// it, and a new one continues the conversation. Without a model, the harness picks its default.
     /// </summary>
@@ -224,7 +224,7 @@ internal static class ChatsEndpoints
         [FromServices] IChatsApi api,
         CancellationToken ct)
     {
-        Result<ChatSummary> result = await api.ChangeModelAsync(principal.ToActor(), new ChangeModel(ChatId.From(id), request.Account, request.Model), ct);
+        Result<ChatSummary> result = await api.ChangeModelAsync(principal.ToActor(), new ChangeModel(ChatId.From(id), request.Account, request.Model, request.Thinking), ct);
         return result.ToOk();
     }
 

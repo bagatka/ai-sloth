@@ -103,8 +103,8 @@ None. A plan's access token is renewed when it is used and due, never in the bac
 - **Models come from each vendor's list.** OpenRouter's catalog is public, read on each call (about
   60 ms for 750 KB), without its batch variants. Anthropic's and OpenAI's lists are asked at the
   account's endpoint with its credentials; OpenAI's holds every model its API serves, so only its GPT,
-  o-series, and Codex models are offered, and with a ChatGPT plan's token it can leave out models the
-  plan runs. Copilot and Claude plans list none yet, and their agents start on their harness's default
+  o-series, and Codex models are offered, and a ChatGPT plan's token gets the plan's own catalog,
+  named and in order. Copilot and Claude plans list none yet, and their agents start on their harness's default
   model.
 - **Secrets at rest** are sealed with AES-256-GCM under the deployment's encryption key, bound to
   their row's ID (`PATTERNS.md`, entry 13). They leave the module only through `UseAsync`, in records

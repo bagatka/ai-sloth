@@ -19,7 +19,7 @@ internal sealed partial class ChatsApi
             return new Result<IReadOnlyList<AgentModel>>(person.Error);
         }
 
-        Result<HarnessProfile> found = HarnessWith(harness, model: null);
+        Result<HarnessProfile> found = HarnessWith(harness, model: null, thinking: null);
         if (found.Failed)
         {
             return new Result<IReadOnlyList<AgentModel>>(found.Error);

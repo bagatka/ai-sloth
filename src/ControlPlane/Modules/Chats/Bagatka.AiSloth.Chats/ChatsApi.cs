@@ -102,9 +102,9 @@ internal sealed partial class ChatsApi(
         return account is null ? new Result<AgentAccountSummary>(UnusableAccount) : new Result<AgentAccountSummary>(account);
     }
 
-    // The harness a chat runs, with a model only for a harness that takes one, and only an ID a
-    // harness can be given.
-    private static Result<HarnessProfile> HarnessWith(string id, string? model)
+    // The harness a chat runs, with a model and thinking level only for a harness that takes them, a
+    // model's ID a harness can be given, and a level of the harness's own.
+    private static Result<HarnessProfile> HarnessWith(string id, string? model, string? thinking)
     {
         HarnessProfile? harness = HarnessProfiles.Find(id);
         if (harness is null)
@@ -117,10 +117,14 @@ internal sealed partial class ChatsApi(
             return new Result<HarnessProfile>(Error.Validation("model", harness.Name + " runs on its own default model."));
         }
 
-        bool valid = model is null || HarnessProfile.IsModelId(model);
-        return valid
-            ? new Result<HarnessProfile>(harness)
-            : new Result<HarnessProfile>(Error.Validation("model", "Must be a model's ID as its vendor writes it, such as openai/gpt-6-luna: letters, digits, and . _ - : / ~ @ + only."));
+        if (model is not null && !HarnessProfile.IsModelId(model))
+        {
+            return new Result<HarnessProfile>(Error.Validation("model", "Must be a model's ID as its vendor writes it, such as openai/gpt-6-luna: letters, digits, and . _ - : / ~ @ + only."));
+        }
+
+        bool thinks = thinking is null || harness.ThinkingLevels.Contains(thinking, StringComparer.Ordinal);
+        string levels = harness.ThinkingLevels.Count == 0 ? harness.Name + " takes no thinking level." : harness.Name + " thinks at " + string.Join(", ", harness.ThinkingLevels) + ".";
+        return thinks ? new Result<HarnessProfile>(harness) : new Result<HarnessProfile>(Error.Validation("thinking", levels));
     }
 
     // Enough of a first message for its first line's title.

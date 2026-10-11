@@ -30,8 +30,10 @@ public sealed class OpenAIModelsClient : IDisposable
     }
 
     /// <summary>
-    /// Every model the API at <paramref name="apiUrl"/> serves, such as <c>https://api.openai.com/v1</c>,
-    /// asked with <paramref name="headers"/>, which hold the credentials and are never logged.
+    /// The models the API at <paramref name="apiUrl"/> serves, such as <c>https://api.openai.com/v1</c>,
+    /// asked with <paramref name="headers"/>, which hold the credentials and are never logged: every
+    /// model the API serves for an API key, or, for a ChatGPT plan's token, the models of the plan's
+    /// catalog meant for display, in its order.
     /// </summary>
     public async Task<IReadOnlyList<OpenAIModel>> ListModelsAsync(Uri apiUrl, IReadOnlyDictionary<string, string> headers, CancellationToken ct)
     {
@@ -60,12 +62,19 @@ public sealed class OpenAIModelsClient : IDisposable
             throw new HttpRequestException("The OpenAI API's answer isn't the JSON expected.", exception);
         }
 
-        if (list is null)
+        if (list?.Data is IReadOnlyList<OpenAIWire.Model> models)
         {
-            throw new HttpRequestException("The OpenAI API answered with nothing.");
+            return [.. models.Select(model => new OpenAIModel(model.Id, DisplayName: null, model.Created is long seconds ? DateTimeOffset.FromUnixTimeSeconds(seconds) : null))];
         }
 
-        return [.. list.Data.Select(model => new OpenAIModel(model.Id, model.Created is long seconds ? DateTimeOffset.FromUnixTimeSeconds(seconds) : null))];
+        if (list?.Models is IReadOnlyList<OpenAIWire.CatalogModel> catalog)
+        {
+            return [.. catalog
+                .Where(model => model.Visibility is null or "list")
+                .Select(model => new OpenAIModel(model.Slug, model.DisplayName ?? model.Slug, Created: null))];
+        }
+
+        throw new HttpRequestException("The OpenAI API's answer has no list of models.");
     }
 
     /// <inheritdoc />

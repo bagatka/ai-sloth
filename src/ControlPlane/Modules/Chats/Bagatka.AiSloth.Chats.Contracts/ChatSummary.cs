@@ -19,6 +19,7 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <param name="Model">
 /// The model its agent runs on from its next turn; <see langword="null"/> for the harness's default.
 /// </param>
+/// <param name="Thinking">How hard its agent thinks from its next turn; <see langword="null"/> for the harness's default.</param>
 /// <param name="Account">The agent account that pays for its work from its next turn.</param>
 /// <param name="AccountOwner">
 /// The owner of the personal account it runs on, whose messages alone reach the agent: everyone
@@ -38,6 +39,7 @@ public sealed record ChatSummary(
     bool Working,
     string Harness,
     string? Model,
+    string? Thinking,
     AgentAccountId Account,
     UserId? AccountOwner,
     string? Title);

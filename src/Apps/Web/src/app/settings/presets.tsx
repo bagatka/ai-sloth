@@ -35,12 +35,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { ApiError, answer, api, messageOf, type Schemas } from "../api"
-import {
-  accountsFor,
-  modelLabel,
-  ModelPicker,
-  type Choice,
-} from "../model-picker"
+import { accountsFor, ModelPicker } from "../model-picker"
+import { modelLabel, thinkingLabel, type Choice } from "../models"
 import {
   agentAccounts,
   harnesses as harnessesQuery,
@@ -102,6 +98,7 @@ export function PresetsSection({ workspace }: { workspace: Workspace }) {
                 harnesses?.find((harness) => harness.id === preset.harness)
                   ?.name ?? preset.harness,
                 preset.model ?? "default model",
+                preset.thinking && `${thinkingLabel(preset.thinking)} thinking`,
                 accounts?.find((account) => account.id === preset.account)
                   ?.name,
               ]
@@ -263,17 +260,28 @@ function PresetForm({
       ? chosen?.harness === harness.id &&
         offered.some((account) => account.id === chosen.account)
         ? chosen
-        : { harness: harness.id, account: offered[0].id, model: null }
+        : {
+            harness: harness.id,
+            account: offered[0].id,
+            model: null,
+            thinking: null,
+          }
       : null
   const models = useQuery({
     ...modelsQuery(workspace.id, choice?.harness ?? "", choice?.account ?? ""),
     enabled: !!choice,
   })
   const picked = models.data?.find((model) => model.id === choice?.model)
-  const defaultName =
-    harness && choice?.model
-      ? `${harness.name} · ${picked ? spokenName(picked.name) : modelLabel(choice.model)}`
-      : (harness?.name ?? "")
+  const defaultName = harness
+    ? [
+        harness.name,
+        choice?.model &&
+          (picked ? spokenName(picked.name) : modelLabel(choice.model)),
+        choice?.thinking && thinkingLabel(choice.thinking),
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : ""
 
   const save = useMutation({
     mutationFn: (of: Choice) =>
@@ -332,7 +340,12 @@ function PresetForm({
               const next = harnesses.find((found) => found.id === value)
               const first = next && accountsFor(accounts, next)[0]
               if (next && first) {
-                setChosen({ harness: next.id, account: first.id, model: null })
+                setChosen({
+                  harness: next.id,
+                  account: first.id,
+                  model: null,
+                  thinking: null,
+                })
                 save.reset()
               }
             }}
@@ -376,6 +389,40 @@ function PresetForm({
             </FieldError>
           )}
         </Field>
+        {harness.thinkingLevels.length > 0 && (
+          <Field data-invalid={!!error?.fields.thinking || undefined}>
+            <FieldLabel>Thinking</FieldLabel>
+            <Select
+              items={[
+                { value: "", label: "Default" },
+                ...harness.thinkingLevels.map((level) => ({
+                  value: level,
+                  label: thinkingLabel(level),
+                })),
+              ]}
+              value={choice.thinking ?? ""}
+              onValueChange={(value) => {
+                setChosen({ ...choice, thinking: (value as string) || null })
+                save.reset()
+              }}
+            >
+              <SelectTrigger aria-label="Thinking">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Default</SelectItem>
+                {harness.thinkingLevels.map((level) => (
+                  <SelectItem key={level} value={level}>
+                    {thinkingLabel(level)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {error?.fields.thinking && (
+              <FieldError>{error.fields.thinking[0]}</FieldError>
+            )}
+          </Field>
+        )}
         <Field data-invalid={!!error?.fields.name || undefined}>
           <FieldLabel htmlFor="preset-new-name">Name</FieldLabel>
           <Input

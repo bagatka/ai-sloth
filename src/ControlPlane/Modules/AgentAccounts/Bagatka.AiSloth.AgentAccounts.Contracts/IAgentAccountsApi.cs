@@ -60,8 +60,8 @@ public interface IAgentAccountsApi
     /// <summary>
     /// The models the account's vendor offers, for choosing one per chat: OpenRouter's catalog without
     /// its batch variants, and the lists of Anthropic's and OpenAI's APIs at the account's endpoint,
-    /// asked with its credentials, newest first. A ChatGPT plan's list is OpenAI's API's, which may
-    /// leave out models the plan runs. Copilot and Claude plans list none yet; their agents start on
+    /// asked with its credentials, newest first, and a ChatGPT plan's catalog in its own order. Copilot
+    /// and Claude plans list none yet; their agents start on
     /// their harness's default model. Asks the vendor each time, which throws when it can't be
     /// reached; try again later.
     /// </summary>

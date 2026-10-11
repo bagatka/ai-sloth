@@ -1,9 +1,10 @@
 import * as React from "react"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
 import {
   ArrowUpIcon,
   BookBookmarkIcon,
+  BookmarkSimpleIcon,
   CaretDownIcon,
   HardDrivesIcon,
 } from "@phosphor-icons/react"
@@ -31,8 +32,9 @@ import {
   accountsFor,
   HarnessPicker,
   ModelPicker,
-  type Choice,
+  ThinkingPicker,
 } from "./model-picker"
+import { type Choice } from "./models"
 import {
   agentAccounts,
   harnesses as harnessesQuery,
@@ -57,6 +59,7 @@ type Setup = {
   account: string
   harness: string
   model: string | null
+  thinking: string | null
   provider: string
   repositories: readonly string[]
 }
@@ -113,8 +116,8 @@ function NewChat({ workspace }: { workspace: Workspace }) {
   const harness = offeredHarnesses.find((found) => found.id === setup?.harness)
   const agentName = harness?.name ?? "the agent"
 
-  // Another agent comes back to the account and model last used with it, or its first preset, or
-  // its first account on its own default model.
+  // Another agent comes back to the account, model, and thinking last used with it, or its first
+  // preset, or its first account on its own defaults.
   function chooseHarness(id: string) {
     const next = offeredHarnesses.find((found) => found.id === id)
     if (!next) {
@@ -127,8 +130,12 @@ function NewChat({ workspace }: { workspace: Workspace }) {
       last && accountIds.includes(last.account)
         ? last
         : preset
-          ? { account: preset.account, model: preset.model }
-          : { account: accountIds[0]!, model: null }
+          ? {
+              account: preset.account,
+              model: preset.model,
+              thinking: preset.thinking,
+            }
+          : { account: accountIds[0]!, model: null, thinking: null }
     choose({ harness: id, ...pick })
   }
 
@@ -151,6 +158,7 @@ function NewChat({ workspace }: { workspace: Workspace }) {
             account: of.account,
             harness: of.harness,
             model: of.model,
+            thinking: of.thinking,
             provider: of.provider,
             repositories: of.repositories.map((repository) => ({
               repository,
@@ -273,13 +281,22 @@ function NewChat({ workspace }: { workspace: Workspace }) {
                   />
                 )}
                 {harness && (
-                  <ModelPicker
-                    workspaceId={workspace.id}
-                    harness={harness}
-                    value={setup}
-                    presets={offeredPresets}
-                    onChange={chooseModel}
-                  />
+                  <>
+                    <ModelPicker
+                      workspaceId={workspace.id}
+                      harness={harness}
+                      value={setup}
+                      presets={[]}
+                      onChange={chooseModel}
+                    />
+                    <ThinkingPicker
+                      levels={harness.thinkingLevels}
+                      value={setup.thinking}
+                      onChange={(thinking) =>
+                        chooseModel({ ...setup, thinking })
+                      }
+                    />
+                  </>
                 )}
                 {places.length > 1 && (
                   <PlacePicker
@@ -303,6 +320,14 @@ function NewChat({ workspace }: { workspace: Workspace }) {
             </Button>
           }
         />
+        {setup && !loading && (
+          <PresetShortcuts
+            workspaceId={workspace.id}
+            presets={offeredPresets}
+            setup={setup}
+            onPick={chooseModel}
+          />
+        )}
       </div>
       {unusable && (
         <Alert className="max-w-[44rem]">
@@ -434,6 +459,90 @@ function agentsOf(
     .filter((agent) => agent.harnesses.length > 0)
 }
 
+// The person's presets as one-click shortcuts under the message box, and saving what's chosen now as
+// another. A preset only starts the choice: the pickers above change anything in it.
+function PresetShortcuts({
+  workspaceId,
+  presets,
+  setup,
+  onPick,
+}: {
+  workspaceId: string
+  presets: readonly Preset[]
+  setup: Setup
+  onPick: (choice: Choice) => void
+}) {
+  const queryClient = useQueryClient()
+  const save = useMutation({
+    mutationFn: () =>
+      answer(
+        api.POST("/workspaces/{workspaceId}/presets", {
+          params: { path: { workspaceId } },
+          body: {
+            harness: setup.harness,
+            account: setup.account,
+            model: setup.model,
+            thinking: setup.thinking,
+          },
+        })
+      ),
+    onSuccess: (preset) => {
+      void queryClient.invalidateQueries({
+        queryKey: presetsQuery(workspaceId).queryKey,
+      })
+      toast.add({
+        type: "success",
+        title: `Saved ${preset.name}`,
+        description: "Rename it in Settings.",
+      })
+    },
+    onError: (error) =>
+      toast.add({
+        type: "error",
+        title: "Not saved",
+        description: messageOf(error),
+      }),
+  })
+  const current = presets.find(
+    (preset) =>
+      preset.harness === setup.harness &&
+      preset.account === setup.account &&
+      preset.model === setup.model &&
+      preset.thinking === setup.thinking
+  )
+
+  return (
+    <div
+      role="group"
+      aria-label="Presets"
+      className="mt-3 flex flex-wrap items-center justify-center gap-2"
+    >
+      {presets.map((preset) => (
+        <Button
+          key={preset.id}
+          variant={preset === current ? "secondary" : "outline"}
+          size="xs"
+          aria-pressed={preset === current}
+          onClick={() => onPick(preset)}
+        >
+          {preset.name}
+        </Button>
+      ))}
+      {!current && (
+        <Button
+          variant="ghost"
+          size="xs"
+          loading={save.isPending}
+          onClick={() => save.mutate()}
+        >
+          <BookmarkSimpleIcon />
+          Save as preset
+        </Button>
+      )}
+    </div>
+  )
+}
+
 function PlacePicker({
   places,
   chosen,
@@ -495,6 +604,7 @@ function resolve(
           account: chosen.account,
           harness: chosen.harness,
           model: chosen.model,
+          thinking: chosen.thinking,
         }
       : null
   const first = agents[0]
@@ -505,6 +615,7 @@ function resolve(
       account: first.account.id,
       harness: first.harnesses[0]!.id,
       model: null,
+      thinking: null,
     })
   if (!agent || !place) {
     return null
@@ -513,6 +624,7 @@ function resolve(
     account: agent.account,
     harness: agent.harness,
     model: agent.model,
+    thinking: agent.thinking,
     provider: place.id,
     repositories: (chosen?.repositories ?? []).filter((id) =>
       repositories.some((repository) => repository.id === id)
@@ -531,7 +643,11 @@ function remembered(workspaceId: string): Setup | null {
       typeof saved.harness === "string" &&
       typeof saved.provider === "string" &&
       Array.isArray(saved.repositories)
-      ? { ...(saved as Setup), model: saved.model ?? null }
+      ? {
+          ...(saved as Setup),
+          model: saved.model ?? null,
+          thinking: saved.thinking ?? null,
+        }
       : null
   } catch {
     return null
@@ -547,7 +663,10 @@ function remember(workspaceId: string, setup: Setup) {
   rememberAgent(workspaceId, setup)
 }
 
-type LastAgents = Record<string, { account: string; model: string | null }>
+type LastAgents = Record<
+  string,
+  { account: string; model: string | null; thinking: string | null }
+>
 
 // The account and model last used with each agent in the workspace, in this browser only.
 function lastAgents(workspaceId: string): LastAgents {
@@ -565,7 +684,11 @@ function rememberAgent(workspaceId: string, choice: Choice) {
   try {
     const agents = {
       ...lastAgents(workspaceId),
-      [choice.harness]: { account: choice.account, model: choice.model },
+      [choice.harness]: {
+        account: choice.account,
+        model: choice.model,
+        thinking: choice.thinking,
+      },
     }
     localStorage.setItem(
       `new-chat:${workspaceId}:agents`,

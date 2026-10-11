@@ -68,7 +68,7 @@ internal sealed partial class Sloth(
 
         Chats
           sloth chat ["<message>"] [--harness <id>] [--account <name>] [--model <id>]
-                     [--preset <name>] [--on cloud|<machine>]
+                     [--thinking <level>] [--preset <name>] [--on cloud|<machine>]
                      [--repo <name>[@<branch>]]... [--from <chat>[@<checkpoint>]]
                                      Start a chat in a nook of its own, and follow it: with the
                                      workspace's repositories, or a copy of a chat's files, as
@@ -76,7 +76,7 @@ internal sealed partial class Sloth(
                                      the nook starts while you type it
           sloth chat list
           sloth chat open <id>       Follow a chat; type to write to the agent, /stop to stop it,
-                                     /model <id> to switch its model
+                                     /model <id> or /thinking <level> to switch them
           sloth chat send <id> "<message>"
                                      Send a message
           sloth chat stop <id>
@@ -103,7 +103,8 @@ internal sealed partial class Sloth(
 
         Presets: the agents you start chats with most, each with its account and model
           sloth preset list
-          sloth preset add [--harness <id>] [--account <name>] [--model <id>] [--name <name>]
+          sloth preset add [--harness <id>] [--account <name>] [--model <id>]
+                     [--thinking <level>] [--name <name>]
           sloth preset rename <name> "<new name>"
           sloth preset remove <name>
           sloth model list [<search>] [--harness <id>] [--account <name>]

@@ -81,8 +81,7 @@ internal sealed partial class Sloth
                     await PrintSetupAsync(type, body);
                     break;
                 case "model-changed":
-                    string? model = body.GetProperty("model").GetString();
-                    await LineAsync(model is null ? "  (switched to the agent's default model, from the next turn)" : "  (switched to " + model + ", from the next turn)");
+                    await LineAsync(Switched(body));
                     break;
                 case "agent-restarted":
                     bool remembers = body.GetProperty("remembers").GetBoolean();
@@ -92,6 +91,14 @@ internal sealed partial class Sloth
                     // message-steered, and kinds a newer host adds: nothing to show.
                     break;
             }
+        }
+
+        // Another model or thinking level, from the next turn.
+        private static string Switched(JsonElement body)
+        {
+            string model = body.GetProperty("model").GetString() ?? "the agent's default model";
+            string? thinking = body.GetProperty("thinking").GetString();
+            return "  (switched to " + model + (thinking is null ? string.Empty : ", thinking " + thinking) + ", from the next turn)";
         }
 
         // The nook's setup: when it starts and ends.

@@ -17,6 +17,10 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// (<see cref="IChatsApi.ListModelsAsync"/>); or <see langword="null"/> for the harness's default.
 /// Only for harnesses that take one: Claude Code, Codex, and pi.
 /// </param>
+/// <param name="Thinking">
+/// How hard its agent thinks, one of its harness's <see cref="HarnessSummary.ThinkingLevels"/>; or
+/// <see langword="null"/> for the harness's default.
+/// </param>
 /// <param name="Repositories">The workspace's repositories its nook starts with, each at <c>/work/&lt;name&gt;</c>; empty for none.</param>
 /// <param name="CopyOf">
 /// Another chat of the workspace whose nook's files its nook starts with, with its repositories; or
@@ -32,6 +36,7 @@ public sealed record StartChat(
     string Harness,
     AgentAccountId Account,
     string? Model,
+    string? Thinking,
     IReadOnlyList<NookRepository> Repositories,
     ChatId? CopyOf,
     int? Checkpoint);

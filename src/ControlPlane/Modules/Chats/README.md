@@ -88,12 +88,12 @@ minutes unless given).
   vendor's that can call tools; a chat's model isn't checked against them, so a model the vendor
   doesn't know fails its turns with the vendor's answer.
 - **A chat's model changes between turns.** Its harness stays, since its nook runs it, but whoever
-  may use the chat's account picks another model, or another account of the same owner's, for the
-  next turn (`ModelChanged`). A running agent finishes its turn on its own account, so its calls never
+  may use the chat's account picks another model, thinking level, or account of the same owner's,
+  for the next turn (`ModelChanged`). Thinking levels are each harness's own words. A running agent finishes its turn on its own account, so its calls never
   reach another vendor under the old model's name; then it stops, and the next agent starts on the
   new ones and loads the conversation.
-- **Presets are personal.** A preset is someone's saved harness, account, and model, offered first
-  in the model picker. It shows wherever its account works, and hides once the account is removed.
+- **Presets are personal.** A preset is someone's saved harness, account, model, and thinking level:
+  a shortcut that starts a choice, which every picker still changes. It shows wherever its account works, and hides once the account is removed.
   A person keeps at most 20.
 - **No model key or plan in a nook.** An agent gets the model gateway's URL and a token for its chat;
   the gateway forwards each call with the headers that pay for it. A plan's token tied to one harness,

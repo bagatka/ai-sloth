@@ -119,7 +119,7 @@ internal sealed class FakeModel : IAsyncDisposable
         app.MapPost("/v1/messages", model.MessagesAsync);
         app.MapPost("/v1/responses", model.ResponsesAsync);
         app.MapPost("/v1/chat/completions", model.ChatCompletionsAsync);
-        app.MapGet("/v1/models", OpenRouterCatalog);
+        app.MapGet("/v1/models", ListModels);
         await app.StartAsync();
         IServerAddressesFeature? addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
         if (addresses is null)
@@ -276,6 +276,29 @@ internal sealed class FakeModel : IAsyncDisposable
         ];
         context.Response.ContentType = "text/event-stream";
         await context.Response.WriteAsync(EventStream(events), context.RequestAborted);
+    }
+
+    // A ChatGPT plan's token, which the fake ChatGPT issues, gets the plan's catalog; any other caller
+    // the vendors' lists.
+    private static IResult ListModels(HttpContext context)
+    {
+        string? authorization = context.Request.Headers.Authorization.FirstOrDefault();
+        bool plan = authorization?.StartsWith("Bearer access-", StringComparison.Ordinal) == true;
+        return plan ? PlanCatalog() : OpenRouterCatalog();
+    }
+
+    // A ChatGPT plan's catalog, as OpenAI answers a plan's token: models to show, in order, and one
+    // to hide.
+    private static IResult PlanCatalog()
+    {
+        JsonObject catalog = new JsonObject
+        {
+            ["models"] = new JsonArray(
+                new JsonObject { ["slug"] = "gpt-6.1-sol", ["display_name"] = "GPT-6.1 Sol", ["visibility"] = "list" },
+                new JsonObject { ["slug"] = OpenAIModel, ["display_name"] = "GPT-5.6 Terra", ["visibility"] = "list" },
+                new JsonObject { ["slug"] = "codex-auto-review", ["display_name"] = "Auto review", ["visibility"] = "hide" }),
+        };
+        return Results.Text(catalog.ToJsonString(), "application/json");
     }
 
     // The vendors' lists of models, as each lists them: models that can call tools, one only for

@@ -1,3 +1,4 @@
+import { thinkingLabel } from "../models"
 import { seconds } from "../api"
 
 // A chat's transcript as rows to draw, folded from its events one at a time. Folding never changes a
@@ -174,9 +175,11 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
         kind: "notice",
         key,
         tone: "info",
-        text: body.model
-          ? `Switched to ${body.model}.`
-          : "Switched to the agent's default model.",
+        text: `Switched to ${body.model ?? "the agent's default model"}${
+          body.thinking
+            ? `, thinking ${thinkingLabel(body.thinking).toLowerCase()}`
+            : ""
+        }.`,
         switched: true,
       })
     case "agent-restarted": {

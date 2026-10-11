@@ -64,8 +64,9 @@ public interface IChatsApi
 
     /// <summary>
     /// Saves a preset of the actor's, checked as a chat's start is: a harness, an account the actor may
-    /// use in the workspace of a kind the harness takes, and a model only for a harness that takes one.
-    /// A person keeps at most 20, each harness, account, and model once.
+    /// use in the workspace of a kind the harness takes, and a model and thinking level only for a
+    /// harness that takes them. A person keeps at most 20, each harness, account, model, and thinking
+    /// level once.
     /// </summary>
     /// <returns>
     /// The preset; a validation error for its harness, account, model, or name; <see cref="ChatsErrors.PresetExists"/>;
@@ -83,7 +84,8 @@ public interface IChatsApi
     public Task<Result> RemovePresetAsync(Actor actor, PresetId id, CancellationToken ct);
 
     /// <summary>
-    /// Runs the chat's agent on another model, or on another account, from its next turn: an agent
+    /// Runs the chat's agent on another model, at another thinking level, or on another account, from its
+    /// next turn: an agent
     /// working on a turn finishes it, and a new agent on the same harness continues the conversation.
     /// The account must be one the actor may use, of a kind the harness takes, and whose the chat's
     /// is: the workspace's for a chat on the workspace's account, the same person's own for a chat on

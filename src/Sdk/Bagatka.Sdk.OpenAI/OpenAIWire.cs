@@ -7,9 +7,17 @@ namespace Bagatka.Sdk.OpenAI;
 // The shapes of OpenAI's authorization server responses, as it sends them.
 internal static class OpenAIWire
 {
-    internal sealed record ModelList([property: JsonPropertyName("data")] IReadOnlyList<Model> Data);
+    // The API's list of models, or, for a ChatGPT plan's token, the plan's catalog.
+    internal sealed record ModelList(
+        [property: JsonPropertyName("data")] IReadOnlyList<Model>? Data,
+        [property: JsonPropertyName("models")] IReadOnlyList<CatalogModel>? Models);
 
     internal sealed record Model([property: JsonPropertyName("id")] string Id, [property: JsonPropertyName("created")] long? Created);
+
+    internal sealed record CatalogModel(
+        [property: JsonPropertyName("slug")] string Slug,
+        [property: JsonPropertyName("display_name")] string? DisplayName,
+        [property: JsonPropertyName("visibility")] string? Visibility);
 
     internal sealed record TokenResponse(
         [property: JsonPropertyName("access_token")] string? AccessToken,

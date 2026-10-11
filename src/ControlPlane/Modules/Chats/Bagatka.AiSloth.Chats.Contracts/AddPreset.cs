@@ -8,8 +8,9 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <param name="Harness">The harness, as for <see cref="StartChat"/>.</param>
 /// <param name="Account">The agent account, as for <see cref="StartChat"/>.</param>
 /// <param name="Model">The model, as for <see cref="StartChat"/>; <see langword="null"/> for the harness's default.</param>
+/// <param name="Thinking">How hard it thinks, as for <see cref="StartChat"/>; <see langword="null"/> for the harness's default.</param>
 /// <param name="Name">
 /// Its name for people, 1 to 64 characters; <see langword="null"/> for the harness's name and the
 /// model's ID, such as <c>pi · openai/gpt-6-luna</c>.
 /// </param>
-public sealed record AddPreset(WorkspaceId WorkspaceId, string Harness, AgentAccountId Account, string? Model, string? Name);
+public sealed record AddPreset(WorkspaceId WorkspaceId, string Harness, AgentAccountId Account, string? Model, string? Thinking, string? Name);

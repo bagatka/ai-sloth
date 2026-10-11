@@ -19,7 +19,8 @@ internal sealed partial class ChatsApi
         IReadOnlyList<HarnessSummary> harnesses = [.. HarnessProfiles.All.Select(harness => new HarnessSummary(
             harness.Id,
             harness.Name,
-            [.. kinds.Where(kind => harness.Accepts(AccountCredentials.KindOf(kind)))]))];
+            [.. kinds.Where(kind => harness.Accepts(AccountCredentials.KindOf(kind)))],
+            harness.ThinkingLevels))];
         return Task.FromResult(harnesses);
     }
 }

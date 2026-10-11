@@ -14,8 +14,10 @@ internal sealed class PresetConfiguration : IEntityTypeConfiguration<Preset>
         builder.Property(preset => preset.Name).HasMaxLength(Preset.MaxNameLength);
         builder.Property(preset => preset.Harness).HasMaxLength(Chat.MaxHarnessLength);
         builder.Property(preset => preset.Model).HasMaxLength(HarnessProfile.MaxModelLength);
+        builder.Property(preset => preset.Thinking).HasMaxLength(Chat.MaxThinkingLength);
 
-        // A person's presets, each harness, account, and model once: the harness's default model too.
-        builder.HasIndex(preset => new { preset.OwnerId, preset.Harness, preset.AgentAccountId, preset.Model }).IsUnique().AreNullsDistinct(false);
+        // A person's presets, each harness, account, model, and thinking level once, the harness's
+        // defaults too.
+        builder.HasIndex(preset => new { preset.OwnerId, preset.Harness, preset.AgentAccountId, preset.Model, preset.Thinking }).IsUnique().AreNullsDistinct(false);
     }
 }

@@ -20,7 +20,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { ApiError } from "../api"
-import { agentLabel } from "../model-picker"
+import { agentLabel } from "../models"
 import { chat as chatQuery, harnesses, me, nooks, people } from "../queries"
 import { chatStream, useChat } from "./chat-stream"
 import { ChangesPanel, DownloadFiles } from "./changes-panel"
@@ -109,7 +109,7 @@ export function ChatPage() {
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-title">{title}</h1>
           <p className="truncate text-label text-muted-foreground">
-            {agentLabel(agent, chat.data.model)}
+            {agentLabel(agent, chat.data.model, chat.data.thinking)}
           </p>
         </div>
         <div className="hidden sm:block">

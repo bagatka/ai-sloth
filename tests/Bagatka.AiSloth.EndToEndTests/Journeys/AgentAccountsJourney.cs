@@ -136,9 +136,10 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         await workspace.SendAsync(codex, "say hello");
         JsonElement first = await watch.NextAsync("turn-ended");
         ChatSummary switched = await Api.ReadAsync<ChatSummary>(
-            _alice.SendPutAsync(Paths.Chat(codex) + "/model", new { account = workspace.Account, model = FakeModel.OpenAIModel }), HttpStatusCode.OK);
+            _alice.SendPutAsync(Paths.Chat(codex) + "/model", new { account = workspace.Account, model = FakeModel.OpenAIModel, thinking = "high" }), HttpStatusCode.OK);
         JsonElement changed = await watch.NextAsync("model-changed");
         Problem toOwn = await Api.ProblemAsync(_alice.SendPutAsync(Paths.Chat(codex) + "/model", new { account = own.Id }), HttpStatusCode.BadRequest);
+        Problem tooHard = await Api.ProblemAsync(_alice.SendPutAsync(Paths.Chat(codex) + "/model", new { account = workspace.Account, thinking = "max" }), HttpStatusCode.BadRequest);
         await workspace.SendAsync(codex, "say hello again");
         JsonElement restarted = await watch.NextAsync("agent-restarted");
         JsonElement second = await watch.NextAsync("turn-ended");
@@ -146,12 +147,14 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
 
         Assert.Equal([FakeModel.OpenAIModel], models.Select(model => model.Id), StringComparer.Ordinal);
         Assert.All([first, second, piEnded], turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
-        Assert.Equal(FakeModel.OpenAIModel, switched.Model);
-        Assert.Equal(FakeModel.OpenAIModel, changed.GetProperty("model").GetString());
+        Assert.Equal((FakeModel.OpenAIModel, "high"), (switched.Model, switched.Thinking));
+        Assert.Equal(("high", FakeModel.OpenAIModel), (changed.GetProperty("thinking").GetString(), changed.GetProperty("model").GetString()));
         Assert.True(toOwn.Errors?.ContainsKey("account"));
+        Assert.True(tooHard.Errors?.ContainsKey("thinking"));
         Assert.True(restarted.GetProperty("remembers").GetBoolean());
         Assert.Contains(app.Model.OpenAIAuthorizations, authorization => string.Equals(authorization, "Bearer " + FakeModel.ApiKey, StringComparison.Ordinal));
-        Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.OpenAIModel + "\"", StringComparison.Ordinal) && body.Contains("say hello again", StringComparison.Ordinal));
+        Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.OpenAIModel + "\"", StringComparison.Ordinal)
+            && body.Contains("\"effort\":\"high\"", StringComparison.Ordinal) && body.Contains("say hello again", StringComparison.Ordinal));
     }
 
     // OpenRouter speaks Anthropic's API for Claude Code and OpenAI's chat API for pi, at one address and
@@ -236,7 +239,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Equal("The sign-in was declined.", declined.Errors?.GetValueOrDefault("returnedTo")?.Single());
         Assert.Equal((AgentAccountKind.ChatGptPlan, false), (plan.Kind, plan.NeedsSignIn));
         Assert.Equal(AgentAccountsErrors.SignInNotFound.Code, again.Code);
-        Assert.Equal([FakeModel.OpenAIModel], planModels.Select(model => model.Id), StringComparer.Ordinal);
+        Assert.Equal([("gpt-6.1-sol", "GPT-6.1 Sol"), (FakeModel.OpenAIModel, "GPT-5.6 Terra")], planModels.Select(model => (model.Id, model.Name)));
         Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
         Assert.True(app.ChatGpt.Renewals > renewalsBefore);
         Assert.Equal(0, app.ChatGpt.ReusedRefreshTokens);

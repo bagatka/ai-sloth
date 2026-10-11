@@ -25,7 +25,7 @@ internal sealed partial class Sloth
 
     private async Task<int> StartChatAsync(string[] words, CancellationToken ct)
     {
-        CommandLine? line = CommandLine.Parse(words, ["--harness", "--account", "--model", "--preset", "--on", "--from"], [], repeatable: ["--repo"]);
+        CommandLine? line = CommandLine.Parse(words, ["--harness", "--account", "--model", "--thinking", "--preset", "--on", "--from"], [], repeatable: ["--repo"]);
         if (line is not { Arguments: [] or [_] })
         {
             return await UsageAsync();
@@ -56,12 +56,12 @@ internal sealed partial class Sloth
         Wire.Chat chat = await api.SendAsync(
             HttpMethod.Post,
             "/workspaces/" + workspace + "/chats",
-            new Wire.StartChat(setup.Provider.Id, setup.Harness.Id, setup.Account.Id, setup.Model, repositories, copyOf?.Id, checkpoint),
+            new Wire.StartChat(setup.Provider.Id, setup.Harness.Id, setup.Account.Id, setup.Model, setup.Thinking, repositories, copyOf?.Id, checkpoint),
             CliJsonContext.Default.StartChat,
             CliJsonContext.Default.Chat,
             ct);
         HostsFile hosts = await ReadHostsAsync(ct);
-        await PrivateFile.WriteAsync(HostsPath, hosts.With(host with { Defaults = new ChatDefaults(setup.Harness.Id, setup.Account.Id, setup.Provider.Id, setup.Model) }), CliJsonContext.Default.HostsFile, ct);
+        await PrivateFile.WriteAsync(HostsPath, hosts.With(host with { Defaults = new ChatDefaults(setup.Harness.Id, setup.Account.Id, setup.Provider.Id, setup.Model, setup.Thinking) }), CliJsonContext.Default.HostsFile, ct);
         string at = checkpoint is int number ? string.Create(CultureInfo.InvariantCulture, $" at checkpoint {number}") : string.Empty;
         string starting = line.Values("--repo").Count > 0 ? " · " + string.Join(", ", line.Values("--repo")) : copyOf is null ? string.Empty : " · a copy of " + ShortId(copyOf.Id) + at;
         await terminal.WriteLineAsync("Chat " + ShortId(chat.Id) + " · " + setup.Describe() + starting);
@@ -103,7 +103,7 @@ internal sealed partial class Sloth
     // saying what to choose.
     private async Task<ChatSetup?> ChooseSetupAsync(HostApi api, SignedInHost host, Guid workspace, CommandLine line, CancellationToken ct)
     {
-        (Wire.Account Account, Wire.Harness Harness, string? Model)? agent;
+        AgentChoice? agent;
         if (line.Value("--preset") is string preset)
         {
             agent = await ChoosePresetAsync(api, workspace, preset, line, ct);
@@ -118,11 +118,13 @@ internal sealed partial class Sloth
             return null;
         }
 
-        (Wire.Account account, Wire.Harness harness, string? chosenModel) = agent.Value;
+        (Wire.Account account, Wire.Harness harness, string? chosenModel, string? chosenThinking) = agent;
 
-        // The last chat's model goes with its harness and account.
+        // The last chat's model and thinking level go with its harness and account.
         bool asLast = host.Defaults is ChatDefaults last && last.Account == account.Id && string.Equals(last.Harness, harness.Id, StringComparison.Ordinal);
-        string? model = line.Value("--preset") is not null ? chosenModel : line.Value("--model") ?? (asLast ? host.Defaults?.Model : null);
+        bool fromPreset = line.Value("--preset") is not null;
+        string? model = fromPreset ? chosenModel : line.Value("--model") ?? (asLast ? host.Defaults?.Model : null);
+        string? thinking = fromPreset ? chosenThinking : line.Value("--thinking") ?? (asLast ? host.Defaults?.Thinking : null);
         IReadOnlyList<Wire.Provider> providers = await api.GetAsync("/workspaces/" + workspace + "/providers", CliJsonContext.Default.IReadOnlyListProvider, ct);
         Wire.Provider? provider = await ChooseAsync(
             [.. providers.Where(found => found.Available)],
@@ -138,12 +140,15 @@ internal sealed partial class Sloth
             return null;
         }
 
-        return new ChatSetup(account, harness, model, provider);
+        return new ChatSetup(account, harness, model, thinking, provider);
     }
+
+    // An agent to run: its account and harness, and its model and thinking level when a preset chose them.
+    private sealed record AgentChoice(Wire.Account Account, Wire.Harness Harness, string? Model, string? Thinking);
 
     // The account and the harness, from the options given and the last chat's choices, or null after
     // saying what to choose.
-    private async Task<(Wire.Account Account, Wire.Harness Harness, string? Model)?> ChooseAgentAsync(
+    private async Task<AgentChoice?> ChooseAgentAsync(
         HostApi api, SignedInHost host, Guid workspace, string? accountNamed, string? harnessNamed, CancellationToken ct)
     {
         IReadOnlyList<Wire.Account> accounts = await api.GetAsync("/workspaces/" + workspace + "/agent-accounts", CliJsonContext.Default.IReadOnlyListAccount, ct);
@@ -171,15 +176,17 @@ internal sealed partial class Sloth
             "harness",
             "--harness",
             "No harness on " + host.Name + " runs on \"" + account.Name + "\".");
-        return harness is null ? null : (account, harness, null);
+        return harness is null ? null : new AgentChoice(account, harness, Model: null, Thinking: null);
     }
 
-    // A preset of the person's: its account, harness, and model together, so none is given beside it.
-    private async Task<(Wire.Account Account, Wire.Harness Harness, string? Model)?> ChoosePresetAsync(HostApi api, Guid workspace, string named, CommandLine line, CancellationToken ct)
+    // A preset of the person's: its account, harness, model, and thinking level together, so none is
+    // given beside it.
+    private async Task<AgentChoice?> ChoosePresetAsync(HostApi api, Guid workspace, string named, CommandLine line, CancellationToken ct)
     {
-        if (line.Value("--account") is not null || line.Value("--harness") is not null || line.Value("--model") is not null)
+        bool beside = line.Value("--account") is not null || line.Value("--harness") is not null || line.Value("--model") is not null || line.Value("--thinking") is not null;
+        if (beside)
         {
-            await terminal.FailAsync("A preset chooses the harness, the account, and the model: leave out --harness, --account, and --model.");
+            await terminal.FailAsync("A preset chooses the harness, the account, the model, and the thinking level: leave out --harness, --account, --model, and --thinking.");
             return null;
         }
 
@@ -208,16 +215,15 @@ internal sealed partial class Sloth
             return null;
         }
 
-        return (account, harness, preset.Model);
+        return new AgentChoice(account, harness, preset.Model, preset.Thinking);
     }
 
-    private sealed record ChatSetup(Wire.Account Account, Wire.Harness Harness, string? Model, Wire.Provider Provider)
+    private sealed record ChatSetup(Wire.Account Account, Wire.Harness Harness, string? Model, string? Thinking, Wire.Provider Provider)
     {
-        // As a chat's start shows it: "pi · openai/gpt-6-luna · OpenRouter · Docker".
+        // As a chat's start shows it: "pi · openai/gpt-6-luna · xhigh · OpenRouter · Docker".
         public string Describe()
         {
-            string model = Model is null ? string.Empty : " · " + Model;
-            return Harness.Name + model + " · " + Account.Name + " · " + Provider.Name;
+            return string.Join(" · ", new[] { Harness.Name, Model, Thinking, Account.Name, Provider.Name }.Where(part => part is not null));
         }
     }
 
@@ -474,7 +480,7 @@ internal sealed partial class Sloth
     {
         if (terminal.Interactive)
         {
-            await terminal.WriteLineAsync("Type to write to the agent, even while it works; /stop stops it, /model <id> switches its model. Ctrl+C leaves it working.");
+            await terminal.WriteLineAsync("Type to write to the agent, even while it works; /stop stops it, /model <id> and /thinking <level> switch them. Ctrl+C leaves it working.");
         }
 
         using CancellationTokenSource leave = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -536,10 +542,11 @@ internal sealed partial class Sloth
         return 1;
     }
 
-    // What the person types while following: each line goes to the agent; /stop stops it. A message
-    // that fails to send is reported, and typing goes on.
+    // What the person types while following: each line goes to the agent; /stop stops it, /model and
+    // /thinking change the next turn's. A message that fails to send is reported, and typing goes on.
     private async Task TypeAsync(HostApi api, Wire.Chat chat, ChatPrinter printer, CancellationToken ct)
     {
+        Wire.Chat current = chat;
         string? line = await terminal.ReadLineAsync(ct);
         while (line is not null)
         {
@@ -550,17 +557,13 @@ internal sealed partial class Sloth
                 {
                     await api.CallAsync(HttpMethod.Post, "/chats/" + chat.Id + "/stop", ct);
                 }
-                else if (text is "/model" || text.StartsWith("/model ", StringComparison.Ordinal))
+                else if (Switch(text, "/model") is { } model)
                 {
-                    // On the chat's account; without an ID, the harness's default model.
-                    string model = text["/model".Length..].Trim();
-                    await api.SendAsync(
-                        HttpMethod.Put,
-                        "/chats/" + chat.Id + "/model",
-                        new Wire.ChangeModel(chat.Account, model.Length == 0 ? null : model),
-                        CliJsonContext.Default.ChangeModel,
-                        CliJsonContext.Default.Chat,
-                        ct);
+                    current = await ChangeModelAsync(api, current, new Wire.ChangeModel(current.Account, model, current.Thinking), ct);
+                }
+                else if (Switch(text, "/thinking") is { } thinking)
+                {
+                    current = await ChangeModelAsync(api, current, new Wire.ChangeModel(current.Account, current.Model, thinking), ct);
                 }
                 else if (text.Length > 0)
                 {
@@ -575,6 +578,21 @@ internal sealed partial class Sloth
 
             line = await terminal.ReadLineAsync(ct);
         }
+    }
+
+    // What a switch typed while following sets: "/model gpt-6.1-sol" sets the model, "/model" alone the
+    // harness's default; any other line isn't this switch.
+    private static string? Switch(string text, string command)
+    {
+        bool typed = string.Equals(text, command, StringComparison.Ordinal) || text.StartsWith(command + " ", StringComparison.Ordinal);
+        return typed ? text[command.Length..].Trim() : null;
+    }
+
+    // The chat's model, thinking level, or both changed for its next turn, on its account.
+    private static async Task<Wire.Chat> ChangeModelAsync(HostApi api, Wire.Chat chat, Wire.ChangeModel change, CancellationToken ct)
+    {
+        Wire.ChangeModel cleared = change with { Model = change.Model is "" ? null : change.Model, Thinking = change.Thinking is "" ? null : change.Thinking };
+        return await api.SendAsync(HttpMethod.Put, "/chats/" + chat.Id + "/model", cleared, CliJsonContext.Default.ChangeModel, CliJsonContext.Default.Chat, ct);
     }
 
     // The chat people mean: by its whole ID, or by the short one sloth shows (the end of the whole ID)
