@@ -1673,6 +1673,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{workspaceId}/agent-accounts/{id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    workspaceId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlanUsage"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agent-accounts": {
         parameters: {
             query?: never;
@@ -3715,6 +3753,20 @@ export interface components {
             /** @description Pass it in the next PageRequest; `null` on the last page. */
             nextCursor: null | string;
         };
+        /** @description What a plan has used of its limits, as its vendor last reported it. */
+        PlanUsage: {
+            /**
+             * @description Each limit or count the vendor reports, in its order; empty for an account that isn't a plan, or a
+             *     plan whose vendor has reported none yet.
+             */
+            meters: components["schemas"]["UsageMeter"][];
+            /**
+             * Format: date-time
+             * @description When the vendor reported them: now, for a plan asked when someone looks (Copilot, Claude); at its
+             *     latest call, for a plan whose calls report them (ChatGPT); null before any report.
+             */
+            reportedAt: null | string;
+        };
         PostHogProject: {
             /** Format: uri */
             host: string;
@@ -4170,6 +4222,28 @@ export interface components {
             cost: null | number;
             /** @description Whether the cost is a plan's estimate at the vendor's API prices. */
             estimate: boolean;
+        };
+        /** @description One of a plan's limits or counts: a window, a quota, or spend without a limit. */
+        UsageMeter: {
+            /** @description What it counts, as people read it, such as `5 hours`, `Week`, `Week, Opus`, `Premium requests`, or `Credits`. */
+            name: string;
+            /**
+             * Format: double
+             * @description How much is used: a percent of a window, a count of a quota, the credits spent.
+             */
+            used: number;
+            /**
+             * Format: double
+             * @description The most it allows, in the same unit: 100 for a window; null for spend without a limit.
+             */
+            limit: null | number;
+            /** @description `percent`, `requests`, or `credits`. */
+            unit: string;
+            /**
+             * Format: date-time
+             * @description When it starts over, when the vendor says.
+             */
+            resetsAt: null | string;
         };
         /**
          * Format: uuid

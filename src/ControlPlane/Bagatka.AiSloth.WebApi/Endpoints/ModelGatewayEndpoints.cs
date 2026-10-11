@@ -85,20 +85,7 @@ internal static class ModelGatewayEndpoints
         using HttpRequestMessage forwarded = Forwarded(request, endpoint, path);
         using HttpResponseMessage response = await clients.CreateClient(HttpClientName)
             .SendAsync(forwarded, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
-        context.Response.StatusCode = (int)response.StatusCode;
-        foreach (KeyValuePair<string, IEnumerable<string>> header in response.Headers)
-        {
-            if (!NotForwarded.Contains(header.Key))
-            {
-                context.Response.Headers[header.Key] = new StringValues([.. header.Value]);
-            }
-        }
-
-        foreach (KeyValuePair<string, IEnumerable<string>> header in response.Content.Headers)
-        {
-            context.Response.Headers[header.Key] = new StringValues([.. header.Value]);
-        }
-
+        IReadOnlyDictionary<string, string> headers = PassHead(context.Response, response);
         ModelCallUsage? usage = await RelayAsync(context, response);
         if (usage is null)
         {
@@ -108,11 +95,33 @@ internal static class ModelGatewayEndpoints
         // The agent has the whole answer before the call is recorded, which can't hold it up.
         await context.Response.CompleteAsync();
         using CancellationTokenSource recording = new CancellationTokenSource(RecordingTimeout);
-        Result recorded = await chats.RecordModelCallAsync(Actor.Anonymous, token, usage, startedAt, recording.Token);
+        Result recorded = await chats.RecordModelCallAsync(Actor.Anonymous, token, usage, headers, startedAt, recording.Token);
         if (recorded.Failed)
         {
             Log.ModelCallNotRecorded(logger, recorded.Error.Code);
         }
+    }
+
+    // Passes the answer's status and headers to the agent, and gives its headers for the call's record.
+    private static Dictionary<string, string> PassHead(HttpResponse passed, HttpResponseMessage response)
+    {
+        passed.StatusCode = (int)response.StatusCode;
+        Dictionary<string, string> headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, IEnumerable<string>> header in response.Headers)
+        {
+            headers[header.Key] = string.Join(',', header.Value);
+            if (!NotForwarded.Contains(header.Key))
+            {
+                passed.Headers[header.Key] = new StringValues([.. header.Value]);
+            }
+        }
+
+        foreach (KeyValuePair<string, IEnumerable<string>> header in response.Content.Headers)
+        {
+            passed.Headers[header.Key] = new StringValues([.. header.Value]);
+        }
+
+        return headers;
     }
 
     // Passes the answer to the agent as it comes, reading a successful one's usage on the way.

@@ -13,12 +13,20 @@ import {
 } from "@/components/ui/popover"
 import { type Schemas } from "../api"
 import { dollarsLabel, tokensLabel } from "../models"
+import {
+  PlanMeterList,
+  limitSentence,
+  nearLimit,
+  usePlanUsage,
+} from "../plan-usage"
 import { usage as usageQuery } from "../queries"
+import { BoxLine } from "./box-line"
 import type { Transcript } from "./transcript"
 
 // What the chat's agent has used, beside its message box's action: how full its context is, what the
 // chat has cost so far, and while its prompt's cache stays, for how long, so a message sent in time
-// reads it cheaply. A click shows the details. Nothing shows before the agent's first call.
+// reads it cheaply. A click shows the details, and what the chat's plan has used of its limits.
+// Nothing shows before the agent's first call.
 
 // Under a minute left, the cache countdown asks for attention.
 const SoonSeconds = 60
@@ -26,15 +34,21 @@ const SoonSeconds = 60
 export function UsageMeter({
   chatId,
   transcript,
+  workspaceId,
+  account,
 }: {
   chatId: string
   transcript: Transcript
+  workspaceId: string
+  /** The chat's account, when the person can see it. */
+  account: Schemas["AgentAccountSummary"] | undefined
 }) {
   const working = transcript.working
   const usage = useQuery({
     ...usageQuery(chatId, transcript.checkpoint),
     refetchInterval: working ? 4000 : false,
   }).data
+  const plan = usePlanUsage(workspaceId, account, working)
   const now = useNow()
   // The agent's own count when it gives one, the latest call's otherwise.
   const context = transcript.context ?? contextOf(usage)
@@ -79,8 +93,41 @@ export function UsageMeter({
           <PopoverTitle>This chat</PopoverTitle>
         </PopoverHeader>
         <UsageDetails usage={usage} context={context} warmFor={warmFor} />
+        {account && (plan.data?.meters.length || plan.isError) ? (
+          <section className="flex flex-col gap-2 border-t pt-3">
+            <h3 className="text-sm font-medium">{account.name}</h3>
+            {plan.isError ? (
+              <p className="text-sm text-muted-foreground">
+                Its use of its limits couldn't be read.
+              </p>
+            ) : (
+              <PlanMeterList meters={plan.data?.meters ?? []} now={now} />
+            )}
+          </section>
+        ) : null}
       </PopoverContent>
     </Popover>
+  )
+}
+
+/** A line on the message box while the chat's plan is near one of its limits, or at it. */
+export function PlanLimitLine({
+  workspaceId,
+  account,
+  working,
+}: {
+  workspaceId: string
+  account: Schemas["AgentAccountSummary"] | undefined
+  working: boolean
+}) {
+  const plan = usePlanUsage(workspaceId, account, working)
+  const now = useNow()
+  const [fullest] = nearLimit(plan.data?.meters ?? [], now)
+  if (!account || !fullest) {
+    return null
+  }
+  return (
+    <BoxLine tone="warning">{limitSentence(account, fullest, now)}</BoxLine>
   )
 }
 

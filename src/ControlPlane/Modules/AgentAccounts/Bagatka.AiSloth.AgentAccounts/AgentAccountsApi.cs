@@ -26,6 +26,7 @@ internal sealed partial class AgentAccountsApi(
     ChatGptSignInClient chatGpt,
     OpenAIModelsClient openAI,
     AnthropicModelsClient anthropic,
+    ClaudePlanUsageClient claudeUsage,
     CopilotModelsClient copilot,
     GitHubClient github,
     ModelCatalog catalog,

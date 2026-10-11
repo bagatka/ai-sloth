@@ -11,7 +11,8 @@ a nook: the model gateway adds them to each call.
 ## Owns
 
 - **Data:** the accounts: kind, name, whose they are (a workspace or a person), an API key's
-  endpoint, when a sign-in ended, and the sealed secret; and sign-ins in progress.
+  endpoint, when a sign-in ended, the sealed secret, and a ChatGPT plan's limits as its latest call
+  reported them; and sign-ins in progress.
 - **Rules:** who may add and remove them (Manage on the workspace, or the person), who may use them
   (Write on the workspace, or the person; the control plane's own processes, any), which kinds are
   personal only (plans), which are added by signing in (ChatGPT and Copilot plans), and which kinds this
@@ -22,7 +23,10 @@ a nook: the model gateway adds them to each call.
   the host's Copilot app, through `Bagatka.Sdk.GitHub`. The vendors' lists of
   models: OpenAI's through `Bagatka.Sdk.OpenAI`, Anthropic's through `Bagatka.Sdk.Anthropic`,
   Copilot's through `Bagatka.Sdk.GitHub`, and OpenRouter's catalog through `Bagatka.Sdk.OpenRouter`.
-  models.dev's open catalog of what each model takes, holds, and costs (`Catalog/`).
+  models.dev's open catalog of what each model takes, holds, and costs (`Catalog/`). What plans have
+  used of their limits: ChatGPT's from its answers' `x-codex-*` headers, Copilot's quotas through
+  `Bagatka.Sdk.GitHub`, and Claude's windows through `Bagatka.Sdk.Anthropic`, the last two from the
+  vendors' undocumented endpoints that their own clients read.
 
 ## Does not own
 
@@ -35,7 +39,8 @@ a nook: the model gateway adds them to each call.
 
 `IAgentAccountsApi` in `Bagatka.AiSloth.AgentAccounts.Contracts`: people add accounts to a workspace
 or as their own, with their secret or by signing in at the vendor, list the ones they can use in a
-workspace and the models each one's vendor offers, and remove them; `ListKindsAsync` says, for every kind, how it is added, whether it is
+workspace, the models each one's vendor offers, and what a plan has used of its limits
+(`GetPlanUsageAsync`), and remove them; `ListKindsAsync` says, for every kind, how it is added, whether it is
 personal only, and whether this host allows it. `UseAsync` hands whoever runs an agent what it takes, renewing a plan's
 token when it is due; it is for module callers only, never a route.
 
@@ -80,7 +85,8 @@ Nothing yet. Once workspaces can be deleted, `WorkspaceDeleted` removes their ac
 
 Schema `agent_accounts`. Table `accounts` (kind, name, workspace or owner — a check constraint keeps
 exactly one — when it was added, an API key's endpoint, when a sign-in ended, and the sealed
-secret: a key or token as given, or a plan's session as JSON). Table `sign_ins` (who, the account's
+secret: a key or token as given, or a plan's session as JSON; a ChatGPT plan's `x-codex-*` headers as
+its latest call reported them, as JSON, and when). Table `sign_ins` (who, the account's
 kind and name, the callback, the state and nonce, when it expires, and the sealed PKCE verifier).
 Table `code_sign_ins` (who, the account's kind and name, the sealed device code, when it expires,
 and when GitHub may be asked next).
@@ -103,10 +109,16 @@ background.
   since a local run is self-hosted;
 - `CopilotClientId`, the GitHub OAuth app people sign in to for their Copilot plans: AiSloth's own
   unless the host names another;
-- `ChatGptAuthority`, `ChatGptApi`, `OpenRouterApi`, `CopilotApi`, and `ModelsDevUrl`, the
-  vendors' own by default; tests point them at fakes. GitHub itself is the host's `GitHubClient`'s.
+- `ChatGptAuthority`, `ChatGptApi`, `OpenRouterApi`, `CopilotApi`, `ClaudeApi`, and `ModelsDevUrl`,
+  the vendors' own by default; tests point them at fakes. GitHub itself is the host's `GitHubClient`'s.
 
 ## Decisions and constraints
+
+- **A plan's limits, as its vendor counts them** (`PlanUsage`): a ChatGPT plan's five-hour and weekly
+  windows come with every answer, so the gateway's calls bring them through Chats
+  (`ObservePlanUsageAsync`) and the account keeps the latest; Copilot's quotas (premium requests used
+  of those allowed, or the credits a plan without limits spent) and a Claude plan's windows are asked
+  of the vendor when someone looks. No vendor documents these answers.
 
 - **One OpenRouter key, both APIs.** OpenRouter serves Anthropic's Messages API at its root
   (`/v1/messages`) and OpenAI's at `/v1`, so an OpenRouter key's endpoint is OpenRouter's root, with

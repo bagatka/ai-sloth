@@ -1,16 +1,12 @@
-import type { ReactNode } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import {
   CaretDownIcon,
   CheckCircleIcon,
-  CircleNotchIcon,
   GitPullRequestIcon,
   WarningCircleIcon,
   WrenchIcon,
 } from "@phosphor-icons/react"
-
-import { cn } from "cn"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -21,6 +17,7 @@ import {
 } from "@/components/ui/collapsible"
 import { toast } from "@/components/ui/toast"
 import { answer, api, messageOf } from "../api"
+import { BoxBanner, BoxLine } from "./box-line"
 import { chatStream, useChat } from "./chat-stream"
 import { usePush } from "./push-menu"
 import type { Row, Transcript } from "./transcript"
@@ -169,7 +166,7 @@ function Failed({
   })
 
   return (
-    <Banner>
+    <BoxBanner>
       <Alert variant="warning">
         <WarningCircleIcon />
         <AlertTitle>
@@ -232,7 +229,7 @@ function Failed({
           </CollapsibleContent>
         </Collapsible>
       </Alert>
-    </Banner>
+    </BoxBanner>
   )
 }
 
@@ -271,7 +268,7 @@ function FixedElsewhere({
   })
 
   return (
-    <Line
+    <BoxLine
       tone={fixed ? "done" : failed ? "warning" : "working"}
       actions={
         <>
@@ -302,7 +299,7 @@ function FixedElsewhere({
         : failed
           ? `${setupOf} still fails in another chat.`
           : `${setupOf} is being fixed in another chat.`}
-    </Line>
+    </BoxLine>
   )
 }
 
@@ -317,7 +314,7 @@ function Fixed({
 }) {
   const push = usePush(chatId)
   return (
-    <Banner>
+    <BoxBanner>
       <Alert className="*:[svg]:text-primary">
         <CheckCircleIcon />
         <AlertTitle>{setupOf} works now</AlertTitle>
@@ -337,59 +334,12 @@ function Fixed({
           </div>
         )}
       </Alert>
-    </Banner>
+    </BoxBanner>
   )
 }
 
 function Working({ children }: { children: string }) {
-  return <Line tone="working">{children}</Line>
-}
-
-// One line: what's happening, and what to do about it at its end. With buttons or without, it's
-// the same height, so it doesn't jump as one comes or goes.
-function Line({
-  tone,
-  children,
-  actions,
-}: {
-  tone: "working" | "done" | "warning"
-  children: string
-  actions?: ReactNode
-}) {
-  return (
-    <Banner>
-      <Alert
-        className={cn(
-          "flex flex-wrap items-center gap-x-3 gap-y-2 *:[svg]:translate-y-0",
-          actions ? "py-2" : "py-3",
-          tone === "done" && "*:[svg]:text-primary",
-          tone === "warning" && "*:[svg]:text-warning"
-        )}
-      >
-        {tone === "done" ? (
-          <CheckCircleIcon />
-        ) : tone === "warning" ? (
-          <WarningCircleIcon />
-        ) : (
-          <CircleNotchIcon className="animate-spin motion-reduce:animate-none" />
-        )}
-        <AlertDescription className="min-w-0 flex-1 text-foreground">
-          {children}
-        </AlertDescription>
-        {actions && (
-          <div className="flex shrink-0 items-center gap-1.5">{actions}</div>
-        )}
-      </Alert>
-    </Banner>
-  )
-}
-
-function Banner({ children }: { children: ReactNode }) {
-  return (
-    <div className="shrink-0 px-4 pb-2 md:px-5">
-      <div className="mx-auto w-full max-w-[44rem]">{children}</div>
-    </div>
-  )
+  return <BoxLine tone="working">{children}</BoxLine>
 }
 
 // The repository whose setup it is, by its folder in the nook's files, when it's one repository's.

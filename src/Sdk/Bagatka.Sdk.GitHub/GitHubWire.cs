@@ -49,4 +49,9 @@ internal static class GitHubWire
     internal sealed record CopilotSupports(bool? ToolCalls, IReadOnlyList<string>? ReasoningEffort);
 
     internal sealed record CopilotPolicy(string? State);
+
+    // copilot_internal/user, which Copilot doesn't document either: only the quotas are read.
+    internal sealed record CopilotUser(string? QuotaResetDateUtc, IReadOnlyDictionary<string, CopilotQuotaSnapshot>? QuotaSnapshots);
+
+    internal sealed record CopilotQuotaSnapshot(decimal? Entitlement, decimal? Remaining, bool? Unlimited, decimal? CreditsUsed);
 }

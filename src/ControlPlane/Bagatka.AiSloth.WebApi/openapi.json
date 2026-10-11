@@ -1500,6 +1500,45 @@
         }
       }
     },
+    "/workspaces/{workspaceId}/agent-accounts/{id}/usage": {
+      "get": {
+        "tags": [
+          "Agent accounts"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanUsage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/agent-accounts": {
       "post": {
         "tags": [
@@ -4578,6 +4617,31 @@
         },
         "description": "One page of a keyset-paginated list."
       },
+      "PlanUsage": {
+        "required": [
+          "meters",
+          "reportedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "meters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageMeter"
+            },
+            "description": "Each limit or count the vendor reports, in its order; empty for an account that isn\u0027t a plan, or a\nplan whose vendor has reported none yet."
+          },
+          "reportedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the vendor reported them: now, for a plan asked when someone looks (Copilot, Claude); at its\nlatest call, for a plan whose calls report them (ChatGPT); null before any report.",
+            "format": "date-time"
+          }
+        },
+        "description": "What a plan has used of its limits, as its vendor last reported it."
+      },
       "PostHogProject": {
         "required": [
           "host",
@@ -5661,6 +5725,48 @@
           }
         },
         "description": "What one turn\u0027s model calls used and cost."
+      },
+      "UsageMeter": {
+        "required": [
+          "name",
+          "used",
+          "limit",
+          "unit",
+          "resetsAt"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "What it counts, as people read it, such as \u00605 hours\u0060, \u0060Week\u0060, \u0060Week, Opus\u0060, \u0060Premium requests\u0060, or \u0060Credits\u0060."
+          },
+          "used": {
+            "type": "number",
+            "description": "How much is used: a percent of a window, a count of a quota, the credits spent.",
+            "format": "double"
+          },
+          "limit": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The most it allows, in the same unit: 100 for a window; null for spend without a limit.",
+            "format": "double"
+          },
+          "unit": {
+            "type": "string",
+            "description": "\u0060percent\u0060, \u0060requests\u0060, or \u0060credits\u0060."
+          },
+          "resetsAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it starts over, when the vendor says.",
+            "format": "date-time"
+          }
+        },
+        "description": "One of a plan\u0027s limits or counts: a window, a quota, or spend without a limit."
       },
       "UserId": {
         "type": "string",

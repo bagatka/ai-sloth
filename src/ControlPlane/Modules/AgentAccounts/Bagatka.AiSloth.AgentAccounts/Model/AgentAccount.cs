@@ -54,6 +54,12 @@ internal sealed class AgentAccount
 
     public byte[] SealedSecret { get; private set; } = [];
 
+    // A ChatGPT plan's limits as its latest model call's answer reported them (its x-codex-* headers,
+    // as JSON), and when.
+    public string? ReportedLimits { get; private set; }
+
+    public DateTimeOffset? LimitsReportedAt { get; private set; }
+
     public bool NeedsSignIn => SignInEndedAt is not null;
 
     // An account added with its secret. Only Anthropic and OpenAI API keys name an endpoint: an
@@ -106,6 +112,23 @@ internal sealed class AgentAccount
     public void Renewed(PlanSession session, SecretBox box)
     {
         Seal(session, box);
+    }
+
+    public void LimitsReported(string limits, TimeProvider time)
+    {
+        ReportedLimits = limits;
+        LimitsReportedAt = time.GetUtcNow();
+    }
+
+    // The token a Copilot or Claude plan was added with, for asking its vendor what the plan has used.
+    public string PlanToken(SecretBox box)
+    {
+        if (Kind is not (AgentAccountKind.CopilotPlan or AgentAccountKind.ClaudePlan))
+        {
+            throw new InvalidOperationException("Agent account " + Id.Value + " isn't a Copilot or Claude plan.");
+        }
+
+        return OpenSecret(box);
     }
 
     public void SignInEnded(TimeProvider time)

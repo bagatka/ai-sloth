@@ -23,14 +23,21 @@ import {
 } from "@/components/ui/tooltip"
 import { ApiError } from "../api"
 import { agentLabel } from "../models"
-import { chat as chatQuery, harnesses, me, nooks, people } from "../queries"
+import {
+  agentAccounts,
+  chat as chatQuery,
+  harnesses,
+  me,
+  nooks,
+  people,
+} from "../queries"
 import { chatStream, useChat } from "./chat-stream"
 import { ChangesPanel, DownloadFiles } from "./changes-panel"
 import { Composer } from "./composer"
 import { PushMenu } from "./push-menu"
 import { SetupBanner } from "./setup-banner"
 import { TranscriptView } from "./transcript-view"
-import { UsageMeter } from "./usage-meter"
+import { PlanLimitLine, UsageMeter } from "./usage-meter"
 
 // One chat as it happens: who wrote what, what the agent did, and a box to write to it.
 export function ChatPage() {
@@ -43,6 +50,11 @@ export function ChatPage() {
     ...nooks(chat.data?.workspaceId ?? ""),
     enabled: !!chat.data,
   }).data
+  // The chat's account, when it's the workspace's or the person's own.
+  const account = useQuery({
+    ...agentAccounts(chat.data?.workspaceId ?? ""),
+    enabled: !!chat.data,
+  }).data?.find((found) => found.id === chat.data?.account)
   const writers = state.transcript.rows.flatMap((row) =>
     row.kind === "message" ? [row.sentBy] : []
   )
@@ -156,6 +168,11 @@ export function ChatPage() {
           transcript={state.transcript}
           proposing={proposing !== null}
         />
+        <PlanLimitLine
+          workspaceId={chat.data.workspaceId}
+          account={account}
+          working={working}
+        />
         {/* While the agent works, a line on the message box says so, wherever the transcript is read. */}
         {working && state.transcript.turnStartedAt && (
           <div className="shrink-0 px-4 pb-1.5 md:px-5">
@@ -175,7 +192,14 @@ export function ChatPage() {
           working={working}
           agent={agent}
           proposing={proposing}
-          usage={<UsageMeter chatId={chatId} transcript={state.transcript} />}
+          usage={
+            <UsageMeter
+              chatId={chatId}
+              transcript={state.transcript}
+              workspaceId={chat.data.workspaceId}
+              account={account}
+            />
+          }
         />
       </MessageScrollerProvider>
     </>

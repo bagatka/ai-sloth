@@ -1,6 +1,7 @@
 import * as React from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowSquareOutIcon, PlusIcon } from "@phosphor-icons/react"
+import { cn } from "cn"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -32,6 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/components/ui/toast"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { ApiError, answer, api, messageOf, type Schemas } from "../api"
+import { metersSummary, nearLimit, usePlanUsage } from "../plan-usage"
 import { accountKinds, agentAccounts, me } from "../queries"
 import { aborted, CodeSteps, waitForCode } from "./code-sign-in"
 import { NoRows, RemoveButton, Row, Rows, Section } from "./section"
@@ -152,6 +154,7 @@ export function AccountsSection({ workspace }: { workspace: Workspace }) {
                   .filter(Boolean)
                   .join(", ")}
               >
+                <PlanMeters workspaceId={workspace.id} account={account} />
                 {(own || manager) && (
                   <RemoveButton
                     what={account.name}
@@ -168,6 +171,31 @@ export function AccountsSection({ workspace }: { workspace: Workspace }) {
         )}
       </Rows>
     </Section>
+  )
+}
+
+// What a plan has used of its limits, at its row's end, as of when it was read.
+function PlanMeters({
+  workspaceId,
+  account,
+}: {
+  workspaceId: string
+  account: Schemas["AgentAccountSummary"]
+}) {
+  const usage = usePlanUsage(workspaceId, account)
+  const meters = usage.data?.meters ?? []
+  if (meters.length === 0) {
+    return null
+  }
+  return (
+    <span
+      className={cn(
+        "hidden text-label text-muted-foreground tabular-nums sm:inline",
+        nearLimit(meters, usage.dataUpdatedAt).length > 0 && "text-warning"
+      )}
+    >
+      {metersSummary(meters, usage.dataUpdatedAt)}
+    </span>
   )
 }
 

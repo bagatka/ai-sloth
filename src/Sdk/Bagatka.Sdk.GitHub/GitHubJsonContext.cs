@@ -8,6 +8,7 @@ namespace Bagatka.Sdk.GitHub;
 [JsonSerializable(typeof(GitHubWire.DeviceCodeResponse))]
 [JsonSerializable(typeof(GitHubWire.TokenResponse))]
 [JsonSerializable(typeof(GitHubWire.User))]
+[JsonSerializable(typeof(GitHubWire.CopilotUser))]
 [JsonSerializable(typeof(GitHubWire.InstallationPage))]
 [JsonSerializable(typeof(GitHubWire.Repository))]
 [JsonSerializable(typeof(GitHubWire.RepositoryPage))]

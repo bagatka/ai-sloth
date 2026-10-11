@@ -118,6 +118,21 @@ public sealed class GitHubClient : IDisposable
         return new GitHubUser(user.Id, user.Login, user.Name);
     }
 
+    /// <summary>
+    /// The quotas of the Copilot plan of <paramref name="token"/>'s person, as Copilot's own clients read
+    /// them (<c>GET /copilot_internal/user</c>, undocumented): each with its entitlement and what's left,
+    /// or unlimited with the credits spent.
+    /// </summary>
+    public async Task<CopilotQuota> GetCopilotQuotaAsync(string token, CancellationToken ct)
+    {
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Get, "copilot_internal/user", token, content: null, ct).ConfigureAwait(false);
+        GitHubWire.CopilotUser user = await ReadAsync(response, GitHubJsonContext.Default.CopilotUser, ct).ConfigureAwait(false);
+        List<CopilotQuotaSnapshot> snapshots = [.. (user.QuotaSnapshots ?? new Dictionary<string, GitHubWire.CopilotQuotaSnapshot>(StringComparer.Ordinal))
+            .Select(entry => new CopilotQuotaSnapshot(entry.Key, entry.Value.Entitlement ?? 0, entry.Value.Remaining ?? 0, entry.Value.Unlimited == true, entry.Value.CreditsUsed))];
+        bool dated = DateTimeOffset.TryParse(user.QuotaResetDateUtc, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset resetsAt);
+        return new CopilotQuota(snapshots, dated ? resetsAt : null);
+    }
+
     /// <summary>An account by its login, such as an app's bot <c>my-app[bot]</c>; <see langword="null"/> when there's none.</summary>
     public async Task<GitHubUser?> GetUserAsync(string token, string login, CancellationToken ct)
     {

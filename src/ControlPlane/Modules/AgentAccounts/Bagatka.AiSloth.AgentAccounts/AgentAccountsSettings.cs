@@ -31,6 +31,7 @@ public sealed record AgentAccountsSettings
     /// models.dev's catalog of models, read daily for what's known of each model; <see langword="null"/>
     /// for <c>https://models.dev/api.json</c>. Tests change it.
     /// </param>
+    /// <param name="claudeApi">Anthropic's API, where a Claude plan's models and usage are asked; <see langword="null"/> for <c>https://api.anthropic.com</c>. Tests change it.</param>
     public AgentAccountsSettings(
         bool allowClaudePlans = false,
         bool allowChatGptPlans = false,
@@ -39,8 +40,10 @@ public sealed record AgentAccountsSettings
         Uri? openRouterApi = null,
         Uri? copilotApi = null,
         string? copilotClientId = null,
-        Uri? modelsDevUrl = null)
+        Uri? modelsDevUrl = null,
+        Uri? claudeApi = null)
     {
+        ClaudeApi = claudeApi ?? new Uri("https://api.anthropic.com");
         ModelsDevUrl = modelsDevUrl ?? new Uri("https://models.dev/api.json");
         CopilotClientId = string.IsNullOrWhiteSpace(copilotClientId) ? AiSlothCopilotApp : copilotClientId;
         CopilotApi = copilotApi ?? Bagatka.Sdk.GitHub.CopilotApi.Public;
@@ -75,6 +78,9 @@ public sealed record AgentAccountsSettings
 
     /// <summary>The GitHub OAuth app people sign in to for their Copilot plans, by its client ID.</summary>
     public string CopilotClientId { get; }
+
+    /// <summary>Anthropic's API, where a Claude plan's models and usage are asked.</summary>
+    public Uri ClaudeApi { get; }
 
     /// <summary>models.dev's catalog of models, read daily.</summary>
     public Uri ModelsDevUrl { get; }

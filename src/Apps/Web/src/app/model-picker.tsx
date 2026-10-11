@@ -1,5 +1,6 @@
 import { useQueries, useQuery } from "@tanstack/react-query"
 import { BrainIcon, CaretDownIcon } from "@phosphor-icons/react"
+import { cn } from "cn"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -33,13 +34,19 @@ import {
   type Choice,
   type Chosen,
 } from "./models"
-import { agentAccounts, models as modelsQuery } from "./queries"
+import { isPlan, metersSummary, nearLimit } from "./plan-usage"
+import {
+  agentAccounts,
+  models as modelsQuery,
+  planUsage as planUsageQuery,
+} from "./queries"
 
 // What a chat runs on, picked in its message box the way coding agents' own pickers work: one click
 // opens every model of every account the agent can run on, grouped by account, with the person's
 // presets first; typing narrows it by name or ID, and one click picks. How hard the agent thinks is
 // picked beside it. Before a chat starts, its agent (harness) is picked too; once its nook runs one,
-// the model, thinking, and account still change, for the next turn.
+// the model, thinking, and account still change, for the next turn. A plan's group says what it has
+// used of its limits, so a plan near one is passed over for another account.
 
 type Account = Schemas["AgentAccountSummary"]
 type Harness = Schemas["HarnessSummary"]
@@ -53,7 +60,13 @@ type Item = {
   model?: Schemas["HarnessModel"]
   choice: Chosen | null
 }
-type Group = { value: string; label: string; items: Item[] }
+type Group = {
+  value: string
+  label: string
+  /** What a plan has used of its limits, and whether one is nearly used up. */
+  meters?: { summary: string; near: boolean }
+  items: Item[]
+}
 
 /** The accounts a harness can run on, in the order the host lists them. */
 export function accountsFor(
@@ -91,6 +104,12 @@ export function ModelPicker({
   const lists = useQueries({
     queries: accounts.map((account) => ({
       ...modelsQuery(workspaceId, harness.id, account.id),
+    })),
+  })
+  const usages = useQueries({
+    queries: accounts.map((account) => ({
+      ...planUsageQuery(workspaceId, account.id),
+      enabled: isPlan(account),
     })),
   })
 
@@ -158,9 +177,20 @@ export function ModelPicker({
         })
       }
     }
+    const usage = usages[index]
+    const meters = usage?.data?.meters ?? []
+    // As of when they were read: the picker doesn't tick.
+    const now = usage?.dataUpdatedAt ?? 0
     groups.push({
       value: account.id,
       label: `${account.name}${account.ownerId ? ", your own" : ""}`,
+      meters:
+        meters.length > 0
+          ? {
+              summary: metersSummary(meters, now),
+              near: nearLimit(meters, now).length > 0,
+            }
+          : undefined,
       items,
     })
   })
@@ -227,7 +257,19 @@ export function ModelPicker({
         <ComboboxList>
           {(group: Group) => (
             <ComboboxGroup key={group.value} items={group.items}>
-              <ComboboxLabel>{group.label}</ComboboxLabel>
+              <ComboboxLabel className="flex items-baseline gap-2">
+                <span className="truncate">{group.label}</span>
+                {group.meters && (
+                  <span
+                    className={cn(
+                      "ml-auto shrink-0 tabular-nums",
+                      group.meters.near && "text-warning"
+                    )}
+                  >
+                    {group.meters.summary}
+                  </span>
+                )}
+              </ComboboxLabel>
               <ComboboxCollection>
                 {(item: Item) => (
                   <ComboboxItem

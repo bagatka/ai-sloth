@@ -26,6 +26,7 @@ public static class AgentAccountsModule
         services.AddChatGptSignInClient(settings.ChatGptSignIn);
         services.AddOpenAIModelsClient();
         services.AddAnthropicModelsClient();
+        services.AddClaudePlanUsageClient();
         services.AddCopilotModelsClient();
         services.AddSingleton<ModelCatalog>();
         services.AddOpenRouterClient(new OpenRouterSettings(settings.OpenRouterApi));

@@ -105,7 +105,8 @@ minutes unless given).
   (`IAgentAccountsApi.GetModelFactsAsync`), or by the vendor's own figure, and put in the turn the
   chat was on when the call started. A chat's usage (`GetUsageAsync`) adds them up; how full the
   context is comes from the agent itself where it says (`usage_update`), and from its largest
-  latest call otherwise. A Claude plan's agent holds its token, so its calls aren't recorded.
+  latest call otherwise. A Claude plan's agent holds its token, so its calls aren't recorded. What an
+  answer's headers say of the account's plan goes to its account (`ObservePlanUsageAsync`).
 - **No model key or plan in a nook.** An agent gets the model gateway's URL and a token for its chat;
   the gateway forwards each call with the headers that pay for it. A Claude plan's token, tied to
   Claude Code, goes to the harness itself.

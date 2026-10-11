@@ -76,8 +76,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
     }
 
     // An own account serves its owner in every workspace; a plan is only ever someone's own. A Copilot
-    // plan is added with a code the person approves at GitHub, and lists the chat models of Copilot's
-    // picker that the plan allows.
+    // plan is added with a code the person approves at GitHub, lists the chat models of Copilot's
+    // picker that the plan allows, and says how many of its premium requests are used.
     private async Task OwnAccountsServeTheirOwnerInEveryWorkspaceAndPlansStayPersonalAsync()
     {
         WorkspaceSummary acme = await Api.ReadAsync<WorkspaceSummary>(_alice.SendPostAsync("/workspaces", new { name = "Acme" }), HttpStatusCode.Created);
@@ -101,6 +101,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
             _alice.SendPostAsync(Paths.Workspace(acme.Id) + "/agent-accounts", new { kind = "CopilotPlan", name = "Shared", secret = "github_pat_example" }), HttpStatusCode.BadRequest);
         Problem claudePlan = await Api.ProblemAsync(
             _alice.SendPostAsync("/agent-accounts", new { kind = "ClaudePlan", name = "Mine", secret = "sk-ant-oat-example" }), HttpStatusCode.BadRequest);
+        PlanUsage usage = await Api.ReadAsync<PlanUsage>(_alice.SendGetAsync(UsagePath(acme.Id, own.Id)), HttpStatusCode.OK);
+        await Api.ProblemAsync(_bob.SendGetAsync(UsagePath(bobs.Id, own.Id)), HttpStatusCode.NotFound);
 
         Assert.Null(pending.Account);
         Assert.Equal(("My Copilot", AgentAccountKind.CopilotPlan), (own.Name, own.Kind));
@@ -115,6 +117,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Equal((200_000, 4m, true), (copilot[0].Facts.ContextWindow, copilot[0].Facts.Price?.Input, copilot[0].Facts.Price?.Estimate));
         Assert.True(sharedPlan.Errors?.ContainsKey("kind"));
         Assert.True(claudePlan.Errors?.ContainsKey("kind"));
+        Assert.Equal([("Premium requests", 12m, (decimal?)300m, "requests")], usage.Meters.Select(meter => (meter.Name, meter.Used, meter.Limit, meter.Unit)));
     }
 
     // Erin finds a model by name for pi on her OpenRouter key, and saves the choice as a preset. Her
@@ -223,20 +226,25 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
 
     // A Copilot plan's token stays on the host: Copilot and pi call the gateway with their chat's token,
     // each in the API Copilot takes for its model (Responses for one that speaks only that, OpenAI's
-    // chat API otherwise), and the gateway calls Copilot with the plan's token and its integration.
+    // chat API otherwise), and the gateway calls Copilot with the plan's token and its integration. A
+    // plan billed for what it uses, as an enterprise's, reports the credits it spent.
     private async Task ACopilotPlanRunsCopilotAndPiThroughTheGatewayAsync()
     {
         TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice);
-        AgentAccountSummary plan = await TestWorkspace.AddCopilotPlanAsync(app, _alice, "alice-copilot-" + Guid.CreateVersion7());
+        string login = "alice-copilot-" + Guid.CreateVersion7();
+        AgentAccountSummary plan = await TestWorkspace.AddCopilotPlanAsync(app, _alice, login);
+        app.GitHub.BillCopilotCredits(login);
 
         JsonElement[] ended = await Task.WhenAll(
             TurnAsync(workspace, "copilot", plan.Id, FakeModel.CopilotGpt),
             TurnAsync(workspace, "pi", plan.Id, FakeModel.CopilotClaude));
+        PlanUsage usage = await Api.ReadAsync<PlanUsage>(_alice.SendGetAsync(UsagePath(workspace.Id, plan.Id)), HttpStatusCode.OK);
 
         Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
         Assert.Contains(app.Model.CopilotCalls, call => call is { Path: "/copilot/responses", Integration: "copilot-developer-cli" });
         Assert.Contains(app.Model.CopilotCalls, call => call is { Path: "/copilot/chat/completions", Integration: "copilot-developer-cli" });
         Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.CopilotGpt + "\"", StringComparison.Ordinal) && body.Contains("\"effort\":\"medium\"", StringComparison.Ordinal));
+        Assert.Equal([("Credits", 41.5m, (decimal?)null, "credits")], usage.Meters.Select(meter => (meter.Name, meter.Used, meter.Limit, meter.Unit)));
     }
 
     // A preset is checked as a chat's start is, kept once, and only by its owner.
@@ -268,7 +276,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
     }
 
     // Every token set the fake ChatGPT issues asks to be renewed at once, so each model call renews:
-    // two agents working at the same time on one plan must never use a refresh token twice.
+    // two agents working at the same time on one plan must never use a refresh token twice. The plan's
+    // answers report its five-hour and weekly windows.
     private async Task AChatGptPlanIsAddedBySigningInAndRenewedOneCallAtATimeAsync()
     {
         TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice, openAI: true);
@@ -285,6 +294,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
 
         IReadOnlyList<HarnessModel> planModels = await Api.ReadAsync<IReadOnlyList<HarnessModel>>(_alice.SendGetAsync(ModelsPath(workspace, "codex", plan.Id)), HttpStatusCode.OK);
         JsonElement[] ended = await Task.WhenAll(TurnAsync(workspace, "codex", plan.Id), TurnAsync(workspace, "codex", plan.Id));
+        PlanUsage usage = await Api.ReadAsync<PlanUsage>(_alice.SendGetAsync(UsagePath(workspace.Id, plan.Id)), HttpStatusCode.OK);
         ChatSummary later = await workspace.StartChatAsync("codex", plan.Id);
         await using ChatWatch laterWatch = await ChatWatch.OpenAsync(workspace.Person, later);
         app.ChatGpt.Disconnect(QueryHelpers.ParseQuery(returnedTo.Query)["client_id"].ToString());
@@ -299,6 +309,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
         Assert.True(app.ChatGpt.Renewals > renewalsBefore);
         Assert.Equal(0, app.ChatGpt.ReusedRefreshTokens);
+        Assert.Equal([("5 hours", 42.5m, 100m), ("Week", 12m, 100m)], usage.Meters.Select(meter => (meter.Name, meter.Used, meter.Limit ?? 0)));
+        Assert.NotNull(usage.ReportedAt);
         Assert.Equal("The agent couldn't start: " + AgentAccountsErrors.SignInEnded.Message, afterDisconnect.GetProperty("failure").GetString());
         Assert.True(accounts.Single(found => found.Id == plan.Id).NeedsSignIn);
     }
@@ -317,6 +329,11 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
     private static async Task<IReadOnlyList<AgentAccountSummary>> ListAsync(HttpClient client, WorkspaceId workspace)
     {
         return await Api.ReadAsync<IReadOnlyList<AgentAccountSummary>>(client.SendGetAsync(Paths.Workspace(workspace) + "/agent-accounts"), HttpStatusCode.OK);
+    }
+
+    private static string UsagePath(WorkspaceId workspace, AgentAccountId account)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"{Paths.Workspace(workspace)}/agent-accounts/{account.Value}/usage");
     }
 
     private static string ModelsPath(TestWorkspace workspace, string harness, AgentAccountId account)

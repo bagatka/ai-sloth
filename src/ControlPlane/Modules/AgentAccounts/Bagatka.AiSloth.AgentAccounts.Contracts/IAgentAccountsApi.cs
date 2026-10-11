@@ -85,6 +85,23 @@ public interface IAgentAccountsApi
     public Task<Result<ModelFacts>> GetModelFactsAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, string model, CancellationToken ct);
 
     /// <summary>
+    /// What a plan has used of its limits (<see cref="PlanUsage"/>): a ChatGPT plan's as its latest call
+    /// reported it; a Copilot plan's (its quotas, or credits spent) and a Claude plan's (its five-hour and
+    /// weekly windows) asked of the vendor now; nothing for an API key. Copilot and Anthropic don't
+    /// document what they answer; asking throws when the vendor can't be reached.
+    /// </summary>
+    /// <returns>The usage; <see cref="AgentAccountsErrors.SignInEnded"/>; or not found for anyone who may not use the account.</returns>
+    public Task<Result<PlanUsage>> GetPlanUsageAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct);
+
+    /// <summary>
+    /// Keeps what a model call's answer reported of the account's plan in its headers: a ChatGPT plan's
+    /// windows and credits (<c>x-codex-*</c>, as Codex reads them). For the model gateway's calls, through
+    /// Chats; others' headers report nothing kept.
+    /// </summary>
+    /// <returns>Success; or not found for anyone who may not use the account.</returns>
+    public Task<Result> ObservePlanUsageAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, IReadOnlyDictionary<string, string> headers, CancellationToken ct);
+
+    /// <summary>
     /// Removes an account: a personal one by its owner, a workspace's by its managers. Agents already
     /// running with a token they hold keep it until they stop; calls through the model gateway stop at
     /// once. A sign-in's session at the vendor ends too, when the vendor can be reached.

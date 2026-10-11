@@ -123,7 +123,7 @@ internal sealed partial class AgentAccountsApi
             ["Authorization"] = "Bearer " + token,
             ["anthropic-beta"] = "oauth-2025-04-20",
         };
-        IReadOnlyList<AnthropicModel> served = await anthropic.ListModelsAsync(new Uri("https://api.anthropic.com"), signedIn, ct);
+        IReadOnlyList<AnthropicModel> served = await anthropic.ListModelsAsync(settings.ClaudeApi, signedIn, ct);
         return [.. served.Select(model => new Offered(model.Id, model.DisplayName, UsesTools: true, VendorFacts: null))];
     }
 

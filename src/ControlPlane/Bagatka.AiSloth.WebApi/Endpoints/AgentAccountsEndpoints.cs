@@ -29,6 +29,7 @@ internal static class AgentAccountsEndpoints
         RouteGroupBuilder workspaceAccounts = app.MapGroup("/workspaces/{workspaceId:guid}/agent-accounts").WithTags("Agent accounts");
         workspaceAccounts.MapPost("/", AddToWorkspace);
         workspaceAccounts.MapGet("/", List);
+        workspaceAccounts.MapGet("/{id:guid}/usage", GetPlanUsage);
 
         app.MapGet("/agent-account-kinds", ListKinds).WithTags("Agent accounts");
 
@@ -95,6 +96,22 @@ internal static class AgentAccountsEndpoints
         CancellationToken ct)
     {
         Result<IReadOnlyList<AgentAccountSummary>> result = await api.ListAsync(principal.ToActor(), WorkspaceId.From(workspaceId), ct);
+        return result.ToOk();
+    }
+
+    /// <summary>
+    /// What the plan has used of its limits: a ChatGPT plan's windows as its latest call reported them, a
+    /// Copilot plan's quotas or credits spent, and a Claude plan's windows, both asked of the vendor now.
+    /// Nothing for an API key.
+    /// </summary>
+    private static async Task<Results<Ok<PlanUsage>, ProblemHttpResult>> GetPlanUsage(
+        [FromRoute] Guid workspaceId,
+        [FromRoute] Guid id,
+        ClaimsPrincipal principal,
+        [FromServices] IAgentAccountsApi api,
+        CancellationToken ct)
+    {
+        Result<PlanUsage> result = await api.GetPlanUsageAsync(principal.ToActor(), AgentAccountId.From(id), WorkspaceId.From(workspaceId), ct);
         return result.ToOk();
     }
 

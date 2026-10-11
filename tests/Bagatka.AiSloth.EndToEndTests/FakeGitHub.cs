@@ -53,6 +53,7 @@ internal sealed class FakeGitHub : IAsyncDisposable
     private readonly Dictionary<string, HashSet<string>> _collaborators = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
     private readonly List<PullRequest> _pullRequests = [];
     private readonly List<Release> _releases = [];
+    private readonly HashSet<string> _billedForCredits = new HashSet<string>(StringComparer.Ordinal);
 
     private FakeGitHub(WebApplication app)
     {
@@ -76,6 +77,7 @@ internal sealed class FakeGitHub : IAsyncDisposable
         app.MapGet("/login/device", gitHub.ApproveInBrowser);
         app.MapPost("/login/oauth/access_token", gitHub.TokenAsync);
         app.MapGet("/api/user", gitHub.User);
+        app.MapGet("/api/copilot_internal/user", gitHub.CopilotUser);
         app.MapGet("/api/users/{login}", FakeGitHub.Account);
         app.MapGet("/api/user/installations", gitHub.Installations);
         app.MapGet("/api/user/installations/{id:long}/repositories", gitHub.InstallationRepositories);
@@ -276,6 +278,15 @@ internal sealed class FakeGitHub : IAsyncDisposable
         return Results.Json(string.Equals(clientId, CopilotClientId, StringComparison.Ordinal) ? IssueCopilotToken(login) : IssueTokens(login));
     }
 
+    /// <summary>Makes <paramref name="login"/>'s Copilot plan one without limits that bills the credits it spends, as an enterprise's.</summary>
+    public void BillCopilotCredits(string login)
+    {
+        lock (_lock)
+        {
+            _billedForCredits.Add(login);
+        }
+    }
+
     /// <summary>How the Copilot app's tokens for <paramref name="login"/> start, so a fake Copilot knows whose they are.</summary>
     public static string CopilotTokenPrefix(string login)
     {
@@ -336,6 +347,39 @@ internal sealed class FakeGitHub : IAsyncDisposable
     {
         string? login = Login(request);
         return login is null ? Results.Unauthorized() : Results.Json(new JsonObject { ["id"] = IdOf(login), ["login"] = login, ["name"] = "The " + login });
+    }
+
+    // Copilot's quotas for the person, as copilot_internal/user answers: 12 of 300 premium requests used,
+    // chat and completions without limits; a plan billed for its credits has no limits and reports
+    // what it spent.
+    private IResult CopilotUser(HttpRequest request)
+    {
+        string? login = Login(request);
+        if (login is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        bool billed;
+        lock (_lock)
+        {
+            billed = _billedForCredits.Contains(login);
+        }
+
+        JsonObject premium = billed
+            ? new JsonObject { ["entitlement"] = 0, ["remaining"] = 0, ["unlimited"] = true, ["credits_used"] = 41.5, ["quota_id"] = "premium_interactions" }
+            : new JsonObject { ["entitlement"] = 300, ["remaining"] = 288, ["unlimited"] = false, ["quota_id"] = "premium_interactions" };
+        return Results.Json(new JsonObject
+        {
+            ["login"] = login,
+            ["quota_reset_date_utc"] = "2026-11-01T00:00:00.000Z",
+            ["quota_snapshots"] = new JsonObject
+            {
+                ["chat"] = new JsonObject { ["entitlement"] = 0, ["remaining"] = 0, ["unlimited"] = true, ["quota_id"] = "chat" },
+                ["completions"] = new JsonObject { ["entitlement"] = 0, ["remaining"] = 0, ["unlimited"] = true, ["quota_id"] = "completions" },
+                ["premium_interactions"] = premium,
+            },
+        });
     }
 
     private static IResult Account(string login)

@@ -81,7 +81,7 @@ public sealed class WebSetupJourney(ControlPlane app)
     }
 
     // A Copilot plan of their own, with GitHub's device flow: the dialog shows the code, which they
-    // approve at GitHub.
+    // approve at GitHub. Its row says how many of its premium requests are used.
     private async Task AddsTheirCopilotPlanWithACodeAsync(IPage page, string login)
     {
         ILocator accounts = Section(page, "Agent accounts");
@@ -99,6 +99,7 @@ public sealed class WebSetupJourney(ControlPlane app)
 
         await Assertions.Expect(accounts.GetByText("My Copilot")).ToBeVisibleAsync(WebBrowser.Shown);
         await Assertions.Expect(dialog).ToBeHiddenAsync();
+        await Assertions.Expect(accounts.GetByText("Premium requests 12 of 300")).ToBeVisibleAsync(WebBrowser.Shown);
     }
 
     // GitHub's device flow: the page shows the code, which the person approves at GitHub.

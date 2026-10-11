@@ -81,6 +81,23 @@ export function agentAccounts(workspaceId: string) {
 }
 
 /**
+ * What the account's plan has used of its limits, as its vendor reports them: a ChatGPT plan's as its
+ * latest call did, a Copilot or Claude plan's asked of the vendor; nothing for an API key.
+ */
+export function planUsage(workspaceId: string, account: string) {
+  return queryOptions({
+    queryKey: ["workspaces", workspaceId, "agent-accounts", account, "usage"],
+    queryFn: () =>
+      answer(
+        api.GET("/workspaces/{workspaceId}/agent-accounts/{id}/usage", {
+          params: { path: { workspaceId, id: account } },
+        })
+      ),
+    staleTime: 60_000,
+  })
+}
+
+/**
  * The models a chat's agent can run on with the harness and the account, newest first; empty when
  * the harness picks its own. The host reads the vendor's catalog each time, which changes rarely
  * within a session.

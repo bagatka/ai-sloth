@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
@@ -27,13 +28,15 @@ public interface IChatHarnessesApi
     /// <summary>
     /// Records a call the gateway forwarded for the agent holding the token, once its answer is in:
     /// its tokens, with its cost from the model's price at the chat's account (or the vendor's own
-    /// figure), in the turn the chat was on when the call started. Persists one row.
+    /// figure), in the turn the chat was on when the call started. Persists one row, and passes what the
+    /// answer's headers report of the account's plan to its account.
     /// </summary>
     /// <param name="actor">Anonymous: the token is the credential.</param>
     /// <param name="token">The chat's token the call carried.</param>
     /// <param name="usage">What the answer reported.</param>
+    /// <param name="headers">The answer's headers, such as a ChatGPT plan's limits.</param>
     /// <param name="startedAt">When the call reached the gateway.</param>
     /// <param name="ct">Cancels the recording.</param>
     /// <returns>Success; or unauthorized for a token no chat's agent holds.</returns>
-    public Task<Result> RecordModelCallAsync(Actor actor, string token, ModelCallUsage usage, DateTimeOffset startedAt, CancellationToken ct);
+    public Task<Result> RecordModelCallAsync(Actor actor, string token, ModelCallUsage usage, IReadOnlyDictionary<string, string> headers, DateTimeOffset startedAt, CancellationToken ct);
 }
