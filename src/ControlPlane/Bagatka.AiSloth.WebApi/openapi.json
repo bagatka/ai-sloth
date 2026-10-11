@@ -2907,8 +2907,7 @@
       "AgentAccountKindSummary": {
         "required": [
           "kind",
-          "addedBySignIn",
-          "personalOnly",
+          "plan",
           "allowed"
         ],
         "type": "object",
@@ -2917,13 +2916,9 @@
             "description": "The kind.",
             "$ref": "#/components/schemas/AgentAccountKind"
           },
-          "addedBySignIn": {
+          "plan": {
             "type": "boolean",
-            "description": "Whether it is added by signing in at its vendor rather than with its secret."
-          },
-          "personalOnly": {
-            "type": "boolean",
-            "description": "Whether it can only be someone\u0027s own, as plans are."
+            "description": "Whether it is a plan: a person\u0027s subscription, added by signing in at its vendor and only ever\ntheir own. Otherwise it is an API key, added with its secret, a workspace\u0027s or someone\u0027s own."
           },
           "allowed": {
             "type": "boolean",
@@ -3369,7 +3364,7 @@
             "description": "The latest turns\u0027 usage, newest first, at most 50."
           }
         },
-        "description": "What a chat\u0027s agents have used of their models: every call the model gateway saw, added up and by\nturn, with what a cost is known for; how full the context is; and how long its prompt\u0027s cache stays.\nCalls of an agent that holds its own token (a Claude plan\u0027s) don\u0027t pass the gateway, so they aren\u0027t here."
+        "description": "What a chat\u0027s agents have used of their models: every call the model gateway saw, added up and by\nturn, with what a cost is known for; how full the context is; and how long its prompt\u0027s cache stays."
       },
       "CheckpointSummary": {
         "required": [

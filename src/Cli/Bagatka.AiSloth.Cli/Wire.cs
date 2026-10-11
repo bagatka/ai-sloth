@@ -35,7 +35,7 @@ internal static class Wire
 
     internal sealed record Resource(string Kind, Guid Id);
 
-    internal sealed record AccountKind(string Kind, bool AddedBySignIn, bool PersonalOnly, bool Allowed);
+    internal sealed record AccountKind(string Kind, bool Plan, bool Allowed);
 
     internal sealed record Account(Guid Id, string Kind, string Name, Guid? WorkspaceId, Uri? Endpoint, bool NeedsSignIn);
 

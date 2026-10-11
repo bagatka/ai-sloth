@@ -30,7 +30,7 @@ public sealed class ChatGptUsageClient : IDisposable
     /// <summary>
     /// The windows of the plan that <paramref name="accessToken"/> uses, from ChatGPT's backend at
     /// <paramref name="backendUrl"/>, for the ChatGPT account the sign-in chose
-    /// (<see cref="ChatGptIdToken.AccountId"/>) when known. The token is never logged.
+    /// (<see cref="ChatGptTokens.AccountId"/>) when known. The token is never logged.
     /// </summary>
     public async Task<IReadOnlyList<ChatGptUsageWindow>> GetWindowsAsync(Uri backendUrl, string accessToken, string? accountId, CancellationToken ct)
     {

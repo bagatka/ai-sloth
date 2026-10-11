@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Bagatka.AiSloth.AgentAccounts.Data.Migrations;
 
 /// <inheritdoc />
-public partial class _20261008091528_Initial : Migration
+public partial class _20261011201422_Initial : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -44,11 +44,11 @@ public partial class _20261008091528_Initial : Migration
                 user_id = table.Column<Guid>(type: "uuid", nullable: false),
                 kind = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                 name = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                callback = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: false),
-                state = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                nonce = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                user_code = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                 expires_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                sealed_verifier = table.Column<byte[]>(type: "bytea", nullable: false)
+                interval = table.Column<TimeSpan>(type: "interval", nullable: false),
+                next_poll_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                sealed_secret = table.Column<byte[]>(type: "bytea", nullable: false)
             },
             constraints: table =>
             {

@@ -2,6 +2,7 @@ using Bagatka.AiSloth.AgentAccounts.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
+using Bagatka.AiSloth.AgentAccounts.Kinds;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
@@ -74,25 +75,26 @@ internal sealed partial class AgentAccountsApi
         return new Result<AgentAccountSummary>(added.Output.ToSummary());
     }
 
-    // Plans are for one person, some need the deployment's permission, and some are added by signing in.
+    // API keys only: a plan is added by signing in. Only some kinds name an endpoint of their own.
     private Error? Refusal(AddAgentAccount command)
     {
-        if (!KindRules.Known(command.Kind))
+        IAccountKind? kind = kinds.Find(command.Kind);
+        if (kind is null)
         {
             return Error.Validation("kind", "Unknown kind of account.");
         }
 
-        if (KindRules.AddedBySignIn(command.Kind))
+        if (kind is IPlanKind)
         {
-            return Error.Validation("kind", "This kind of account is added by signing in at its vendor.");
+            return Error.Validation("kind", "A plan is added by signing in at its vendor, as your own account.");
         }
 
-        if (!KindRules.Allowed(command.Kind, settings))
+        if (!kind.Allowed)
         {
             return Error.Validation("kind", "This host doesn't allow this kind of account.");
         }
 
-        bool sharedPlan = KindRules.PersonalOnly(command.Kind) && command.WorkspaceId is not null;
-        return sharedPlan ? Error.Validation("kind", "A plan is for one person: add it as your own account.") : null;
+        bool endpointRefused = command.Endpoint is not null && !kind.TakesEndpoint;
+        return endpointRefused ? Error.Validation("endpoint", "Only an Anthropic or OpenAI API key names an endpoint.") : null;
     }
 }

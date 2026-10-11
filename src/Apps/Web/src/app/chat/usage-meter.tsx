@@ -204,7 +204,8 @@ function UsageDetails({
       </Detail>
       <Detail term="Written">
         {tokensLabel(tokens.output)} tokens
-        {tokens.reasoning > 0 && `, ${tokensLabel(tokens.reasoning)} thinking`}
+        {tokens.reasoning > 0 &&
+          `, ${tokensLabel(tokens.reasoning)} of them thinking`}
       </Detail>
       <Detail term="Cache">
         {warmFor > 0

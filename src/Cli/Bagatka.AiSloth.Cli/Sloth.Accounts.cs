@@ -63,13 +63,13 @@ internal sealed partial class Sloth
             foreach (Wire.AccountKind kind in offered)
             {
                 AccountKinds.Kind? known = AccountKinds.FromHost(kind.Kind);
-                if ((known?.IsPlan ?? kind.PersonalOnly) != plans)
+                if (kind.Plan != plans)
                 {
                     continue;
                 }
 
                 string how = !kind.Allowed ? "not allowed on " + host.Name
-                    : kind.AddedBySignIn ? "sign in with " + (known?.SignsInWith ?? "its vendor")
+                    : kind.Plan ? "sign in with " + (known?.SignsInWith ?? "its vendor")
                     : (known?.SecretPrompt ?? "its secret");
                 string runs = string.Join(", ", harnesses.Where(harness => harness.Accepts.Contains(kind.Kind, StringComparer.Ordinal)).Select(harness => harness.Name));
                 await terminal.WriteLineAsync(
@@ -122,7 +122,7 @@ internal sealed partial class Sloth
         string name = line.Value("--name") ?? kind.Name;
         string path = forWorkspace ? "/workspaces/" + host.Workspace + "/agent-accounts" : "/agent-accounts";
         Wire.Account? account;
-        if (rules.AddedBySignIn)
+        if (rules.Plan)
         {
             account = await SignInAccountAsync(api, kind, name, ct);
         }
@@ -161,8 +161,8 @@ internal sealed partial class Sloth
         return await api.SendAsync(HttpMethod.Post, path, add, CliJsonContext.Default.AddAccount, CliJsonContext.Default.Account, ct);
     }
 
-    // A plan added by signing in at its vendor's page: the person approves there and pastes back the
-    // code it shows, or enters a code of sloth's there.
+    // A plan added by signing in at its vendor's page: the person enters the code sloth shows there, or
+    // approves there and pastes back the code it shows.
     private async Task<Wire.Account?> SignInAccountAsync(HostApi api, AccountKinds.Kind kind, string name, CancellationToken ct)
     {
         Wire.AccountSignInStarted started = await api.SendAsync(
@@ -172,7 +172,7 @@ internal sealed partial class Sloth
             CliJsonContext.Default.StartAccountSignIn,
             CliJsonContext.Default.AccountSignInStarted,
             ct);
-        if (kind.WithCode)
+        if (started.UserCode is not null)
         {
             return await SignInWithCodeAsync(api, kind, started, ct);
         }

@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Bagatka.AiSloth.Nooks.Data.Migrations;
 
 [DbContext(typeof(NooksDbContext))]
-[Migration("20261008130530_Initial")]
-partial class _20261008130530_Initial
+[Migration("20261011201437_Initial")]
+partial class _20261011201437_Initial
 {
     /// <inheritdoc />
     protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -33,9 +33,21 @@ partial class _20261008130530_Initial
                     .HasColumnType("uuid")
                     .HasColumnName("id");
 
+                b.Property<int?>("AddedLines")
+                    .HasColumnType("integer")
+                    .HasColumnName("added_lines");
+
+                b.Property<int?>("ChangedFiles")
+                    .HasColumnType("integer")
+                    .HasColumnName("changed_files");
+
                 b.Property<DateTimeOffset>("CreatedAt")
                     .HasColumnType("timestamp with time zone")
                     .HasColumnName("created_at");
+
+                b.Property<int?>("DeletedLines")
+                    .HasColumnType("integer")
+                    .HasColumnName("deleted_lines");
 
                 b.Property<Guid>("NookId")
                     .HasColumnType("uuid")

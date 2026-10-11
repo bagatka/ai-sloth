@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Bagatka.AiSloth.Nooks.Data.Migrations;
 
 /// <inheritdoc />
-public partial class _20261008130530_Initial : Migration
+public partial class _20261011201437_Initial : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -24,7 +24,10 @@ public partial class _20261008130530_Initial : Migration
                 nook_id = table.Column<Guid>(type: "uuid", nullable: false),
                 number = table.Column<int>(type: "integer", nullable: false),
                 created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                note = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false)
+                note = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                changed_files = table.Column<int>(type: "integer", nullable: true),
+                added_lines = table.Column<int>(type: "integer", nullable: true),
+                deleted_lines = table.Column<int>(type: "integer", nullable: true)
             },
             constraints: table =>
             {

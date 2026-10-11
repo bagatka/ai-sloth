@@ -147,12 +147,7 @@ function dateOf(day: string): Date {
   return new Date(year, month - 1, date)
 }
 
+// What the calls read and wrote; their thinking is part of what they wrote.
 function totalTokens(tokens: Schemas["TokenCounts"]): number {
-  return (
-    tokens.input +
-    tokens.cacheRead +
-    tokens.cacheWrite +
-    tokens.output +
-    tokens.reasoning
-  )
+  return tokens.input + tokens.cacheRead + tokens.cacheWrite + tokens.output
 }

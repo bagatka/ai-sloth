@@ -1,25 +1,18 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
-using Bagatka.AiSloth.AgentAccounts.Catalog;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
-using Bagatka.Sdk.GitHub;
 
 namespace Bagatka.AiSloth.AgentAccounts.Model;
 
-// An account at an agent vendor: a workspace's, which its members use, or a person's own. The secret
-// is kept only sealed: a key or token as given, or a signed-in plan's session (PlanSession) as JSON.
-// What each kind is at its vendor, where its calls go and how they are paid for, is decided here.
+// An account at an agent vendor: a workspace's, which its members use, or a person's own. Its
+// credential is kept only sealed. What its kind means at its vendor is its kind's (Kinds/).
 internal sealed class AgentAccount
 {
     public const int MaxSecretLength = 4096;
-
-    private static readonly Uri AnthropicApi = new Uri("https://api.anthropic.com");
-    private static readonly Uri OpenAIApi = new Uri("https://api.openai.com/v1");
 
     // Used by the factories and by EF: parameter names match property names.
     private AgentAccount(AgentAccountId id, AgentAccountKind kind, AgentAccountName name, WorkspaceId? workspaceId, UserId? ownerId, DateTimeOffset addedAt, ApiEndpoint? endpoint)
@@ -46,18 +39,17 @@ internal sealed class AgentAccount
 
     public DateTimeOffset AddedAt { get; private set; }
 
-    // Another endpoint than the vendor's, for an API key.
+    // Another endpoint than the vendor's, for an API key whose kind takes one.
     public ApiEndpoint? Endpoint { get; private set; }
 
-    // Set when the vendor ended a signed-in plan's session; its tokens are gone.
+    // Set when the vendor ended a plan's sign-in; its credential is gone.
     public DateTimeOffset? SignInEndedAt { get; private set; }
 
     public byte[] SealedSecret { get; private set; } = [];
 
     public bool NeedsSignIn => SignInEndedAt is not null;
 
-    // An account added with its secret. Only Anthropic and OpenAI API keys name an endpoint: an
-    // OpenRouter key's is OpenRouter's.
+    // An API key, added with its secret.
     public static Result<AgentAccount> Add(WorkspaceId? workspaceId, UserId? ownerId, AgentAccountKind kind, AgentAccountName name, string? secret, ApiEndpoint? endpoint, SecretBox box, TimeProvider time)
     {
         string trimmed = (secret ?? string.Empty).Trim();
@@ -67,56 +59,44 @@ internal sealed class AgentAccount
             return new Result<AgentAccount>(Error.Validation("secret", message));
         }
 
-        bool namesEndpoint = kind is AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey;
-        if (endpoint is not null && !namesEndpoint)
-        {
-            return new Result<AgentAccount>(Error.Validation("endpoint", "Only an Anthropic or OpenAI API key names an endpoint."));
-        }
-
         AgentAccount account = new AgentAccount(AgentAccountId.New(), kind, name, workspaceId, ownerId, time.GetUtcNow(), endpoint);
-        account.SealedSecret = box.Seal(trimmed, account.Id.Value);
+        account.Seal(new Credential(trimmed), box);
         return new Result<AgentAccount>(account);
     }
 
     // A person's plan, added by signing in.
-    public static AgentAccount SignedIn(UserId ownerId, AgentAccountKind kind, AgentAccountName name, PlanSession session, SecretBox box, TimeProvider time)
+    public static AgentAccount SignedIn(UserId ownerId, AgentAccountKind kind, AgentAccountName name, Credential credential, SecretBox box, TimeProvider time)
     {
         AgentAccount account = new AgentAccount(AgentAccountId.New(), kind, name, workspaceId: null, ownerId, time.GetUtcNow(), endpoint: null);
-        account.Seal(session, box);
+        account.Seal(credential, box);
         return account;
     }
 
-    // Whether a signed-in plan's access token should be renewed before it is used.
+    public Credential OpenCredential(SecretBox box)
+    {
+        if (NeedsSignIn)
+        {
+            throw new InvalidOperationException("Agent account " + Id.Value + " has no credential: its sign-in ended.");
+        }
+
+        Credential? credential = JsonSerializer.Deserialize<Credential>(box.Open(SealedSecret, Id.Value), FoundationJson.Options);
+        if (credential is null)
+        {
+            throw new InvalidOperationException("Agent account " + Id.Value + " has no credential.");
+        }
+
+        return credential;
+    }
+
+    // Whether its credential should be renewed before it is used.
     public bool RenewalDue(SecretBox box, DateTimeOffset now)
     {
-        return Signs && !NeedsSignIn && OpenSession(box).RenewalDue(now);
+        return !NeedsSignIn && OpenCredential(box).RenewalDue(now);
     }
 
-    // The plan's session, while it lasts: for renewing it, and for ending it at the vendor on removal.
-    public PlanSession? Session(SecretBox box)
+    public void Renewed(Credential credential, SecretBox box)
     {
-        if (!Signs || NeedsSignIn)
-        {
-            return null;
-        }
-
-        return OpenSession(box);
-    }
-
-    public void Renewed(PlanSession session, SecretBox box)
-    {
-        Seal(session, box);
-    }
-
-    // The token a Copilot plan was added with, for asking Copilot what the plan has used.
-    public string PlanToken(SecretBox box)
-    {
-        if (Kind != AgentAccountKind.CopilotPlan)
-        {
-            throw new InvalidOperationException("Agent account " + Id.Value + " isn't a Copilot plan.");
-        }
-
-        return OpenSecret(box);
+        Seal(credential, box);
     }
 
     public void SignInEnded(TimeProvider time)
@@ -130,79 +110,8 @@ internal sealed class AgentAccount
         return new AgentAccountSummary(Id, Kind, Name.Value, WorkspaceId, OwnerId, AddedAt, Endpoint?.Value, NeedsSignIn);
     }
 
-    // What running an agent on the account takes: the model gateway adds these headers to its calls,
-    // a plan's token included. OpenRouter's root serves Anthropic's Messages API at /v1/messages and
-    // OpenAI's at /v1, so each harness picks its own. A ChatGPT plan's calls go to ChatGPT's Codex
-    // backend, a Claude plan's to Anthropic's API, as their own agents' do.
-    public AgentAccountCredential ToCredential(SecretBox box, AgentAccountsSettings settings)
+    private void Seal(Credential credential, SecretBox box)
     {
-        ModelEndpoint endpoint = Kind switch
-        {
-            AgentAccountKind.AnthropicApiKey => Through(Endpoint?.Value ?? AnthropicApi, "x-api-key", OpenSecret(box)),
-            AgentAccountKind.OpenAIApiKey => Through(Endpoint?.Value ?? OpenAIApi, "Authorization", "Bearer " + OpenSecret(box)),
-            AgentAccountKind.OpenRouterApiKey => Through(settings.OpenRouterApi, "Authorization", "Bearer " + OpenSecret(box)),
-            AgentAccountKind.ChatGptPlan => new ModelEndpoint(settings.CodexApi, CodexHeaders(OpenSession(box))),
-            AgentAccountKind.CopilotPlan => new ModelEndpoint(settings.CopilotApi, CopilotApi.Headers(OpenSecret(box))),
-            AgentAccountKind.ClaudePlan => Through(settings.ClaudeApi, "Authorization", "Bearer " + OpenSession(box).AccessToken),
-        };
-        return new AgentAccountCredential(Id, Kind, OwnerId, endpoint);
-    }
-
-    // Where models.dev's catalog has the account's models, and how they're priced: at the vendor's
-    // price for an API key at its endpoint, as an estimate at the vendor's API price for a plan, which
-    // pays none per token, and not at all for an endpoint of the account's own, whose price is its own.
-    public CatalogPricing Pricing()
-    {
-        return Kind switch
-        {
-            AgentAccountKind.AnthropicApiKey => new CatalogPricing(ModelCatalog.Anthropic, Estimate: false, Priced: Endpoint is null),
-            AgentAccountKind.OpenAIApiKey => new CatalogPricing(ModelCatalog.OpenAI, Estimate: false, Priced: Endpoint is null),
-            AgentAccountKind.OpenRouterApiKey => new CatalogPricing(ModelCatalog.OpenRouter, Estimate: false, Priced: true),
-            AgentAccountKind.ChatGptPlan => new CatalogPricing(ModelCatalog.OpenAI, Estimate: true, Priced: true),
-            AgentAccountKind.CopilotPlan => new CatalogPricing(ModelCatalog.Copilot, Estimate: true, Priced: true),
-            AgentAccountKind.ClaudePlan => new CatalogPricing(ModelCatalog.Anthropic, Estimate: true, Priced: true),
-        };
-    }
-
-    // The plans a session signs in to, renewed by this host.
-    private bool Signs => Kind is AgentAccountKind.ChatGptPlan or AgentAccountKind.ClaudePlan;
-
-    // What ChatGPT's Codex backend takes, as Codex sends it: the plan's token and its ChatGPT account.
-    private static Dictionary<string, string> CodexHeaders(PlanSession session)
-    {
-        Dictionary<string, string> headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Authorization"] = "Bearer " + session.AccessToken };
-        if (session.AccountId is string account)
-        {
-            headers["ChatGPT-Account-Id"] = account;
-        }
-
-        return headers;
-    }
-
-    private static ModelEndpoint Through(Uri url, string header, string value)
-    {
-        Dictionary<string, string> headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [header] = value };
-        return new ModelEndpoint(url, headers);
-    }
-
-    private string OpenSecret(SecretBox box)
-    {
-        return box.Open(SealedSecret, Id.Value);
-    }
-
-    private PlanSession OpenSession(SecretBox box)
-    {
-        PlanSession? session = JsonSerializer.Deserialize<PlanSession>(OpenSecret(box), FoundationJson.Options);
-        if (session is null)
-        {
-            throw new InvalidOperationException("Agent account " + Id.Value + " has no session.");
-        }
-
-        return session;
-    }
-
-    private void Seal(PlanSession session, SecretBox box)
-    {
-        SealedSecret = box.Seal(JsonSerializer.Serialize(session, FoundationJson.Options), Id.Value);
+        SealedSecret = box.Seal(JsonSerializer.Serialize(credential, FoundationJson.Options), Id.Value);
     }
 }

@@ -10,7 +10,7 @@ internal sealed class SignInConfiguration : IEntityTypeConfiguration<SignIn>
     {
         builder.ToTable("sign_ins");
         builder.HasKey(signIn => signIn.Id);
-        builder.Property(signIn => signIn.State).HasMaxLength(SignIn.MaxValueLength);
+        builder.Property(signIn => signIn.UserCode).HasMaxLength(SignIn.MaxUserCodeLength);
 
         // A person's sign-ins, to clear the expired ones.
         builder.HasIndex(signIn => new { signIn.UserId, signIn.ExpiresAt });

@@ -35,7 +35,11 @@ public sealed record AgentAccountsSettings
     /// ChatGPT's own backend, where a ChatGPT plan's calls (at <c>/codex</c>) and usage go;
     /// <see langword="null"/> for <c>https://chatgpt.com/backend-api</c>. Tests change it.
     /// </param>
-    /// <param name="claudeApi">Anthropic's API, where a Claude plan's calls go and its models and usage are asked; <see langword="null"/> for <c>https://api.anthropic.com</c>. Tests change it.</param>
+    /// <param name="anthropicApi">
+    /// Anthropic's API, where an Anthropic API key's calls go unless it names another endpoint, and a
+    /// Claude plan's, its models, and its usage; <see langword="null"/> for <c>https://api.anthropic.com</c>.
+    /// Tests change it.
+    /// </param>
     /// <param name="claudeAuthorizeUrl">Claude's page where a person approves Claude Code's sign-in; <see langword="null"/> for Anthropic's. Tests change it.</param>
     /// <param name="claudeTokenUrl">Where Claude Code's sign-in gets and renews its tokens; <see langword="null"/> for Anthropic's. Tests change it.</param>
     public AgentAccountsSettings(
@@ -46,7 +50,7 @@ public sealed record AgentAccountsSettings
         Uri? copilotApi = null,
         string? copilotClientId = null,
         Uri? modelsDevUrl = null,
-        Uri? claudeApi = null,
+        Uri? anthropicApi = null,
         Uri? chatGptBackend = null,
         Uri? claudeAuthorizeUrl = null,
         Uri? claudeTokenUrl = null)
@@ -55,7 +59,7 @@ public sealed record AgentAccountsSettings
         ClaudeTokenUrl = claudeTokenUrl ?? ClaudeSignInSettings.Public.TokenUrl;
         ChatGptBackend = chatGptBackend ?? new Uri("https://chatgpt.com/backend-api");
         CodexApi = new Uri(ChatGptBackend.AbsoluteUri.TrimEnd('/') + "/codex");
-        ClaudeApi = claudeApi ?? new Uri("https://api.anthropic.com");
+        AnthropicApi = anthropicApi ?? new Uri("https://api.anthropic.com");
         ModelsDevUrl = modelsDevUrl ?? new Uri("https://models.dev/api.json");
         CopilotClientId = string.IsNullOrWhiteSpace(copilotClientId) ? AiSlothCopilotApp : copilotClientId;
         CopilotApi = copilotApi ?? Bagatka.Sdk.GitHub.CopilotApi.Public;
@@ -95,8 +99,8 @@ public sealed record AgentAccountsSettings
     /// <summary>ChatGPT's Codex backend, where a ChatGPT plan's calls go and its models are listed.</summary>
     public Uri CodexApi { get; }
 
-    /// <summary>Anthropic's API, where a Claude plan's calls go and its models and usage are asked.</summary>
-    public Uri ClaudeApi { get; }
+    /// <summary>Anthropic's API, for Anthropic API keys without an endpoint of their own, and Claude plans.</summary>
+    public Uri AnthropicApi { get; }
 
     /// <summary>models.dev's catalog of models, read daily.</summary>
     public Uri ModelsDevUrl { get; }

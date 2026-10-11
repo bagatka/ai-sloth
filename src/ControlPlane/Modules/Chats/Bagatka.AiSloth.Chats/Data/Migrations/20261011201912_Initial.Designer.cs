@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Bagatka.AiSloth.Chats.Data.Migrations;
 
 [DbContext(typeof(ChatsDbContext))]
-[Migration("20261011172846_ContinuedChats")]
-partial class _20261011172846_ContinuedChats
+[Migration("20261011201912_Initial")]
+partial class _20261011201912_Initial
 {
     /// <inheritdoc />
     protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -155,6 +155,10 @@ partial class _20261011172846_ContinuedChats
                     .HasColumnType("xid")
                     .HasColumnName("xmin");
 
+                b.Property<bool>("WorkFailing")
+                    .HasColumnType("boolean")
+                    .HasColumnName("work_failing");
+
                 b.Property<Guid>("WorkspaceId")
                     .HasColumnType("uuid")
                     .HasColumnName("workspace_id");
@@ -261,10 +265,6 @@ partial class _20261011172846_ContinuedChats
                     .HasColumnType("uuid")
                     .HasColumnName("id");
 
-                b.Property<Guid>("AgentAccountId")
-                    .HasColumnType("uuid")
-                    .HasColumnName("agent_account_id");
-
                 b.Property<DateTimeOffset>("At")
                     .HasColumnType("timestamp with time zone")
                     .HasColumnName("at");
@@ -307,10 +307,6 @@ partial class _20261011172846_ContinuedChats
                     .HasMaxLength(200)
                     .HasColumnType("character varying(200)")
                     .HasColumnName("model");
-
-                b.Property<Guid>("NookId")
-                    .HasColumnType("uuid")
-                    .HasColumnName("nook_id");
 
                 b.Property<int>("Output")
                     .HasColumnType("integer")

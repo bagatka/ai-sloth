@@ -16,7 +16,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261011180821_WorkFailing";
+    public override string LastMigrationId => "20261011201912_Initial";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -267,10 +267,6 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("uuid")
                     .HasColumnName("id");
 
-                b.Property<Guid>("AgentAccountId")
-                    .HasColumnType("uuid")
-                    .HasColumnName("agent_account_id");
-
                 b.Property<DateTimeOffset>("At")
                     .HasColumnType("timestamp with time zone")
                     .HasColumnName("at");
@@ -313,10 +309,6 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(200)
                     .HasColumnType("character varying(200)")
                     .HasColumnName("model");
-
-                b.Property<Guid>("NookId")
-                    .HasColumnType("uuid")
-                    .HasColumnName("nook_id");
 
                 b.Property<int>("Output")
                     .HasColumnType("integer")

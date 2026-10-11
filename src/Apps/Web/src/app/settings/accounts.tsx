@@ -57,6 +57,8 @@ const kindNames: Record<
     secret: string | null
     /** Another endpoint that speaks its API, for the kinds that take one. */
     endpoint: string | null
+    /** Where a plan signs in. */
+    vendor: string | null
   }
 > = {
   AnthropicApiKey: {
@@ -64,43 +66,43 @@ const kindNames: Record<
     description: "Anthropic's API, or any endpoint that speaks it",
     secret: "API key",
     endpoint: "https://gateway.example.com",
+    vendor: null,
   },
   OpenAIApiKey: {
     name: "OpenAI API key",
     description: "OpenAI's API, or any endpoint that speaks it",
     secret: "API key",
     endpoint: "https://gateway.example.com/v1",
+    vendor: null,
   },
   OpenRouterApiKey: {
     name: "OpenRouter API key",
     description: "Many vendors' models with one key, for Claude Code and pi",
     secret: "API key",
     endpoint: null,
+    vendor: null,
   },
   ChatGptPlan: {
     name: "ChatGPT plan",
-    description: "ChatGPT Plus or Pro",
+    description: "ChatGPT Plus or Pro, for Codex",
     secret: null,
     endpoint: null,
+    vendor: "OpenAI",
   },
   ClaudePlan: {
     name: "Claude plan",
-    description: "Claude Pro or Max",
+    description: "Claude Pro or Max, for Claude Code",
     secret: null,
     endpoint: null,
+    vendor: "Claude",
   },
   CopilotPlan: {
     name: "Copilot plan",
-    description: "GitHub Copilot",
+    description: "GitHub Copilot, for Copilot and pi",
     secret: null,
     endpoint: null,
+    vendor: "GitHub",
   },
-}
-
-// The plans added with a code entered at their vendor, and where.
-const codeVendors: Partial<Record<Kind, string>> = {
-  CopilotPlan: "GitHub",
-  ChatGptPlan: "OpenAI",
 }
 
 // Own accounts show in every workspace, and presets where their account works, so any account
@@ -265,7 +267,7 @@ function AccountForm({
   const names = chosen ? kindNames[chosen.kind] : null
   // A plan is someone's own; managers may add API keys for everyone.
   const [everyone, setEveryone] = React.useState(manager)
-  const shared = manager && !chosen?.personalOnly && everyone
+  const shared = manager && !chosen?.plan && everyone
   const [name, setName] = React.useState("")
   const [secret, setSecret] = React.useState("")
   const [endpoint, setEndpoint] = React.useState("")
@@ -310,13 +312,9 @@ function AccountForm({
       <DialogHeader>
         <DialogTitle>Add an agent account</DialogTitle>
         <DialogDescription>
-          {chosen.kind === "CopilotPlan"
-            ? "Its token is kept on the host, sealed, and reaches only your Copilot; agents use it in their nooks."
-            : chosen.kind === "ChatGptPlan"
-              ? "Codex's sign-in is kept on the host, sealed, and renewed there; Codex reaches ChatGPT through the host, so no nook holds it."
-              : chosen.kind === "ClaudePlan"
-                ? "Claude Code's sign-in is kept on the host, sealed, and renewed there; Claude Code reaches Claude through the host, so no nook holds it."
-                : "It's kept on the host, sealed, and never shown again; agents reach their model through the host, so no nook holds it."}
+          {chosen.plan
+            ? "Your sign-in is kept on the host, sealed; agents use it through the host, so no nook holds it."
+            : "It's kept on the host, sealed, and never shown again; agents reach their model through the host, so no nook holds it."}
         </DialogDescription>
       </DialogHeader>
       <FieldGroup>
@@ -346,7 +344,7 @@ function AccountForm({
           </Select>
           <FieldDescription>{names.description}</FieldDescription>
         </Field>
-        {manager && !chosen.personalOnly && (
+        {manager && !chosen.plan && (
           <Field>
             <FieldLabel>For</FieldLabel>
             <ToggleGroup
@@ -380,16 +378,14 @@ function AccountForm({
           )}
         </Field>
       </FieldGroup>
-      {codeVendors[chosen.kind] ? (
-        <CodeSignIn
+      {chosen.plan ? (
+        <PlanSignIn
           kind={chosen.kind}
-          vendor={codeVendors[chosen.kind]!}
+          vendor={names.vendor ?? names.name}
           name={name.trim() || names.name}
           closed={closed}
           onAdded={added}
         />
-      ) : chosen.addedBySignIn ? (
-        <ClaudeSignIn name={name.trim() || names.name} onAdded={added} />
       ) : (
         <form
           className="contents"
@@ -461,23 +457,42 @@ function AccountForm({
   )
 }
 
-// Signing in as Claude Code does: the host makes the sign-in address; the person approves there, and
-// Claude's page shows a code, which they paste back for the host to finish adding the plan.
-function ClaudeSignIn({
+// Adding a plan by signing in at its vendor. With a code to enter there, as GitHub's for Copilot and
+// OpenAI's for ChatGPT, the dialog asks the host whether the person approved it until the plan is added,
+// the code expires, or the dialog closes; without one, as Claude's, the person approves there and
+// pastes back the code its page shows.
+function PlanSignIn({
+  kind,
+  vendor,
   name,
+  closed,
   onAdded,
 }: {
+  kind: Kind
+  vendor: string
   name: string
+  closed: React.RefObject<AbortController>
   onAdded: (account: Schemas["AgentAccountSummary"]) => void
 }) {
   const [code, setCode] = React.useState("")
   const start = useMutation({
     mutationFn: () =>
-      answer(
-        api.POST("/agent-accounts/sign-ins", {
-          body: { kind: "ClaudePlan", name },
-        })
+      answer(api.POST("/agent-accounts/sign-ins", { body: { kind, name } })),
+    onSuccess: (started) => started.userCode && approve.mutate(started),
+  })
+  const approve = useMutation({
+    mutationFn: (started: Schemas["SignInStarted"]) =>
+      waitForCode(
+        started,
+        () =>
+          answer(
+            api.POST("/agent-accounts/sign-ins/{id}/complete", {
+              params: { path: { id: started.id } },
+            })
+          ),
+        closed.current.signal
       ),
+    onSuccess: (account) => account && onAdded(account),
   })
   const complete = useMutation({
     mutationFn: (id: string) =>
@@ -489,24 +504,51 @@ function ClaudeSignIn({
       ),
     onSuccess: (progress) => progress.account && onAdded(progress.account),
   })
+  const failed =
+    start.error ??
+    (approve.isError && !aborted(approve.error) ? approve.error : null)
+  const expired = approve.data === null
+  const restart = () => {
+    approve.reset()
+    complete.reset()
+    setCode("")
+    start.mutate()
+  }
 
-  if (!start.data) {
+  if (!start.data || failed || expired) {
     return (
       <>
-        {start.isError && (
+        {failed && (
           <Alert variant="destructive">
-            <AlertDescription>{messageOf(start.error)}</AlertDescription>
+            <AlertDescription>{messageOf(failed)}</AlertDescription>
           </Alert>
         )}
+        {expired && (
+          <p className="text-label text-muted-foreground">
+            The code expired before it was approved.
+          </p>
+        )}
         <DialogFooter>
-          <Button loading={start.isPending} onClick={() => start.mutate()}>
-            Sign in with Claude
+          <Button loading={start.isPending} onClick={restart}>
+            {failed
+              ? "Start again"
+              : expired
+                ? "Get a new code"
+                : `Sign in with ${vendor}`}
           </Button>
         </DialogFooter>
       </>
     )
   }
-
+  if (start.data.userCode) {
+    return (
+      <CodeSteps
+        code={start.data.userCode}
+        url={start.data.url}
+        vendor={vendor}
+      />
+    )
+  }
   return (
     <form
       className="contents"
@@ -524,13 +566,13 @@ function ClaudeSignIn({
           rel="noopener noreferrer"
           className={buttonVariants({ variant: "outline", className: "w-fit" })}
         >
-          Open Claude to sign in
+          Open {vendor} to sign in
           <ArrowSquareOutIcon data-icon="inline-end" />
         </a>
         <Field data-invalid={complete.isError || undefined}>
-          <FieldLabel htmlFor="claude-code">The code Claude shows</FieldLabel>
+          <FieldLabel htmlFor="shown-code">The code {vendor} shows</FieldLabel>
           <Input
-            id="claude-code"
+            id="shown-code"
             value={code}
             autoComplete="off"
             onChange={(event) => setCode(event.target.value)}
@@ -540,7 +582,7 @@ function ClaudeSignIn({
             <FieldError>{messageOf(complete.error)}</FieldError>
           ) : (
             <FieldDescription>
-              After you approve, Claude shows a code. Copy it and paste it
+              After you approve, {vendor} shows a code. Copy it and paste it
               here, within ten minutes.
             </FieldDescription>
           )}
@@ -548,15 +590,7 @@ function ClaudeSignIn({
       </FieldGroup>
       <DialogFooter>
         {complete.isError && (
-          // A sign-in that failed or expired can't be completed; a new one can.
-          <Button
-            variant="outline"
-            onClick={() => {
-              complete.reset()
-              start.reset()
-              setCode("")
-            }}
-          >
+          <Button variant="outline" onClick={restart}>
             Start again
           </Button>
         )}
@@ -569,99 +603,5 @@ function ClaudeSignIn({
         </Button>
       </DialogFooter>
     </form>
-  )
-}
-
-// Adding a plan with a code: the host gets a code from the vendor (GitHub for Copilot, OpenAI for
-// ChatGPT, as Codex does), and the person enters it there and approves, while the dialog asks the host whether they
-// have, until the plan is added, the code expires, or the dialog closes.
-function CodeSignIn({
-  kind,
-  vendor,
-  name,
-  closed,
-  onAdded,
-}: {
-  kind: Kind
-  vendor: string
-  name: string
-  closed: React.RefObject<AbortController>
-  onAdded: (account: Schemas["AgentAccountSummary"]) => void
-}) {
-  const start = useMutation({
-    mutationFn: () =>
-      answer(
-        api.POST("/agent-accounts/sign-ins", {
-          body: { kind, name },
-        })
-      ),
-    onSuccess: (started) => approve.mutate(started),
-  })
-  const approve = useMutation({
-    mutationFn: (started: Schemas["SignInStarted"]) =>
-      waitForCode(
-        started,
-        () =>
-          answer(
-            api.POST("/agent-accounts/sign-ins/{id}/complete", {
-              params: { path: { id: started.id } },
-            })
-          ),
-        closed.current.signal
-      ),
-    onSuccess: (account) => account && onAdded(account),
-  })
-
-  if (start.isError || (approve.isError && !aborted(approve.error))) {
-    return (
-      <>
-        <Alert variant="destructive">
-          <AlertDescription>
-            {messageOf(start.error ?? approve.error)}
-          </AlertDescription>
-        </Alert>
-        <DialogFooter>
-          <Button
-            onClick={() => {
-              approve.reset()
-              start.mutate()
-            }}
-          >
-            Start again
-          </Button>
-        </DialogFooter>
-      </>
-    )
-  }
-  if (!start.data?.userCode || approve.data === null) {
-    return (
-      <>
-        {approve.data === null && (
-          <p className="text-label text-muted-foreground">
-            The code expired before it was approved.
-          </p>
-        )}
-        <DialogFooter>
-          <Button
-            loading={start.isPending}
-            onClick={() => {
-              approve.reset()
-              start.mutate()
-            }}
-          >
-            {approve.data === null
-              ? "Get a new code"
-              : `Sign in with ${vendor}`}
-          </Button>
-        </DialogFooter>
-      </>
-    )
-  }
-  return (
-    <CodeSteps
-      code={start.data.userCode}
-      url={start.data.url}
-      vendor={vendor}
-    />
   )
 }

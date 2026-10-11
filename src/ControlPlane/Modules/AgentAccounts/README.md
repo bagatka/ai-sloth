@@ -9,10 +9,15 @@ with Write on it; a personal account serves its owner, wherever they work.
 Secrets are encrypted at rest and never shown again, and the keys and plans of model APIs never enter
 a nook: the model gateway adds them to each call.
 
+Every feature is the same for every kind. What differs between kinds is each kind's own, one class
+in `Kinds/` (`IAccountKind`; a plan is an `IPlanKind`): whether this host allows it, where its calls go
+and what pays for them, its vendor's models and how they're priced, and for a plan, how it signs in,
+renews, and reports its limits. Adding a kind is one class and one line in `AgentAccountsModule`.
+
 ## Owns
 
 - **Data:** the accounts: kind, name, whose they are (a workspace or a person), an API key's
-  endpoint, when a sign-in ended, and the sealed secret; and sign-ins in progress.
+  endpoint, when a sign-in ended, and the sealed credential; and sign-ins in progress.
 - **Rules:** who may add and remove them (Manage on the workspace, or the person), who may use them
   (Write on the workspace, or the person; the control plane's own processes, any), which kinds are
   personal only and added by signing in (plans), and which kinds this deployment allows. What each
@@ -82,15 +87,14 @@ Nothing yet. Once workspaces can be deleted, `WorkspaceDeleted` removes their ac
 
 Schema `agent_accounts`. Table `accounts` (kind, name, workspace or owner — a check constraint keeps
 exactly one — when it was added, an API key's endpoint, when a sign-in ended, and the sealed
-secret: a key or token as given, or a plan's session as JSON). Table `sign_ins` (who, the account's
-kind and name, the state, when it expires, and the sealed PKCE verifier), for sign-ins with a code
-shown at the vendor's page.
-Table `code_sign_ins` (who, the account's kind and name, the sealed device code and the code the
-person enters, when it expires, and when the vendor may be asked next).
+credential as JSON: a key or a plan's token, and for a plan this host renews, its refresh token,
+when it expires, and the vendor's account it uses). Table `sign_ins` (who, the plan's kind and name,
+the code the person enters at the vendor if any, when it expires, when the vendor may be asked next,
+and the sealed secret the sign-in continues with: a device code or a PKCE verifier).
 
 ## Background work
 
-None. A plan's access token is renewed when it is used and due, never in the background.
+None. A plan's credential is renewed when it is used and due, never in the background.
 models.dev's catalog is read again once a day old, by the next caller that needs it, never in the
 background.
 
@@ -105,7 +109,7 @@ background.
 - `CopilotClientId`, the GitHub OAuth app people sign in to for their Copilot plans: AiSloth's own
   unless the host names another;
 - `ChatGptAuthority` (Codex's sign-in), `ChatGptBackend` (a ChatGPT plan's calls, at `/codex`, and
-  its usage), `ClaudeAuthorizeUrl` and `ClaudeTokenUrl` (Claude Code's sign-in), `ClaudeApi`,
+  its usage), `ClaudeAuthorizeUrl` and `ClaudeTokenUrl` (Claude Code's sign-in), `AnthropicApi`,
   `OpenRouterApi`, `CopilotApi`, and `ModelsDevUrl`, the vendors' own by default; tests point them
   at fakes. GitHub itself is the host's `GitHubClient`'s.
 

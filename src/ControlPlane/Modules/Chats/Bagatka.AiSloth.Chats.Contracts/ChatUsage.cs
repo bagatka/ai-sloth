@@ -6,7 +6,6 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <summary>
 /// What a chat's agents have used of their models: every call the model gateway saw, added up and by
 /// turn, with what a cost is known for; how full the context is; and how long its prompt's cache stays.
-/// Calls of an agent that holds its own token (a Claude plan's) don't pass the gateway, so they aren't here.
 /// </summary>
 /// <param name="Calls">How many calls the chat's agents made.</param>
 /// <param name="Tokens">Their tokens.</param>

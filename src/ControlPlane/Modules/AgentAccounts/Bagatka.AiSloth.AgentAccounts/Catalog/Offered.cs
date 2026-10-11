@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
+using Bagatka.Sdk.Anthropic;
 using Bagatka.Sdk.GitHub;
 using Bagatka.Sdk.OpenRouter;
 
@@ -22,6 +23,12 @@ internal sealed record Offered(string Id, string Name, bool UsesTools, ModelFact
             : null;
         ModelFacts stated = new ModelFacts(reasons ? true : null, [], model.ContextLength, MaxOutput: null, price, CacheLifetime: null);
         return new Offered(model.Id, model.Name, model.SupportedParameters.Contains("tools", StringComparer.Ordinal), stated);
+    }
+
+    // Anthropic's list states names only; every model it lists can call tools.
+    public static Offered Of(AnthropicModel model)
+    {
+        return new Offered(model.Id, model.DisplayName, UsesTools: true, VendorFacts: null);
     }
 
     public static Offered Of(CopilotModel model)

@@ -2,12 +2,10 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
+using Bagatka.AiSloth.AgentAccounts.Kinds;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
-using Bagatka.Sdk.Anthropic;
-using Bagatka.Sdk.GitHub;
-using Bagatka.Sdk.OpenAI;
 
 namespace Bagatka.AiSloth.AgentAccounts;
 
@@ -15,7 +13,7 @@ internal sealed partial class AgentAccountsApi
 {
     public async Task<Result<PlanUsage>> GetPlanUsageAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct)
     {
-        // Asking the vendor takes what an agent's calls take, a plan's token renewed when it's due.
+        // Asking the vendor takes what an agent's calls take, a credential renewed when it's due.
         Result<AgentAccount> usable = await UsableAsync(actor, id, workspaceId, ct);
         if (usable.Failed)
         {
@@ -23,20 +21,12 @@ internal sealed partial class AgentAccountsApi
         }
 
         AgentAccount account = usable.Output;
-        switch (account.Kind)
+        if (kinds.Of(account.Kind) is not IPlanKind plan)
         {
-            case AgentAccountKind.ChatGptPlan:
-                PlanSession session = account.Session(box)!;
-                IReadOnlyList<ChatGptUsageWindow> windows = await chatGptUsage.GetWindowsAsync(settings.ChatGptBackend, session.AccessToken, session.AccountId, ct);
-                return new Result<PlanUsage>(new PlanUsage(PlanMeters.OfChatGpt(windows), time.GetUtcNow()));
-            case AgentAccountKind.CopilotPlan:
-                CopilotQuota quota = await github.GetCopilotQuotaAsync(account.PlanToken(box), ct);
-                return new Result<PlanUsage>(new PlanUsage(PlanMeters.OfCopilot(quota), time.GetUtcNow()));
-            case AgentAccountKind.ClaudePlan:
-                IReadOnlyList<ClaudePlanWindow> claudeWindows = await claudeUsage.GetWindowsAsync(settings.ClaudeApi, account.Session(box)!.AccessToken, ct);
-                return new Result<PlanUsage>(new PlanUsage(PlanMeters.OfClaude(claudeWindows), time.GetUtcNow()));
-            default:
-                return new Result<PlanUsage>(PlanUsage.None);
+            return new Result<PlanUsage>(PlanUsage.None);
         }
+
+        IReadOnlyList<UsageMeter> meters = await plan.MetersAsync(account.OpenCredential(box), ct);
+        return new Result<PlanUsage>(new PlanUsage(meters, time.GetUtcNow()));
     }
 }

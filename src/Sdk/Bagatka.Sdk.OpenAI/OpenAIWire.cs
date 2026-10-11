@@ -21,9 +21,9 @@ internal static class OpenAIWire
         [property: JsonPropertyName("supported_reasoning_levels")] IReadOnlyList<JsonElement>? SupportedReasoningLevels,
         [property: JsonPropertyName("context_window")] long? ContextWindow);
 
-    internal sealed record IdTokenClaims(
-        [property: JsonPropertyName("sub")] string? Subject,
-        [property: JsonPropertyName("email")] string? Email,
+    // What Codex reads of its tokens: when the access token expires, and the ID token's ChatGPT account.
+    internal sealed record TokenClaims(
+        [property: JsonPropertyName("exp")] long? ExpiresAt,
         [property: JsonPropertyName("https://api.openai.com/auth")] AuthClaims? Auth);
 
     internal sealed record CodexUserCodeRequest([property: JsonPropertyName("client_id")] string ClientId);

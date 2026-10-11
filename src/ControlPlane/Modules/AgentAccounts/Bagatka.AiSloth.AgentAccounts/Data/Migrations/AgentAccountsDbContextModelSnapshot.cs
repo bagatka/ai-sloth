@@ -16,7 +16,7 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261011194950_OneWayPerPlan";
+    public override string LastMigrationId => "20261011201422_Initial";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -87,7 +87,7 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
                     });
             });
 
-        modelBuilder.Entity("Bagatka.AiSloth.AgentAccounts.Model.CodeSignIn", b =>
+        modelBuilder.Entity("Bagatka.AiSloth.AgentAccounts.Model.SignIn", b =>
             {
                 b.Property<Guid>("Id")
                     .HasColumnType("uuid")
@@ -117,60 +117,15 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("timestamp with time zone")
                     .HasColumnName("next_poll_at");
 
-                b.Property<byte[]>("SealedDeviceCode")
+                b.Property<byte[]>("SealedSecret")
                     .IsRequired()
                     .HasColumnType("bytea")
-                    .HasColumnName("sealed_device_code");
+                    .HasColumnName("sealed_secret");
 
                 b.Property<string>("UserCode")
-                    .HasColumnType("text")
+                    .HasMaxLength(64)
+                    .HasColumnType("character varying(64)")
                     .HasColumnName("user_code");
-
-                b.Property<Guid>("UserId")
-                    .HasColumnType("uuid")
-                    .HasColumnName("user_id");
-
-                b.HasKey("Id")
-                    .HasName("pk_code_sign_ins");
-
-                b.HasIndex("UserId", "ExpiresAt")
-                    .HasDatabaseName("ix_code_sign_ins_user_id_expires_at");
-
-                b.ToTable("code_sign_ins", "agent_accounts");
-            });
-
-        modelBuilder.Entity("Bagatka.AiSloth.AgentAccounts.Model.SignIn", b =>
-            {
-                b.Property<Guid>("Id")
-                    .HasColumnType("uuid")
-                    .HasColumnName("id");
-
-                b.Property<DateTimeOffset>("ExpiresAt")
-                    .HasColumnType("timestamp with time zone")
-                    .HasColumnName("expires_at");
-
-                b.Property<string>("Kind")
-                    .IsRequired()
-                    .HasMaxLength(32)
-                    .HasColumnType("character varying(32)")
-                    .HasColumnName("kind");
-
-                b.Property<string>("Name")
-                    .IsRequired()
-                    .HasMaxLength(64)
-                    .HasColumnType("character varying(64)")
-                    .HasColumnName("name");
-
-                b.Property<byte[]>("SealedVerifier")
-                    .IsRequired()
-                    .HasColumnType("bytea")
-                    .HasColumnName("sealed_verifier");
-
-                b.Property<string>("State")
-                    .IsRequired()
-                    .HasMaxLength(64)
-                    .HasColumnType("character varying(64)")
-                    .HasColumnName("state");
 
                 b.Property<Guid>("UserId")
                     .HasColumnType("uuid")

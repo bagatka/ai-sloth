@@ -3,36 +3,25 @@ using System.Collections.Generic;
 using Bagatka.AiSloth.AgentAccounts.Catalog;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Data;
+using Bagatka.AiSloth.AgentAccounts.Kinds;
 using Bagatka.AiSloth.AgentAccounts.Model;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
-using Bagatka.Sdk.Anthropic;
-using Bagatka.Sdk.GitHub;
-using Bagatka.Sdk.OpenAI;
-using Bagatka.Sdk.OpenRouter;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Bagatka.AiSloth.AgentAccounts;
 
-// The front door for the contract. Each feature is a file in Features/.
+// The front door for the contract. Each feature is a file in Features/, the same for every kind of
+// account; what differs between kinds is theirs (Kinds/).
 internal sealed partial class AgentAccountsApi(
     IDbContextFactory<AgentAccountsDbContext> databases,
     IWorkspacesApi workspaces,
     [FromKeyedServices(AgentAccountsDbContext.Schema)] SecretBox box,
-    AgentAccountsSettings settings,
-    CodexSignInClient codex,
-    ClaudeSignInClient claude,
-    ChatGptUsageClient chatGptUsage,
-    OpenAIModelsClient openAI,
-    AnthropicModelsClient anthropic,
-    ClaudePlanUsageClient claudeUsage,
-    CopilotModelsClient copilot,
-    GitHubClient github,
+    AccountKinds kinds,
     ModelCatalog catalog,
-    OpenRouterClient openRouter,
     IProductEvents productEvents,
     TimeProvider time,
     ILogger<AgentAccountsApi> logger) : IAgentAccountsApi

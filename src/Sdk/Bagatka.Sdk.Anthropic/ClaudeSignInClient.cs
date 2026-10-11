@@ -138,7 +138,7 @@ public sealed class ClaudeSignInClient : IDisposable
         }
 
         TimeSpan expiresIn = TimeSpan.FromSeconds(answer.ExpiresIn ?? 28_800);
-        return new Result<ClaudeTokens>(new ClaudeTokens(answer.AccessToken, refresh, expiresIn, answer.Account?.Uuid, answer.Account?.EmailAddress));
+        return new Result<ClaudeTokens>(new ClaudeTokens(answer.AccessToken, refresh, expiresIn));
     }
 
     private static string? ErrorOf(string body)

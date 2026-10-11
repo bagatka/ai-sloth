@@ -6,7 +6,7 @@ namespace Bagatka.Sdk.OpenAI;
 /// Source-generated JSON for OpenAI's answers; the wire names are on the records.
 /// </summary>
 [JsonSerializable(typeof(OpenAIWire.ModelList))]
-[JsonSerializable(typeof(OpenAIWire.IdTokenClaims))]
+[JsonSerializable(typeof(OpenAIWire.TokenClaims))]
 [JsonSerializable(typeof(OpenAIWire.CodexUserCodeRequest))]
 [JsonSerializable(typeof(OpenAIWire.CodexUserCode))]
 [JsonSerializable(typeof(OpenAIWire.CodexPollRequest))]

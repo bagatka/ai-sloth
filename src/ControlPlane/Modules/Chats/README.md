@@ -56,8 +56,8 @@ model chosen while an agent ran; the chat it continues, up to which event; wheth
 and how far its output is read; the turn in progress; `xmin` as concurrency token), `messages`,
 `events` (sequence numbers per chat; an agent update is stored as the agent sent it), `drafts`,
 `workspace_instructions`, `personal_instructions`, `presets` (a person's harness, account, and
-model, each once), and `model_calls` (each call the gateway passed: its chat, nook, workspace,
-account, and turn, its tokens, its cost then, and until when its cache stays).
+model, each once), and `model_calls` (each call the gateway passed: its chat, workspace, and turn,
+its tokens, its cost then, and until when its cache stays).
 
 ## Background work
 

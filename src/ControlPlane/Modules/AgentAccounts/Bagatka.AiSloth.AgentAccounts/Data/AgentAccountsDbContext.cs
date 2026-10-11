@@ -15,14 +15,11 @@ internal sealed class AgentAccountsDbContext(DbContextOptions<AgentAccountsDbCon
 
     public DbSet<SignIn> SignIns => Set<SignIn>();
 
-    public DbSet<CodeSignIn> CodeSignIns => Set<CodeSignIn>();
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfiguration(new AgentAccountConfiguration());
         modelBuilder.ApplyConfiguration(new SignInConfiguration());
-        modelBuilder.ApplyConfiguration(new CodeSignInConfiguration());
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

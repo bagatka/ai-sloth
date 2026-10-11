@@ -46,7 +46,8 @@ public interface IAgentAccountsApi
     /// <summary>
     /// Finishes a sign-in and adds the account: with the code Claude's page showed, or, for a sign-in with
     /// a user code, once the person approved it at the vendor; until then the progress says when to ask
-    /// again, and asking sooner waits until then. A code works once: a failed sign-in starts again.
+    /// again, and asking sooner waits until then. A failed attempt may be retried until the sign-in
+    /// expires, though a code the vendor refused stays refused: then start again.
     /// </summary>
     /// <returns>
     /// The progress; a validation error for a code of another sign-in or one the vendor refused; or

@@ -3077,10 +3077,11 @@ export interface components {
         AgentAccountKindSummary: {
             /** @description The kind. */
             kind: components["schemas"]["AgentAccountKind"];
-            /** @description Whether it is added by signing in at its vendor rather than with its secret. */
-            addedBySignIn: boolean;
-            /** @description Whether it can only be someone's own, as plans are. */
-            personalOnly: boolean;
+            /**
+             * @description Whether it is a plan: a person's subscription, added by signing in at its vendor and only ever
+             *     their own. Otherwise it is an API key, added with its secret, a workspace's or someone's own.
+             */
+            plan: boolean;
             /** @description Whether this host allows adding it. */
             allowed: boolean;
         };
@@ -3261,7 +3262,6 @@ export interface components {
         /**
          * @description What a chat's agents have used of their models: every call the model gateway saw, added up and by
          *     turn, with what a cost is known for; how full the context is; and how long its prompt's cache stays.
-         *     Calls of an agent that holds its own token (a Claude plan's) don't pass the gateway, so they aren't here.
          */
         ChatUsage: {
             /**

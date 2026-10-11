@@ -133,7 +133,8 @@ public sealed class CodexSignInClient : IDisposable
         _http.Dispose();
     }
 
-    // Codex's tokens say when they expire in the access token itself; a renewal may keep the refresh token.
+    // Codex's tokens say when they expire in the access token itself, and which ChatGPT account the
+    // sign-in uses in the ID token, which a renewal leaves out; a renewal may keep the refresh token.
     private ChatGptTokens? TokensOf(OpenAIWire.CodexTokens tokens, string? refreshToken)
     {
         string? refresh = tokens.RefreshToken ?? refreshToken;
@@ -143,13 +144,17 @@ public sealed class CodexSignInClient : IDisposable
         }
 
         DateTimeOffset now = _time.GetUtcNow();
-        DateTimeOffset expiresAt = ExpiryOf(tokens.AccessToken) ?? now + TimeSpan.FromSeconds(tokens.ExpiresIn ?? 3600);
-        return new ChatGptTokens(tokens.AccessToken, refresh, tokens.IdToken, expiresAt - now);
+        long? expiresAt = ClaimsOf(tokens.AccessToken)?.ExpiresAt;
+        TimeSpan expiresIn = expiresAt is long at ? DateTimeOffset.FromUnixTimeSeconds(at) - now : TimeSpan.FromSeconds(tokens.ExpiresIn ?? 3600);
+        string? account = tokens.IdToken is null ? null : ClaimsOf(tokens.IdToken)?.Auth?.ChatGptAccountId;
+        return new ChatGptTokens(tokens.AccessToken, refresh, expiresIn, account);
     }
 
-    private static DateTimeOffset? ExpiryOf(string accessToken)
+    // A token's claims, unchecked: it came straight from the token endpoint over TLS, which OpenID
+    // Connect accepts in place of its signature.
+    private static OpenAIWire.TokenClaims? ClaimsOf(string token)
     {
-        string[] parts = accessToken.Split('.');
+        string[] parts = token.Split('.');
         if (parts.Length != 3)
         {
             return null;
@@ -157,9 +162,7 @@ public sealed class CodexSignInClient : IDisposable
 
         try
         {
-            using JsonDocument payload = JsonDocument.Parse(System.Buffers.Text.Base64Url.DecodeFromChars(parts[1]));
-            bool present = payload.RootElement.TryGetProperty("exp", out JsonElement expiry);
-            return present && expiry.ValueKind == JsonValueKind.Number ? DateTimeOffset.FromUnixTimeSeconds(expiry.GetInt64()) : null;
+            return JsonSerializer.Deserialize(System.Buffers.Text.Base64Url.DecodeFromChars(parts[1]), OpenAIJsonContext.Default.TokenClaims);
         }
         catch (FormatException)
         {

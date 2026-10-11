@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Bagatka.AiSloth.Chats.Data.Migrations;
 
 /// <inheritdoc />
-public partial class _20261008091529_Initial : Migration
+public partial class _20261011201912_Initial : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -25,11 +25,21 @@ public partial class _20261008091529_Initial : Migration
                 started_by = table.Column<Guid>(type: "uuid", nullable: false),
                 started_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                 harness = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                model = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                thinking = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                agent_change_waiting = table.Column<bool>(type: "boolean", nullable: false),
+                next_agent_account_id = table.Column<Guid>(type: "uuid", nullable: true),
+                next_model = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                next_thinking = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: true),
                 agent_account_id = table.Column<Guid>(type: "uuid", nullable: false),
                 account_owner_id = table.Column<Guid>(type: "uuid", nullable: true),
                 starts_agent = table.Column<bool>(type: "boolean", nullable: false),
+                work_failing = table.Column<bool>(type: "boolean", nullable: false),
+                continues_from = table.Column<Guid>(type: "uuid", nullable: true),
+                continues_up_to = table.Column<long>(type: "bigint", nullable: true),
                 setup_run_id = table.Column<Guid>(type: "uuid", nullable: true),
                 setup_exit_code = table.Column<int>(type: "integer", nullable: true),
+                setup_run_waiting = table.Column<bool>(type: "boolean", nullable: false),
                 harness_process_id = table.Column<Guid>(type: "uuid", nullable: true),
                 harness_token_hash = table.Column<byte[]>(type: "bytea", nullable: true),
                 output_offset = table.Column<long>(type: "bigint", nullable: false),
@@ -98,6 +108,32 @@ public partial class _20261008091529_Initial : Migration
             });
 
         migrationBuilder.CreateTable(
+            name: "model_calls",
+            schema: "chats",
+            columns: table => new
+            {
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                chat_id = table.Column<Guid>(type: "uuid", nullable: false),
+                workspace_id = table.Column<Guid>(type: "uuid", nullable: false),
+                turn = table.Column<Guid>(type: "uuid", nullable: true),
+                at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                model = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                input = table.Column<int>(type: "integer", nullable: false),
+                cache_read = table.Column<int>(type: "integer", nullable: false),
+                cache_write = table.Column<int>(type: "integer", nullable: false),
+                cache_write_long = table.Column<int>(type: "integer", nullable: false),
+                output = table.Column<int>(type: "integer", nullable: false),
+                reasoning = table.Column<int>(type: "integer", nullable: false),
+                cost = table.Column<decimal>(type: "numeric(18,8)", precision: 18, scale: 8, nullable: true),
+                estimate = table.Column<bool>(type: "boolean", nullable: false),
+                cache_warm_until = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("pk_model_calls", x => x.id);
+            });
+
+        migrationBuilder.CreateTable(
             name: "personal_instructions",
             schema: "chats",
             columns: table => new
@@ -109,6 +145,25 @@ public partial class _20261008091529_Initial : Migration
             constraints: table =>
             {
                 table.PrimaryKey("pk_personal_instructions", x => x.person_id);
+            });
+
+        migrationBuilder.CreateTable(
+            name: "presets",
+            schema: "chats",
+            columns: table => new
+            {
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                owner_id = table.Column<Guid>(type: "uuid", nullable: false),
+                name = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                harness = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                agent_account_id = table.Column<Guid>(type: "uuid", nullable: false),
+                model = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                thinking = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                added_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("pk_presets", x => x.id);
             });
 
         migrationBuilder.CreateTable(
@@ -157,6 +212,26 @@ public partial class _20261008091529_Initial : Migration
             schema: "chats",
             table: "messages",
             columns: new[] { "chat_id", "state", "id" });
+
+        migrationBuilder.CreateIndex(
+            name: "ix_model_calls_chat_id_at",
+            schema: "chats",
+            table: "model_calls",
+            columns: new[] { "chat_id", "at" });
+
+        migrationBuilder.CreateIndex(
+            name: "ix_model_calls_workspace_id_at",
+            schema: "chats",
+            table: "model_calls",
+            columns: new[] { "workspace_id", "at" });
+
+        migrationBuilder.CreateIndex(
+            name: "ix_presets_owner_id_harness_agent_account_id_model_thinking",
+            schema: "chats",
+            table: "presets",
+            columns: new[] { "owner_id", "harness", "agent_account_id", "model", "thinking" },
+            unique: true)
+            .Annotation("Npgsql:NullsDistinct", false);
     }
 
     /// <inheritdoc />
@@ -179,7 +254,15 @@ public partial class _20261008091529_Initial : Migration
             schema: "chats");
 
         migrationBuilder.DropTable(
+            name: "model_calls",
+            schema: "chats");
+
+        migrationBuilder.DropTable(
             name: "personal_instructions",
+            schema: "chats");
+
+        migrationBuilder.DropTable(
+            name: "presets",
             schema: "chats");
 
         migrationBuilder.DropTable(

@@ -14,9 +14,7 @@ internal static class AnthropicWire
 
     internal sealed record Refresh(string GrantType, string RefreshToken, string ClientId, string Scope);
 
-    internal sealed record TokenAnswer(string? AccessToken, string? RefreshToken, long? ExpiresIn, Account? Account);
-
-    internal sealed record Account(string? Uuid, string? EmailAddress);
+    internal sealed record TokenAnswer(string? AccessToken, string? RefreshToken, long? ExpiresIn);
 
     internal sealed record ErrorAnswer(string? Error);
 }

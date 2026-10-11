@@ -230,7 +230,7 @@ public sealed partial class ControlPlane : IAsyncLifetime
             .WithEnvironment("Modules__AgentAccounts__ChatGptBackend", new Uri(Model.Url, "backend-api").AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__ClaudeAuthorizeUrl", Claude.AuthorizeUrl.AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__ClaudeTokenUrl", Claude.TokenUrl.AbsoluteUri)
-            .WithEnvironment("Modules__AgentAccounts__ClaudeApi", Model.Url.AbsoluteUri)
+            .WithEnvironment("Modules__AgentAccounts__AnthropicApi", Model.Url.AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__OpenRouterApi", Model.Url.AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__CopilotApi", new Uri(Model.Url, "copilot").AbsoluteUri)
             .WithEnvironment("Modules__AgentAccounts__CopilotClientId", FakeGitHub.CopilotClientId)
