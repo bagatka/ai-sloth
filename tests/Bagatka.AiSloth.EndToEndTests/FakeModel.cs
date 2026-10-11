@@ -31,7 +31,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// OpenAI's Responses API well enough for Codex and pi, answering every call with a short text. It
 /// stands in for OpenRouter too: its catalog of models, and OpenAI's chat API, which pi calls there,
 /// answering every call with a short text. One catalog of models answers OpenRouter's, OpenAI's, and
-/// Anthropic's list of models, with every field each reads.
+/// Anthropic's list of models, with every field each reads. Under <c>/copilot</c> it is Copilot's API:
+/// its list of a plan's models, and OpenAI's two APIs for them, for a plan's token only.
 /// </summary>
 internal sealed class FakeModel : IAsyncDisposable
 {
@@ -50,10 +51,17 @@ internal sealed class FakeModel : IAsyncDisposable
     /// <summary>A model as OpenAI's API names it, which an agent can run on; not Codex's default.</summary>
     public const string OpenAIModel = "gpt-5.6-terra";
 
+    /// <summary>A Copilot plan's model that speaks OpenAI's chat API.</summary>
+    public const string CopilotClaude = "claude-opus-5.5";
+
+    /// <summary>A Copilot plan's model that speaks only OpenAI's Responses API, and reasons.</summary>
+    public const string CopilotGpt = "gpt-6.1-sol";
+
     private readonly WebApplication _app;
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
 
     private readonly ConcurrentDictionary<string, Hold> _holds = new ConcurrentDictionary<string, Hold>(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _refusedCopilot = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
     private int _cut;
 
     private FakeModel(WebApplication app)
@@ -107,6 +115,15 @@ internal sealed class FakeModel : IAsyncDisposable
     /// <summary>The Authorization header each OpenAI responses call carried, as the gateway forwarded it.</summary>
     public ConcurrentQueue<string?> OpenAIAuthorizations { get; } = new ConcurrentQueue<string?>();
 
+    /// <summary>Each call to Copilot's API that it answered: its path, the token, and the integration it named.</summary>
+    public ConcurrentQueue<(string Path, string Token, string Integration)> CopilotCalls { get; } = new ConcurrentQueue<(string Path, string Token, string Integration)>();
+
+    /// <summary>Refuses the Copilot tokens GitHub gives <paramref name="login"/>, as for a plan that lapsed.</summary>
+    public void RefuseCopilotFor(string login)
+    {
+        _refusedCopilot.TryAdd(FakeGitHub.CopilotTokenPrefix(login), 0);
+    }
+
     public static async Task<FakeModel> StartAsync()
     {
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
@@ -120,7 +137,9 @@ internal sealed class FakeModel : IAsyncDisposable
         app.MapPost("/v1/responses", model.ResponsesAsync);
         app.MapPost("/v1/chat/completions", model.ChatCompletionsAsync);
         app.MapGet("/v1/models", ListModels);
-        app.MapGet("/copilot/models", CopilotModels);
+        app.MapGet("/copilot/models", model.CopilotModels);
+        app.MapPost("/copilot/responses", context => model.CopilotAsync(context, model.ResponsesAsync));
+        app.MapPost("/copilot/chat/completions", context => model.CopilotAsync(context, model.ChatCompletionsAsync));
         await app.StartAsync();
         IServerAddressesFeature? addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
         if (addresses is null)
@@ -302,35 +321,72 @@ internal sealed class FakeModel : IAsyncDisposable
         return Results.Text(catalog.ToJsonString(), "application/json");
     }
 
-    // Copilot's list of a plan's models, as its API answers a plan's token from a known integration:
-    // two chat models in the picker, one the plan has turned off, and one for embeddings.
-    private static IResult CopilotModels(HttpContext context)
+    // Copilot's API for a plan's token from a known integration, or the refusal of one: a token not
+    // from GitHub's sign-in, without the integration, or of a person whose plan is refused.
+    private IResult? CopilotRefusal(HttpContext context)
     {
-        string? authorization = context.Request.Headers.Authorization.FirstOrDefault();
-        if (authorization?.StartsWith("Bearer gho_", StringComparison.Ordinal) != true || !context.Request.Headers.ContainsKey("Copilot-Integration-Id"))
+        string authorization = context.Request.Headers.Authorization.ToString();
+        bool known = authorization.StartsWith("Bearer gho_", StringComparison.Ordinal) && context.Request.Headers.ContainsKey("Copilot-Integration-Id");
+        bool refused = _refusedCopilot.Keys.Any(prefix => authorization.StartsWith("Bearer " + prefix, StringComparison.Ordinal));
+        if (!known || refused)
         {
-            return Results.Unauthorized();
+            return Results.Json(new JsonObject { ["error"] = new JsonObject { ["message"] = "Bad credentials", ["type"] = "authentication_error" } }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        CopilotCalls.Enqueue((context.Request.Path.Value ?? string.Empty, authorization["Bearer ".Length..], context.Request.Headers["Copilot-Integration-Id"].ToString()));
+        return null;
+    }
+
+    private async Task CopilotAsync(HttpContext context, Func<HttpContext, Task> answer)
+    {
+        IResult? refusal = CopilotRefusal(context);
+        if (refusal is not null)
+        {
+            await refusal.ExecuteAsync(context);
+            return;
+        }
+
+        await answer(context);
+    }
+
+    // Copilot's list of a plan's models: a Claude model that speaks OpenAI's chat API, a GPT model that
+    // speaks only its Responses API and reasons, one the plan has turned off, Copilot's own without a
+    // policy, and one for embeddings.
+    private IResult CopilotModels(HttpContext context)
+    {
+        IResult? refusal = CopilotRefusal(context);
+        if (refusal is not null)
+        {
+            return refusal;
         }
 
         JsonObject list = new JsonObject
         {
             ["data"] = new JsonArray(
-                CopilotModel("claude-opus-5.5", "Claude Opus 5.5", "chat", picker: true, policy: "enabled"),
-                CopilotModel("gpt-6.1-sol", "GPT-6.1 Sol", "chat", picker: true, policy: null),
-                CopilotModel("gpt-5-mini", "GPT-5 mini", "chat", picker: true, policy: "disabled"),
-                CopilotModel("text-embedding-3-small", "Embedding V3 small", "embeddings", picker: false, policy: null)),
+                CopilotModel(CopilotClaude, "Claude Opus 5.5", "chat", "enabled", ["/chat/completions", "/v1/messages"], reasons: false),
+                CopilotModel(CopilotGpt, "GPT-6.1 Sol", "chat", "enabled", ["/responses", "ws:/responses"], reasons: true),
+                CopilotModel("gpt-5-mini", "GPT-5 mini", "chat", "disabled", ["/chat/completions", "/responses"], reasons: true),
+                CopilotModel("exec-agent-a", "Agent A", "chat", policy: null, ["/chat/completions"], reasons: false),
+                CopilotModel("text-embedding-3-small", "Embedding V3 small", "embeddings", policy: null, [], reasons: false)),
         };
         return Results.Text(list.ToJsonString(), "application/json");
     }
 
-    private static JsonObject CopilotModel(string id, string name, string type, bool picker, string? policy)
+    private static JsonObject CopilotModel(string id, string name, string type, string? policy, string[] endpoints, bool reasons)
     {
+        JsonObject supports = new JsonObject { ["tool_calls"] = string.Equals(type, "chat", StringComparison.Ordinal), ["streaming"] = true };
+        if (reasons)
+        {
+            supports["reasoning_effort"] = new JsonArray("low", "medium", "high");
+        }
+
         JsonObject model = new JsonObject
         {
             ["id"] = id,
             ["name"] = name,
-            ["model_picker_enabled"] = picker,
-            ["capabilities"] = new JsonObject { ["type"] = type, ["supports"] = new JsonObject { ["tool_calls"] = string.Equals(type, "chat", StringComparison.Ordinal) } },
+            ["model_picker_enabled"] = false,
+            ["capabilities"] = new JsonObject { ["type"] = type, ["supports"] = supports },
+            ["supported_endpoints"] = new JsonArray([.. endpoints.Select(endpoint => (JsonNode)JsonValue.Create(endpoint))]),
         };
         if (policy is not null)
         {

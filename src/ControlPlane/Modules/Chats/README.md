@@ -99,8 +99,8 @@ minutes unless given).
   a shortcut that starts a choice, which every picker still changes. It shows wherever its account works, and hides once the account is removed.
   A person keeps at most 20.
 - **No model key or plan in a nook.** An agent gets the model gateway's URL and a token for its chat;
-  the gateway forwards each call with the headers that pay for it. A plan's token tied to one harness,
-  such as Copilot's, goes to the harness itself.
+  the gateway forwards each call with the headers that pay for it. A Claude plan's token, tied to
+  Claude Code, goes to the harness itself.
 - **Every turn ends with a checkpoint,** however it ended, before `TurnEnded`, so clients wait for one
   event. A failed checkpoint is told (`CheckpointFailed`), and the chat goes on. A nearly full disk is
   told too (`DiskNearlyFull`), since the next checkpoints may fail.

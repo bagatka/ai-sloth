@@ -10,8 +10,7 @@ namespace Bagatka.Harnesses;
 /// Its paths are where those versions keep files when run as root, whose home is <c>/root</c>. Claude
 /// Code's start script points its memory at <c>~/.claude/memory</c>, wherever it works. Codex, pi,
 /// and Copilot write no memory of their own that we know of, so they keep no state. Copilot's
-/// instructions file is confirmed by <c>copilot instruction list</c>, not by a test, since no fake
-/// serves Copilot.
+/// instructions file is confirmed by <c>copilot instruction list</c>, not by a test.
 /// </summary>
 public static class HarnessProfiles
 {
@@ -39,11 +38,11 @@ public static class HarnessProfiles
         ThinkingLevels: ["low", "medium", "high", "xhigh"],
         DefaultThinking: "medium");
 
-    /// <summary>pi through its ACP adapter, on OpenAI's or Anthropic's API, OpenRouter, or a Copilot plan.</summary>
+    /// <summary>pi through its ACP adapter, on OpenAI's or Anthropic's API, OpenRouter, or Copilot's.</summary>
     public static HarnessProfile Pi { get; } = new HarnessProfile(
         "pi",
         "pi",
-        [CredentialKind.OpenAIApi, CredentialKind.AnthropicApi, CredentialKind.OpenRouterApi, CredentialKind.GitHubToken],
+        [CredentialKind.OpenAIApi, CredentialKind.AnthropicApi, CredentialKind.OpenRouterApi, CredentialKind.CopilotApi],
         SessionPaths: ["/root/.pi/agent/sessions"],
         InstructionsPath: "/root/.pi/agent/AGENTS.md",
         StatePaths: [],
@@ -51,11 +50,11 @@ public static class HarnessProfiles
         ThinkingLevels: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
         DefaultThinking: "medium");
 
-    /// <summary>GitHub Copilot CLI in ACP mode, drawing on the token owner's Copilot plan.</summary>
+    /// <summary>GitHub Copilot CLI in ACP mode, on Copilot's API.</summary>
     public static HarnessProfile Copilot { get; } = new HarnessProfile(
         "copilot",
         "GitHub Copilot",
-        [CredentialKind.GitHubToken],
+        [CredentialKind.CopilotApi],
         SessionPaths: ["/root/.copilot/session-state"],
         InstructionsPath: "/root/.copilot/copilot-instructions.md",
         StatePaths: [],

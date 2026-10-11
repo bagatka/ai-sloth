@@ -21,12 +21,11 @@ public sealed record AgentAccountsSettings
     /// <param name="chatGptAuthority">OpenAI's authorization server; <see langword="null"/> for <c>https://auth.openai.com</c>. Tests change it.</param>
     /// <param name="chatGptApi">The API a ChatGPT plan's calls go to; <see langword="null"/> for <c>https://api.openai.com/v1</c>. Tests change it.</param>
     /// <param name="openRouterApi">OpenRouter's API, its models' calls and catalog; <see langword="null"/> for <c>https://openrouter.ai/api</c>. Tests change it.</param>
-    /// <param name="copilotApi">Copilot's API, which lists a Copilot plan's models; <see langword="null"/> for <c>https://api.githubcopilot.com</c>. Tests change it.</param>
+    /// <param name="copilotApi">Copilot's API, where a Copilot plan's calls go and its models are listed; <see langword="null"/> for <c>https://api.githubcopilot.com</c>. Tests change it.</param>
     /// <param name="copilotClientId">
     /// The GitHub OAuth app people sign in to with a code to add their Copilot plans, by its client ID,
-    /// which is public. It asks for no scopes, so its tokens reach nothing but the person's Copilot and
-    /// can go to an agent in a nook, and they never expire, so no agent outlives one. Without it, Copilot
-    /// plans can't be added.
+    /// which is public; <see langword="null"/> for AiSloth's own. It asks for no scopes, so its tokens
+    /// reach nothing but the person's Copilot, and they never expire, so this host never renews them.
     /// </param>
     public AgentAccountsSettings(
         bool allowClaudePlans = false,
@@ -37,8 +36,8 @@ public sealed record AgentAccountsSettings
         Uri? copilotApi = null,
         string? copilotClientId = null)
     {
-        CopilotClientId = string.IsNullOrWhiteSpace(copilotClientId) ? null : copilotClientId;
-        CopilotApi = copilotApi ?? new Uri("https://api.githubcopilot.com");
+        CopilotClientId = string.IsNullOrWhiteSpace(copilotClientId) ? AiSlothCopilotApp : copilotClientId;
+        CopilotApi = copilotApi ?? Bagatka.Sdk.GitHub.CopilotApi.Public;
         AllowClaudePlans = allowClaudePlans;
         AllowChatGptPlans = allowChatGptPlans;
         ChatGptAuthority = chatGptAuthority ?? new Uri("https://auth.openai.com");
@@ -65,9 +64,12 @@ public sealed record AgentAccountsSettings
     /// <summary>OpenRouter's API: where an OpenRouter key's calls go, and its catalog of models.</summary>
     public Uri OpenRouterApi { get; }
 
-    /// <summary>Copilot's API, which lists a Copilot plan's models.</summary>
+    /// <summary>Copilot's API, where a Copilot plan's calls go and its models are listed.</summary>
     public Uri CopilotApi { get; }
 
-    /// <summary>The GitHub OAuth app people sign in to for their Copilot plans, by its client ID; none when Copilot plans can't be added.</summary>
-    public string? CopilotClientId { get; }
+    /// <summary>The GitHub OAuth app people sign in to for their Copilot plans, by its client ID.</summary>
+    public string CopilotClientId { get; }
+
+    // AiSloth's GitHub OAuth app for Copilot plans: no scopes, tokens that never expire, device flow on.
+    private const string AiSlothCopilotApp = "Ov23li6XFDuFcx4wXfCZ";
 }

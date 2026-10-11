@@ -86,8 +86,7 @@ internal sealed partial class AgentAccountsApi
         return new Result<SignInStarted>(new SignInStarted(signIn.Id, url, UserCode: null, signIn.ExpiresAt, TimeSpan.Zero));
     }
 
-    // A Copilot plan: the person enters GitHub's code for the host's Copilot app (Allowed means it has
-    // one) at GitHub.
+    // A Copilot plan: the person enters GitHub's code for the host's Copilot app at GitHub.
     private async Task<Result<SignInStarted>> StartCodeSignInAsync(AgentAccountsDbContext db, UserActor user, StartSignIn command, AgentAccountName name, CancellationToken ct)
     {
         if (command.Callback is not null)
@@ -95,7 +94,7 @@ internal sealed partial class AgentAccountsApi
             return new Result<SignInStarted>(Error.Validation("callback", "A Copilot plan signs in with a code, which returns nowhere."));
         }
 
-        GitHubDeviceCode code = await github.RequestDeviceCodeAsync(settings.CopilotClientId!, ct);
+        GitHubDeviceCode code = await github.RequestDeviceCodeAsync(settings.CopilotClientId, ct);
         CodeSignIn signIn = CodeSignIn.Start(user.UserId, command.Kind, name, code, box, time);
         db.CodeSignIns.Add(signIn);
         Result saved = await db.SaveAsync(ct);

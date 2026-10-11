@@ -72,10 +72,12 @@ COPY --chmod=755 src/Harnesses/start/codex.sh /usr/local/bin/harness
 
 FROM node AS pi
 COPY --from=pi-install /opt/harness /opt/harness
+COPY --chmod=755 src/Harnesses/start/copilot-model.sh /usr/local/bin/copilot-model
 COPY --chmod=755 src/Harnesses/start/pi.sh /usr/local/bin/harness
 
 FROM node AS copilot
 COPY --from=copilot-install /opt/harness /opt/harness
+COPY --chmod=755 src/Harnesses/start/copilot-model.sh /usr/local/bin/copilot-model
 COPY --chmod=755 src/Harnesses/start/copilot.sh /usr/local/bin/harness
 
 # Without --target, the base image.

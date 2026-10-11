@@ -71,7 +71,7 @@ public sealed record HarnessProfile(
 
     /// <summary>
     /// The variables a harness starts with: <c>HARNESS_CREDENTIAL</c>, the kind (<c>openai</c>,
-    /// <c>anthropic</c>, <c>openrouter</c>, <c>github-token</c>, or <c>claude-oauth-token</c>);
+    /// <c>anthropic</c>, <c>openrouter</c>, <c>copilot</c>, or <c>claude-oauth-token</c>);
     /// <c>HARNESS_TOKEN</c>; for a model API <c>HARNESS_MODEL_URL</c>; <c>HARNESS_MODEL</c>, the model it
     /// runs on; and <c>HARNESS_THINKING</c>, how hard it thinks. A model API
     /// always goes through a model gateway, so <paramref name="token"/> is the gateway's token and
@@ -100,7 +100,7 @@ public sealed record HarnessProfile(
             CredentialKind.OpenAIApi => ("openai", true),
             CredentialKind.AnthropicApi => ("anthropic", true),
             CredentialKind.OpenRouterApi => ("openrouter", true),
-            CredentialKind.GitHubToken => ("github-token", false),
+            CredentialKind.CopilotApi => ("copilot", true),
             CredentialKind.ClaudeOAuthToken => ("claude-oauth-token", false),
         };
         if (modelApi != gateway is not null)

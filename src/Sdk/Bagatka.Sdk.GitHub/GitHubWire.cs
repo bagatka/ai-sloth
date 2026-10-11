@@ -40,7 +40,7 @@ internal static class GitHubWire
     // Copilot's API, which doesn't document this answer: what a client reads of it is all optional.
     internal sealed record CopilotModelList(IReadOnlyList<CopilotModel> Data);
 
-    internal sealed record CopilotModel(string Id, string? Name, bool? ModelPickerEnabled, CopilotCapabilities? Capabilities, CopilotPolicy? Policy);
+    internal sealed record CopilotModel(string Id, string? Name, CopilotCapabilities? Capabilities, CopilotPolicy? Policy);
 
     internal sealed record CopilotCapabilities(string? Type, CopilotSupports? Supports);
 

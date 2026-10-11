@@ -14,7 +14,8 @@ machines, and local Docker for development, tests, and single-machine self-hosti
    waits for it to start.
 2. **Apps.** Native iOS and Android apps that connect to any number of hosts, and shipping the web
    app every host serves. Agents and models: a first run that sets up someone's first agent, its
-   account, and its model together; models listed for Copilot and Claude plans; and Codex on
+   account, and its model together; models listed for Claude plans, and Copilot's limited to what a
+   plan's billing includes; and Codex on
    OpenRouter. Before it ships, check its speed where the sample screens couldn't: a
    bundle-size budget in CI with routes split, and icons with only the weight we use (Phosphor ships
    all six with each icon, a tenth of today's first load); long chats with real event streams; a

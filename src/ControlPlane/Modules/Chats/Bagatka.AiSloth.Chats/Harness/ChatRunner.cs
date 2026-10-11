@@ -69,6 +69,9 @@ internal sealed class ChatRunner(
     // again, until its exit arrives.
     private ProcessId? _stoppedForChange;
 
+    // The agent couldn't start and was stopped, its waiting message answered, until its exit arrives.
+    private bool _startFailed;
+
     // The trace of the turn the chat works on, from when a message waits for the agent, its start
     // included, to the turn's end: a trace of its own, current only in the steps that work on the
     // turn, so the runner's background reading and waiting stay out of it. The step that ends the
@@ -797,6 +800,7 @@ internal sealed class ChatRunner(
     {
         Message? first = await db.Messages.Where(message => message.ChatId == chatId && message.State == MessageState.Queued).OrderBy(message => message.Id).FirstOrDefaultAsync(ct);
         await FailAsync(db, chat, first, "The agent couldn't start: " + error, ct);
+        _startFailed = true;
         await StopHarnessAsync(chat, ct);
     }
 
@@ -844,7 +848,8 @@ internal sealed class ChatRunner(
     }
 
     // An agent lost with its nook hands its turn to the next agent, which works on the files of the
-    // nook's latest checkpoint; any other exit ends the turn as failed.
+    // nook's latest checkpoint; any other exit ends the turn as failed, and one before the agent had a
+    // session, as its start script failing, fails the first message waiting for it.
     private async Task HandleExitAsync(ChatsDbContext db, Chat chat, int exitCode, CancellationToken ct)
     {
         bool lost = exitCode == ProcessExited.Lost;
@@ -852,6 +857,11 @@ internal sealed class ChatRunner(
         {
             string failure = string.Create(CultureInfo.InvariantCulture, $"The agent stopped with exit code {exitCode}.");
             await EndTurnAsync(db, chat, turn, new TurnEnded("failed", failure), "agent_exited", ct);
+        }
+        else if (!lost && chat.SessionId is null && !_startFailed)
+        {
+            Message? first = await db.Messages.Where(message => message.ChatId == chatId && message.State == MessageState.Queued).OrderBy(message => message.Id).FirstOrDefaultAsync(ct);
+            await FailAsync(db, chat, first, string.Create(CultureInfo.InvariantCulture, $"The agent couldn't start: it stopped with exit code {exitCode}."), ct);
         }
 
         List<Message> steering = await db.Messages.Where(message => message.ChatId == chatId && message.State == MessageState.Steering).ToListAsync(ct);
@@ -873,6 +883,7 @@ internal sealed class ChatRunner(
         chat.ApplyAgentChange();
         _stoppedForChange = null;
         _agentFinishedTurn = false;
+        _startFailed = false;
     }
 
     // The turn a lost agent was working on ends as failed; otherwise the message gets a turn that

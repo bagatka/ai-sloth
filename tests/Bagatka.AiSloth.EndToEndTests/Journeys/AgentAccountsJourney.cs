@@ -41,6 +41,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         await SlothListsEachKindByANameThatCantBeConfusedAndSavesAPresetAsync();
         await CodexAndPiAnswerThroughTheGatewayOnAnOpenAIKeyAsync();
         await OneOpenRouterKeyRunsEachAgentOnTheModelChosenForItsChatAsync();
+        await ACopilotPlanRunsCopilotAndPiThroughTheGatewayAsync();
         await AChoiceOfHarnessAccountAndModelIsSavedAsAPresetAsync();
         await AChatGptPlanIsAddedBySigningInAndRenewedOneCallAtATimeAsync();
     }
@@ -201,6 +202,24 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.OpenRouterClaude + "\"", StringComparison.Ordinal));
         Assert.Contains(app.Model.OpenAIAuthorizations, authorization => string.Equals(authorization, "Bearer " + FakeModel.OpenRouterKey, StringComparison.Ordinal));
         Assert.Contains(app.Model.Credentials, credentials => string.Equals(credentials.Authorization, "Bearer " + FakeModel.OpenRouterKey, StringComparison.Ordinal));
+    }
+
+    // A Copilot plan's token stays on the host: Copilot and pi call the gateway with their chat's token,
+    // each in the API Copilot takes for its model (Responses for one that speaks only that, OpenAI's
+    // chat API otherwise), and the gateway calls Copilot with the plan's token and its integration.
+    private async Task ACopilotPlanRunsCopilotAndPiThroughTheGatewayAsync()
+    {
+        TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice);
+        AgentAccountSummary plan = await TestWorkspace.AddCopilotPlanAsync(app, _alice, "alice-copilot-" + Guid.CreateVersion7());
+
+        JsonElement[] ended = await Task.WhenAll(
+            TurnAsync(workspace, "copilot", plan.Id, FakeModel.CopilotGpt),
+            TurnAsync(workspace, "pi", plan.Id, FakeModel.CopilotClaude));
+
+        Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
+        Assert.Contains(app.Model.CopilotCalls, call => call is { Path: "/copilot/responses", Integration: "copilot-developer-cli" });
+        Assert.Contains(app.Model.CopilotCalls, call => call is { Path: "/copilot/chat/completions", Integration: "copilot-developer-cli" });
+        Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.CopilotGpt + "\"", StringComparison.Ordinal) && body.Contains("\"effort\":\"medium\"", StringComparison.Ordinal));
     }
 
     // A preset is checked as a chat's start is, kept once, and only by its owner.

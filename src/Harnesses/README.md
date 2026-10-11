@@ -23,8 +23,8 @@ speak. Nothing here knows AiSloth; Chats is its caller.
 
   | Variable | Value |
   |---|---|
-  | `HARNESS_CREDENTIAL` | `openai`, `anthropic`, `openrouter`, `github-token`, or `claude-oauth-token` |
-  | `HARNESS_MODEL_URL` | the model gateway's URL, for `openai`, `anthropic`, and `openrouter` |
+  | `HARNESS_CREDENTIAL` | `openai`, `anthropic`, `openrouter`, `copilot`, or `claude-oauth-token` |
+  | `HARNESS_MODEL_URL` | the model gateway's URL, for all but `claude-oauth-token` |
   | `HARNESS_TOKEN` | the gateway's token, or the harness's own token |
   | `HARNESS_MODEL` | the model's ID as its vendor names it (`IsModelId`) |
   | `HARNESS_THINKING` | one of its `ThinkingLevels` |
@@ -34,7 +34,9 @@ speak. Nothing here knows AiSloth; Chats is its caller.
   the key or plan behind it never reaches the harness; only a token tied to one harness goes to it.
   OpenRouter is one credential for two APIs: Claude Code calls its Anthropic API at the gateway's
   root, with OpenRouter's newest Claude models behind its aliases, and pi its OpenAI chat API at
-  `/v1`. pi also runs on a Copilot plan, through its own GitHub Copilot provider.
+  `/v1`. Copilot's API is one credential for both of OpenAI's: Copilot's CLI and pi take it as an
+  OpenAI-style provider at the gateway, each in the API Copilot says the chat's model speaks, which
+  the images' `copilot-model` (`start/copilot-model.sh`) reads from Copilot's list of models.
 - `Acp` builds the messages a client sends and reads what a harness writes into an `AcpEvent`: an
   update, a request to answer, or the answer to one of the client's requests, already matched to it.
   A prompt or steer carries the caller's key, and its answer comes back with it. The request IDs

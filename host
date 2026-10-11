@@ -219,9 +219,9 @@ Modules__AgentAccounts__AllowChatGptPlans=true
 #Modules__Sources__GitHubApp__ClientSecret=
 #Modules__Sources__GitHubApp__Slug=
 
-# Copilot plans as agent accounts, which people add with a code at GitHub: the client ID of a GitHub
-# OAuth app (github.com/settings/applications/new) with Enable Device Flow on. It asks for no scopes,
-# so its tokens reach only people's Copilot; any callback URL will do, as nothing returns to it.
+# Copilot plans, which people add with a code at GitHub, sign in to AiSloth's own GitHub OAuth app.
+# To use your own instead: an OAuth app (github.com/settings/applications/new) with Enable Device
+# Flow on and Expire user access tokens off; it asks for no scopes. Its client ID:
 #Modules__AgentAccounts__CopilotClientId=
 
 # Agent accounts whose model runs on this computer or its network, such as with Ollama: the host

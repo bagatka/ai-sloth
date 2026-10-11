@@ -33,16 +33,14 @@ internal static class KindRules
         };
     }
 
-    // Plans a vendor allows hosted apps only with its permission are off until the deployment says so;
-    // Copilot plans need the GitHub app people sign in to.
+    // Plans a vendor allows hosted apps only with its permission are off until the deployment says so.
     public static bool Allowed(AgentAccountKind kind, AgentAccountsSettings settings)
     {
         return kind switch
         {
             AgentAccountKind.ClaudePlan => settings.AllowClaudePlans,
             AgentAccountKind.ChatGptPlan => settings.AllowChatGptPlans,
-            AgentAccountKind.CopilotPlan => settings.CopilotClientId is not null,
-            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey => true,
+            AgentAccountKind.AnthropicApiKey or AgentAccountKind.OpenAIApiKey or AgentAccountKind.OpenRouterApiKey or AgentAccountKind.CopilotPlan => true,
         };
     }
 

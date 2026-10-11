@@ -276,10 +276,16 @@ internal sealed class FakeGitHub : IAsyncDisposable
         return Results.Json(string.Equals(clientId, CopilotClientId, StringComparison.Ordinal) ? IssueCopilotToken(login) : IssueTokens(login));
     }
 
+    /// <summary>How the Copilot app's tokens for <paramref name="login"/> start, so a fake Copilot knows whose they are.</summary>
+    public static string CopilotTokenPrefix(string login)
+    {
+        return "gho_" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(login)))[..12] + "_";
+    }
+
     // An OAuth app's token, which never expires.
     private JsonObject IssueCopilotToken(string login)
     {
-        string access = Random("gho_");
+        string access = Random(CopilotTokenPrefix(login));
         lock (_lock)
         {
             _tokens[access] = login;

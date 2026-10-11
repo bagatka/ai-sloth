@@ -79,8 +79,8 @@ internal sealed partial class AgentAccountsApi
         return await AddedAsync(db, user, account, ct);
     }
 
-    // Asks GitHub whether the person approved the code, as often as it allows. The token reaches only
-    // their Copilot, so it becomes the plan's secret, which goes to its agent.
+    // Asks GitHub whether the person approved the code, as often as it allows. The token becomes the
+    // plan's secret, which the model gateway adds to its agents' calls to Copilot.
     private async Task<Result<SignInProgress>> CompleteCodeSignInAsync(AgentAccountsDbContext db, UserActor user, CodeSignIn signIn, DateTimeOffset now, CancellationToken ct)
     {
         TimeSpan wait = signIn.WaitAt(now);
@@ -89,18 +89,18 @@ internal sealed partial class AgentAccountsApi
             return new Result<SignInProgress>(new SignInProgress(Account: null, wait));
         }
 
-        GitHubDevicePoll poll = await github.PollDeviceAsync(settings.CopilotClientId!, signIn.DeviceCode(box), ct);
+        GitHubDevicePoll poll = await github.PollDeviceAsync(settings.CopilotClientId, signIn.DeviceCode(box), ct);
         if (poll.Tokens is null)
         {
             return await NotYetAsync(db, signIn, poll, now, ct);
         }
 
-        // An agent holds the token for as long as it runs, so one that expires would stop it midway.
+        // This host never renews a Copilot plan's token, so one that expires would stop working.
         db.CodeSignIns.Remove(signIn);
         if (poll.Tokens.ExpiresIn is not null)
         {
             _ = await db.SaveAsync(ct);
-            return new Result<SignInProgress>(Error.Conflict("agent_accounts.copilot_token_expires", "GitHub gave a token that expires, which an agent could outlive: this host's Copilot app must be an OAuth app."));
+            return new Result<SignInProgress>(Error.Conflict("agent_accounts.copilot_token_expires", "GitHub gave a token that expires, which this host can't renew: its Copilot app must not expire its tokens."));
         }
 
         Result<AgentAccount> added = AgentAccount.Add(workspaceId: null, user.UserId, signIn.Kind, signIn.Name, poll.Tokens.AccessToken, endpoint: null, box, time);

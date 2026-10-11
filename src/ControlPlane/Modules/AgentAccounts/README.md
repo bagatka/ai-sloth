@@ -59,7 +59,7 @@ if (used.Failed)
 switch (used.Output.Access)
 {
     case ModelEndpoint endpoint: ...; break;   // the gateway forwards to endpoint.Url with endpoint.Headers
-    case HarnessToken token: ...; break;       // a Copilot or Claude plan's token goes to the harness
+    case HarnessToken token: ...; break;       // a Claude plan's token goes to the harness
 }
 ```
 
@@ -98,8 +98,8 @@ None. A plan's access token is renewed when it is used and due, never in the bac
 - `AllowChatGptPlans`, off: OpenAI lets open-source and self-hosted deployments use Sign in with
   ChatGPT; a hosted service for other people needs OpenAI's approval first. The AppHost turns it on,
   since a local run is self-hosted;
-- `CopilotClientId`, the GitHub OAuth app people sign in to for their Copilot plans; without it,
-  Copilot plans can't be added;
+- `CopilotClientId`, the GitHub OAuth app people sign in to for their Copilot plans: AiSloth's own
+  unless the host names another;
 - `ChatGptAuthority`, `ChatGptApi`, `OpenRouterApi`, and `CopilotApi`, the vendors' own by
   default; tests point them at fakes. GitHub itself is the host's `GitHubClient`'s.
 
@@ -113,8 +113,8 @@ None. A plan's access token is renewed when it is used and due, never in the bac
   60 ms for 750 KB), without its batch variants. Anthropic's and OpenAI's lists are asked at the
   account's endpoint with its credentials; OpenAI's holds every model its API serves, so only its GPT,
   o-series, and Codex models are offered, and a ChatGPT plan's token gets the plan's own catalog,
-  named and in order. A Copilot plan's token gets the chat models of Copilot's picker that the plan
-  allows, from Copilot's undocumented `/models`; a Claude plan's is asked of Anthropic's list with
+  named and in order. A Copilot plan's token gets the chat models the plan's policy enables, from
+  Copilot's undocumented `/models`; a Claude plan's is asked of Anthropic's list with
   the plan's sign-in token. Every chat names its model; the apps start a new one on the first
   listed.
 - **Secrets at rest** are sealed with AES-256-GCM under the deployment's encryption key, bound to
@@ -131,12 +131,15 @@ None. A plan's access token is renewed when it is used and due, never in the bac
   so its claims are checked (issuer, audience, nonce, expiry) without its signature, as OpenID Connect
   allows. The person must allow the app to use their plan; a sign-in without it adds nothing. OpenAI
   identifies each installation: this deployment's ID derives from its encryption key.
-- **Copilot plans sign in to an app of their own.** Copilot's token goes into the nook, to the
-  agent, so it must reach nothing else. The host's GitHub App can write to the person's
-  repositories, and its tokens expire within eight hours, which a running agent can outlive. So
-  Copilot plans sign in, with GitHub's device flow, to a GitHub OAuth app that asks for no scopes:
-  its token reaches the person's Copilot and public data only, and never expires. Its client ID is
-  public, so every host can use the same app; a token that expires anyway is refused.
+- **A Copilot plan is Copilot's API, behind the gateway.** Copilot's CLI and pi call the gateway
+  as an OpenAI-style provider, with their chat's token; the gateway calls Copilot's API with the
+  plan's token and the headers Copilot's CLI sends (`CopilotApi.Headers`). Copilot doesn't document
+  this API; its CLI's provider mode is documented.
+- **Copilot plans sign in to an app of their own,** not the host's GitHub App: a plan is what pays
+  for models, perhaps a work account's, and has nothing to do with whose repositories a person
+  reaches. The app, a GitHub OAuth app, asks for no scopes, so its token reaches the person's
+  Copilot and public data only; it never expires, so this host never renews it, and its client ID is
+  public, so every host uses AiSloth's own. A token that expires anyway is refused.
 - **One renewal at a time per account.** A plan's access token lasts an hour; it is renewed when
   OpenAI asks (`earliest_refresh_at`), or shortly before it expires, on the next use. Every renewal
   replaces the refresh token and OpenAI refuses one used twice, so the renewal locks the account's
@@ -147,5 +150,5 @@ None. A plan's access token is renewed when it is used and due, never in the bac
   added again. A refresh token unused for 30 days ends it too.
 - **Removing a plan ends its session** at OpenAI. When OpenAI can't be reached the account goes
   anyway, with a warning in the log.
-- **Removing an account** stops model-gateway calls at once; an agent holding a token directly, such
-  as a Copilot token, keeps it until its process stops.
+- **Removing an account** stops model-gateway calls at once; an agent holding a token directly, a
+  Claude plan's, keeps it until its process stops.

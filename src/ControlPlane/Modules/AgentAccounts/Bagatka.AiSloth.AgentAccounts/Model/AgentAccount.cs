@@ -6,6 +6,7 @@ using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
+using Bagatka.Sdk.GitHub;
 
 namespace Bagatka.AiSloth.AgentAccounts.Model;
 
@@ -118,8 +119,9 @@ internal sealed class AgentAccount
     }
 
     // What running an agent on the account takes. Model APIs are reached through the model gateway,
-    // which adds these headers; plan tokens tied to one harness go to it. OpenRouter's root serves
-    // Anthropic's Messages API at /v1/messages and OpenAI's at /v1, so each harness picks its own.
+    // which adds these headers, a Copilot plan's included; a Claude plan's token goes to its harness.
+    // OpenRouter's root serves Anthropic's Messages API at /v1/messages and OpenAI's at /v1, so each
+    // harness picks its own.
     // Not handled: Claude plans through the gateway; moving their token there needs a test against
     // Anthropic.
     public AgentAccountCredential ToCredential(SecretBox box, AgentAccountsSettings settings)
@@ -130,7 +132,8 @@ internal sealed class AgentAccount
             AgentAccountKind.OpenAIApiKey => Through(Endpoint?.Value ?? OpenAIApi, "Authorization", "Bearer " + OpenSecret(box)),
             AgentAccountKind.OpenRouterApiKey => Through(settings.OpenRouterApi, "Authorization", "Bearer " + OpenSecret(box)),
             AgentAccountKind.ChatGptPlan => Through(settings.ChatGptApi, "Authorization", "Bearer " + OpenSession(box).AccessToken),
-            AgentAccountKind.CopilotPlan or AgentAccountKind.ClaudePlan => new AgentAccountAccess(new HarnessToken(OpenSecret(box))),
+            AgentAccountKind.CopilotPlan => new AgentAccountAccess(new ModelEndpoint(settings.CopilotApi, CopilotApi.Headers(OpenSecret(box)))),
+            AgentAccountKind.ClaudePlan => new AgentAccountAccess(new HarnessToken(OpenSecret(box))),
         };
         return new AgentAccountCredential(Id, Kind, OwnerId, access);
     }

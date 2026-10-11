@@ -28,10 +28,10 @@ internal sealed partial class AgentAccountsApi
             return new Result<IReadOnlyList<AgentModel>>(used.Error);
         }
 
-        // A plan's token that goes to its harness lists the plan's own models.
+        // A Claude plan's token, which goes to its harness, lists the plan's own models.
         if (used.Output.Access is HarnessToken token)
         {
-            IReadOnlyList<AgentModel> planModels = await PlanModelsAsync(used.Output.Kind, token.Value, ct);
+            IReadOnlyList<AgentModel> planModels = await ClaudePlanModelsAsync(token.Value, ct);
             return new Result<IReadOnlyList<AgentModel>>(planModels);
         }
 
@@ -47,6 +47,13 @@ internal sealed partial class AgentAccountsApi
             return new Result<IReadOnlyList<AgentModel>>([.. catalog
                 .Where(model => !model.Id.EndsWith(":batch", StringComparison.Ordinal))
                 .Select(model => new AgentModel(model.Id, model.Name, model.SupportedParameters.Contains("tools", StringComparer.Ordinal)))]);
+        }
+
+        // A Copilot plan's models are Copilot's to list, for the plan.
+        if (used.Output.Kind == AgentAccountKind.CopilotPlan)
+        {
+            IReadOnlyList<CopilotModel> offered = await copilot.ListModelsAsync(endpoint.Url, endpoint.Headers, ct);
+            return new Result<IReadOnlyList<AgentModel>>([.. offered.Select(model => new AgentModel(model.Id, model.Name, model.UsesTools))]);
         }
 
         if (used.Output.Kind == AgentAccountKind.AnthropicApiKey)
@@ -68,17 +75,10 @@ internal sealed partial class AgentAccountsApi
             .Select(model => new AgentModel(model.Id, model.Id, RunsAgents(model.Id)))]);
     }
 
-    // A Copilot plan's models are Copilot's to list. Not handled: a Claude plan's (off unless Anthropic
-    // allowed this host) are asked of Anthropic's API with the plan's sign-in token, which no test or
-    // plan here confirms.
-    private async Task<IReadOnlyList<AgentModel>> PlanModelsAsync(AgentAccountKind kind, string token, CancellationToken ct)
+    // Not handled: a Claude plan's models (off unless Anthropic allowed this host) are asked of
+    // Anthropic's API with the plan's sign-in token, which no test or plan here confirms.
+    private async Task<IReadOnlyList<AgentModel>> ClaudePlanModelsAsync(string token, CancellationToken ct)
     {
-        if (kind == AgentAccountKind.CopilotPlan)
-        {
-            IReadOnlyList<CopilotModel> offered = await copilot.ListModelsAsync(settings.CopilotApi, token, ct);
-            return [.. offered.Select(model => new AgentModel(model.Id, model.Name, model.UsesTools))];
-        }
-
         Dictionary<string, string> signedIn = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["Authorization"] = "Bearer " + token,
