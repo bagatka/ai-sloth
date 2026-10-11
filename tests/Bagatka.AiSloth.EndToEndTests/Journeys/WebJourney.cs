@@ -290,7 +290,8 @@ public sealed partial class WebJourney(ControlPlane app)
 
     // The changes panel reads the changes again while it's open and the agent works. Someone reading
     // a long file, picked in the tree, stays at the same line as a file above it grows (here the journey
-    // changes the files, as the agent would, while the model holds its turn).
+    // changes the files, as the agent would, while the model holds its turn). Closed, its button counts
+    // them as the agent works too.
     private async Task TheChangesStayLiveAndKeepTheReadersPlaceAsync(IPage page, TestWorkspace acme, ChatSummary chat)
     {
         await acme.ChangeAsync(chat.NookId, "mkdir -p /work/api/notes && echo 'first note' > /work/api/notes/a.txt && seq 1 150 | sed 's/^/line /' > /work/api/notes/long.txt");
@@ -310,6 +311,14 @@ public sealed partial class WebJourney(ControlPlane app)
         await WebBrowser.ShotAsync(page, "changes-live");
         app.Model.Release(Wait);
         await page.Keyboard.PressAsync("Escape");
+
+        app.Model.HoldOn(Wait);
+        await acme.SendAsync(chat, Wait);
+        await app.Model.HeldAsync(Wait);
+        await acme.ChangeAsync(chat.NookId, "seq 1 10 >> /work/api/notes/a.txt");
+        ILocator counted = page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Changes" }).GetByText("+202", new LocatorGetByTextOptions { Exact = true });
+        await Assertions.Expect(counted).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
+        app.Model.Release(Wait);
 
         Assert.NotNull(before);
         Assert.NotNull(after);

@@ -42,12 +42,14 @@ import { changedFiles, type ChangedFile } from "./changes"
 
 // A chat's changes on demand: every changed file's diff in one scroll, beside a tree of the files
 // that selects the one being read, marks the ones on screen, and jumps to the one picked. The host
-// reads them when the panel opens, never waking the nook, and again while it's open: after each
-// turn's checkpoint, and every few seconds while the agent works. The reader keeps their place. The
-// button says how much changed: as the panel read it, or else as the latest checkpoint kept it.
+// reads them, never waking the nook, when the panel opens, after each turn's checkpoint, and while the
+// agent works: every few seconds while the panel is open, and now and then for the button's count.
+// The reader keeps their place. The button says how much changed: as last read, or as the latest
+// checkpoint kept it until that checkpoint's changes are read.
 
-// How often an open panel reads the changes again while the agent works.
-const whileWorking = 3000
+// How often the changes are read again while the agent works: for the open panel, and for the count.
+const whileOpen = 3000
+const whileClosed = 10_000
 
 export function ChangesPanel({
   nookId,
@@ -66,8 +68,7 @@ export function ChangesPanel({
   const [open, setOpen] = React.useState(false)
   const read = useQuery({
     ...changesQuery(nookId, checkpoint),
-    enabled: open,
-    refetchInterval: open && working ? whileWorking : false,
+    refetchInterval: working ? (open ? whileOpen : whileClosed) : false,
   })
   const sources = read.data ?? []
   // With several repositories, each file's path starts with its repository's name.
@@ -87,12 +88,23 @@ export function ChangesPanel({
     }),
     { additions: 0, deletions: 0 }
   )
-  // What the button says: as the panel read them, or else as the latest checkpoint kept them.
-  const shown = read.data ? totals : counted
+  // What the button says: as last read since the latest checkpoint, or as that checkpoint kept them,
+  // or as read before it.
+  const fresh = read.data !== undefined && !read.isPlaceholderData
+  const shown = fresh ? totals : (counted ?? (read.data ? totals : null))
   const [layout, setLayout] = React.useState<DiffLayout>("unified")
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet
+      open={open}
+      onOpenChange={(opened) => {
+        setOpen(opened)
+        // Opening reads them anew: files may have changed since the button's count.
+        if (opened) {
+          void read.refetch()
+        }
+      }}
+    >
       <SheetTrigger
         onPointerEnter={preloadCode}
         render={<Button variant="outline" size="sm" />}
