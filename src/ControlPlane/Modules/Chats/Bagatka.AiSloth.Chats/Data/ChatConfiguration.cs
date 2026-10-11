@@ -11,8 +11,13 @@ internal sealed class ChatConfiguration : IEntityTypeConfiguration<Chat>
     {
         builder.HasKey(chat => chat.Id);
         builder.Property(chat => chat.Version).IsRowVersion();
-        builder.Property(chat => chat.SessionId).HasMaxLength(256);
-        builder.Property(chat => chat.ResumableSessionId).HasMaxLength(256);
+        builder.ComplexProperty(chat => chat.Session, session =>
+        {
+            session.Property(value => value.SessionId).HasColumnName("session_id").HasMaxLength(256);
+            session.Property(value => value.Earlier).HasColumnName("earlier_session_id").HasMaxLength(256);
+            session.Property(value => value.CanSteer).HasColumnName("can_steer");
+            session.Property(value => value.Loading).HasColumnName("loading_session");
+        });
         builder.Property(chat => chat.Harness).HasMaxLength(Chat.MaxHarnessLength);
         builder.Property(chat => chat.Model).HasMaxLength(HarnessProfile.MaxModelLength);
         builder.Property(chat => chat.NextModel).HasMaxLength(HarnessProfile.MaxModelLength);

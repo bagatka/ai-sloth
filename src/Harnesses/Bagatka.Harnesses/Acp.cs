@@ -11,7 +11,7 @@ namespace Bagatka.Harnesses;
 /// A prompt or steer carries the caller's key, and the answer comes back with it, even when it is read
 /// from saved output after a restart.
 /// </summary>
-public static class Acp
+internal static class Acp
 {
     /// <summary>
     /// The first request: negotiates the protocol and names the client, which some agents pass on to

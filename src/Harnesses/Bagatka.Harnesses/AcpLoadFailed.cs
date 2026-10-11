@@ -5,4 +5,4 @@ namespace Bagatka.Harnesses;
 /// are gone; a new session can still start.
 /// </summary>
 /// <param name="Error">What the agent said, in words for people.</param>
-public sealed record AcpLoadFailed(string Error);
+internal sealed record AcpLoadFailed(string Error);

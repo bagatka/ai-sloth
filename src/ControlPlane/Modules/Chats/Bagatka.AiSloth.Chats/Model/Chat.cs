@@ -7,6 +7,7 @@ using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.AiSloth.Nooks.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
+using Bagatka.Harnesses;
 
 namespace Bagatka.AiSloth.Chats.Model;
 
@@ -103,17 +104,9 @@ internal sealed class Chat
     // How far the agent's output is read: everything before this offset is handled.
     public long OutputOffset { get; private set; }
 
-    // The agent's session, once it answered session/new or session/load, and whether it accepts
-    // messages mid-turn.
-    public string? SessionId { get; private set; }
-
-    public bool SupportsSteering { get; private set; }
-
-    // The session of an agent that ended, which the next one loads when its harness can; and
-    // whether it is loading it, while the updates it replays are history already recorded.
-    public string? ResumableSessionId { get; private set; }
-
-    public bool LoadingSession { get; private set; }
+    // The agent's conversation (Bagatka.Harnesses): its session once it has one, whether it takes
+    // messages mid-turn, and an ended agent's session, which the next one continues when it can.
+    public AgentSession Session { get; private set; } = new AgentSession();
 
 
 
@@ -269,9 +262,7 @@ internal sealed class Chat
     {
         HarnessProcessId = processId;
         OutputOffset = 0;
-        SessionId = null;
-        SupportsSteering = false;
-        LoadingSession = false;
+        Session = Session.Ended();
     }
 
     // The agent's process is gone, with any turn it was working on; its session may come back.
@@ -288,41 +279,13 @@ internal sealed class Chat
         HarnessProcessId = null;
         HarnessTokenHash = null;
         OutputOffset = 0;
-        ResumableSessionId = SessionId ?? ResumableSessionId;
-        SessionId = null;
-        SupportsSteering = false;
-        LoadingSession = false;
+        Session = Session.Ended();
     }
 
-    // Returns the earlier session the agent loads, or null when it starts a new one.
-    public string? Initialized(bool supportsSteering, bool supportsLoading)
+    // What the agent's last line came to (AgentSession.Read).
+    public void SessionChanged(AgentSession session)
     {
-        SupportsSteering = supportsSteering;
-        LoadingSession = supportsLoading && ResumableSessionId is not null;
-        return LoadingSession ? ResumableSessionId : null;
-    }
-
-    // The agent couldn't load the earlier session, so a new one starts.
-    public void LoadFailed()
-    {
-        LoadingSession = false;
-    }
-
-    // A new session; returns whether it took over from an earlier agent's, without its conversation.
-    public bool SessionReady(string sessionId)
-    {
-        bool tookOver = ResumableSessionId is not null;
-        SessionId = sessionId;
-        ResumableSessionId = null;
-        return tookOver;
-    }
-
-    // The agent loaded the earlier session, and continues its conversation.
-    public void SessionLoaded()
-    {
-        SessionId = ResumableSessionId;
-        ResumableSessionId = null;
-        LoadingSession = false;
+        Session = session;
     }
 
     public void Read(long offset)

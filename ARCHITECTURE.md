@@ -115,7 +115,7 @@ foundation    Bagatka.Foundation               results, errors, actors, typed ID
 |---|---|---|---|
 | WebApi | `Bagatka.AiSloth.WebApi` | HTTP host and composition root of the control plane | Sign-in, public API for users, workspaces, machines, nooks, agent accounts, and chats, the gRPC endpoint daemons and machines dial, the model gateway, `migrate` |
 | Modules | `Bagatka.AiSloth.<Module>` + `.Contracts` | Product capabilities, one contract each | Users, Workspaces, Machines, Nooks, Secrets, AgentAccounts, and Chats built |
-| Harnesses | `Bagatka.Harnesses` | The programs that run coding agents, how to start and pay for each, and an agent's session over ACP: what to write it and what it said | Claude Code, Codex, pi, and GitHub Copilot; the session's logic moves here from Chats' runner |
+| Harnesses | `Bagatka.Harnesses` | The programs that run coding agents, how to start and pay for each, and an agent's session over ACP: what to write it and what it said | Claude Code, Codex, pi, and GitHub Copilot, each on its ACP adapter; agent sessions |
 | ModelAccess | `Bagatka.ModelAccess` | Paying for model vendors' models: with an API key, or with a plan signed in as its vendor's own agent (renewed, its limits read); each vendor's models with what's known of them (models.dev); and the usage a model call reports | Claude, ChatGPT, and Copilot plans; Anthropic, OpenAI, and OpenRouter API keys |
 | Sandboxing | `Bagatka.Sandboxing` + `.<Provider>`, `.Remote` | Provider contract, conformance tests, one project per compute backend, remote calls | Contract, Docker and Azure providers, remote calls |
 | Daemon | `Bagatka.AiSloth.DaemonProtocol`, `Bagatka.AiSloth.Daemon` (`slothd`) | The protocol, and the Native AOT process in every nook | Built |

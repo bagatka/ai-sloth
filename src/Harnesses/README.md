@@ -39,42 +39,35 @@ an agent's session over it. Nothing here knows AiSloth; Chats is its caller.
   `/v1`. Copilot's API is one credential for both of OpenAI's: Copilot's CLI and pi take it as an
   OpenAI-style provider at the gateway, each in the API Copilot says the chat's model speaks, which
   the images' `copilot-model` (`start/copilot-model.sh`) reads from Copilot's list of models.
-- `Acp` builds the messages a client sends and reads what a harness writes into an `AcpEvent`: an
-  update, a request to answer, or the answer to one of the client's requests, already matched to it.
-  A prompt or steer carries the caller's key, and its answer comes back with it. The request IDs
-  that carry keys are persisted wherever a host keeps harness output, so their format never changes.
-  `Acp.LoadSession` continues an earlier session whose files the harness kept, when it says it can
-  (`AcpInitialized.SupportsLoading`); the history it replays comes as updates before the answer.
+- `AgentSession` is one agent's conversation over ACP as plain state its caller keeps with whatever it
+  saves, so another process can continue it: the session prompts go to, the earlier session the next
+  agent continues when it can load it, whether the agent takes messages into a running turn, and
+  whether it replays history. `Read` takes each line the harness writes and answers with the next
+  state, the lines to write back, and what happened (`AgentEvent`): progress (`AgentReported`), the
+  session ready, remembering the conversation or not (`SessionReady`), a prompt or a steer answered
+  (`PromptAnswered`, `SteerAnswered`), or an agent that can't start (`StartFailed`). It answers the
+  harness's requests itself, loads the earlier session when the agent can, and skips the history a
+  loaded session replays. `Prompt`, `Steer`, and `Cancel` give the lines that send a message or stop
+  the turn. A prompt or steer carries the caller's key, and its answer comes back with it; the request
+  IDs that carry keys are persisted wherever a host keeps harness output, so their format never
+  changes. It does no I/O.
 
 ```csharp
-IReadOnlyDictionary<string, string> environment = HarnessProfile.EnvironmentFor(CredentialKind.OpenAIApi, gatewayToken, gateway);
-// start HarnessProfile.Command with environment in the harness's image; write Acp.Initialize("aisloth", "AiSloth", "1.0") to it
-AcpEvent? read = Acp.Read(line);   // null: noise, or an answer to nothing this client asked
-switch (read?.Value)
+IReadOnlyDictionary<string, string> environment = harness.EnvironmentFor(CredentialKind.OpenAIApi, gatewayToken, gateway, "gpt-6.1-sol", "medium");
+// start HarnessProfile.Command with environment in the harness's image, then write:
+Write(AgentSession.Start("aisloth", "AiSloth", "1.0"));
+AgentSession session = saved.Ended();                       // the last agent's session, which this one continues when it can
+
+AgentStep step = session.Read(line, "/work");               // each line the harness writes
+Write(step.Lines);                                          // session/new or session/load, answers to its requests
+session = step.Session;                                     // save it with what happened
+switch (step.Event?.Value)
 {
-    case AcpInitialized initialized: Write(initialized.SupportsLoading && earlier is not null ? Acp.LoadSession(earlier, "/work") : Acp.NewSession("/work")); break;
-    case AcpSessionLoaded: ...; break;                       // continues the conversation; AcpLoadFailed: start a new one
-    case AcpSessionCreated created: Write(Acp.Prompt(messageId, created.SessionId, "Add a README")); break;
-    case AcpUpdate update: ...; break;                       // save or show it
-    case AcpRequest request: Write(Acp.Allow(request)); break;
-    case AcpPromptEnded ended: ...; break;                   // ended.Prompt == messageId
-    case AcpStartFailed failed: ...; break;                  // failed.Error: "Authentication required"
+    case SessionReady ready: Write(session.Prompt(messageKey, "Add a README")); break;
+    case AgentReported reported: ...; break;                // save or show it
+    case PromptAnswered answered: ...; break;               // answered.Prompt == messageKey
+    case StartFailed failed: ...; break;                    // failed.Error: "Authentication required"
 }
-```
-
-- `AgentSession` is one agent's conversation over ACP as plain state, and what to do next: given
-  what the harness wrote, or what the caller wants (a prompt, a message steered into the running
-  turn, a stop), it answers with the lines to write to the harness and what happened. It starts a
-  session or loads the earlier one, answers the harness's requests, gives a lost agent's turn to the
-  next one, and matches every answer to its prompt. It does no I/O and keeps nothing: the caller
-  stores the state with what it saves, so another process can continue the session from it.
-
-```csharp
-AgentStep step = AgentSession.Start(earlierSessionId, "/work");               // initialize, then session/new or load
-step = AgentSession.Read(step.Session, line);                                  // each line the harness writes
-step = AgentSession.Send(step.Session, messageKey, "Add a README");            // a new turn, or steered into the running one
-// step.Lines: write them to the harness; step.Events: AgentUpdate, TurnEnded(key, reason), Steered(key),
-// AgentRestarted(remembers), StartFailed(error); step.Session: save it with them.
 ```
 
 ## Rules

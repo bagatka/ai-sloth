@@ -75,7 +75,7 @@ internal sealed class ChatRunners(
         await using (ChatsDbContext db = await databases.CreateDbContextAsync(stoppingToken))
         {
             busy = await db.Chats
-                .Where(chat => chat.TurnMessageId != null || (chat.HarnessProcessId != null && chat.SessionId == null) || chat.StartsAgent
+                .Where(chat => chat.TurnMessageId != null || (chat.HarnessProcessId != null && chat.Session.SessionId == null) || chat.StartsAgent
                     || db.Messages.Any(message => message.ChatId == chat.Id
                         && (message.State == MessageState.New || message.State == MessageState.Queued || message.State == MessageState.Steering)))
                 .Select(chat => chat.Id)

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Bagatka.AiSloth.Chats.Data.Migrations;
 
 /// <inheritdoc />
-public partial class _20261011201912_Initial : Migration
+public partial class _20261011210727_Initial : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -43,13 +43,13 @@ public partial class _20261011201912_Initial : Migration
                 harness_process_id = table.Column<Guid>(type: "uuid", nullable: true),
                 harness_token_hash = table.Column<byte[]>(type: "bytea", nullable: true),
                 output_offset = table.Column<long>(type: "bigint", nullable: false),
-                session_id = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                supports_steering = table.Column<bool>(type: "boolean", nullable: false),
-                resumable_session_id = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                loading_session = table.Column<bool>(type: "boolean", nullable: false),
                 turn_message_id = table.Column<Guid>(type: "uuid", nullable: true),
                 last_sequence = table.Column<long>(type: "bigint", nullable: false),
-                xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)
+                xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                can_steer = table.Column<bool>(type: "boolean", nullable: false),
+                earlier_session_id = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                loading_session = table.Column<bool>(type: "boolean", nullable: false),
+                session_id = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true)
             },
             constraints: table =>
             {
