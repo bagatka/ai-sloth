@@ -31,9 +31,31 @@ internal sealed class Checkpoint
 
     public string Note { get; private set; }
 
+    // How much its repositories had changed, when it kept their changes (ChangesKey): null when it
+    // didn't, as checkpoints taken before changes were kept.
+    public int? ChangedFiles { get; private set; }
+
+    public int? AddedLines { get; private set; }
+
+    public int? DeletedLines { get; private set; }
+
     public static Checkpoint Take(NookId nookId, int number, string note, TimeProvider time)
     {
         return new Checkpoint(CheckpointId.New(), nookId, number, time.GetUtcNow(), note);
+    }
+
+    // It keeps its repositories' changes, stored at ChangesKey, which come to this much.
+    public void KeepChanges(ChangeCount count)
+    {
+        ChangedFiles = count.Files;
+        AddedLines = count.Additions;
+        DeletedLines = count.Deletions;
+    }
+
+    // Where a checkpoint's repositories' changes are kept, as JSON.
+    public static string ChangesKey(NookId nookId, int number)
+    {
+        return ObjectKey(nookId, number, "changes.json");
     }
 
     // Where the bundles of a nook's checkpoint are stored; everything under the nook's prefix goes with it.
@@ -49,6 +71,7 @@ internal sealed class Checkpoint
 
     public CheckpointSummary ToSummary()
     {
-        return new CheckpointSummary(NookId, Number, CreatedAt, Note);
+        ChangeCount? changes = ChangedFiles is int files ? new ChangeCount(files, AddedLines ?? 0, DeletedLines ?? 0) : null;
+        return new CheckpointSummary(NookId, Number, CreatedAt, Note, changes);
     }
 }

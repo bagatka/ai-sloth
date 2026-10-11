@@ -16,7 +16,8 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// Journey: nooks nobody uses fall asleep and come back when used, with their files and an agent that
 /// remembers. A busy nook stays awake beside an idle one that sleeps and wakes for its next message; a
 /// nook wakes early on request; one asleep for long is evicted and comes back from its latest
-/// checkpoint, through a ready copy when its setup left one; one whose container is lost comes back
+/// checkpoint, through a ready copy when its setup left one, and shows its changes meanwhile without
+/// waking; one whose container is lost comes back
 /// too, as does one whose container can't start again as it wakes; and one stays awake while someone
 /// watches its process. On the sleepy app, whose nooks sleep
 /// after 8 idle seconds and are evicted after 20 asleep; the parts wait on those clocks, so they run at
@@ -123,8 +124,11 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
         await using ChatWatch watch = await ChatWatch.OpenAsync(dev, chat);
         await acme.SendAsync(chat, "Please write hello.txt for me");
         await watch.NextAsync("turn-ended", TimeSpan.FromMinutes(2));
+        await acme.ChangeAsync(chat.NookId, "echo 'changed after the turn' > /work/api/CHANGE.md");
 
         bool evicted = await app.SandboxGoneAsync(chat.NookId.Value, SleepyControlPlane.Eviction);
+        IReadOnlyList<SourceChanges> shown = await Api.ReadAsync<IReadOnlyList<SourceChanges>>(dev.SendGetAsync(Paths.Nook(chat.NookId) + "/changes"), HttpStatusCode.OK);
+        NookSummary afterShowing = await acme.NookAsync(chat.NookId);
         await acme.SendAsync(chat, "What was my first message?");
         JsonElement started = await watch.NextAsync("setup-started", SleepyControlPlane.Sleep);
         JsonElement ended = await watch.NextAsync("setup-ended");
@@ -132,6 +136,8 @@ public sealed class SleepJourney(SleepyControlPlane sleepy)
         int? kept = await acme.RunAsync(chat.NookId, "test -f /work/api/deps/installed && grep -q 'hi from the fake model' /work/hello.txt");
 
         Assert.True(evicted);
+        Assert.Contains("+changed after the turn", Assert.Single(shown).Patch, StringComparison.Ordinal);
+        Assert.Equal(NookStatus.Asleep, afterShowing.Status);
         Assert.True(started.GetProperty("fromReadyCopy").GetBoolean());
         Assert.True(TimeSpan.Parse(ended.GetProperty("took").GetString()!, CultureInfo.InvariantCulture) < TimeSpan.FromSeconds(SlowSetupRepository.SetupSeconds));
         Assert.Equal(0, kept);

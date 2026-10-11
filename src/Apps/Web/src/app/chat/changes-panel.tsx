@@ -42,9 +42,17 @@ import { changedFiles, type ChangedFile } from "./changes"
 
 // A chat's changes on demand: every changed file's diff in one scroll, beside a tree of the files
 // that selects the one being read, marks the ones on screen, and jumps to the one picked. The host
-// reads them each time the panel opens, which wakes an asleep nook.
+// reads them each time the panel opens, never waking the nook. The button says how much changed: as
+// the panel read it, or else as the latest checkpoint kept it.
 
-export function ChangesPanel({ nookId }: { nookId: string }) {
+export function ChangesPanel({
+  nookId,
+  counted,
+}: {
+  nookId: string
+  /** How much had changed at the nook's latest checkpoint, when it kept that. */
+  counted: { additions: number; deletions: number } | null
+}) {
   const [open, setOpen] = React.useState(false)
   const read = useQuery({ ...changesQuery(nookId), enabled: open })
   const sources = read.data ?? []
@@ -65,6 +73,8 @@ export function ChangesPanel({ nookId }: { nookId: string }) {
     }),
     { additions: 0, deletions: 0 }
   )
+  // What the button says: as the panel read them, or else as the latest checkpoint kept them.
+  const shown = read.data ? totals : counted
   const [layout, setLayout] = React.useState<DiffLayout>("unified")
 
   return (
@@ -75,6 +85,12 @@ export function ChangesPanel({ nookId }: { nookId: string }) {
       >
         <GitDiffIcon data-icon="inline-start" />
         <span className="hidden sm:inline">Changes</span>
+        {shown && (
+          <ChangeCounts
+            additions={shown.additions}
+            deletions={shown.deletions}
+          />
+        )}
       </SheetTrigger>
       <SheetContent className="gap-0 p-0 data-[side=right]:w-[calc(100%-1.5rem)] data-[side=right]:sm:max-w-5xl">
         <div className="flex h-16 shrink-0 items-center gap-3 pr-16 pl-5">

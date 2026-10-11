@@ -30,8 +30,9 @@ computers (Machines, to this module one more provider, `machine`).
 them, take, list, and download checkpoints, copy files in and out, show the changes in a nook's
 repositories for review and export a source's changes for pushing, see and run their setup, wake
 them, and sync a folder of a nook with a kept folder.
-`INookDaemonsApi` is the daemon endpoint's side. Every operation wakes a sleeping nook first, and
-every operation on its files puts them in place first, so callers only notice latency.
+`INookDaemonsApi` is the daemon endpoint's side. Every operation wakes a sleeping nook first, except
+reading its changes, which never does, and every operation on its files puts them in place first, so
+callers only notice latency.
 
 ## Asks
 
@@ -89,8 +90,9 @@ output also goes to `/var/log/aisloth/setup.log`. A nook that woke runs only its
 ## Data
 
 Schema `nooks`: `nooks`, `source_copies`, `processes`, `checkpoints` and `checkpoint_parts`,
-`ready_copies`, `kept_folders`; nooks and kept folders have a concurrency token. Objects are under
-`nooks/<nook>/checkpoints/<number>/` and `folders/<name>/<commit>/`.
+`ready_copies`, `kept_folders`; nooks and kept folders have a concurrency token; a checkpoint counts
+the files and lines its repositories had changed. Objects are under `nooks/<nook>/checkpoints/<number>/`
+(its bundles, and its repositories' changes as `changes.json`) and `folders/<name>/<commit>/`.
 
 ## Configuration
 
@@ -126,6 +128,10 @@ when people are warned (85%), and how many of a workspace's nooks may be awake (
   each place it changes whole, so a restore fetches a few dozen bundles, not one per turn. Ignored
   files, tags, git's settings besides remotes, and repositories deeper than directly in `/work`
   aren't kept; checkpoints are kept until the nook is deleted.
+- **Changes without the nook.** Each checkpoint keeps its repositories' changes, read while the nook
+  is awake anyway, so showing them never wakes a nook: an awake nook says them as they are now, and
+  any other shows its latest checkpoint's, which a nook takes before it sleeps. A checkpoint that
+  can't keep them is still taken, and a nook asleep since before checkpoints kept them wakes once.
 - **Kept folders merge by lines.** A text file two nooks changed keeps the lines of both; any other
   file keeps the syncing nook's version. A kept folder holds up to 16 MiB.
 - **One active instance** holds daemon connections (`ActiveInstance`); one that hands over tells its

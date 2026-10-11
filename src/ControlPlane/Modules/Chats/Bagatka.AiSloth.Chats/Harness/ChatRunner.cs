@@ -397,7 +397,7 @@ internal sealed class ChatRunner(
         Result<CheckpointSummary> taken = await nooks.CheckpointAsync(SystemActors.Harness, new CheckpointNook(chat.NookId, Note(message.Text)), ct);
         ChatEventBody told = taken.Failed
             ? new ChatEventBody(new CheckpointFailed(taken.Error.Message))
-            : new ChatEventBody(new CheckpointSaved(taken.Output.Number));
+            : new ChatEventBody(new CheckpointSaved(taken.Output.Number, taken.Output.Changes));
         db.Events.Add(chat.Record(told, time));
         Result<NookSummary> nook = await nooks.GetAsync(SystemActors.Harness, chat.NookId, ct);
         if (!nook.Failed && nook.Output is { DiskNearlyFull: true, Usage: NookUsage usage })

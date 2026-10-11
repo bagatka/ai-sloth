@@ -87,6 +87,16 @@ export type Transcript = {
    * its work, until their turn starts, they go into the running turn, or they're cancelled.
    */
   queued: readonly MessageRow[]
+  /**
+   * How much the nook's repositories had changed at its latest checkpoint, when it kept that, and
+   * the checkpoint's number.
+   */
+  changes: {
+    checkpoint: number
+    files: number
+    additions: number
+    deletions: number
+  } | null
   /** Whether someone asked to run the setup again, until it runs again. */
   setupRunAsked: boolean
   /**
@@ -105,6 +115,7 @@ export type Transcript = {
 export const emptyTranscript: Transcript = {
   rows: [],
   queued: [],
+  changes: null,
   setupRunAsked: false,
   setupFix: null,
   working: false,
@@ -205,6 +216,18 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
       }
       return started ? replace(next, index, ended) : append(next, ended)
     }
+    case "checkpoint-saved":
+      return body.changes
+        ? {
+            ...next,
+            changes: {
+              checkpoint: body.number,
+              files: body.changes.files,
+              additions: body.changes.additions,
+              deletions: body.changes.deletions,
+            },
+          }
+        : next
     case "setup-run-asked":
       return { ...next, setupRunAsked: true }
     case "setup-fix-started":
@@ -264,7 +287,7 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
         text: `The nook's disk is nearly full: ${gigabytes(body.usedBytes)} of ${gigabytes(body.totalBytes)} used.`,
       })
     default:
-      // A checkpoint saved, or something newer than this app: nothing to draw.
+      // Something newer than this app: nothing to draw.
       return next
   }
 }

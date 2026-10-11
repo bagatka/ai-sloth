@@ -17,7 +17,7 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261008130530_Initial";
+    public override string LastMigrationId => "20261011124806_KeptChanges";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -35,9 +35,21 @@ partial class NooksDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("uuid")
                     .HasColumnName("id");
 
+                b.Property<int?>("AddedLines")
+                    .HasColumnType("integer")
+                    .HasColumnName("added_lines");
+
+                b.Property<int?>("ChangedFiles")
+                    .HasColumnType("integer")
+                    .HasColumnName("changed_files");
+
                 b.Property<DateTimeOffset>("CreatedAt")
                     .HasColumnType("timestamp with time zone")
                     .HasColumnName("created_at");
+
+                b.Property<int?>("DeletedLines")
+                    .HasColumnType("integer")
+                    .HasColumnName("deleted_lines");
 
                 b.Property<Guid>("NookId")
                     .HasColumnType("uuid")

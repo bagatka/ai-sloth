@@ -7,4 +7,8 @@ namespace Bagatka.AiSloth.Nooks.Contracts;
 /// <param name="Number">Its number in the nook, counting from 1.</param>
 /// <param name="CreatedAt">When it was taken.</param>
 /// <param name="Note">What it follows, in words for people.</param>
-public sealed record CheckpointSummary(NookId NookId, int Number, DateTimeOffset CreatedAt, string Note);
+/// <param name="Changes">
+/// How much its repositories had changed since they were copied in, kept with it; <see langword="null"/>
+/// when it didn't keep them.
+/// </param>
+public sealed record CheckpointSummary(NookId NookId, int Number, DateTimeOffset CreatedAt, string Note, ChangeCount? Changes);

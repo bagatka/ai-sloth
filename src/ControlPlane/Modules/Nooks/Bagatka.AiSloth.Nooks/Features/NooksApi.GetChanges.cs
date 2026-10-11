@@ -1,10 +1,7 @@
 using Bagatka.AiSloth.Nooks.Data;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Nooks.Contracts;
@@ -28,46 +25,40 @@ internal sealed partial class NooksApi
             return new Result<IReadOnlyList<SourceChanges>>(nook.Error);
         }
 
+        // An awake nook says them as they are now; reading them isn't using it.
+        DaemonConnection? awake = await daemons.WaitAsync(nookId, TimeSpan.Zero, ct);
+        if (awake is not null)
+        {
+            Result<List<SourceChanges>> live = await diffs.ReadAsync(db, nookId, awake, ct);
+            return live.Failed ? new Result<IReadOnlyList<SourceChanges>>(live.Error) : new Result<IReadOnlyList<SourceChanges>>(live.Output);
+        }
+
+        // Otherwise its latest checkpoint kept them; a nook takes one before it sleeps. A nook without
+        // any has only its sources as they were copied in.
+        Checkpoint? latest = await db.Checkpoints.AsNoTracking().Where(found => found.NookId == nookId).OrderByDescending(found => found.Number).FirstOrDefaultAsync(ct);
+        if (latest is null)
+        {
+            return new Result<IReadOnlyList<SourceChanges>>([]);
+        }
+
+        if (latest.ChangedFiles is not null)
+        {
+            List<SourceChanges>? kept = await checkpoints.KeptChangesAsync(nookId, latest.Number, ct);
+            if (kept is not null)
+            {
+                return new Result<IReadOnlyList<SourceChanges>>(kept);
+            }
+        }
+
+        // Not handled: a nook asleep since before checkpoints kept their changes wakes to read them
+        // once; its next checkpoint keeps them.
         Result<DaemonConnection> ready = await ReadyAsync(db, actor, nook.Output, changes: false, ct);
         if (ready.Failed)
         {
             return new Result<IReadOnlyList<SourceChanges>>(ready.Error);
         }
 
-        List<SourceCopy> copies = await db.SourceCopies.AsNoTracking().Where(copy => copy.NookId == nookId).OrderBy(copy => copy.Name).ToListAsync(ct);
-        string limit = SourceChanges.MaxPatch.ToString(CultureInfo.InvariantCulture);
-        List<SourceChanges> changes = [];
-        foreach (SourceCopy copy in copies)
-        {
-            if (copy is not { Branch: string branch, Commit: string commit })
-            {
-                continue;
-            }
-
-            using MemoryStream printed = new MemoryStream();
-            ProcessRun diffed = await processes.RunAsync(ready.Output, Scripts.Diff, [copy.Name, commit, limit], NookProcesses.NoVariables, input: null, ScriptOutput.Small(printed, SourceChanges.MaxPatch + 1), ct);
-            if (!diffed.Succeeded)
-            {
-                return new Result<IReadOnlyList<SourceChanges>>(Error.Conflict("nooks.changes_failed", "Reading " + copy.Name + "'s changes in the nook failed: " + diffed.Errors));
-            }
-
-            (string patch, bool truncated) = WholeFiles(printed.ToArray());
-            changes.Add(new SourceChanges(copy.Name, copy.RepositoryId, branch, commit, patch, truncated));
-        }
-
-        return new Result<IReadOnlyList<SourceChanges>>(changes);
-    }
-
-    // The patch as printed, or, when it ran past the most a patch comes to, up to the last file that
-    // fits whole: each file's section starts with "diff --git".
-    private static (string Patch, bool Truncated) WholeFiles(byte[] printed)
-    {
-        if (printed.Length <= SourceChanges.MaxPatch)
-        {
-            return (Encoding.UTF8.GetString(printed), false);
-        }
-
-        int next = printed.AsSpan(0, SourceChanges.MaxPatch).LastIndexOf("\ndiff --git "u8);
-        return (next < 0 ? string.Empty : Encoding.UTF8.GetString(printed, 0, next + 1), true);
+        Result<List<SourceChanges>> read = await diffs.ReadAsync(db, nookId, ready.Output, ct);
+        return read.Failed ? new Result<IReadOnlyList<SourceChanges>>(read.Error) : new Result<IReadOnlyList<SourceChanges>>(read.Output);
     }
 }

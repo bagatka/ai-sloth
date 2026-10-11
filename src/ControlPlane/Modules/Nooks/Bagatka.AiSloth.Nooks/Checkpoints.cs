@@ -6,6 +6,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Bagatka.AiSloth.Nooks.Contracts;
@@ -15,6 +16,7 @@ using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.ObjectStorage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Bagatka.AiSloth.Nooks;
 
@@ -25,8 +27,9 @@ namespace Bagatka.AiSloth.Nooks;
 // needs nothing else. Its author and dates are fixed, so the same files and branches make the same
 // commit, which is how an unchanged place is noticed. A checkpoint leaves out what git ignores, git's
 // settings besides remotes, tags, and repositories deeper than directly in /work; checkpoints are
-// kept until their nook is deleted.
-internal sealed class Checkpoints(NookProcesses processes, IObjectStorage storage, FileLocks fileLocks, TimeProvider time)
+// kept until their nook is deleted. Each also keeps its repositories' changes, so they show without
+// the nook.
+internal sealed class Checkpoints(NookProcesses processes, SourceDiffs diffs, IObjectStorage storage, FileLocks fileLocks, TimeProvider time, ILogger<Checkpoints> logger)
 {
     // The most places one checkpoint keeps; more fails the checkpoint.
     private const int MaxPlaces = 100;
@@ -77,10 +80,41 @@ internal sealed class Checkpoints(NookProcesses processes, IObjectStorage storag
             return new Result<Checkpoint>(latest);
         }
 
+        await KeepChangesAsync(db, nook, connection, checkpoint, ct);
         db.Checkpoints.Add(checkpoint);
         db.CheckpointParts.AddRange(stored.Output);
         Result saved = await db.SaveAsync(ct);
         return saved.Failed ? new Result<Checkpoint>(saved.Error) : new Result<Checkpoint>(checkpoint);
+    }
+
+    // Keeps the repositories' changes with the checkpoint, read while its nook is awake anyway. A
+    // checkpoint is worth more than its changes: one that can't keep them is taken without, and its
+    // changes are then read from the nook.
+    private async Task KeepChangesAsync(NooksDbContext db, Nook nook, DaemonConnection connection, Checkpoint checkpoint, CancellationToken ct)
+    {
+        Result<List<SourceChanges>> read = await diffs.ReadAsync(db, nook.Id, connection, ct);
+        if (read.Failed)
+        {
+            Log.ChangesNotKept(logger, nook.Id.Value, checkpoint.Number, read.Error.Message);
+            return;
+        }
+
+        using MemoryStream json = new MemoryStream(JsonSerializer.SerializeToUtf8Bytes(read.Output, FoundationJson.Options));
+        await storage.PutAsync(Checkpoint.ChangesKey(nook.Id, checkpoint.Number), json, ct);
+        checkpoint.KeepChanges(SourceDiffs.Count(read.Output));
+    }
+
+    // Kept changes of the checkpoint numbered so; null when it kept none, or isn't there.
+    public async Task<List<SourceChanges>?> KeptChangesAsync(NookId nookId, int number, CancellationToken ct)
+    {
+        await using Stream? kept = await storage.OpenAsync(Checkpoint.ChangesKey(nookId, number), ct);
+        if (kept is null)
+        {
+            return null;
+        }
+
+        List<SourceChanges>? changes = await JsonSerializer.DeserializeAsync<List<SourceChanges>>(kept, FoundationJson.Options, ct);
+        return changes;
     }
 
     // Stores the bundles the snapshot wrote, and reads its manifest into parts. It comes from the

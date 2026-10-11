@@ -171,8 +171,10 @@ public interface INooksApi
 
     /// <summary>
     /// What each of the nook's repositories changed since it was copied in, for people to review:
-    /// its commits since and what isn't committed, as one patch. The sources stay as they are. People
-    /// who can see the nook may; an asleep nook wakes first, which takes a few seconds.
+    /// its commits since and what isn't committed, as one patch. The sources stay as they are. It
+    /// never wakes the nook, and reading isn't using it: while the nook is awake they're read from it,
+    /// otherwise they're the ones its latest checkpoint kept, which a nook takes before it sleeps, so
+    /// they're the same. People who can see the nook may.
     /// </summary>
     /// <returns>The changes, a repository's at a time by name; <see cref="NooksErrors.NotReady"/>; or not found.</returns>
     public Task<Result<IReadOnlyList<SourceChanges>>> GetChangesAsync(Actor actor, NookId nookId, CancellationToken ct);

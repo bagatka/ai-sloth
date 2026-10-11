@@ -28,6 +28,7 @@ internal sealed partial class NooksApi(
     InputFeeds feeds,
     NookProcesses processes,
     NookFiles files,
+    SourceDiffs diffs,
     Checkpoints checkpoints,
     KeptFolders folders,
     NookLifecycle lifecycle,

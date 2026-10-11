@@ -138,8 +138,8 @@ export function repositories(workspaceId: string) {
 }
 
 /**
- * What the nook's repositories changed, read when someone looks. Asking wakes an asleep nook, so
- * nothing asks unless someone opens the changes.
+ * What the nook's repositories changed, read when someone looks: live from an awake nook, otherwise
+ * as its latest checkpoint kept them. Asking never wakes a nook.
  */
 export function changes(nookId: string) {
   return queryOptions({

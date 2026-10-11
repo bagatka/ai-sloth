@@ -3033,6 +3033,24 @@ export interface components {
             /** @description Whether only people given access see it. */
             private: boolean;
         };
+        /** @description How much a nook's repositories changed since they were copied in, all of them together. */
+        ChangeCount: {
+            /**
+             * Format: int32
+             * @description The files changed, added, removed, or renamed.
+             */
+            files: number;
+            /**
+             * Format: int32
+             * @description The lines added.
+             */
+            additions: number;
+            /**
+             * Format: int32
+             * @description The lines removed.
+             */
+            deletions: number;
+        };
         ChangeModelRequest: {
             account: components["schemas"]["AgentAccountId"];
             model?: null | string;
@@ -3117,6 +3135,7 @@ export interface components {
         CheckpointSaved: {
             /** Format: int32 */
             number: number;
+            changes: null | components["schemas"]["ChangeCount"];
         };
         /** @description A nook's files as they were at one moment, kept while the nook exists. */
         CheckpointSummary: {
@@ -3134,6 +3153,7 @@ export interface components {
             createdAt: string;
             /** @description What it follows, in words for people. */
             note: string;
+            changes: null | components["schemas"]["ChangeCount"];
         };
         CodeSignInRequest: {
             code: string;

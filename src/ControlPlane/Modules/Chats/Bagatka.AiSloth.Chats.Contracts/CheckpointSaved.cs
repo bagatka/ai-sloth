@@ -1,3 +1,5 @@
+using Bagatka.AiSloth.Nooks.Contracts;
+
 namespace Bagatka.AiSloth.Chats.Contracts;
 
 /// <summary>
@@ -6,4 +8,8 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// machine is lost.
 /// </summary>
 /// <param name="Number">The checkpoint's number in the chat's nook.</param>
-public sealed record CheckpointSaved(int Number);
+/// <param name="Changes">
+/// How much the nook's repositories had changed since they were copied in, by then; <see langword="null"/>
+/// when the checkpoint didn't keep its changes.
+/// </param>
+public sealed record CheckpointSaved(int Number, ChangeCount? Changes);

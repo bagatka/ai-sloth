@@ -18,6 +18,9 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Warning, Message = "Work on nook {NookId} took longer than {Deadline} and stopped; a later pass tries again")]
     public static partial void NookWorkTooLong(ILogger logger, Guid nookId, TimeSpan deadline);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Nook {NookId}'s checkpoint {Checkpoint} kept no changes; they're read from the nook instead: {Reason}")]
+    public static partial void ChangesNotKept(ILogger logger, Guid nookId, int checkpoint, string reason);
+
     [LoggerMessage(Level = LogLevel.Information, Message = "Deleted nook {NookId}")]
     public static partial void NookDeleted(ILogger logger, Guid nookId);
 

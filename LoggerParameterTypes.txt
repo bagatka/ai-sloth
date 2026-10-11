@@ -6,6 +6,7 @@ Actor;System.String
 AgentAccountId;System.Guid
 Attempts;System.Int32
 ChatId;System.Guid
+Checkpoint;System.Int32
 Deadline;System.TimeSpan
 EventId;System.Guid
 Events;System.Int32

@@ -32,6 +32,7 @@ public static class NooksModule
         services.AddSingleton<NookActivity>();
         services.AddSingleton<NookStarts>();
         services.AddSingleton<NookProcesses>();
+        services.AddSingleton<SourceDiffs>();
         services.AddSingleton<Checkpoints>();
         services.AddSingleton<NookLifecycle>();
         services.AddHostedService(provider => provider.GetRequiredService<NookLifecycle>());

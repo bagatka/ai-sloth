@@ -2966,6 +2966,32 @@
         },
         "description": "A repository a person\u0027s GitHub connection reaches."
       },
+      "ChangeCount": {
+        "required": [
+          "files",
+          "additions",
+          "deletions"
+        ],
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "integer",
+            "description": "The files changed, added, removed, or renamed.",
+            "format": "int32"
+          },
+          "additions": {
+            "type": "integer",
+            "description": "The lines added.",
+            "format": "int32"
+          },
+          "deletions": {
+            "type": "integer",
+            "description": "The lines removed.",
+            "format": "int32"
+          }
+        },
+        "description": "How much a nook\u0027s repositories changed since they were copied in, all of them together."
+      },
       "ChangeModelRequest": {
         "required": [
           "account"
@@ -3206,13 +3232,24 @@
       },
       "CheckpointSaved": {
         "required": [
-          "number"
+          "number",
+          "changes"
         ],
         "type": "object",
         "properties": {
           "number": {
             "type": "integer",
             "format": "int32"
+          },
+          "changes": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ChangeCount"
+              }
+            ]
           }
         }
       },
@@ -3221,7 +3258,8 @@
           "nookId",
           "number",
           "createdAt",
-          "note"
+          "note",
+          "changes"
         ],
         "type": "object",
         "properties": {
@@ -3242,6 +3280,17 @@
           "note": {
             "type": "string",
             "description": "What it follows, in words for people."
+          },
+          "changes": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "How much its repositories had changed since they were copied in, kept with it; \u0060null\u0060\nwhen it didn\u0027t keep them.",
+                "$ref": "#/components/schemas/ChangeCount"
+              }
+            ]
           }
         },
         "description": "A nook\u0027s files as they were at one moment, kept while the nook exists."
