@@ -86,16 +86,30 @@ internal sealed partial class AgentAccountsApi
         return new Result<SignInStarted>(new SignInStarted(signIn.Id, url, UserCode: null, signIn.ExpiresAt, TimeSpan.Zero));
     }
 
-    // A Copilot plan: the person enters GitHub's code for the host's Copilot app at GitHub.
+    // A Copilot plan: the person enters GitHub's code for the host's Copilot app at GitHub. A Codex
+    // plan: they enter OpenAI's code for Codex at OpenAI, as Codex's own sign-in asks.
     private async Task<Result<SignInStarted>> StartCodeSignInAsync(AgentAccountsDbContext db, UserActor user, StartSignIn command, AgentAccountName name, CancellationToken ct)
     {
         if (command.Callback is not null)
         {
-            return new Result<SignInStarted>(Error.Validation("callback", "A Copilot plan signs in with a code, which returns nowhere."));
+            return new Result<SignInStarted>(Error.Validation("callback", "This plan signs in with a code, which returns nowhere."));
         }
 
-        GitHubDeviceCode code = await github.RequestDeviceCodeAsync(settings.CopilotClientId, ct);
-        CodeSignIn signIn = CodeSignIn.Start(user.UserId, command.Kind, name, code, box, time);
+        CodeSignIn signIn;
+        Uri verificationUrl;
+        if (command.Kind == AgentAccountKind.CodexPlan)
+        {
+            CodexDeviceCode code = await codex.StartAsync(ct);
+            signIn = CodeSignIn.Start(user.UserId, command.Kind, name, code.DeviceAuthId, code.UserCode, code.ExpiresIn, code.Interval, box, time);
+            verificationUrl = code.VerificationUrl;
+        }
+        else
+        {
+            GitHubDeviceCode code = await github.RequestDeviceCodeAsync(settings.CopilotClientId, ct);
+            signIn = CodeSignIn.Start(user.UserId, command.Kind, name, code.DeviceCode, code.UserCode, code.ExpiresIn, code.Interval, box, time);
+            verificationUrl = code.VerificationUri;
+        }
+
         db.CodeSignIns.Add(signIn);
         Result saved = await db.SaveAsync(ct);
         if (saved.Failed)
@@ -103,6 +117,6 @@ internal sealed partial class AgentAccountsApi
             return new Result<SignInStarted>(saved.Error);
         }
 
-        return new Result<SignInStarted>(signIn.ToStarted(code));
+        return new Result<SignInStarted>(signIn.ToStarted(verificationUrl));
     }
 }

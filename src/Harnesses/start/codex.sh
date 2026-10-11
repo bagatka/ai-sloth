@@ -2,8 +2,9 @@
 # Starts Codex's ACP adapter from the variables every harness takes (src/Harnesses/README.md).
 set -eu
 
+# OpenAI's API or ChatGPT's Codex backend: both the Responses API, at the gateway.
 case "$HARNESS_CREDENTIAL" in
-  openai) ;;
+  openai | codex) ;;
   *) echo "Codex doesn't take $HARNESS_CREDENTIAL." >&2; exit 64 ;;
 esac
 

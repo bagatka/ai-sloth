@@ -5,11 +5,21 @@ import { Spinner } from "@/components/ui/spinner"
 import { seconds } from "../api"
 import { CopyableCode } from "./section"
 
-// Signing in at GitHub with a code, as connecting GitHub and adding a Copilot plan do: the host gets
-// a code, the person enters it at GitHub and approves, and the page asks the host whether they have.
+// Signing in at a vendor with a code, as connecting GitHub and adding a Copilot or Codex plan do: the
+// host gets a code, the person enters it at the vendor and approves, and the page asks the host
+// whether they have.
 
-/** The code, the button that opens GitHub's page to enter it, and that the page is waiting. */
-export function CodeSteps({ code, url }: { code: string; url: string }) {
+/** The code, the button that opens the vendor's page to enter it, and that the page is waiting. */
+export function CodeSteps({
+  code,
+  url,
+  vendor = "GitHub",
+}: {
+  code: string
+  url: string
+  /** Where the code is entered, such as GitHub or OpenAI. */
+  vendor?: string
+}) {
   return (
     <>
       <CopyableCode code={code} />
@@ -19,7 +29,7 @@ export function CodeSteps({ code, url }: { code: string; url: string }) {
         rel="noopener noreferrer"
         className={buttonVariants({ className: "w-full" })}
       >
-        Open GitHub
+        Open {vendor}
         <ArrowSquareOutIcon data-icon="inline-end" />
       </a>
       <p
@@ -27,7 +37,7 @@ export function CodeSteps({ code, url }: { code: string; url: string }) {
         className="flex items-center gap-2 text-label text-muted-foreground"
       >
         <Spinner className="size-3.5" />
-        Waiting for you to approve it at GitHub
+        Waiting for you to approve it at {vendor}
       </p>
     </>
   )

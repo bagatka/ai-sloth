@@ -31,6 +31,10 @@ public sealed record AgentAccountsSettings
     /// models.dev's catalog of models, read daily for what's known of each model; <see langword="null"/>
     /// for <c>https://models.dev/api.json</c>. Tests change it.
     /// </param>
+    /// <param name="chatGptBackend">
+    /// ChatGPT's own backend, where a Codex plan's calls (at <c>/codex</c>) and usage go;
+    /// <see langword="null"/> for <c>https://chatgpt.com/backend-api</c>. Tests change it.
+    /// </param>
     /// <param name="claudeApi">Anthropic's API, where a Claude plan's models and usage are asked; <see langword="null"/> for <c>https://api.anthropic.com</c>. Tests change it.</param>
     public AgentAccountsSettings(
         bool allowClaudePlans = false,
@@ -41,8 +45,11 @@ public sealed record AgentAccountsSettings
         Uri? copilotApi = null,
         string? copilotClientId = null,
         Uri? modelsDevUrl = null,
-        Uri? claudeApi = null)
+        Uri? claudeApi = null,
+        Uri? chatGptBackend = null)
     {
+        ChatGptBackend = chatGptBackend ?? new Uri("https://chatgpt.com/backend-api");
+        CodexApi = new Uri(ChatGptBackend.AbsoluteUri.TrimEnd('/') + "/codex");
         ClaudeApi = claudeApi ?? new Uri("https://api.anthropic.com");
         ModelsDevUrl = modelsDevUrl ?? new Uri("https://models.dev/api.json");
         CopilotClientId = string.IsNullOrWhiteSpace(copilotClientId) ? AiSlothCopilotApp : copilotClientId;
@@ -78,6 +85,12 @@ public sealed record AgentAccountsSettings
 
     /// <summary>The GitHub OAuth app people sign in to for their Copilot plans, by its client ID.</summary>
     public string CopilotClientId { get; }
+
+    /// <summary>ChatGPT's own backend, where a Codex plan's usage is asked.</summary>
+    public Uri ChatGptBackend { get; }
+
+    /// <summary>ChatGPT's Codex backend, where a Codex plan's calls go and its models are listed.</summary>
+    public Uri CodexApi { get; }
 
     /// <summary>Anthropic's API, where a Claude plan's models and usage are asked.</summary>
     public Uri ClaudeApi { get; }

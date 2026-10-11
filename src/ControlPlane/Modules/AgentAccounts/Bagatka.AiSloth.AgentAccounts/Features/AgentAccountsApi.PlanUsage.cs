@@ -7,6 +7,7 @@ using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Sdk.Anthropic;
 using Bagatka.Sdk.GitHub;
+using Bagatka.Sdk.OpenAI;
 
 namespace Bagatka.AiSloth.AgentAccounts;
 
@@ -14,8 +15,9 @@ internal sealed partial class AgentAccountsApi
 {
     public async Task<Result<PlanUsage>> GetPlanUsageAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct)
     {
-        // Not handled: a ChatGPT plan's usage. ChatGPT shares it with no app that signs in with ChatGPT;
-        // its own page shows it (the web app links there).
+        // Asking the vendor takes what an agent's calls take, a Codex plan's token renewed when due. A
+        // ChatGPT plan's usage ChatGPT shares only with Codex's sign-in, and on its own page, which the
+        // web app links to.
         Result<AgentAccount> usable = await UsableAsync(actor, id, workspaceId, ct);
         if (usable.Failed)
         {
@@ -25,6 +27,10 @@ internal sealed partial class AgentAccountsApi
         AgentAccount account = usable.Output;
         switch (account.Kind)
         {
+            case AgentAccountKind.CodexPlan:
+                PlanSession session = account.Session(box)!;
+                IReadOnlyList<ChatGptUsageWindow> windows = await chatGptUsage.GetWindowsAsync(settings.ChatGptBackend, session.AccessToken, session.AccountId, ct);
+                return new Result<PlanUsage>(new PlanUsage(PlanMeters.OfChatGpt(windows), time.GetUtcNow()));
             case AgentAccountKind.CopilotPlan:
                 CopilotQuota quota = await github.GetCopilotQuotaAsync(account.PlanToken(box), ct);
                 return new Result<PlanUsage>(new PlanUsage(PlanMeters.OfCopilot(quota), time.GetUtcNow()));

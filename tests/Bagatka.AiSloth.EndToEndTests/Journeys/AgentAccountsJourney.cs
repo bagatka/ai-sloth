@@ -45,6 +45,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         await ACopilotPlanRunsCopilotAndPiThroughTheGatewayAsync();
         await AChoiceOfHarnessAccountAndModelIsSavedAsAPresetAsync();
         await AChatGptPlanIsAddedBySigningInAndRenewedOneCallAtATimeAsync();
+        await ACodexPlanRunsCodexOnChatGptsBackendAndShowsItsLimitsAsync();
     }
 
     public void Dispose()
@@ -325,6 +326,43 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Empty(usage.Meters);
         Assert.Equal("The agent couldn't start: " + AgentAccountsErrors.SignInEnded.Message, afterDisconnect.GetProperty("failure").GetString());
         Assert.True(accounts.Single(found => found.Id == plan.Id).NeedsSignIn);
+    }
+
+    // A ChatGPT plan signed in as Codex: a code the person enters at OpenAI. Codex's calls reach ChatGPT's
+    // Codex backend with the plan's token and its ChatGPT account, the token renewed one call at a
+    // time; its models are the backend's, pi can't use it, and ChatGPT says how much of the plan's
+    // five-hour and weekly windows is used.
+    private async Task ACodexPlanRunsCodexOnChatGptsBackendAndShowsItsLimitsAsync()
+    {
+        TestWorkspace workspace = await TestWorkspace.CreateAsync(app, _alice);
+        string subject = "alice-codex-" + Guid.CreateVersion7();
+        SignInStarted started = await Api.ReadAsync<SignInStarted>(_alice.SendPostAsync("/agent-accounts/sign-ins", new { kind = "CodexPlan", name = "My Codex" }), HttpStatusCode.OK);
+        SignInProgress pending = await Api.ReadAsync<SignInProgress>(_alice.SendPostAsync(CompletePath(started), new { }), HttpStatusCode.OK);
+        app.ChatGpt.ApproveCodex(started.UserCode!, subject);
+        SignInProgress approved = await Api.EventuallyAsync(async () =>
+        {
+            SignInProgress progress = await Api.ReadAsync<SignInProgress>(_alice.SendPostAsync(CompletePath(started), new { }), HttpStatusCode.OK);
+            return progress.Account is null ? null : progress;
+        });
+        AgentAccountSummary plan = approved.Account!;
+        IReadOnlyList<HarnessModel> models = await Api.ReadAsync<IReadOnlyList<HarnessModel>>(_alice.SendGetAsync(ModelsPath(workspace, "codex", plan.Id)), HttpStatusCode.OK);
+        Problem pi = await Api.ProblemAsync(_alice.SendGetAsync(ModelsPath(workspace, "pi", plan.Id)), HttpStatusCode.BadRequest);
+        int renewalsBefore = app.ChatGpt.CodexRenewals;
+
+        JsonElement[] ended = await Task.WhenAll(TurnAsync(workspace, "codex", plan.Id, FakeModel.CodexModel), TurnAsync(workspace, "codex", plan.Id, FakeModel.CodexModel));
+        PlanUsage usage = await Api.ReadAsync<PlanUsage>(_alice.SendGetAsync(UsagePath(workspace.Id, plan.Id)), HttpStatusCode.OK);
+
+        Assert.Null(pending.Account);
+        Assert.Equal((AgentAccountKind.CodexPlan, "My Codex"), (plan.Kind, plan.Name));
+        Assert.Equal([(FakeModel.CodexModel, "GPT-6.1 Sol")], models.Select(model => (model.Id, model.Name)));
+        Assert.Equal(["low", "medium", "high", "xhigh"], models[0].ThinkingLevels);
+        Assert.Equal(272_000, models[0].Facts.ContextWindow);
+        Assert.True(pi.Errors?.ContainsKey("account"));
+        Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
+        Assert.Contains(app.Model.CodexCalls, call => string.Equals(call.Path, "/backend-api/codex/responses", StringComparison.Ordinal) && string.Equals(call.Account, FakeChatGpt.CodexAccountOf(subject), StringComparison.Ordinal));
+        Assert.True(app.ChatGpt.CodexRenewals > renewalsBefore);
+        Assert.Equal(0, app.ChatGpt.CodexReusedRefreshTokens);
+        Assert.Equal([("5 hours", 42m, 100m), ("Week", 12m, 100m)], usage.Meters.Select(meter => (meter.Name, meter.Used, meter.Limit ?? 0)));
     }
 
     private async Task<SignInStarted> StartSignInAsync()

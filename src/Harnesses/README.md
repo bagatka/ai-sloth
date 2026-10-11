@@ -23,7 +23,7 @@ speak. Nothing here knows AiSloth; Chats is its caller.
 
   | Variable | Value |
   |---|---|
-  | `HARNESS_CREDENTIAL` | `openai`, `anthropic`, `openrouter`, `copilot`, or `claude-oauth-token` |
+  | `HARNESS_CREDENTIAL` | `openai`, `codex` (ChatGPT's Codex backend), `anthropic`, `openrouter`, `copilot`, or `claude-oauth-token` |
   | `HARNESS_MODEL_URL` | the model gateway's URL, for all but `claude-oauth-token` |
   | `HARNESS_TOKEN` | the gateway's token, or the harness's own token |
   | `HARNESS_MODEL` | the model's ID as its vendor names it (`IsModelId`) |

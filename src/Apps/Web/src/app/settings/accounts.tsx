@@ -46,7 +46,8 @@ import { NoRows, RemoveButton, Row, Rows, Section } from "./section"
 
 // Agent accounts: what pays for the agents' work. A workspace's account is for everyone who works
 // there; someone's own is for their chats alone. Most are added with a secret; a ChatGPT plan by
-// signing in with ChatGPT, and a Copilot plan with a code entered at GitHub.
+// signing in with ChatGPT, or with a code entered at OpenAI as Codex does, and a Copilot plan with a
+// code entered at GitHub.
 
 type Workspace = Schemas["WorkspaceSummary"]
 type Kind = Schemas["AgentAccountKind"]
@@ -99,6 +100,19 @@ const kindNames: Record<
     secret: null,
     endpoint: null,
   },
+  CodexPlan: {
+    name: "ChatGPT plan through Codex",
+    description:
+      "ChatGPT Plus or Pro, signed in as Codex, with its limits shown",
+    secret: null,
+    endpoint: null,
+  },
+}
+
+// The plans added with a code entered at their vendor, and where.
+const codeVendors: Partial<Record<Kind, string>> = {
+  CopilotPlan: "GitHub",
+  CodexPlan: "OpenAI",
 }
 
 // Where ChatGPT sends the browser back. ChatGPT returns only to this computer, where nothing
@@ -326,7 +340,9 @@ function AccountForm({
         <DialogDescription>
           {chosen.kind === "CopilotPlan"
             ? "Its token is kept on the host, sealed, and reaches only your Copilot; agents use it in their nooks."
-            : "It's kept on the host, sealed, and never shown again; agents reach their model through the host, so no nook holds it."}
+            : chosen.kind === "CodexPlan"
+              ? "Codex's sign-in is kept on the host, sealed, and renewed there; Codex reaches ChatGPT through the host, so no nook holds it."
+              : "It's kept on the host, sealed, and never shown again; agents reach their model through the host, so no nook holds it."}
         </DialogDescription>
       </DialogHeader>
       <FieldGroup>
@@ -390,8 +406,10 @@ function AccountForm({
           )}
         </Field>
       </FieldGroup>
-      {chosen.kind === "CopilotPlan" ? (
-        <CopilotSignIn
+      {codeVendors[chosen.kind] ? (
+        <CodeSignIn
+          kind={chosen.kind}
+          vendor={codeVendors[chosen.kind]!}
           name={name.trim() || names.name}
           closed={closed}
           onAdded={added}
@@ -584,14 +602,18 @@ function ChatGptSignIn({
   )
 }
 
-// Adding a Copilot plan: the host gets a code from GitHub, and the person enters it there and
-// approves, while the dialog asks the host whether they have, until the plan is added, the code
-// expires, or the dialog closes.
-function CopilotSignIn({
+// Adding a plan with a code: the host gets a code from the vendor (GitHub for Copilot, OpenAI for
+// Codex), and the person enters it there and approves, while the dialog asks the host whether they
+// have, until the plan is added, the code expires, or the dialog closes.
+function CodeSignIn({
+  kind,
+  vendor,
   name,
   closed,
   onAdded,
 }: {
+  kind: Kind
+  vendor: string
   name: string
   closed: React.RefObject<AbortController>
   onAdded: (account: Schemas["AgentAccountSummary"]) => void
@@ -600,7 +622,7 @@ function CopilotSignIn({
     mutationFn: () =>
       answer(
         api.POST("/agent-accounts/sign-ins", {
-          body: { kind: "CopilotPlan", name },
+          body: { kind, name },
         })
       ),
     onSuccess: (started) => approve.mutate(started),
@@ -657,11 +679,19 @@ function CopilotSignIn({
               start.mutate()
             }}
           >
-            {approve.data === null ? "Get a new code" : "Sign in with GitHub"}
+            {approve.data === null
+              ? "Get a new code"
+              : `Sign in with ${vendor}`}
           </Button>
         </DialogFooter>
       </>
     )
   }
-  return <CodeSteps code={start.data.userCode} url={start.data.url} />
+  return (
+    <CodeSteps
+      code={start.data.userCode}
+      url={start.data.url}
+      vendor={vendor}
+    />
+  )
 }

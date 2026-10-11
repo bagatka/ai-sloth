@@ -20,6 +20,10 @@ internal sealed partial class AgentAccountsApi
 {
     // OpenAI lists every model its API serves; an agent runs on its GPT, o-series, and Codex models,
     // never on those for audio, images, speech, search, embeddings, or moderation.
+    // The Codex the nook images run (src/Daemon/Dockerfile: codex-acp 2.1.1), whose models ChatGPT's
+    // Codex backend lists.
+    private const string NookCodexVersion = "0.159.3";
+
     private static readonly string[] NotForAgents = ["audio", "realtime", "image", "transcribe", "tts", "search", "embedding", "moderation", "instruct"];
 
     public async Task<Result<IReadOnlyList<AgentModel>>> ListModelsAsync(Actor actor, AgentAccountId id, WorkspaceId workspaceId, CancellationToken ct)
@@ -95,6 +99,13 @@ internal sealed partial class AgentAccountsApi
             return [.. listed.Select(Offered.Of)];
         }
 
+        // A Codex plan's models are those ChatGPT's Codex backend offers the Codex the nooks run.
+        if (used.Kind == AgentAccountKind.CodexPlan)
+        {
+            IReadOnlyList<OpenAIModel> codexModels = await openAI.ListCodexModelsAsync(endpoint.Url, endpoint.Headers, NookCodexVersion, ct);
+            return [.. codexModels.Select(model => new Offered(model.Id, model.DisplayName ?? model.Id, UsesTools: true, CodexFacts(model)))];
+        }
+
         if (used.Kind == AgentAccountKind.AnthropicApiKey)
         {
             IReadOnlyList<AnthropicModel> served = await anthropic.ListModelsAsync(endpoint.Url, endpoint.Headers, ct);
@@ -125,6 +136,12 @@ internal sealed partial class AgentAccountsApi
         };
         IReadOnlyList<AnthropicModel> served = await anthropic.ListModelsAsync(settings.ClaudeApi, signedIn, ct);
         return [.. served.Select(model => new Offered(model.Id, model.DisplayName, UsesTools: true, VendorFacts: null))];
+    }
+
+    // What the Codex backend states of a model: how hard it reasons, and its context.
+    private static ModelFacts CodexFacts(OpenAIModel model)
+    {
+        return new ModelFacts(model.ReasoningEfforts.Count > 0 ? true : null, model.ReasoningEfforts, model.ContextWindow, MaxOutput: null, Price: null, CacheLifetime: null);
     }
 
     private static bool RunsAgents(string model)

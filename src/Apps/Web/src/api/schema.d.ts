@@ -3072,7 +3072,7 @@ export interface components {
          * @description What an agent account is at its vendor, and so which harnesses can use it.
          * @enum {unknown}
          */
-        AgentAccountKind: "AnthropicApiKey" | "CopilotPlan" | "ClaudePlan" | "OpenAIApiKey" | "ChatGptPlan" | "OpenRouterApiKey";
+        AgentAccountKind: "AnthropicApiKey" | "CopilotPlan" | "ClaudePlan" | "OpenAIApiKey" | "ChatGptPlan" | "OpenRouterApiKey" | "CodexPlan";
         /** @description A kind of account as this host offers it. */
         AgentAccountKindSummary: {
             /** @description The kind. */

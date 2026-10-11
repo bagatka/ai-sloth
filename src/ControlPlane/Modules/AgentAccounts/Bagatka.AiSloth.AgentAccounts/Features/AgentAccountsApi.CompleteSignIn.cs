@@ -89,6 +89,11 @@ internal sealed partial class AgentAccountsApi
             return new Result<SignInProgress>(new SignInProgress(Account: null, wait));
         }
 
+        if (signIn.Kind == AgentAccountKind.CodexPlan)
+        {
+            return await CompleteCodexSignInAsync(db, user, signIn, now, ct);
+        }
+
         GitHubDevicePoll poll = await github.PollDeviceAsync(settings.CopilotClientId, signIn.DeviceCode(box), ct);
         if (poll.Tokens is null)
         {
@@ -111,6 +116,33 @@ internal sealed partial class AgentAccountsApi
 
         db.Accounts.Add(added.Output);
         return await AddedAsync(db, user, added.Output, ct);
+    }
+
+    // Asks OpenAI whether the person approved Codex's code. The plan's session, renewed by this host,
+    // becomes its secret; the model gateway adds its token to Codex's calls to ChatGPT's Codex backend.
+    private async Task<Result<SignInProgress>> CompleteCodexSignInAsync(AgentAccountsDbContext db, UserActor user, CodeSignIn signIn, DateTimeOffset now, CancellationToken ct)
+    {
+        ChatGptTokens? tokens = await codex.PollAsync(signIn.DeviceCode(box), signIn.UserCode!, ct);
+        if (tokens is null)
+        {
+            signIn.Polled(slowDown: null, now);
+            _ = await db.SaveAsync(ct);
+            return new Result<SignInProgress>(new SignInProgress(Account: null, signIn.Interval));
+        }
+
+        // A code works once: whatever happens next, this sign-in is over.
+        db.CodeSignIns.Remove(signIn);
+        ChatGptIdToken? identity = tokens.IdToken is null ? null : ChatGptSignInClient.ReadIdToken(tokens.IdToken);
+        if (identity is null)
+        {
+            _ = await db.SaveAsync(ct);
+            return new Result<SignInProgress>(Error.Conflict("agent_accounts.codex_no_identity", "OpenAI signed Codex in without saying who; start again."));
+        }
+
+        PlanSession session = PlanSession.Start(CodexSignInClient.ClientId, identity, tokens, now);
+        AgentAccount account = AgentAccount.SignedIn(user.UserId, signIn.Kind, signIn.Name, session, box, time);
+        db.Accounts.Add(account);
+        return await AddedAsync(db, user, account, ct);
     }
 
     // Waiting for the person, or over: expired, declined, or anything else GitHub says.

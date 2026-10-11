@@ -15,6 +15,7 @@ internal static class AccountCredentials
             AgentAccountKind.OpenRouterApiKey => CredentialKind.OpenRouterApi,
             AgentAccountKind.OpenAIApiKey or AgentAccountKind.ChatGptPlan => CredentialKind.OpenAIApi,
             AgentAccountKind.CopilotPlan => CredentialKind.CopilotApi,
+            AgentAccountKind.CodexPlan => CredentialKind.CodexApi,
             AgentAccountKind.ClaudePlan => CredentialKind.ClaudeOAuthToken,
         };
     }

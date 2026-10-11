@@ -40,4 +40,13 @@ public enum AgentAccountKind
     /// Anthropic's Messages API or OpenAI's APIs at OpenRouter. It never enters a nook.
     /// </summary>
     OpenRouterApiKey = 6,
+
+    /// <summary>
+    /// A ChatGPT plan, added by signing in the way Codex does, with a code entered at OpenAI
+    /// (<see cref="IAgentAccountsApi.StartSignInAsync"/>): Codex's calls go to ChatGPT's Codex backend,
+    /// whose answers carry the plan's five-hour and weekly limits, which ChatGPT also shares
+    /// (<see cref="IAgentAccountsApi.GetPlanUsageAsync"/>). Runs Codex only. Personal only, where the
+    /// deployment allows ChatGPT plans. It never enters a nook.
+    /// </summary>
+    CodexPlan = 7,
 }

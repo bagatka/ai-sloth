@@ -28,7 +28,7 @@ namespace Bagatka.AiSloth.EndToEndTests;
 /// signs in at once, as a person who allows everything asked. Every token set asks to be renewed
 /// right away, so every model call on a plan renews it.
 /// </summary>
-internal sealed class FakeChatGpt : IAsyncDisposable
+internal sealed partial class FakeChatGpt : IAsyncDisposable
 {
     private readonly WebApplication _app;
     private readonly Lock _lock = new Lock();
@@ -63,6 +63,9 @@ internal sealed class FakeChatGpt : IAsyncDisposable
         app.MapGet("/api/accounts/authorize", chatGpt.Authorize);
         app.MapPost("/api/accounts/oauth/token", chatGpt.TokenAsync);
         app.MapPost("/api/accounts/oauth/revoke", chatGpt.RevokeAsync);
+        app.MapPost("/api/accounts/deviceauth/usercode", chatGpt.CodexUserCodeAsync);
+        app.MapPost("/api/accounts/deviceauth/token", chatGpt.CodexApprovalAsync);
+        app.MapPost("/oauth/token", chatGpt.CodexTokenAsync);
         await app.StartAsync();
         IServerAddressesFeature? addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
         if (addresses is null)

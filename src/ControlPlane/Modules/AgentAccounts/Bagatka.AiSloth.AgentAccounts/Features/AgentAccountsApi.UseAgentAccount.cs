@@ -98,7 +98,11 @@ internal sealed partial class AgentAccountsApi
             return new Result<AgentAccount>(account);
         }
 
-        Result<ChatGptTokens> tokens = await chatGpt.RefreshAsync(session.ClientId, session.RefreshToken, CancellationToken.None);
+        // A Codex plan renews as Codex does; a ChatGPT plan with its own sign-in's client.
+        Task<Result<ChatGptTokens>> renewing = account.Kind == AgentAccountKind.CodexPlan
+            ? codex.RefreshAsync(session.RefreshToken, CancellationToken.None)
+            : chatGpt.RefreshAsync(session.ClientId, session.RefreshToken, CancellationToken.None);
+        Result<ChatGptTokens> tokens = await renewing;
         if (tokens.Failed)
         {
             // Every refusal means the session is over, such as after the person disconnected the app.

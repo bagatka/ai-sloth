@@ -9,4 +9,10 @@ namespace Bagatka.Sdk.OpenAI;
 [JsonSerializable(typeof(OpenAIWire.TokenResponse))]
 [JsonSerializable(typeof(OpenAIWire.ErrorResponse))]
 [JsonSerializable(typeof(OpenAIWire.IdTokenClaims))]
+[JsonSerializable(typeof(OpenAIWire.CodexUserCodeRequest))]
+[JsonSerializable(typeof(OpenAIWire.CodexUserCode))]
+[JsonSerializable(typeof(OpenAIWire.CodexPollRequest))]
+[JsonSerializable(typeof(OpenAIWire.CodexApproval))]
+[JsonSerializable(typeof(OpenAIWire.CodexRefreshRequest))]
+[JsonSerializable(typeof(OpenAIWire.CodexTokens))]
 internal sealed partial class OpenAIJsonContext : JsonSerializerContext;

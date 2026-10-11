@@ -121,6 +121,7 @@ public sealed record HarnessProfile(
             CredentialKind.AnthropicApi => ("anthropic", true),
             CredentialKind.OpenRouterApi => ("openrouter", true),
             CredentialKind.CopilotApi => ("copilot", true),
+            CredentialKind.CodexApi => ("codex", true),
             CredentialKind.ClaudeOAuthToken => ("claude-oauth-token", false),
         };
         if (modelApi != gateway is not null)

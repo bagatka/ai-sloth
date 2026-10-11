@@ -2,8 +2,9 @@
 
 Agent accounts are accounts at agent vendors that pay for agents' work: an API key for OpenAI's or
 Anthropic's API (at the vendor or at another endpoint that speaks it, such as a company's gateway),
-an OpenRouter key for many vendors' models, a ChatGPT plan added by signing in with ChatGPT, a
-Copilot plan added with a code entered at GitHub, or a Claude plan. A workspace's
+an OpenRouter key for many vendors' models, a ChatGPT plan added by signing in with ChatGPT or
+with a code entered at OpenAI as Codex does (a Codex plan), a Copilot plan added with a code entered
+at GitHub, or a Claude plan. A workspace's
 account serves everyone with Write on it; a personal account serves its owner, wherever they work.
 Secrets are encrypted at rest and never shown again, and the keys and plans of model APIs never enter
 a nook: the model gateway adds them to each call.
@@ -23,8 +24,10 @@ a nook: the model gateway adds them to each call.
   models: OpenAI's through `Bagatka.Sdk.OpenAI`, Anthropic's through `Bagatka.Sdk.Anthropic`,
   Copilot's through `Bagatka.Sdk.GitHub`, and OpenRouter's catalog through `Bagatka.Sdk.OpenRouter`.
   models.dev's open catalog of what each model takes, holds, and costs (`Catalog/`). What plans have
-  used of their limits: Copilot's quotas through `Bagatka.Sdk.GitHub` and Claude's windows through
-  `Bagatka.Sdk.Anthropic`, from the vendors' undocumented endpoints that their own clients read.
+  used of their limits: a Codex plan's windows through `Bagatka.Sdk.OpenAI`, Copilot's quotas through
+  `Bagatka.Sdk.GitHub`, and Claude's windows through `Bagatka.Sdk.Anthropic`, from the vendors'
+  undocumented endpoints that their own clients read. Codex's own sign-in (its device flow and
+  renewals, `CodexSignInClient`) and ChatGPT's Codex backend's models, through `Bagatka.Sdk.OpenAI`.
 
 ## Does not own
 
@@ -85,8 +88,8 @@ Schema `agent_accounts`. Table `accounts` (kind, name, workspace or owner — a 
 exactly one — when it was added, an API key's endpoint, when a sign-in ended, and the sealed
 secret: a key or token as given, or a plan's session as JSON). Table `sign_ins` (who, the account's
 kind and name, the callback, the state and nonce, when it expires, and the sealed PKCE verifier).
-Table `code_sign_ins` (who, the account's kind and name, the sealed device code, when it expires,
-and when GitHub may be asked next).
+Table `code_sign_ins` (who, the account's kind and name, the sealed device code and the code the
+person enters, when it expires, and when the vendor may be asked next).
 
 ## Background work
 
@@ -106,16 +109,23 @@ background.
   since a local run is self-hosted;
 - `CopilotClientId`, the GitHub OAuth app people sign in to for their Copilot plans: AiSloth's own
   unless the host names another;
-- `ChatGptAuthority`, `ChatGptApi`, `OpenRouterApi`, `CopilotApi`, `ClaudeApi`, and `ModelsDevUrl`,
+- `ChatGptAuthority` (Codex's sign-in too), `ChatGptApi`, `ChatGptBackend` (a Codex plan's calls, at
+  `/codex`, and its usage), `OpenRouterApi`, `CopilotApi`, `ClaudeApi`, and `ModelsDevUrl`,
   the vendors' own by default; tests point them at fakes. GitHub itself is the host's `GitHubClient`'s.
 
 ## Decisions and constraints
 
 - **A plan's limits, as its vendor counts them** (`PlanUsage`), asked of the vendor when someone
-  looks, where its own clients ask: Copilot's quotas (requests used of those allowed, or the credits
-  a plan without limits spent) and a Claude plan's windows. No vendor documents these answers. A
-  ChatGPT plan's usage stays on ChatGPT's own page: neither the API's answers to a Sign in with
-  ChatGPT token nor ChatGPT's backend (`/wham/usage`, which refuses that token) share it.
+  looks, where its own clients ask: a Codex plan's five-hour and weekly windows (ChatGPT's
+  `/wham/usage`, as Codex's `/status`), Copilot's quotas (requests used of those allowed, or the
+  credits a plan without limits spent), and a Claude plan's windows. No vendor documents these
+  answers. A ChatGPT plan signed in with ChatGPT has none: neither the API's answers to its token nor
+  ChatGPT's backend, which refuses that token, share them; ChatGPT's own page shows them.
+- **Two ways to a ChatGPT plan.** Sign in with ChatGPT is OpenAI's program for apps: its token calls
+  the API (`api.openai.com/v1`), for Codex and pi. A Codex plan signs in as Codex itself does, with
+  Codex's OAuth client: its token calls ChatGPT's Codex backend (`chatgpt.com/backend-api/codex`),
+  whose answers and usage carry the plan's limits, for Codex only. Both are renewed here, one renewal
+  at a time; neither enters a nook.
 
 - **One OpenRouter key, both APIs.** OpenRouter serves Anthropic's Messages API at its root
   (`/v1/messages`) and OpenAI's at `/v1`, so an OpenRouter key's endpoint is OpenRouter's root, with

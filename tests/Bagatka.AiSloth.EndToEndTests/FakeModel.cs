@@ -147,6 +147,9 @@ internal sealed class FakeModel : IAsyncDisposable
         app.MapGet("/models-dev/api.json", ModelsDev);
         app.MapPost("/copilot/responses", context => model.CopilotAsync(context, model.ResponsesAsync));
         app.MapPost("/copilot/chat/completions", context => model.CopilotAsync(context, model.ChatCompletionsAsync));
+        app.MapPost("/backend-api/codex/responses", context => model.CodexAsync(context, model.ResponsesAsync));
+        app.MapGet("/backend-api/codex/models", context => model.CodexAsync(context, CodexModelsAsync));
+        app.MapGet("/backend-api/wham/usage", context => model.CodexAsync(context, PlanUsageAsync));
         await app.StartAsync();
         IServerAddressesFeature? addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
         if (addresses is null)
@@ -258,6 +261,63 @@ internal sealed class FakeModel : IAsyncDisposable
             message["content"] = new JsonArray([.. blocks.Select(block => block.DeepClone())]);
             await context.Response.WriteAsJsonAsync(message, context.RequestAborted);
         }
+    }
+
+    /// <summary>The Codex models ChatGPT's Codex backend offers a plan signed in as Codex.</summary>
+    public const string CodexModel = "gpt-6.1-sol";
+
+    private static readonly string[] CodexEfforts = ["low", "medium", "high", "xhigh"];
+
+    /// <summary>Each Codex call ChatGPT's Codex backend answered: its path and the ChatGPT account it named.</summary>
+    public ConcurrentQueue<(string Path, string Account)> CodexCalls { get; } = new ConcurrentQueue<(string Path, string Account)>();
+
+    // ChatGPT's own backend, for Codex's sign-in only: an unexpired token for Codex's client, with the
+    // ChatGPT account it signed in to named alongside, as Codex sends it.
+    private async Task CodexAsync(HttpContext context, Func<HttpContext, Task> answer)
+    {
+        string authorization = context.Request.Headers.Authorization.ToString();
+        string[] parts = authorization.StartsWith("Bearer ", StringComparison.Ordinal) ? authorization["Bearer ".Length..].Split('.') : [];
+        JsonNode? claims = parts.Length == 3 ? JsonNode.Parse(System.Buffers.Text.Base64Url.DecodeFromChars(parts[1])) : null;
+        string? account = (string?)claims?["https://api.openai.com/auth"]?["chatgpt_account_id"];
+        bool genuine = string.Equals((string?)claims?["client_id"], FakeChatGpt.CodexClientId, StringComparison.Ordinal)
+            && (long?)claims?["exp"] > TimeProvider.System.GetUtcNow().ToUnixTimeSeconds()
+            && account is not null
+            && string.Equals(context.Request.Headers["ChatGPT-Account-Id"].ToString(), account, StringComparison.Ordinal);
+        if (!genuine)
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        CodexCalls.Enqueue((context.Request.Path.Value ?? string.Empty, account!));
+        await answer(context);
+    }
+
+    // Codex's catalog: the models it shows, how hard each reasons, and its context; one it hides.
+    private static async Task CodexModelsAsync(HttpContext context)
+    {
+        JsonArray levels = [.. CodexEfforts.Select(effort => (JsonNode)new JsonObject { ["effort"] = effort, ["description"] = effort })];
+        JsonObject shown = new JsonObject { ["slug"] = CodexModel, ["display_name"] = "GPT-6.1 Sol", ["visibility"] = "list", ["supported_reasoning_levels"] = levels, ["context_window"] = 272_000 };
+        JsonObject hidden = new JsonObject { ["slug"] = "codex-auto-review", ["display_name"] = "Auto review", ["visibility"] = "hide" };
+        await context.Response.WriteAsJsonAsync(new JsonObject { ["models"] = new JsonArray(shown, hidden) }, context.RequestAborted);
+    }
+
+    // The plan's five-hour and weekly windows, as Codex's /status reads them.
+    private static async Task PlanUsageAsync(HttpContext context)
+    {
+        long now = TimeProvider.System.GetUtcNow().ToUnixTimeSeconds();
+        JsonObject usage = new JsonObject
+        {
+            ["plan_type"] = "plus",
+            ["rate_limit"] = new JsonObject
+            {
+                ["allowed"] = true,
+                ["limit_reached"] = false,
+                ["primary_window"] = new JsonObject { ["used_percent"] = 42, ["limit_window_seconds"] = 18_000, ["reset_after_seconds"] = 7_200, ["reset_at"] = now + 7_200 },
+                ["secondary_window"] = new JsonObject { ["used_percent"] = 12, ["limit_window_seconds"] = 604_800, ["reset_after_seconds"] = 259_200, ["reset_at"] = now + 259_200 },
+            },
+        };
+        await context.Response.WriteAsJsonAsync(usage, context.RequestAborted);
     }
 
     // A streamed response with one short message, as OpenAI's Responses API streams it. Codex and pi

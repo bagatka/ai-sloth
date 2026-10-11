@@ -16,7 +16,7 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261011184219_NoReportedLimits";
+    public override string LastMigrationId => "20261011190413_CodexSignIns";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -121,6 +121,10 @@ partial class AgentAccountsDbContextModelSnapshot : ModelSnapshot
                     .IsRequired()
                     .HasColumnType("bytea")
                     .HasColumnName("sealed_device_code");
+
+                b.Property<string>("UserCode")
+                    .HasColumnType("text")
+                    .HasColumnName("user_code");
 
                 b.Property<Guid>("UserId")
                     .HasColumnType("uuid")

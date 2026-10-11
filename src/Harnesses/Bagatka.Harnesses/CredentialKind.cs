@@ -28,4 +28,10 @@ public enum CredentialKind
     /// <c>/v1/messages</c> and OpenAI's chat API at <c>/v1</c>, each with OpenRouter's names for models.
     /// </summary>
     OpenRouterApi = 5,
+
+    /// <summary>
+    /// ChatGPT's Codex backend, through a model gateway: a ChatGPT plan signed in as Codex. OpenAI's
+    /// Responses API, for Codex's own calls only.
+    /// </summary>
+    CodexApi = 6,
 }

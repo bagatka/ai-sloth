@@ -26,11 +26,11 @@ public static class HarnessProfiles
         ThinkingLevels: ["low", "medium", "high", "xhigh", "max"],
         DefaultThinking: "high");
 
-    /// <summary>Codex through its ACP adapter, on OpenAI's API.</summary>
+    /// <summary>Codex through its ACP adapter, on OpenAI's API or ChatGPT's Codex backend.</summary>
     public static HarnessProfile Codex { get; } = new HarnessProfile(
         "codex",
         "Codex",
-        [CredentialKind.OpenAIApi],
+        [CredentialKind.OpenAIApi, CredentialKind.CodexApi],
         SessionPaths: ["/root/.codex/sessions"],
         InstructionsPath: "/root/.codex/AGENTS.md",
         StatePaths: [],

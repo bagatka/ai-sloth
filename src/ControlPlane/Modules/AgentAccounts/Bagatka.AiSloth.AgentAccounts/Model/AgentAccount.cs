@@ -89,13 +89,13 @@ internal sealed class AgentAccount
     // Whether a signed-in plan's access token should be renewed before it is used.
     public bool RenewalDue(SecretBox box, DateTimeOffset now)
     {
-        return Kind == AgentAccountKind.ChatGptPlan && !NeedsSignIn && OpenSession(box).RenewalDue(now);
+        return Signs && !NeedsSignIn && OpenSession(box).RenewalDue(now);
     }
 
     // The plan's session, while it lasts: for renewing it, and for ending it at the vendor on removal.
     public PlanSession? Session(SecretBox box)
     {
-        if (Kind != AgentAccountKind.ChatGptPlan || NeedsSignIn)
+        if (!Signs || NeedsSignIn)
         {
             return null;
         }
@@ -144,6 +144,7 @@ internal sealed class AgentAccount
             AgentAccountKind.OpenAIApiKey => Through(Endpoint?.Value ?? OpenAIApi, "Authorization", "Bearer " + OpenSecret(box)),
             AgentAccountKind.OpenRouterApiKey => Through(settings.OpenRouterApi, "Authorization", "Bearer " + OpenSecret(box)),
             AgentAccountKind.ChatGptPlan => Through(settings.ChatGptApi, "Authorization", "Bearer " + OpenSession(box).AccessToken),
+            AgentAccountKind.CodexPlan => new AgentAccountAccess(new ModelEndpoint(settings.CodexApi, CodexHeaders(OpenSession(box)))),
             AgentAccountKind.CopilotPlan => new AgentAccountAccess(new ModelEndpoint(settings.CopilotApi, CopilotApi.Headers(OpenSecret(box)))),
             AgentAccountKind.ClaudePlan => new AgentAccountAccess(new HarnessToken(OpenSecret(box))),
         };
@@ -160,10 +161,25 @@ internal sealed class AgentAccount
             AgentAccountKind.AnthropicApiKey => new CatalogPricing(ModelCatalog.Anthropic, Estimate: false, Priced: Endpoint is null),
             AgentAccountKind.OpenAIApiKey => new CatalogPricing(ModelCatalog.OpenAI, Estimate: false, Priced: Endpoint is null),
             AgentAccountKind.OpenRouterApiKey => new CatalogPricing(ModelCatalog.OpenRouter, Estimate: false, Priced: true),
-            AgentAccountKind.ChatGptPlan => new CatalogPricing(ModelCatalog.OpenAI, Estimate: true, Priced: true),
+            AgentAccountKind.ChatGptPlan or AgentAccountKind.CodexPlan => new CatalogPricing(ModelCatalog.OpenAI, Estimate: true, Priced: true),
             AgentAccountKind.CopilotPlan => new CatalogPricing(ModelCatalog.Copilot, Estimate: true, Priced: true),
             AgentAccountKind.ClaudePlan => new CatalogPricing(ModelCatalog.Anthropic, Estimate: true, Priced: true),
         };
+    }
+
+    // The ChatGPT plans a session signs in to, renewed by this host.
+    private bool Signs => Kind is AgentAccountKind.ChatGptPlan or AgentAccountKind.CodexPlan;
+
+    // What ChatGPT's Codex backend takes, as Codex sends it: the plan's token and its ChatGPT account.
+    private static Dictionary<string, string> CodexHeaders(PlanSession session)
+    {
+        Dictionary<string, string> headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Authorization"] = "Bearer " + session.AccessToken };
+        if (session.AccountId is string account)
+        {
+            headers["ChatGPT-Account-Id"] = account;
+        }
+
+        return headers;
     }
 
     private static AgentAccountAccess Through(Uri url, string header, string value)

@@ -2,13 +2,12 @@ using System;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
-using Bagatka.Sdk.GitHub;
 
 namespace Bagatka.AiSloth.AgentAccounts.Model;
 
-// A sign-in with a code at GitHub (its device flow) waiting for the person: the account it will add.
-// The device code gets the token once they approve, so it is kept only sealed; GitHub is asked no more
-// often than it allows.
+// A sign-in with a code the person enters at the vendor (a device flow: GitHub's for Copilot, OpenAI's
+// for Codex) waiting for them: the account it will add. The device code gets the token once they
+// approve, so it is kept only sealed; the vendor is asked no more often than it allows.
 internal sealed class CodeSignIn
 {
     // Used by Start and by EF: parameter names match property names.
@@ -33,17 +32,20 @@ internal sealed class CodeSignIn
 
     public byte[] SealedDeviceCode { get; private set; } = [];
 
+    // What the person enters, which OpenAI wants back when asked whether they approved.
+    public string? UserCode { get; private set; }
+
     public DateTimeOffset ExpiresAt { get; private set; }
 
     public TimeSpan Interval { get; private set; }
 
     public DateTimeOffset NextPollAt { get; private set; }
 
-    public static CodeSignIn Start(UserId userId, AgentAccountKind kind, AgentAccountName name, GitHubDeviceCode code, SecretBox box, TimeProvider time)
+    public static CodeSignIn Start(UserId userId, AgentAccountKind kind, AgentAccountName name, string deviceCode, string userCode, TimeSpan expiresIn, TimeSpan interval, SecretBox box, TimeProvider time)
     {
         DateTimeOffset now = time.GetUtcNow();
-        CodeSignIn signIn = new CodeSignIn(SignInId.New(), userId, kind, name, now + code.ExpiresIn, code.Interval, now + code.Interval);
-        signIn.SealedDeviceCode = box.Seal(code.DeviceCode, signIn.Id.Value);
+        CodeSignIn signIn = new CodeSignIn(SignInId.New(), userId, kind, name, now + expiresIn, interval, now + interval) { UserCode = userCode };
+        signIn.SealedDeviceCode = box.Seal(deviceCode, signIn.Id.Value);
         return signIn;
     }
 
@@ -64,15 +66,15 @@ internal sealed class CodeSignIn
         return wait > TimeSpan.Zero ? wait : TimeSpan.Zero;
     }
 
-    // GitHub was asked; it may have asked for a longer interval.
+    // The vendor was asked; GitHub may have asked for a longer interval.
     public void Polled(TimeSpan? slowDown, DateTimeOffset now)
     {
         Interval = slowDown ?? Interval;
         NextPollAt = now + Interval;
     }
 
-    public SignInStarted ToStarted(GitHubDeviceCode code)
+    public SignInStarted ToStarted(Uri verificationUrl)
     {
-        return new SignInStarted(Id, code.VerificationUri, code.UserCode, ExpiresAt, Interval);
+        return new SignInStarted(Id, verificationUrl, UserCode, ExpiresAt, Interval);
     }
 }

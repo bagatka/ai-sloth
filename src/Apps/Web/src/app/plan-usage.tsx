@@ -17,9 +17,16 @@ const NearShare = 0.9
 const day = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" })
 const amount = new Intl.NumberFormat("en", { maximumFractionDigits: 1 })
 
-/** Whether the account is a plan whose vendor says what it used of its limits: Copilot and Claude do. */
+/**
+ * Whether the account is a plan whose vendor says what it used of its limits: Copilot and Claude do,
+ * and ChatGPT for a plan signed in as Codex.
+ */
 export function isPlan(account: Account): boolean {
-  return account.kind === "CopilotPlan" || account.kind === "ClaudePlan"
+  return (
+    account.kind === "CopilotPlan" ||
+    account.kind === "ClaudePlan" ||
+    account.kind === "CodexPlan"
+  )
 }
 
 /**

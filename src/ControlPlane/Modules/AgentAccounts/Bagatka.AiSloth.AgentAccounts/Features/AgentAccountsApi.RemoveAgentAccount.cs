@@ -43,10 +43,11 @@ internal sealed partial class AgentAccountsApi
             }
         }
 
-        // Signing out ends the session at the vendor. When the vendor can't be reached, the account goes
-        // anyway: its tokens are gone with it, and the person can disconnect the app at the vendor.
+        // Signing out ends a Sign in with ChatGPT session at the vendor; Codex's sign-in has no way to
+        // end one but forgetting it. When the vendor can't be reached, the account goes anyway: its
+        // tokens are gone with it, and the person can disconnect the app at the vendor.
         PlanSession? session = account.Session(box);
-        if (session is not null)
+        if (session is not null && account.Kind == AgentAccountKind.ChatGptPlan)
         {
             try
             {

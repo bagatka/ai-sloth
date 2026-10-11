@@ -80,6 +80,8 @@ public sealed class HarnessProfilesTests
         Assert.True(HarnessProfiles.Pi.Accepts(CredentialKind.CopilotApi));
         Assert.True(HarnessProfiles.ClaudeCode.Accepts(CredentialKind.OpenRouterApi));
         Assert.True(HarnessProfiles.Codex.Accepts(CredentialKind.OpenAIApi));
+        Assert.True(HarnessProfiles.Codex.Accepts(CredentialKind.CodexApi));
+        Assert.False(HarnessProfiles.Pi.Accepts(CredentialKind.CodexApi));
         Assert.False(HarnessProfiles.Codex.Accepts(CredentialKind.AnthropicApi));
         Assert.Equal(HarnessProfiles.Codex, HarnessProfiles.Find("codex"));
         Assert.Null(HarnessProfiles.Find("nowhere"));

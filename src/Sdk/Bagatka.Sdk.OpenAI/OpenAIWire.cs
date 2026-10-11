@@ -17,7 +17,9 @@ internal static class OpenAIWire
     internal sealed record CatalogModel(
         [property: JsonPropertyName("slug")] string Slug,
         [property: JsonPropertyName("display_name")] string? DisplayName,
-        [property: JsonPropertyName("visibility")] string? Visibility);
+        [property: JsonPropertyName("visibility")] string? Visibility,
+        [property: JsonPropertyName("supported_reasoning_levels")] IReadOnlyList<JsonElement>? SupportedReasoningLevels,
+        [property: JsonPropertyName("context_window")] long? ContextWindow);
 
     internal sealed record TokenResponse(
         [property: JsonPropertyName("access_token")] string? AccessToken,
@@ -38,5 +40,37 @@ internal static class OpenAIWire
         [property: JsonPropertyName("aud")] JsonElement Audience,
         [property: JsonPropertyName("exp")] long? ExpiresAt,
         [property: JsonPropertyName("nonce")] string? Nonce,
-        [property: JsonPropertyName("email")] string? Email);
+        [property: JsonPropertyName("email")] string? Email,
+        [property: JsonPropertyName("https://api.openai.com/auth")] AuthClaims? Auth);
+
+    internal sealed record CodexUserCodeRequest([property: JsonPropertyName("client_id")] string ClientId);
+
+    // Codex reads user_code or usercode, and the interval as a number or a string.
+    internal sealed record CodexUserCode(
+        [property: JsonPropertyName("device_auth_id")] string? DeviceAuthId,
+        [property: JsonPropertyName("user_code")] string? UserCode,
+        [property: JsonPropertyName("usercode")] string? UserCodeUnsplit,
+        [property: JsonPropertyName("interval")] JsonElement? Interval);
+
+    internal sealed record CodexPollRequest(
+        [property: JsonPropertyName("device_auth_id")] string DeviceAuthId,
+        [property: JsonPropertyName("user_code")] string UserCode);
+
+    internal sealed record CodexApproval(
+        [property: JsonPropertyName("authorization_code")] string? AuthorizationCode,
+        [property: JsonPropertyName("code_verifier")] string? CodeVerifier);
+
+    internal sealed record CodexRefreshRequest(
+        [property: JsonPropertyName("client_id")] string ClientId,
+        [property: JsonPropertyName("grant_type")] string GrantType,
+        [property: JsonPropertyName("refresh_token")] string RefreshToken,
+        [property: JsonPropertyName("scope")] string Scope);
+
+    internal sealed record CodexTokens(
+        [property: JsonPropertyName("id_token")] string? IdToken,
+        [property: JsonPropertyName("access_token")] string? AccessToken,
+        [property: JsonPropertyName("refresh_token")] string? RefreshToken,
+        [property: JsonPropertyName("expires_in")] long? ExpiresIn);
+
+    internal sealed record AuthClaims([property: JsonPropertyName("chatgpt_account_id")] string? ChatGptAccountId);
 }

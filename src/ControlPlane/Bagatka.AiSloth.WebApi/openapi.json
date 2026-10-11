@@ -2900,7 +2900,8 @@
           "ClaudePlan",
           "OpenAIApiKey",
           "ChatGptPlan",
-          "OpenRouterApiKey"
+          "OpenRouterApiKey",
+          "CodexPlan"
         ],
         "description": "What an agent account is at its vendor, and so which harnesses can use it."
       },

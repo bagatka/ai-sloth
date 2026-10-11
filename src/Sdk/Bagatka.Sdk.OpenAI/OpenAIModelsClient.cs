@@ -38,8 +38,26 @@ public sealed class OpenAIModelsClient : IDisposable
     public async Task<IReadOnlyList<OpenAIModel>> ListModelsAsync(Uri apiUrl, IReadOnlyDictionary<string, string> headers, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(apiUrl);
+        return await ReadModelsAsync(new Uri(apiUrl.AbsoluteUri.TrimEnd('/') + "/models"), headers, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The models ChatGPT's Codex backend at <paramref name="codexUrl"/>, such as
+    /// <c>https://chatgpt.com/backend-api/codex</c>, offers the plan of a Codex sign-in, as it lists
+    /// them for Codex <paramref name="clientVersion"/>: those meant for display, in its order, with how
+    /// hard each can reason and its context. Asked with <paramref name="headers"/>, never logged.
+    /// </summary>
+    public async Task<IReadOnlyList<OpenAIModel>> ListCodexModelsAsync(Uri codexUrl, IReadOnlyDictionary<string, string> headers, string clientVersion, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(codexUrl);
+        string url = codexUrl.AbsoluteUri.TrimEnd('/') + "/models?client_version=" + Uri.EscapeDataString(clientVersion);
+        return await ReadModelsAsync(new Uri(url), headers, ct).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<OpenAIModel>> ReadModelsAsync(Uri url, IReadOnlyDictionary<string, string> headers, CancellationToken ct)
+    {
         ArgumentNullException.ThrowIfNull(headers);
-        using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(apiUrl.AbsoluteUri.TrimEnd('/') + "/models"));
+        using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, url);
         foreach (KeyValuePair<string, string> header in headers)
         {
             request.Headers.TryAddWithoutValidation(header.Key, header.Value);
@@ -64,17 +82,39 @@ public sealed class OpenAIModelsClient : IDisposable
 
         if (list?.Data is IReadOnlyList<OpenAIWire.Model> models)
         {
-            return [.. models.Select(model => new OpenAIModel(model.Id, DisplayName: null, model.Created is long seconds ? DateTimeOffset.FromUnixTimeSeconds(seconds) : null))];
+            return [.. models.Select(model => new OpenAIModel(model.Id, DisplayName: null, model.Created is long seconds ? DateTimeOffset.FromUnixTimeSeconds(seconds) : null, [], ContextWindow: null))];
         }
 
         if (list?.Models is IReadOnlyList<OpenAIWire.CatalogModel> catalog)
         {
             return [.. catalog
                 .Where(model => model.Visibility is null or "list")
-                .Select(model => new OpenAIModel(model.Slug, model.DisplayName ?? model.Slug, Created: null))];
+                .Select(model => new OpenAIModel(model.Slug, model.DisplayName ?? model.Slug, Created: null, Efforts(model), model.ContextWindow is long tokens and > 0 and <= int.MaxValue ? (int)tokens : null))];
         }
 
         throw new HttpRequestException("The OpenAI API's answer has no list of models.");
+    }
+
+    // A catalog's reasoning levels, each an effort or an object naming one.
+    private static List<string> Efforts(OpenAIWire.CatalogModel model)
+    {
+        List<string> efforts = [];
+        foreach (JsonElement level in model.SupportedReasoningLevels ?? [])
+        {
+            JsonElement effort = level;
+            if (level.ValueKind == JsonValueKind.Object)
+            {
+                bool named = level.TryGetProperty("effort", out JsonElement value);
+                effort = named ? value : default;
+            }
+
+            if (effort.ValueKind == JsonValueKind.String)
+            {
+                efforts.Add(effort.GetString()!);
+            }
+        }
+
+        return efforts;
     }
 
     /// <inheritdoc />
