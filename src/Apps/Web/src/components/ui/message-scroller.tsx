@@ -32,12 +32,45 @@ function MessageScroller({
   )
 }
 
+// Keys that scroll toward the end; Shift+Space scrolls back.
+const towardEnd = new Set(["ArrowDown", "End", "PageDown", " "])
+
 function MessageScrollerViewport({
   className,
+  onWheel,
+  onKeyDown,
+  onTouchEnd,
   ...props
 }: React.ComponentProps<typeof MessageScrollerPrimitive.Viewport>) {
+  const { scrollToEnd } = useMessageScroller()
+  // Any wheel, touch, or scrolling key of the reader's stops the following, and reaching the end
+  // resumes it as the viewport scrolls there. At the end itself nothing scrolls, so a wheel or key
+  // toward it there (a trackpad's last flicks) resumes it here, as it would have stopped it for good.
+  function followAtEnd(viewport: HTMLElement) {
+    const left =
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
+    if (left <= endThreshold) {
+      scrollToEnd({ behavior: "auto" })
+    }
+  }
   return (
     <MessageScrollerPrimitive.Viewport
+      onWheel={(event) => {
+        onWheel?.(event)
+        if (event.deltaY >= 0) {
+          followAtEnd(event.currentTarget)
+        }
+      }}
+      onKeyDown={(event) => {
+        onKeyDown?.(event)
+        if (towardEnd.has(event.key) && !event.shiftKey) {
+          followAtEnd(event.currentTarget)
+        }
+      }}
+      onTouchEnd={(event) => {
+        onTouchEnd?.(event)
+        followAtEnd(event.currentTarget)
+      }}
       data-slot="message-scroller-viewport"
       className={cn(
         "size-full min-h-0 min-w-0 scroll-fade-y scrollbar-thin [scrollbar-gutter:stable_both-edges] overflow-y-auto overscroll-contain rounded-xl contain-content focus-visible:-outline-offset-2 data-autoscrolling:scrollbar-thumb-transparent data-autoscrolling:scrollbar-track-transparent data-pending-scroll:invisible",
@@ -47,6 +80,9 @@ function MessageScrollerViewport({
     />
   )
 }
+
+// How near its end, in pixels, the viewport counts as at it: the scroller's own default.
+const endThreshold = 8
 
 function MessageScrollerContent({
   className,

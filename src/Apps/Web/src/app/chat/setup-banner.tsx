@@ -10,6 +10,8 @@ import {
   WrenchIcon,
 } from "@phosphor-icons/react"
 
+import { cn } from "cn"
+
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -269,29 +271,16 @@ function FixedElsewhere({
   })
 
   return (
-    <Banner>
-      <Alert className={fixed ? "*:[svg]:text-primary" : undefined}>
-        {fixed ? <CheckCircleIcon /> : <WrenchIcon />}
-        <AlertTitle>
-          {fixed
-            ? `${setupOf} is fixed in another chat`
-            : failed
-              ? `${setupOf} still fails in another chat`
-              : `${setupOf} is being fixed in another chat`}
-        </AlertTitle>
-        <AlertDescription>
-          {fixed
-            ? "Use the fix here to run the setup with it."
-            : "This chat goes on without what it installs."}
-        </AlertDescription>
-        <div className="col-start-2 mt-2 flex items-center gap-2">
+    <Line
+      tone={fixed ? "done" : failed ? "warning" : "working"}
+      actions={
+        <>
           {fixed && !proposing && (
             <Button
-              size="sm"
+              size="xs"
               loading={use.isPending}
               onClick={() => use.mutate()}
             >
-              <WrenchIcon data-icon="inline-start" />
               Use the fix here
             </Button>
           )}
@@ -300,14 +289,20 @@ function FixedElsewhere({
             params={{ chatId: fixingIn }}
             className={buttonVariants({
               variant: fixed ? "ghost" : "outline",
-              size: "sm",
+              size: "xs",
             })}
           >
             Open it
           </Link>
-        </div>
-      </Alert>
-    </Banner>
+        </>
+      }
+    >
+      {fixed
+        ? `${setupOf} is fixed in another chat.`
+        : failed
+          ? `${setupOf} still fails in another chat.`
+          : `${setupOf} is being fixed in another chat.`}
+    </Line>
   )
 }
 
@@ -347,13 +342,43 @@ function Fixed({
 }
 
 function Working({ children }: { children: string }) {
+  return <Line tone="working">{children}</Line>
+}
+
+// One line: what's happening, and what to do about it at its end. With buttons or without, it's
+// the same height, so it doesn't jump as one comes or goes.
+function Line({
+  tone,
+  children,
+  actions,
+}: {
+  tone: "working" | "done" | "warning"
+  children: string
+  actions?: ReactNode
+}) {
   return (
     <Banner>
-      <Alert>
-        <CircleNotchIcon className="animate-spin motion-reduce:animate-none" />
-        <AlertDescription className="text-foreground">
+      <Alert
+        className={cn(
+          "flex flex-wrap items-center gap-x-3 gap-y-2 *:[svg]:translate-y-0",
+          actions ? "py-2" : "py-3",
+          tone === "done" && "*:[svg]:text-primary",
+          tone === "warning" && "*:[svg]:text-warning"
+        )}
+      >
+        {tone === "done" ? (
+          <CheckCircleIcon />
+        ) : tone === "warning" ? (
+          <WarningCircleIcon />
+        ) : (
+          <CircleNotchIcon className="animate-spin motion-reduce:animate-none" />
+        )}
+        <AlertDescription className="min-w-0 flex-1 text-foreground">
           {children}
         </AlertDescription>
+        {actions && (
+          <div className="flex shrink-0 items-center gap-1.5">{actions}</div>
+        )}
       </Alert>
     </Banner>
   )

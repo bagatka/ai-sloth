@@ -313,7 +313,7 @@ public sealed partial class WebJourney(ControlPlane app)
     }
 
     // The transcript follows the agent's newest output while the reader is at its end. Scrolled away,
-    // it stays where they put it as output arrives, and its button scrolls to the end, which follows
+    // it stays where they put it as output arrives; its button, or scrolling back to the end, follows
     // again. A short window makes the transcript scroll.
     private static async Task TheTranscriptFollowsOnlyWhileAtItsEndAsync(IPage page, TestWorkspace acme, ChatSummary chat)
     {
@@ -337,10 +337,23 @@ public sealed partial class WebJourney(ControlPlane app)
         await Assertions.Expect(replies).ToHaveCountAsync(replied + 2, new LocatorAssertionsToHaveCountOptions { Timeout = 60_000 });
         bool atEnd = await viewport.EvaluateAsync<bool>("node => node.scrollHeight - node.scrollTop - node.clientHeight < 2");
         await WebBrowser.ShotAsync(page, "following");
+
+        // Scrolling back down follows again, even when the wheel goes on turning at the end. The mouse
+        // leaves the scroll button's place first: a wheel over the button scrolls nothing.
+        await viewport.HoverAsync(new LocatorHoverOptions { Position = new Position { X = 40, Y = 40 } });
+        await page.Mouse.WheelAsync(0, -300);
+        await Assertions.Expect(toEnd).ToHaveAttributeAsync("data-active", "true");
+        await page.Mouse.WheelAsync(0, 2000);
+        await Assertions.Expect(toEnd).ToHaveAttributeAsync("data-active", "false");
+        await page.Mouse.WheelAsync(0, 100);
+        await acme.SendAsync(chat, "say hello at the end");
+        await Assertions.Expect(replies).ToHaveCountAsync(replied + 3, new LocatorAssertionsToHaveCountOptions { Timeout = 60_000 });
+        bool followedAgain = await viewport.EvaluateAsync<bool>("node => node.scrollHeight - node.scrollTop - node.clientHeight < 2");
         await page.SetViewportSizeAsync(1440, 900);
 
         Assert.Equal(before, after, 1);
         Assert.True(atEnd);
+        Assert.True(followedAgain);
     }
 
     // The model holds a call that says Wait, so the turn runs until it's released.
