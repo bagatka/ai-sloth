@@ -14,12 +14,11 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <param name="Account">The agent account that pays for its work: the workspace's, or the actor's own.</param>
 /// <param name="Model">
 /// The model its agent runs on, as the account's vendor names it, such as <c>openai/gpt-6-luna</c>
-/// (<see cref="IChatsApi.ListModelsAsync"/>); or <see langword="null"/> for the harness's default.
-/// Only for harnesses that take one: Claude Code, Codex, and pi.
+/// (<see cref="IChatsApi.ListModelsAsync"/>, whose first a new chat starts on unless someone chose).
 /// </param>
 /// <param name="Thinking">
-/// How hard its agent thinks, one of its harness's <see cref="HarnessSummary.ThinkingLevels"/>; or
-/// <see langword="null"/> for the harness's default.
+/// How hard its agent thinks, one of its harness's <see cref="HarnessSummary.ThinkingLevels"/>, such as
+/// its <see cref="HarnessSummary.DefaultThinking"/>.
 /// </param>
 /// <param name="Repositories">The workspace's repositories its nook starts with, each at <c>/work/&lt;name&gt;</c>; empty for none.</param>
 /// <param name="CopyOf">
@@ -35,8 +34,8 @@ public sealed record StartChat(
     string Provider,
     string Harness,
     AgentAccountId Account,
-    string? Model,
-    string? Thinking,
+    string Model,
+    string Thinking,
     IReadOnlyList<NookRepository> Repositories,
     ChatId? CopyOf,
     int? Checkpoint);

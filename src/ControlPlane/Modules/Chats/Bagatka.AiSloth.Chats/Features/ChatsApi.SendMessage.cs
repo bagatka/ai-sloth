@@ -35,18 +35,10 @@ internal sealed partial class ChatsApi
         Chat chat = found.Output;
         bool? mayUseAccount = await accounts.MayUseAsync(actor, chat.AgentAccountId, chat.WorkspaceId, ct);
         bool isProposal = mayUseAccount == false;
-        if (command.Proposal is not null)
+        Error? refused = await RefusalAsync(db, chat, command.Proposal, isProposal, ct);
+        if (refused is not null)
         {
-            if (isProposal)
-            {
-                return new Result<ChatMessage>(Error.Forbidden);
-            }
-
-            bool proposed = await db.Messages.AnyAsync(message => message.Id == command.Proposal && message.ChatId == chat.Id && message.State == MessageState.Proposed, ct);
-            if (!proposed)
-            {
-                return new Result<ChatMessage>(Error.Validation("proposal", "The chat has no such proposal."));
-            }
+            return new Result<ChatMessage>(refused);
         }
 
         Result<Message> sent = Message.Send(command.ChatId, user.UserId, command.Text, isProposal, command.Proposal, time);
@@ -74,5 +66,28 @@ internal sealed partial class ChatsApi
         runners.Wake(command.ChatId);
         signals.Notify(chat.WorkspaceId);
         return new Result<ChatMessage>(message.ToContract());
+    }
+
+    // Why a message can't go, if it can't: the chat has no model yet, or it sends on a proposal that
+    // isn't the chat's, or as someone whose messages are proposals themselves.
+    private static async Task<Error?> RefusalAsync(ChatsDbContext db, Chat chat, MessageId? proposal, bool isProposal, CancellationToken ct)
+    {
+        if (chat.Model is null && !chat.AgentChangeWaiting)
+        {
+            return ChatsErrors.ModelNotChosen;
+        }
+
+        if (proposal is null)
+        {
+            return null;
+        }
+
+        if (isProposal)
+        {
+            return Error.Forbidden;
+        }
+
+        bool proposed = await db.Messages.AnyAsync(message => message.Id == proposal && message.ChatId == chat.Id && message.State == MessageState.Proposed, ct);
+        return proposed ? null : Error.Validation("proposal", "The chat has no such proposal.");
     }
 }

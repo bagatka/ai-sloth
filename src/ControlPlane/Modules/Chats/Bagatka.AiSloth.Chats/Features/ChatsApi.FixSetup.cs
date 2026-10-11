@@ -114,8 +114,13 @@ internal sealed partial class ChatsApi
         }
 
         ChatSummary like = await SummaryAsync(db, failed, ct);
+        if (like.Model is not string model)
+        {
+            return new Result<ChatSummary>(ChatsErrors.ModelNotChosen);
+        }
+
         NookRepository[] repositories = [.. nook.Output.Sources.Select(source => new NookRepository(source.Repository, source.Branch))];
-        StartChat start = new StartChat(failed.WorkspaceId, nook.Output.Provider, like.Harness, like.Account, like.Model, like.Thinking, repositories, CopyOf: null, Checkpoint: null);
+        StartChat start = new StartChat(failed.WorkspaceId, nook.Output.Provider, like.Harness, like.Account, model, like.Thinking, repositories, CopyOf: null, Checkpoint: null);
         Result<ChatSummary> started = await StartAsync(actor, start, ct);
         return started;
     }

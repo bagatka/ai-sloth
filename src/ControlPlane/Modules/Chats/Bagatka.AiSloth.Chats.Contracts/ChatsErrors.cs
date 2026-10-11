@@ -22,6 +22,12 @@ public static class ChatsErrors
     /// <summary>The chat's setup didn't fail, so there is nothing to fix.</summary>
     public static readonly Error SetupNotFailed = Error.Conflict("chats.setup_not_failed", "This chat's setup didn't fail; there is nothing to fix.");
 
+    /// <summary>
+    /// The chat, started before every chat had a model, has none yet: choose one
+    /// (<see cref="IChatsApi.ChangeModelAsync"/>) first.
+    /// </summary>
+    public static readonly Error ModelNotChosen = Error.Conflict("chats.model_not_chosen", "Choose this chat's model first.");
+
     /// <summary>No chat fixes the chat's setup: start one with <see cref="IChatsApi.FixSetupAsync"/>.</summary>
     public static readonly Error NoSetupFix = Error.Conflict("chats.no_setup_fix", "No chat fixes this chat's setup yet.");
 

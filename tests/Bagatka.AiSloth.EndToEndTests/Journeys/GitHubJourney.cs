@@ -73,7 +73,7 @@ public sealed class GitHubJourney(ControlPlane app) : IDisposable
 
         Assert.Equal((0, 0, 0, 0, 0), (connected, added, chatted, pushed, downloaded));
         Assert.Contains("Connected GitHub as " + _login + ".", connectedOutput, StringComparison.Ordinal);
-        Assert.Matches("^Chat [0-9a-f]{6} · Claude Code · Fake · cloud · api\n", chatOutput);
+        Assert.Matches("^Chat [0-9a-f]{6} · Claude Code · " + FakeModel.OpenRouterClaude + " · high · Fake · cloud · api\n", chatOutput);
         Assert.Equal((0, 0), (copied, guided));
         Assert.Matches("^api: 1 commits on " + branch + "  http://127.0.0.1:[0-9]+/" + _owner + "/api/pull/1\n", pushedOutput);
         Assert.True(archived > 0);
@@ -107,7 +107,7 @@ public sealed class GitHubJourney(ControlPlane app) : IDisposable
     private async Task AChatCopiedFromItStartsWithItsChangesAndRepositoryAsync(ChatSummary chat)
     {
         ChatSummary copy = await Api.ReadAsync<ChatSummary>(
-            Ada.SendPostAsync(Paths.Workspace(chat.WorkspaceId) + "/chats", new { provider = "docker", harness = "claude-code", account = chat.Account, copyOf = chat.Id }), HttpStatusCode.Created);
+            Ada.SendPostAsync(Paths.Workspace(chat.WorkspaceId) + "/chats", new { provider = "docker", harness = "claude-code", account = chat.Account, model = TestWorkspace.AnyModel, thinking = TestWorkspace.AnyThinking, copyOf = chat.Id }), HttpStatusCode.Created);
         int? copied = await NookProcesses.ExitCodeAsync(Ada, copy.NookId, "grep", "-q", "hi", "/work/api/CHANGE.md");
         NookSummary original = await Api.ReadAsync<NookSummary>(Ada.SendGetAsync(Paths.Nook(chat.NookId)), HttpStatusCode.OK);
         NookSummary copyNook = await Api.ReadAsync<NookSummary>(Ada.SendGetAsync(Paths.Nook(copy.NookId)), HttpStatusCode.OK);

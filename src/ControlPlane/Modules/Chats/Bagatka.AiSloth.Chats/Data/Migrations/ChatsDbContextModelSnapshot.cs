@@ -16,7 +16,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261011111928_RunningASetupAgain";
+    public override string LastMigrationId => "20261011132551_ExplicitModels";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -134,6 +134,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnName("supports_steering");
 
                 b.Property<string>("Thinking")
+                    .IsRequired()
                     .HasMaxLength(16)
                     .HasColumnType("character varying(16)")
                     .HasColumnName("thinking");
@@ -290,6 +291,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnName("harness");
 
                 b.Property<string>("Model")
+                    .IsRequired()
                     .HasMaxLength(200)
                     .HasColumnType("character varying(200)")
                     .HasColumnName("model");
@@ -305,6 +307,7 @@ partial class ChatsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnName("owner_id");
 
                 b.Property<string>("Thinking")
+                    .IsRequired()
                     .HasMaxLength(16)
                     .HasColumnType("character varying(16)")
                     .HasColumnName("thinking");

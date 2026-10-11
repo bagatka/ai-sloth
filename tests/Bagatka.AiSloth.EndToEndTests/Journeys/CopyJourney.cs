@@ -60,7 +60,7 @@ public sealed class CopyJourney(ControlPlane app) : IDisposable
     private async Task AChatCopiedNowStartsWithTheFilesAsTheyAreAsync(ChatSummary first)
     {
         ChatSummary copy = await Api.ReadAsync<ChatSummary>(
-            Erin.SendPostAsync(Paths.Workspace(first.WorkspaceId) + "/chats", new { provider = "docker", harness = "claude-code", account = first.Account, copyOf = first.Id }), HttpStatusCode.Created);
+            Erin.SendPostAsync(Paths.Workspace(first.WorkspaceId) + "/chats", new { provider = "docker", harness = "claude-code", account = first.Account, model = TestWorkspace.AnyModel, thinking = TestWorkspace.AnyThinking, copyOf = first.Id }), HttpStatusCode.Created);
 
         int? copied = await NookProcesses.ExitCodeAsync(Erin, copy.NookId, "grep", "-q", "changed", "/work/hello.txt");
 

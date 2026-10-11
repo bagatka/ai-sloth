@@ -149,8 +149,8 @@ public sealed class WebSetupJourney(ControlPlane app)
         await WebBrowser.ShotAsync(page, "setup-preset");
         await dialog.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Save preset" }).ClickAsync();
 
-        await Assertions.Expect(presets.GetByText("pi · GPT-6 Luna")).ToBeVisibleAsync(WebBrowser.Shown);
-        await Assertions.Expect(presets.GetByText("pi, " + FakeModel.OpenRouterModel + ", OpenRouter")).ToBeVisibleAsync();
+        await Assertions.Expect(presets.GetByText("pi · GPT-6 Luna · Medium")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(presets.GetByText("pi, " + FakeModel.OpenRouterModel + ", Medium thinking, OpenRouter")).ToBeVisibleAsync();
     }
 
     private static async Task<string> InvitesSomeoneAsync(IPage page)
@@ -195,7 +195,7 @@ public sealed class WebSetupJourney(ControlPlane app)
         ILocator model = page.GetByRole(AriaRole.Combobox, new PageGetByRoleOptions { Name = "Model", Exact = true });
         ILocator presets = page.GetByRole(AriaRole.Group, new PageGetByRoleOptions { Name = "Presets", Exact = true });
         await Assertions.Expect(model).ToContainTextAsync("gpt-6-luna");
-        await Assertions.Expect(presets.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "pi · GPT-6 Luna", Pressed = true })).ToBeVisibleAsync();
+        await Assertions.Expect(presets.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "pi · GPT-6 Luna · Medium", Pressed = true })).ToBeVisibleAsync();
         await model.ClickAsync();
         await WebBrowser.ShotAsync(page, "setup-new-chat-models");
         await page.GetByLabel("Search models").FillAsync("terra");

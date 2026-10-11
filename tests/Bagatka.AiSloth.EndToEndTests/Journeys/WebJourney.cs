@@ -175,13 +175,14 @@ public sealed partial class WebJourney(ControlPlane app)
 
         await page.GetByRole(AriaRole.Combobox, new PageGetByRoleOptions { Name = "Model", Exact = true }).ClickAsync();
         await WebBrowser.ShotAsync(page, "model-picker");
-        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "Default" }).ClickAsync();
-        await Assertions.Expect(page.GetByText("Switched to the agent's default model.")).ToBeVisibleAsync(WebBrowser.Shown);
+        await page.GetByLabel("Search models").FillAsync("terra");
+        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "OpenAI: GPT-5.6 Terra" }).ClickAsync();
+        await Assertions.Expect(page.GetByText("Switched to " + FakeModel.OpenAIModel + ", thinking high.")).ToBeVisibleAsync(WebBrowser.Shown);
         await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Thinking" }).ClickAsync();
         await page.GetByRole(AriaRole.Menuitemradio, new PageGetByRoleOptions { Name = "Extra high" }).ClickAsync();
-        await Assertions.Expect(page.GetByText("Switched to the agent's default model, thinking extra high.")).ToBeVisibleAsync(WebBrowser.Shown);
+        await Assertions.Expect(page.GetByText("Switched to " + FakeModel.OpenAIModel + ", thinking extra high.")).ToBeVisibleAsync(WebBrowser.Shown);
         Page<ChatSummary> chats = await Api.ReadAsync<Page<ChatSummary>>(acme.Person.SendGetAsync(acme.Path + "/chats"), HttpStatusCode.OK);
-        Assert.Equal((null, "xhigh"), (chats.Items[0].Model, chats.Items[0].Thinking));
+        Assert.Equal((FakeModel.OpenAIModel, "xhigh"), (chats.Items[0].Model, chats.Items[0].Thinking));
         return chats.Items[0];
     }
 

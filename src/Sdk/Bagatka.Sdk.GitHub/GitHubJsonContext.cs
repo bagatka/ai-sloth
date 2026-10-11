@@ -15,4 +15,5 @@ namespace Bagatka.Sdk.GitHub;
 [JsonSerializable(typeof(IReadOnlyList<GitHubWire.PullRequest>))]
 [JsonSerializable(typeof(GitHubWire.NewPullRequest))]
 [JsonSerializable(typeof(GitHubWire.Problem))]
+[JsonSerializable(typeof(GitHubWire.CopilotModelList))]
 internal sealed partial class GitHubJsonContext : JsonSerializerContext;

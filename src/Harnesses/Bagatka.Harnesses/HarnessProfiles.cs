@@ -23,8 +23,9 @@ public static class HarnessProfiles
         SessionPaths: ["/root/.claude/projects"],
         InstructionsPath: "/root/.claude/CLAUDE.md",
         StatePaths: ["/root/.claude/memory"],
-        TakesModel: true,
-        ThinkingLevels: ["low", "medium", "high", "xhigh", "max"]);
+        ModelFamily: "claude",
+        ThinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+        DefaultThinking: "high");
 
     /// <summary>Codex through its ACP adapter, on OpenAI's API.</summary>
     public static HarnessProfile Codex { get; } = new HarnessProfile(
@@ -34,8 +35,9 @@ public static class HarnessProfiles
         SessionPaths: ["/root/.codex/sessions"],
         InstructionsPath: "/root/.codex/AGENTS.md",
         StatePaths: [],
-        TakesModel: true,
-        ThinkingLevels: ["low", "medium", "high", "xhigh"]);
+        ModelFamily: "gpt",
+        ThinkingLevels: ["low", "medium", "high", "xhigh"],
+        DefaultThinking: "medium");
 
     /// <summary>pi through its ACP adapter, on OpenAI's or Anthropic's API, OpenRouter, or a Copilot plan.</summary>
     public static HarnessProfile Pi { get; } = new HarnessProfile(
@@ -45,8 +47,9 @@ public static class HarnessProfiles
         SessionPaths: ["/root/.pi/agent/sessions"],
         InstructionsPath: "/root/.pi/agent/AGENTS.md",
         StatePaths: [],
-        TakesModel: true,
-        ThinkingLevels: ["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
+        ModelFamily: null,
+        ThinkingLevels: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
+        DefaultThinking: "medium");
 
     /// <summary>GitHub Copilot CLI in ACP mode, drawing on the token owner's Copilot plan.</summary>
     public static HarnessProfile Copilot { get; } = new HarnessProfile(
@@ -56,8 +59,9 @@ public static class HarnessProfiles
         SessionPaths: ["/root/.copilot/session-state"],
         InstructionsPath: "/root/.copilot/copilot-instructions.md",
         StatePaths: [],
-        TakesModel: false,
-        ThinkingLevels: []);
+        ModelFamily: null,
+        ThinkingLevels: ["none", "minimal", "low", "medium", "high", "xhigh", "max"],
+        DefaultThinking: "medium");
 
     /// <summary>Every harness, in the order people see them.</summary>
     public static IReadOnlyList<HarnessProfile> All { get; } = [ClaudeCode, Codex, Pi, Copilot];

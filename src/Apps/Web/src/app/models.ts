@@ -3,7 +3,8 @@
 
 /**
  * What a chat runs on: its agent (harness), the account that pays, the model, and how hard it thinks;
- * the harness's own default for a model or thinking level of null.
+ * a model or thinking level of null isn't chosen yet. A new chat fills them in, in sight, before it
+ * starts: the first model the account lists for the agent, and the agent's default thinking level.
  */
 export type Choice = {
   harness: string
@@ -12,7 +13,11 @@ export type Choice = {
   thinking: string | null
 }
 
+/** A choice with nothing left open, as chats start and change on. */
+export type Chosen = Choice & { model: string; thinking: string }
+
 const thinkingNames: Record<string, string> = {
+  none: "None",
   off: "Off",
   minimal: "Minimal",
   low: "Low",

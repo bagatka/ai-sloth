@@ -19,16 +19,10 @@ case "$HARNESS_CREDENTIAL" in
   *) echo "Claude Code doesn't take $HARNESS_CREDENTIAL." >&2; exit 64 ;;
 esac
 
-# The chat's model, when one was chosen, does its main work whichever alias Claude Code starts on;
-# side calls keep the small model.
-if [ -n "${HARNESS_MODEL:-}" ]; then
-  export ANTHROPIC_MODEL="$HARNESS_MODEL" ANTHROPIC_DEFAULT_OPUS_MODEL="$HARNESS_MODEL" ANTHROPIC_DEFAULT_SONNET_MODEL="$HARNESS_MODEL"
-fi
-
-# How hard it thinks, when chosen: low, medium, high, xhigh, or max.
-if [ -n "${HARNESS_THINKING:-}" ]; then
-  export CLAUDE_CODE_EFFORT_LEVEL="$HARNESS_THINKING"
-fi
+# The chat's model does its main work whichever alias Claude Code starts on; side calls keep the
+# small model. It thinks as hard as chosen: low, medium, high, xhigh, or max.
+export ANTHROPIC_MODEL="$HARNESS_MODEL" ANTHROPIC_DEFAULT_OPUS_MODEL="$HARNESS_MODEL" ANTHROPIC_DEFAULT_SONNET_MODEL="$HARNESS_MODEL"
+export CLAUDE_CODE_EFFORT_LEVEL="$HARNESS_THINKING"
 
 # Its memory goes to one place whatever folder it works in, so a host can keep it between nooks: user
 # settings name it, keeping whatever else they hold. Repositories' settings can't move it.

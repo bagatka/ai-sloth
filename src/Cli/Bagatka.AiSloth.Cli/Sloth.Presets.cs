@@ -33,8 +33,7 @@ internal sealed partial class Sloth
         foreach (Wire.Preset preset in presets)
         {
             string account = accounts.FirstOrDefault(found => found.Id == preset.Account)?.Name ?? "an account";
-            string thinking = preset.Thinking is null ? string.Empty : " · " + preset.Thinking;
-            await terminal.WriteLineAsync(preset.Name.PadRight(width) + "  " + preset.Harness + " · " + (preset.Model ?? "default model") + thinking + " · " + account);
+            await terminal.WriteLineAsync(preset.Name.PadRight(width) + "  " + preset.Harness + " · " + preset.Model + " · " + preset.Thinking + " · " + account);
         }
 
         return 0;
@@ -61,10 +60,23 @@ internal sealed partial class Sloth
             return 1;
         }
 
+        // A model or thinking level not given is the first the account lists, and the agent's default.
+        string? model = line.Value("--model");
+        if (model is null)
+        {
+            model = await FirstModelAsync(api, workspace, agent.Harness, agent.Account, ct);
+        }
+
+        if (model is null)
+        {
+            await terminal.FailAsync("\"" + agent.Account.Name + "\" lists no model " + agent.Harness.Name + " can run on.");
+            return 1;
+        }
+
         Wire.Preset preset = await api.SendAsync(
             HttpMethod.Post,
             "/workspaces/" + workspace + "/presets",
-            new Wire.AddPreset(agent.Harness.Id, agent.Account.Id, line.Value("--model"), line.Value("--thinking"), line.Value("--name")),
+            new Wire.AddPreset(agent.Harness.Id, agent.Account.Id, model, line.Value("--thinking") ?? agent.Harness.DefaultThinking, line.Value("--name")),
             CliJsonContext.Default.AddPreset,
             CliJsonContext.Default.Preset,
             ct);
@@ -141,7 +153,7 @@ internal sealed partial class Sloth
         IReadOnlyList<Wire.Model> models = await api.GetAsync(path, CliJsonContext.Default.IReadOnlyListModel, ct);
         if (models.Count == 0)
         {
-            await terminal.WriteLineAsync(harness.Name + " runs on its own default model with \"" + account.Name + "\".");
+            await terminal.WriteLineAsync("\"" + account.Name + "\" lists no model " + harness.Name + " can run on.");
             return 0;
         }
 

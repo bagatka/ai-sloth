@@ -17,9 +17,10 @@ namespace Bagatka.AiSloth.Chats.Contracts;
 /// <param name="Working">Whether the agent is working on a turn, or messages wait for it.</param>
 /// <param name="Harness">The harness that runs its agent.</param>
 /// <param name="Model">
-/// The model its agent runs on from its next turn; <see langword="null"/> for the harness's default.
+/// The model its agent runs on from its next turn; <see langword="null"/> only for a chat started before
+/// every chat had one, which takes one (<see cref="IChatsApi.ChangeModelAsync"/>) before its next message.
 /// </param>
-/// <param name="Thinking">How hard its agent thinks from its next turn; <see langword="null"/> for the harness's default.</param>
+/// <param name="Thinking">How hard its agent thinks from its next turn.</param>
 /// <param name="Account">The agent account that pays for its work from its next turn.</param>
 /// <param name="AccountOwner">
 /// The owner of the personal account it runs on, whose messages alone reach the agent: everyone
@@ -39,7 +40,7 @@ public sealed record ChatSummary(
     bool Working,
     string Harness,
     string? Model,
-    string? Thinking,
+    string Thinking,
     AgentAccountId Account,
     UserId? AccountOwner,
     string? Title);

@@ -26,14 +26,15 @@ namespace Bagatka.Harnesses;
 /// absolute paths; empty when it keeps nothing of the kind. Never its sessions, credentials, or what
 /// its start script writes.
 /// </param>
-/// <param name="TakesModel">
-/// Whether its start script runs it on the model it is given (<c>HARNESS_MODEL</c>); otherwise it runs
-/// on its own default model.
+/// <param name="ModelFamily">
+/// What the IDs of the models it's made for hold, such as <c>claude</c>, which lists offer first; null
+/// when it's made for none in particular.
 /// </param>
 /// <param name="ThinkingLevels">
 /// How hard it can think, in the words its harness uses, such as <c>high</c>, lightest first, for
-/// <c>HARNESS_THINKING</c>; empty when it takes none and thinks as its model does.
+/// <c>HARNESS_THINKING</c>.
 /// </param>
+/// <param name="DefaultThinking">The level, one of <paramref name="ThinkingLevels"/>, an agent thinks at until someone chooses another.</param>
 public sealed record HarnessProfile(
     string Id,
     string Name,
@@ -41,8 +42,9 @@ public sealed record HarnessProfile(
     IReadOnlyList<string> SessionPaths,
     string InstructionsPath,
     IReadOnlyList<string> StatePaths,
-    bool TakesModel,
-    IReadOnlyList<string> ThinkingLevels)
+    string? ModelFamily,
+    IReadOnlyList<string> ThinkingLevels,
+    string DefaultThinking)
 {
     /// <summary>The program, on the PATH of the harness's image, that starts it.</summary>
     public const string Command = "harness";
@@ -70,25 +72,25 @@ public sealed record HarnessProfile(
     /// <summary>
     /// The variables a harness starts with: <c>HARNESS_CREDENTIAL</c>, the kind (<c>openai</c>,
     /// <c>anthropic</c>, <c>openrouter</c>, <c>github-token</c>, or <c>claude-oauth-token</c>);
-    /// <c>HARNESS_TOKEN</c>; for a model API <c>HARNESS_MODEL_URL</c>; <c>HARNESS_MODEL</c> when it runs
-    /// on a chosen model; and <c>HARNESS_THINKING</c> when it thinks at a chosen level. A model API
+    /// <c>HARNESS_TOKEN</c>; for a model API <c>HARNESS_MODEL_URL</c>; <c>HARNESS_MODEL</c>, the model it
+    /// runs on; and <c>HARNESS_THINKING</c>, how hard it thinks. A model API
     /// always goes through a model gateway, so <paramref name="token"/> is the gateway's token and
     /// <paramref name="gateway"/> its URL; a token tied to one harness goes to it, with no gateway.
     /// </summary>
     /// <param name="kind">What it pays with.</param>
     /// <param name="token">The gateway's token, or the harness's own.</param>
     /// <param name="gateway">The gateway's URL, for a model API.</param>
-    /// <param name="model">The model's ID (<see cref="IsModelId"/>), or <see langword="null"/> for the harness's default.</param>
-    /// <param name="thinking">One of its <see cref="ThinkingLevels"/>, or <see langword="null"/> for the harness's default.</param>
-    public IReadOnlyDictionary<string, string> EnvironmentFor(CredentialKind kind, string token, Uri? gateway, string? model, string? thinking)
+    /// <param name="model">The model's ID (<see cref="IsModelId"/>).</param>
+    /// <param name="thinking">One of its <see cref="ThinkingLevels"/>.</param>
+    public IReadOnlyDictionary<string, string> EnvironmentFor(CredentialKind kind, string token, Uri? gateway, string model, string thinking)
     {
         ArgumentException.ThrowIfNullOrEmpty(token);
-        if (model is not null && !IsModelId(model))
+        if (!IsModelId(model))
         {
             throw new ArgumentException("A model's ID takes letters, digits, and . _ - : / ~ @ + only.", nameof(model));
         }
 
-        if (thinking is not null && !ThinkingLevels.Contains(thinking, StringComparer.Ordinal))
+        if (!ThinkingLevels.Contains(thinking, StringComparer.Ordinal))
         {
             throw new ArgumentException(Name + " thinks at " + string.Join(", ", ThinkingLevels) + " only.", nameof(thinking));
         }
@@ -110,20 +112,12 @@ public sealed record HarnessProfile(
         {
             ["HARNESS_CREDENTIAL"] = name,
             ["HARNESS_TOKEN"] = token,
+            ["HARNESS_MODEL"] = model,
+            ["HARNESS_THINKING"] = thinking,
         };
         if (gateway is not null)
         {
             environment["HARNESS_MODEL_URL"] = gateway.AbsoluteUri.TrimEnd('/');
-        }
-
-        if (model is not null)
-        {
-            environment["HARNESS_MODEL"] = model;
-        }
-
-        if (thinking is not null)
-        {
-            environment["HARNESS_THINKING"] = thinking;
         }
 
         return environment;

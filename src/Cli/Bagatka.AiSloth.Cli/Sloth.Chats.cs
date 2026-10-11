@@ -124,7 +124,19 @@ internal sealed partial class Sloth
         bool asLast = host.Defaults is ChatDefaults last && last.Account == account.Id && string.Equals(last.Harness, harness.Id, StringComparison.Ordinal);
         bool fromPreset = line.Value("--preset") is not null;
         string? model = fromPreset ? chosenModel : line.Value("--model") ?? (asLast ? host.Defaults?.Model : null);
-        string? thinking = fromPreset ? chosenThinking : line.Value("--thinking") ?? (asLast ? host.Defaults?.Thinking : null);
+        string thinking = (fromPreset ? chosenThinking : line.Value("--thinking") ?? (asLast ? host.Defaults?.Thinking : null)) ?? harness.DefaultThinking;
+        string? explicitModel = model;
+        if (explicitModel is null)
+        {
+            explicitModel = await FirstModelAsync(api, workspace, harness, account, ct);
+        }
+
+        if (explicitModel is null)
+        {
+            await terminal.FailAsync("\"" + account.Name + "\" lists no model " + harness.Name + " can run on.");
+            return null;
+        }
+
         IReadOnlyList<Wire.Provider> providers = await api.GetAsync("/workspaces/" + workspace + "/providers", CliJsonContext.Default.IReadOnlyListProvider, ct);
         Wire.Provider? provider = await ChooseAsync(
             [.. providers.Where(found => found.Available)],
@@ -140,7 +152,16 @@ internal sealed partial class Sloth
             return null;
         }
 
-        return new ChatSetup(account, harness, model, thinking, provider);
+        return new ChatSetup(account, harness, explicitModel, thinking, provider);
+    }
+
+    // The first model the account lists for the harness, which a chat starts on unless someone chose:
+    // the ones the harness is made for come first. Null when it lists none.
+    private static async Task<string?> FirstModelAsync(HostApi api, Guid workspace, Wire.Harness harness, Wire.Account account, CancellationToken ct)
+    {
+        string path = string.Create(CultureInfo.InvariantCulture, $"/workspaces/{workspace}/models?harness={Uri.EscapeDataString(harness.Id)}&account={account.Id}");
+        IReadOnlyList<Wire.Model> models = await api.GetAsync(path, CliJsonContext.Default.IReadOnlyListModel, ct);
+        return models.Count > 0 ? models[0].Id : null;
     }
 
     // An agent to run: its account and harness, and its model and thinking level when a preset chose them.
@@ -218,12 +239,12 @@ internal sealed partial class Sloth
         return new AgentChoice(account, harness, preset.Model, preset.Thinking);
     }
 
-    private sealed record ChatSetup(Wire.Account Account, Wire.Harness Harness, string? Model, string? Thinking, Wire.Provider Provider)
+    private sealed record ChatSetup(Wire.Account Account, Wire.Harness Harness, string Model, string Thinking, Wire.Provider Provider)
     {
         // As a chat's start shows it: "pi · openai/gpt-6-luna · xhigh · OpenRouter · Docker".
         public string Describe()
         {
-            return string.Join(" · ", new[] { Harness.Name, Model, Thinking, Account.Name, Provider.Name }.Where(part => part is not null));
+            return string.Join(" · ", Harness.Name, Model, Thinking, Account.Name, Provider.Name);
         }
     }
 
@@ -559,11 +580,11 @@ internal sealed partial class Sloth
                 }
                 else if (Switch(text, "/model") is { } model)
                 {
-                    current = await ChangeModelAsync(api, current, new Wire.ChangeModel(current.Account, model, current.Thinking), ct);
+                    current = await ChangeModelAsync(api, current, model, current.Thinking, ct);
                 }
                 else if (Switch(text, "/thinking") is { } thinking)
                 {
-                    current = await ChangeModelAsync(api, current, new Wire.ChangeModel(current.Account, current.Model, thinking), ct);
+                    current = await ChangeModelAsync(api, current, current.Model, thinking, ct);
                 }
                 else if (text.Length > 0)
                 {
@@ -580,19 +601,26 @@ internal sealed partial class Sloth
         }
     }
 
-    // What a switch typed while following sets: "/model gpt-6.1-sol" sets the model, "/model" alone the
-    // harness's default; any other line isn't this switch.
+    // What a switch typed while following sets, such as "/model gpt-6.1-sol"; any other line isn't
+    // this switch.
     private static string? Switch(string text, string command)
     {
         bool typed = string.Equals(text, command, StringComparison.Ordinal) || text.StartsWith(command + " ", StringComparison.Ordinal);
         return typed ? text[command.Length..].Trim() : null;
     }
 
-    // The chat's model, thinking level, or both changed for its next turn, on its account.
-    private static async Task<Wire.Chat> ChangeModelAsync(HostApi api, Wire.Chat chat, Wire.ChangeModel change, CancellationToken ct)
+    // The chat's model and thinking level for its next turn, on its account; a switch names its value.
+    // A chat started before every chat had a model takes one before its thinking level changes.
+    private async Task<Wire.Chat> ChangeModelAsync(HostApi api, Wire.Chat chat, string? model, string thinking, CancellationToken ct)
     {
-        Wire.ChangeModel cleared = change with { Model = change.Model is "" ? null : change.Model, Thinking = change.Thinking is "" ? null : change.Thinking };
-        return await api.SendAsync(HttpMethod.Put, "/chats/" + chat.Id + "/model", cleared, CliJsonContext.Default.ChangeModel, CliJsonContext.Default.Chat, ct);
+        if (string.IsNullOrEmpty(model) || thinking.Length == 0)
+        {
+            await terminal.FailAsync(model is null ? "Choose this chat's model first: /model <id>." : "Name it: /model <id> or /thinking <level>; sloth models lists the models.");
+            return chat;
+        }
+
+        Wire.ChangeModel change = new Wire.ChangeModel(chat.Account, model, thinking);
+        return await api.SendAsync(HttpMethod.Put, "/chats/" + chat.Id + "/model", change, CliJsonContext.Default.ChangeModel, CliJsonContext.Default.Chat, ct);
     }
 
     // The chat people mean: by its whole ID, or by the short one sloth shows (the end of the whole ID)

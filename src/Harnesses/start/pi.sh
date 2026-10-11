@@ -27,15 +27,9 @@ else
   rm -f "$dir/models.json"
 fi
 
-# Neither needs quoting: its host allows a model's ID letters, digits, and . _ - : / ~ @ + only, and a
-# thinking level one of pi's own.
-chosen=""
-if [ -n "${HARNESS_MODEL:-}" ]; then
-  chosen=$(printf ',"defaultModel":"%s"' "$HARNESS_MODEL")
-fi
-if [ -n "${HARNESS_THINKING:-}" ]; then
-  chosen="$chosen$(printf ',"defaultThinkingLevel":"%s"' "$HARNESS_THINKING")"
-fi
-printf '{"defaultProvider":"%s"%s,"quietStartup":true}\n' "$provider" "$chosen" > "$dir/settings.json"
+# The chat's model and thinking level. Neither needs quoting: its host allows a model's ID letters,
+# digits, and . _ - : / ~ @ + only, and a thinking level one of pi's own.
+printf '{"defaultProvider":"%s","defaultModel":"%s","defaultThinkingLevel":"%s","quietStartup":true}\n' \
+  "$provider" "$HARNESS_MODEL" "$HARNESS_THINKING" > "$dir/settings.json"
 
 exec pi-acp

@@ -44,9 +44,9 @@ public interface IChatsApi
 
     /// <summary>
     /// The models a chat's agent can run on with the harness and the account (<see cref="StartChat.Model"/>):
-    /// those of the account's vendor that can call tools, newest first. Empty when the harness runs on
-    /// its own default model, or the vendor's models aren't listed (<c>IAgentAccountsApi.ListModelsAsync</c>).
-    /// Reads the vendor's catalog each time, which throws when it can't be reached; try again later.
+    /// those of the account's vendor that can call tools, the ones the harness is made for first, then
+    /// in the vendor's order. A new chat starts on the first unless someone chooses another. Reads the
+    /// vendor's catalog each time, which throws when it can't be reached; try again later.
     /// </summary>
     /// <returns>
     /// The models; a validation error for an unknown harness, or an account the actor can't use or the

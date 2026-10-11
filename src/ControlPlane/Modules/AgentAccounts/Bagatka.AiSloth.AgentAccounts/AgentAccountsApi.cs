@@ -7,6 +7,7 @@ using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Foundation.Modules;
 using Bagatka.Sdk.Anthropic;
+using Bagatka.Sdk.GitHub;
 using Bagatka.Sdk.OpenAI;
 using Bagatka.Sdk.OpenRouter;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,7 @@ internal sealed partial class AgentAccountsApi(
     ChatGptSignInClient chatGpt,
     OpenAIModelsClient openAI,
     AnthropicModelsClient anthropic,
+    CopilotModelsClient copilot,
     OpenRouterClient openRouter,
     IProductEvents productEvents,
     TimeProvider time,

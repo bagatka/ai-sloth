@@ -121,7 +121,7 @@ public sealed class AgentContextJourney(ControlPlane app)
     // A chat someone starts in the workspace on the account.
     private static async Task<ChatSummary> StartAsync(HttpClient person, TestWorkspace workspace, AgentAccountId account)
     {
-        object chat = new { provider = "docker", harness = "claude-code", account };
+        object chat = new { provider = "docker", harness = "claude-code", account, model = TestWorkspace.AnyModel, thinking = TestWorkspace.AnyThinking };
         return await Api.ReadAsync<ChatSummary>(person.SendPostAsync(workspace.Path + "/chats", chat), HttpStatusCode.Created);
     }
 

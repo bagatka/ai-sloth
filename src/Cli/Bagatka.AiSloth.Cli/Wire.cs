@@ -47,7 +47,7 @@ internal static class Wire
 
     internal sealed record CompleteAccountSignIn(Uri ReturnedTo);
 
-    internal sealed record Harness(string Id, string Name, IReadOnlyList<string> Accepts);
+    internal sealed record Harness(string Id, string Name, IReadOnlyList<string> Accepts, IReadOnlyList<string> ThinkingLevels, string DefaultThinking);
 
     internal sealed record Provider(string Id, string Name, bool Available);
 
@@ -55,17 +55,17 @@ internal static class Wire
 
     internal sealed record SetSecret(string Value);
 
-    internal sealed record Chat(Guid Id, Guid NookId, Guid StartedBy, DateTimeOffset StartedAt, bool Working, string Harness, string? Model, string? Thinking, Guid Account);
+    internal sealed record Chat(Guid Id, Guid NookId, Guid StartedBy, DateTimeOffset StartedAt, bool Working, string Harness, string? Model, string Thinking, Guid Account);
 
     internal sealed record Model(string Id, string Name, bool UsesTools);
 
-    internal sealed record Preset(Guid Id, string Name, string Harness, Guid Account, string? Model, string? Thinking, DateTimeOffset AddedAt);
+    internal sealed record Preset(Guid Id, string Name, string Harness, Guid Account, string Model, string Thinking, DateTimeOffset AddedAt);
 
-    internal sealed record AddPreset(string Harness, Guid Account, string? Model, string? Thinking, string? Name);
+    internal sealed record AddPreset(string Harness, Guid Account, string Model, string Thinking, string? Name);
 
     internal sealed record PresetName(string Name);
 
-    internal sealed record ChangeModel(Guid Account, string? Model, string? Thinking);
+    internal sealed record ChangeModel(Guid Account, string Model, string Thinking);
 
     internal sealed record Nook(Guid Id, string Status, IReadOnlyList<NookSource> Sources);
 
@@ -116,7 +116,7 @@ internal static class Wire
 
     internal sealed record ProcessExit(int ExitCode);
 
-    internal sealed record StartChat(string Provider, string Harness, Guid Account, string? Model, string? Thinking, IReadOnlyList<NookRepository> Repositories, Guid? CopyOf, int? Checkpoint);
+    internal sealed record StartChat(string Provider, string Harness, Guid Account, string Model, string Thinking, IReadOnlyList<NookRepository> Repositories, Guid? CopyOf, int? Checkpoint);
 
     internal sealed record SendMessage(string Text);
 

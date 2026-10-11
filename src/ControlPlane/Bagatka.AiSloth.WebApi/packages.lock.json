@@ -378,6 +378,7 @@
           "Bagatka.AiSloth.AgentAccounts.Contracts": "[1.0.0, )",
           "Bagatka.Foundation.Modules": "[1.0.0, )",
           "Bagatka.Sdk.Anthropic": "[1.0.0, )",
+          "Bagatka.Sdk.GitHub": "[1.0.0, )",
           "Bagatka.Sdk.OpenAI": "[1.0.0, )",
           "Bagatka.Sdk.OpenRouter": "[1.0.0, )"
         }

@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { type Schemas } from "./api"
-import { modelLabel, thinkingLabel, type Choice } from "./models"
+import { modelLabel, thinkingLabel, type Choice, type Chosen } from "./models"
 import { agentAccounts, models as modelsQuery } from "./queries"
 
 // What a chat runs on, picked in its message box the way coding agents' own pickers work: one click
@@ -41,7 +41,7 @@ type Item = {
   key: string
   label: string
   detail: string | null
-  choice: Choice | null
+  choice: Chosen | null
 }
 type Group = { value: string; label: string; items: Item[] }
 
@@ -70,7 +70,7 @@ export function ModelPicker({
   /** Only the accounts of this owner, null for the workspace's; any, when not given. */
   owner?: string | null
   presets: readonly Preset[]
-  onChange: (choice: Choice) => void
+  onChange: (choice: Chosen) => void
   /** Ghost in a message box; outline in a form. */
   variant?: "ghost" | "outline"
 }) {
@@ -112,20 +112,13 @@ export function ModelPicker({
   accounts.forEach((account, index) => {
     const list = lists[index]
     // Another model keeps how hard the agent thinks.
-    const choiceOf = (model: string | null): Choice => ({
+    const choiceOf = (model: string): Chosen => ({
       harness: harness.id,
       account: account.id,
       model,
-      thinking: value.thinking,
+      thinking: value.thinking ?? harness.defaultThinking,
     })
-    const items: Item[] = [
-      {
-        key: `${account.id}:`,
-        label: "Default",
-        detail: `${harness.name} picks`,
-        choice: choiceOf(null),
-      },
-    ]
+    const items: Item[] = []
     if (list?.isPending) {
       items.push({
         key: `${account.id}:loading`,
@@ -200,7 +193,7 @@ export function ModelPicker({
       >
         <span className="flex min-w-0 items-baseline gap-1.5">
           <span className="truncate">
-            {value.model ? modelLabel(value.model) : "Default model"}
+            {value.model ? modelLabel(value.model) : "Choose a model"}
           </span>
           {accounts.length > 1 && account && (
             <span className="truncate font-normal text-muted-foreground">
@@ -295,19 +288,16 @@ export function HarnessPicker({
   )
 }
 
-/** How hard the agent thinks, among its harness's levels; nothing to pick for a harness without any. */
+/** How hard the agent thinks, among its harness's levels. */
 export function ThinkingPicker({
   levels,
   value,
   onChange,
 }: {
   levels: readonly string[]
-  value: string | null
-  onChange: (thinking: string | null) => void
+  value: string
+  onChange: (thinking: string) => void
 }) {
-  if (levels.length === 0) {
-    return null
-  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -321,21 +311,16 @@ export function ThinkingPicker({
         }
       >
         <BrainIcon />
-        <span className="truncate">
-          {value ? thinkingLabel(value) : "Default"}
-        </span>
+        <span className="truncate">{thinkingLabel(value)}</span>
         <CaretDownIcon className="text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-auto min-w-44">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Thinking</DropdownMenuLabel>
           <DropdownMenuRadioGroup
-            value={value ?? ""}
-            onValueChange={(level: string) => onChange(level || null)}
+            value={value}
+            onValueChange={(level: string) => onChange(level)}
           >
-            <DropdownMenuRadioItem value="" closeOnClick>
-              Default
-            </DropdownMenuRadioItem>
             {levels.map((level) => (
               <DropdownMenuRadioItem key={level} value={level} closeOnClick>
                 {thinkingLabel(level)}

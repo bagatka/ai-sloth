@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/tooltip"
 import { ApiError, answer, api, messageOf, type Schemas } from "../api"
 import { accountsFor, ModelPicker } from "../model-picker"
-import { modelLabel, thinkingLabel, type Choice } from "../models"
+import { modelLabel, thinkingLabel, type Choice, type Chosen } from "../models"
 import {
   agentAccounts,
   harnesses as harnessesQuery,
@@ -97,8 +97,8 @@ export function PresetsSection({ workspace }: { workspace: Workspace }) {
               detail={[
                 harnesses?.find((harness) => harness.id === preset.harness)
                   ?.name ?? preset.harness,
-                preset.model ?? "default model",
-                preset.thinking && `${thinkingLabel(preset.thinking)} thinking`,
+                preset.model,
+                `${thinkingLabel(preset.thinking)} thinking`,
                 accounts?.find((account) => account.id === preset.account)
                   ?.name,
               ]
@@ -251,7 +251,8 @@ function PresetForm({
   const [chosen, setChosen] = React.useState<Choice | null>(null)
   const [name, setName] = React.useState("")
 
-  // The agent holds while it's offered; until a model is picked, its first account's own default.
+  // The agent holds while it's offered; until a model and level are picked, the first model its first
+  // account lists for it, and its default level, shown as chosen.
   const harness =
     harnesses.find((found) => found.id === chosen?.harness) ?? harnesses[0]
   const offered = harness ? accountsFor(accounts, harness) : []
@@ -271,20 +272,27 @@ function PresetForm({
     ...modelsQuery(workspace.id, choice?.harness ?? "", choice?.account ?? ""),
     enabled: !!choice,
   })
-  const picked = models.data?.find((model) => model.id === choice?.model)
-  const defaultName = harness
-    ? [
-        harness.name,
-        choice?.model &&
-          (picked ? spokenName(picked.name) : modelLabel(choice.model)),
-        choice?.thinking && thinkingLabel(choice.thinking),
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    : ""
+  const model = choice?.model ?? models.data?.[0]?.id ?? null
+  const ready: Chosen | null =
+    choice && harness && model
+      ? {
+          ...choice,
+          model,
+          thinking: choice.thinking ?? harness.defaultThinking,
+        }
+      : null
+  const picked = models.data?.find((found) => found.id === ready?.model)
+  const defaultName =
+    harness && ready
+      ? [
+          harness.name,
+          picked ? spokenName(picked.name) : modelLabel(ready.model),
+          thinkingLabel(ready.thinking),
+        ].join(" · ")
+      : ""
 
   const save = useMutation({
-    mutationFn: (of: Choice) =>
+    mutationFn: (of: Chosen) =>
       answer(
         api.POST("/workspaces/{workspaceId}/presets", {
           params: { path: { workspaceId: workspace.id } },
@@ -317,7 +325,9 @@ function PresetForm({
       className="contents"
       onSubmit={(event) => {
         event.preventDefault()
-        save.mutate(choice)
+        if (ready) {
+          save.mutate(ready)
+        }
       }}
     >
       <DialogHeader>
@@ -371,7 +381,7 @@ function PresetForm({
           <ModelPicker
             workspaceId={workspace.id}
             harness={harness}
-            value={choice}
+            value={ready ?? choice}
             presets={[]}
             onChange={(next) => {
               setChosen(next)
@@ -380,8 +390,8 @@ function PresetForm({
             variant="outline"
           />
           <FieldDescription>
-            Every model of every account {harness.name} runs on, with its own
-            default first.
+            Every model of every account {harness.name} runs on, the ones it's
+            made for first.
           </FieldDescription>
           {(error?.fields.model || error?.fields.account) && (
             <FieldError>
@@ -389,20 +399,17 @@ function PresetForm({
             </FieldError>
           )}
         </Field>
-        {harness.thinkingLevels.length > 0 && (
+        {ready && (
           <Field data-invalid={!!error?.fields.thinking || undefined}>
             <FieldLabel>Thinking</FieldLabel>
             <Select
-              items={[
-                { value: "", label: "Default" },
-                ...harness.thinkingLevels.map((level) => ({
-                  value: level,
-                  label: thinkingLabel(level),
-                })),
-              ]}
-              value={choice.thinking ?? ""}
+              items={harness.thinkingLevels.map((level) => ({
+                value: level,
+                label: thinkingLabel(level),
+              }))}
+              value={ready.thinking}
               onValueChange={(value) => {
-                setChosen({ ...choice, thinking: (value as string) || null })
+                setChosen({ ...ready, thinking: value as string })
                 save.reset()
               }}
             >
@@ -410,7 +417,6 @@ function PresetForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Default</SelectItem>
                 {harness.thinkingLevels.map((level) => (
                   <SelectItem key={level} value={level}>
                     {thinkingLabel(level)}
@@ -444,7 +450,7 @@ function PresetForm({
           )}
       </FieldGroup>
       <DialogFooter>
-        <Button type="submit" loading={save.isPending}>
+        <Button type="submit" loading={save.isPending} disabled={!ready}>
           Save preset
         </Button>
       </DialogFooter>

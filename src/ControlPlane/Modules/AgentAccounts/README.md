@@ -19,8 +19,8 @@ a nook: the model gateway adds them to each call.
   them, or that its token goes to its harness.
 - **Integrations:** Sign in with ChatGPT, through `Bagatka.Sdk.OpenAI`: registering, exchanging the
   code, renewing a plan's access token, and ending its session on removal. The vendors' lists of
-  models: OpenAI's through `Bagatka.Sdk.OpenAI`, Anthropic's through `Bagatka.Sdk.Anthropic`, and
-  OpenRouter's catalog through `Bagatka.Sdk.OpenRouter`.
+  models: OpenAI's through `Bagatka.Sdk.OpenAI`, Anthropic's through `Bagatka.Sdk.Anthropic`,
+  Copilot's through `Bagatka.Sdk.GitHub`, and OpenRouter's catalog through `Bagatka.Sdk.OpenRouter`.
 
 ## Does not own
 
@@ -104,8 +104,10 @@ None. A plan's access token is renewed when it is used and due, never in the bac
   60 ms for 750 KB), without its batch variants. Anthropic's and OpenAI's lists are asked at the
   account's endpoint with its credentials; OpenAI's holds every model its API serves, so only its GPT,
   o-series, and Codex models are offered, and a ChatGPT plan's token gets the plan's own catalog,
-  named and in order. Copilot and Claude plans list none yet, and their agents start on their harness's default
-  model.
+  named and in order. A Copilot plan's token gets the chat models of Copilot's picker that the plan
+  allows, from Copilot's undocumented `/models`; a Claude plan's is asked of Anthropic's list with
+  the plan's sign-in token. Every chat names its model; the apps start a new one on the first
+  listed.
 - **Secrets at rest** are sealed with AES-256-GCM under the deployment's encryption key, bound to
   their row's ID (`PATTERNS.md`, entry 13). They leave the module only through `UseAsync`, in records
   whose text form leaves them out.

@@ -84,11 +84,12 @@ minutes unless given).
   seconds; the agent keeps working.
 - **The agent acts without asking inside its nook,** as `system:chats.harness`: its permission
   requests get their broadest allow.
-- **A model is the vendor's ID.** A chat runs on a model as its account's vendor names it, such as
-  `openai/gpt-6-luna` at OpenRouter, or on its harness's default. Only harnesses whose start script
-  takes one get it (`HarnessProfile.TakesModel`: Claude Code, Codex, and pi). The models offered are the
-  vendor's that can call tools; a chat's model isn't checked against them, so a model the vendor
-  doesn't know fails its turns with the vendor's answer.
+- **Every chat names its model and thinking level.** Nothing is left to a harness's own default, so
+  what runs is what the chat shows. A model is the vendor's ID, such as `openai/gpt-6-luna` at
+  OpenRouter. The models offered are the vendor's that can call tools, those of the harness's own
+  family first (`HarnessProfile.ModelFamily`); a chat's model isn't checked against them, so a model
+  the vendor doesn't know fails its turns with the vendor's answer. A chat older than this rule has
+  no model and takes one before its next message (`ChatsErrors.ModelNotChosen`).
 - **A chat's model changes between turns.** Its harness stays, since its nook runs it, but whoever
   may use the chat's account picks another model, thinking level, or account of the same owner's,
   for the next turn (`ModelChanged`). Thinking levels are each harness's own words. A running agent finishes its turn on its own account, so its calls never

@@ -24,7 +24,7 @@ internal sealed class Chat
     public const int MaxThinkingLength = 16;
 
     // Used by Start and by EF: parameter names match property names.
-    private Chat(ChatId id, NookId nookId, WorkspaceId workspaceId, UserId startedBy, DateTimeOffset startedAt, string harness, string? model, string? thinking, AgentAccountId agentAccountId, UserId? accountOwnerId)
+    private Chat(ChatId id, NookId nookId, WorkspaceId workspaceId, UserId startedBy, DateTimeOffset startedAt, string harness, string? model, string thinking, AgentAccountId agentAccountId, UserId? accountOwnerId)
     {
         Id = id;
         NookId = nookId;
@@ -50,11 +50,12 @@ internal sealed class Chat
 
     public string Harness { get; private set; }
 
-    // The model its agent runs on, as the account's vendor names it; null for the harness's default.
+    // The model its agent runs on, as the account's vendor names it; null only for a chat started
+    // before every chat had one, which takes one before its next message (ChatsErrors.ModelNotChosen).
     public string? Model { get; private set; }
 
-    // How hard its agent thinks, one of its harness's levels; null for the harness's default.
-    public string? Thinking { get; private set; }
+    // How hard its agent thinks, one of its harness's levels.
+    public string Thinking { get; private set; }
 
     // Another account, model, and thinking level someone chose while an agent ran, which the next agent
     // runs on: the running agent's model calls stay on its own account until it stops, between turns.
@@ -114,7 +115,7 @@ internal sealed class Chat
     // PostgreSQL's xmin: a second writer conflicts instead of overwriting.
     public uint Version { get; private set; }
 
-    public static Chat Start(NookId nookId, WorkspaceId workspaceId, UserId startedBy, string harness, string? model, string? thinking, AgentAccountCredential account, TimeProvider time)
+    public static Chat Start(NookId nookId, WorkspaceId workspaceId, UserId startedBy, string harness, string model, string thinking, AgentAccountCredential account, TimeProvider time)
     {
         return new Chat(ChatId.New(), nookId, workspaceId, startedBy, time.GetUtcNow(), harness, model, thinking, account.Id, account.OwnerId) { StartsAgent = true };
     }
@@ -126,7 +127,7 @@ internal sealed class Chat
 
     // The account, model, and thinking level from the next turn on: at once without a running agent,
     // otherwise once it stops. Returns whether that changes anything.
-    public bool ChangeAgent(AgentAccountId account, string? model, string? thinking)
+    public bool ChangeAgent(AgentAccountId account, string model, string thinking)
     {
         bool sameAsUpcoming = AgentChangeWaiting
             ? Same(NextAgentAccountId!.Value, NextModel, NextThinking, account, model, thinking)
@@ -161,7 +162,7 @@ internal sealed class Chat
 
         AgentAccountId = NextAgentAccountId!.Value;
         Model = NextModel;
-        Thinking = NextThinking;
+        Thinking = NextThinking!;
         AgentChangeWaiting = false;
         NextAgentAccountId = null;
         NextModel = null;
@@ -308,7 +309,7 @@ internal sealed class Chat
     /// <param name="firstMessage">The start of its first message, if anyone wrote in it.</param>
     public ChatSummary ToSummary(bool messagesWaiting, string? firstMessage)
     {
-        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, AgentChangeWaiting ? NextModel : Model, AgentChangeWaiting ? NextThinking : Thinking, AgentChangeWaiting ? NextAgentAccountId!.Value : AgentAccountId, AccountOwnerId, TitleFrom(firstMessage));
+        return new ChatSummary(Id, NookId, WorkspaceId, StartedBy, StartedAt, TurnMessageId is not null || messagesWaiting, Harness, AgentChangeWaiting ? NextModel : Model, AgentChangeWaiting ? NextThinking! : Thinking, AgentChangeWaiting ? NextAgentAccountId!.Value : AgentAccountId, AccountOwnerId, TitleFrom(firstMessage));
     }
 
     private static bool Same(AgentAccountId account, string? model, string? thinking, AgentAccountId otherAccount, string? otherModel, string? otherThinking)

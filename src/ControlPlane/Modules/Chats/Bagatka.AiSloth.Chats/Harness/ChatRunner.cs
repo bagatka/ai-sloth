@@ -545,10 +545,12 @@ internal sealed class ChatRunner(
     {
         // Each waiting message tries once, so an agent that can't start ends with every message answered.
         chat.AgentStartTried();
+        // A chat started before every chat had a model starts no agent until it takes one.
         HarnessProfile? harness = HarnessProfiles.Find(chat.Harness);
-        if (harness is null)
+        if (harness is null || chat.Model is not string model)
         {
-            await FailAsync(db, chat, first, "The agent couldn't start: its harness is no longer offered.", ct);
+            string reason = harness is null ? "its harness is no longer offered." : ChatsErrors.ModelNotChosen.Message;
+            await FailAsync(db, chat, first, "The agent couldn't start: " + reason, ct);
             return;
         }
 
@@ -567,11 +569,11 @@ internal sealed class ChatRunner(
         IReadOnlyDictionary<string, string> environment;
         if (account.Access is HarnessToken token)
         {
-            environment = harness.EnvironmentFor(kind, token.Value, gateway: null, chat.Model, chat.Thinking);
+            environment = harness.EnvironmentFor(kind, token.Value, gateway: null, model, chat.Thinking);
         }
         else
         {
-            environment = harness.EnvironmentFor(kind, chat.IssueHarnessToken(), settings.ModelGatewayUrl, chat.Model, chat.Thinking);
+            environment = harness.EnvironmentFor(kind, chat.IssueHarnessToken(), settings.ModelGatewayUrl, model, chat.Thinking);
         }
 
         await SaveAsync(db, ct);

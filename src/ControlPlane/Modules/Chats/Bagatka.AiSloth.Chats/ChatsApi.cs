@@ -103,29 +103,31 @@ internal sealed partial class ChatsApi(
         return account is null ? new Result<AgentAccountSummary>(UnusableAccount) : new Result<AgentAccountSummary>(account);
     }
 
-    // The harness a chat runs, with a model and thinking level only for a harness that takes them, a
-    // model's ID a harness can be given, and a level of the harness's own.
-    private static Result<HarnessProfile> HarnessWith(string id, string? model, string? thinking)
+    // The harness a chat runs, with a model's ID it can be given and a thinking level of its own.
+    private static Result<HarnessProfile> HarnessWith(string id, string model, string thinking)
     {
-        HarnessProfile? harness = HarnessProfiles.Find(id);
-        if (harness is null)
+        Result<HarnessProfile> harness = FindHarness(id);
+        if (harness.Failed)
         {
-            return new Result<HarnessProfile>(Error.Validation("harness", "Unknown harness; see GET /harnesses."));
+            return harness;
         }
 
-        if (model is not null && !harness.TakesModel)
-        {
-            return new Result<HarnessProfile>(Error.Validation("model", harness.Name + " runs on its own default model."));
-        }
-
-        if (model is not null && !HarnessProfile.IsModelId(model))
+        if (!HarnessProfile.IsModelId(model))
         {
             return new Result<HarnessProfile>(Error.Validation("model", "Must be a model's ID as its vendor writes it, such as openai/gpt-6-luna: letters, digits, and . _ - : / ~ @ + only."));
         }
 
-        bool thinks = thinking is null || harness.ThinkingLevels.Contains(thinking, StringComparer.Ordinal);
-        string levels = harness.ThinkingLevels.Count == 0 ? harness.Name + " takes no thinking level." : harness.Name + " thinks at " + string.Join(", ", harness.ThinkingLevels) + ".";
-        return thinks ? new Result<HarnessProfile>(harness) : new Result<HarnessProfile>(Error.Validation("thinking", levels));
+        bool thinks = harness.Output.ThinkingLevels.Contains(thinking, StringComparer.Ordinal);
+        string levels = harness.Output.Name + " thinks at " + string.Join(", ", harness.Output.ThinkingLevels) + ".";
+        return thinks ? harness : new Result<HarnessProfile>(Error.Validation("thinking", levels));
+    }
+
+    private static Result<HarnessProfile> FindHarness(string id)
+    {
+        HarnessProfile? harness = HarnessProfiles.Find(id);
+        return harness is null
+            ? new Result<HarnessProfile>(Error.Validation("harness", "Unknown harness; see GET /harnesses."))
+            : new Result<HarnessProfile>(harness);
     }
 
     // Enough of a first message for its first line's title.

@@ -20,7 +20,8 @@ internal sealed partial class ChatsApi
             harness.Id,
             harness.Name,
             [.. kinds.Where(kind => harness.Accepts(AccountCredentials.KindOf(kind)))],
-            harness.ThinkingLevels))];
+            harness.ThinkingLevels,
+            harness.DefaultThinking))];
         return Task.FromResult(harnesses);
     }
 }

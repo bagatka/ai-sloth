@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -19,7 +20,7 @@ internal sealed partial class ChatsApi
             return new Result<IReadOnlyList<AgentModel>>(person.Error);
         }
 
-        Result<HarnessProfile> found = HarnessWith(harness, model: null, thinking: null);
+        Result<HarnessProfile> found = FindHarness(harness);
         if (found.Failed)
         {
             return new Result<IReadOnlyList<AgentModel>>(found.Error);
@@ -33,11 +34,6 @@ internal sealed partial class ChatsApi
             return new Result<IReadOnlyList<AgentModel>>(usable.Error);
         }
 
-        if (!profile.TakesModel)
-        {
-            return new Result<IReadOnlyList<AgentModel>>([]);
-        }
-
         // A coding agent works through tools, so a model that can't call them can't run one.
         Result<IReadOnlyList<AgentModel>> models = await accounts.ListModelsAsync(actor, account, workspaceId, ct);
         if (models.Failed)
@@ -45,6 +41,10 @@ internal sealed partial class ChatsApi
             return models;
         }
 
-        return new Result<IReadOnlyList<AgentModel>>([.. models.Output.Where(model => model.UsesTools)]);
+        // The models the harness is made for come first, in the vendor's order, so a new chat starts on
+        // one of them: Claude Code on Claude, Codex on GPT, wherever an account lists others too.
+        string? family = profile.ModelFamily;
+        IEnumerable<AgentModel> toolUsers = models.Output.Where(model => model.UsesTools);
+        return new Result<IReadOnlyList<AgentModel>>([.. toolUsers.OrderBy(model => family is not null && model.Id.Contains(family, StringComparison.OrdinalIgnoreCase) ? 0 : 1)]);
     }
 }

@@ -1,7 +1,8 @@
 # Bagatka.Sdk.GitHub
 
 The parts of GitHub a GitHub App acting as a person uses: the device flow that signs the person in,
-renewing their user access token, their installations and repositories, and pull requests.
+renewing their user access token, their installations and repositories, and pull requests; and
+the models a Copilot plan offers (`CopilotModelsClient`).
 Octokit.NET covers these, but it is a large, reflection-based library for the nine calls used here;
 this client keeps to them, with source-generated JSON.
 
@@ -12,9 +13,11 @@ this client keeps to them, with source-generated JSON.
 - **Endpoints:** `POST /login/device/code` and `POST /login/oauth/access_token` on the site;
   `GET /user`, `GET /users/{login}`, `GET /user/installations`,
   `GET /user/installations/{id}/repositories`, `GET /repos/{owner}/{repo}`, and
-  `GET`/`POST /repos/{owner}/{repo}/pulls` on the API.
+  `GET`/`POST /repos/{owner}/{repo}/pulls` on the API; `GET /models` on Copilot's API
+  (`https://api.githubcopilot.com`).
 - **Auth:** the device flow takes only the app's client ID; renewing takes its client secret too.
-  REST calls carry the person's token as `Authorization: Bearer`.
+  REST calls carry the person's token as `Authorization: Bearer`, and so does Copilot's, with the
+  plan's token and a `Copilot-Integration-Id` naming the tool that asks.
 - **Rate limits:** 5,000 requests an hour per person's token; the device flow's polling interval,
   which `slow_down` lengthens.
 - **No retries:** the OAuth calls change state at GitHub, and the reads are cheap for the caller to
@@ -29,3 +32,5 @@ this client keeps to them, with source-generated JSON.
 - A user access token reaches only repositories both the person and the app's installations can.
 - An app's bot is the user `<slug>[bot]`; its ID makes the no-reply address commits credit it by.
 - The device flow must be turned on in the app's settings; the manifest flow can't.
+- Copilot's `/models` is undocumented. It lists embedding models and models the plan's policy turns
+  off too; only chat models enabled in the model picker are offered.

@@ -239,11 +239,7 @@ export function fold(transcript: Transcript, chatEvent: ChatEvent): Transcript {
         kind: "notice",
         key,
         tone: "info",
-        text: `Switched to ${body.model ?? "the agent's default model"}${
-          body.thinking
-            ? `, thinking ${thinkingLabel(body.thinking).toLowerCase()}`
-            : ""
-        }.`,
+        text: `Switched to ${body.model}, thinking ${thinkingLabel(body.thinking).toLowerCase()}.`,
         switched: true,
       })
     case "agent-restarted": {

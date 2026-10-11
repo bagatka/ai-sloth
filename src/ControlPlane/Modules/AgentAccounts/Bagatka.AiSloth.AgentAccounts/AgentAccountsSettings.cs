@@ -21,13 +21,16 @@ public sealed record AgentAccountsSettings
     /// <param name="chatGptAuthority">OpenAI's authorization server; <see langword="null"/> for <c>https://auth.openai.com</c>. Tests change it.</param>
     /// <param name="chatGptApi">The API a ChatGPT plan's calls go to; <see langword="null"/> for <c>https://api.openai.com/v1</c>. Tests change it.</param>
     /// <param name="openRouterApi">OpenRouter's API, its models' calls and catalog; <see langword="null"/> for <c>https://openrouter.ai/api</c>. Tests change it.</param>
+    /// <param name="copilotApi">Copilot's API, which lists a Copilot plan's models; <see langword="null"/> for <c>https://api.githubcopilot.com</c>. Tests change it.</param>
     public AgentAccountsSettings(
         bool allowClaudePlans = false,
         bool allowChatGptPlans = false,
         Uri? chatGptAuthority = null,
         Uri? chatGptApi = null,
-        Uri? openRouterApi = null)
+        Uri? openRouterApi = null,
+        Uri? copilotApi = null)
     {
+        CopilotApi = copilotApi ?? new Uri("https://api.githubcopilot.com");
         AllowClaudePlans = allowClaudePlans;
         AllowChatGptPlans = allowChatGptPlans;
         ChatGptAuthority = chatGptAuthority ?? new Uri("https://auth.openai.com");
@@ -53,4 +56,7 @@ public sealed record AgentAccountsSettings
 
     /// <summary>OpenRouter's API: where an OpenRouter key's calls go, and its catalog of models.</summary>
     public Uri OpenRouterApi { get; }
+
+    /// <summary>Copilot's API, which lists a Copilot plan's models.</summary>
+    public Uri CopilotApi { get; }
 }

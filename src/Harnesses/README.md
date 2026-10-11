@@ -14,9 +14,9 @@ speak. Nothing here knows AiSloth; Chats is its caller.
   load one, the file it reads its user's standing instructions from (`InstructionsPath`), and where
   it keeps what it writes for itself to use later (`StatePaths`: Claude Code's memory, which its start
   script puts in `~/.claude/memory` whatever folder it works in; never credentials, nor what its start
-  script writes), whether its start script runs it on a model it is given (`TakesModel`), and how
-  hard it can think, in its own words (`ThinkingLevels`: Claude Code's efforts low to max, Codex's
-  reasoning low to xhigh, pi's thinking off to max).
+  script writes), the models it's made for (`ModelFamily`), and how hard it can think, in its own
+  words, and unless told otherwise (`ThinkingLevels`, `DefaultThinking`: Claude Code's efforts low to
+  max, Codex's reasoning low to xhigh, pi's thinking off to max, Copilot's none to max).
 - **Every harness starts the same way.** Its image provides `harness` (`HarnessProfile.Command`), its
   start script from `start/<id>.sh`, and the host starts it with the same variables
   (`HarnessProfile.EnvironmentFor`):
@@ -26,8 +26,8 @@ speak. Nothing here knows AiSloth; Chats is its caller.
   | `HARNESS_CREDENTIAL` | `openai`, `anthropic`, `openrouter`, `github-token`, or `claude-oauth-token` |
   | `HARNESS_MODEL_URL` | the model gateway's URL, for `openai`, `anthropic`, and `openrouter` |
   | `HARNESS_TOKEN` | the gateway's token, or the harness's own token |
-  | `HARNESS_MODEL` | the model's ID as its vendor names it, when one was chosen (`IsModelId`) |
-  | `HARNESS_THINKING` | one of its `ThinkingLevels`, when one was chosen |
+  | `HARNESS_MODEL` | the model's ID as its vendor names it (`IsModelId`) |
+  | `HARNESS_THINKING` | one of its `ThinkingLevels` |
 
   The script translates them into its harness's own configuration (environment variables, a file,
   or its adapter's gateway sign-in) and runs it. A model API always goes through a model gateway, so

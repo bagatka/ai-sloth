@@ -2729,7 +2729,9 @@
       "AddPresetRequest": {
         "required": [
           "harness",
-          "account"
+          "account",
+          "model",
+          "thinking"
         ],
         "type": "object",
         "properties": {
@@ -2740,16 +2742,10 @@
             "$ref": "#/components/schemas/AgentAccountId"
           },
           "model": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": "string"
           },
           "thinking": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": "string"
           },
           "name": {
             "type": [
@@ -2994,7 +2990,9 @@
       },
       "ChangeModelRequest": {
         "required": [
-          "account"
+          "account",
+          "model",
+          "thinking"
         ],
         "type": "object",
         "properties": {
@@ -3002,16 +3000,10 @@
             "$ref": "#/components/schemas/AgentAccountId"
           },
           "model": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": "string"
           },
           "thinking": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": "string"
           }
         }
       },
@@ -3185,14 +3177,11 @@
               "null",
               "string"
             ],
-            "description": "The model its agent runs on from its next turn; \u0060null\u0060 for the harness\u0027s default."
+            "description": "The model its agent runs on from its next turn; \u0060null\u0060 only for a chat started before\nevery chat had one, which takes one (Task\u0026lt;Result\u0026lt;ChatSummary\u0026gt;\u0026gt; IChatsApi.ChangeModelAsync(Actor actor, ChangeModel command, CancellationToken ct)) before its next message."
           },
           "thinking": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "How hard its agent thinks from its next turn; \u0060null\u0060 for the harness\u0027s default."
+            "type": "string",
+            "description": "How hard its agent thinks from its next turn."
           },
           "account": {
             "description": "The agent account that pays for its work from its next turn.",
@@ -3678,7 +3667,8 @@
           "id",
           "name",
           "accepts",
-          "thinkingLevels"
+          "thinkingLevels",
+          "defaultThinking"
         ],
         "type": "object",
         "properties": {
@@ -3702,7 +3692,11 @@
             "items": {
               "type": "string"
             },
-            "description": "How hard it can think, in its own words, such as \u0060high\u0060, lightest first; empty when it takes\nnone."
+            "description": "How hard it can think, in its own words, such as \u0060high\u0060, lightest first."
+          },
+          "defaultThinking": {
+            "type": "string",
+            "description": "The level, one of its levels, a new chat thinks at unless someone chooses another."
           }
         },
         "description": "A harness chats can run, and the agent accounts it takes."
@@ -3976,16 +3970,10 @@
             "$ref": "#/components/schemas/AgentAccountId"
           },
           "model": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": "string"
           },
           "thinking": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": "string"
           },
           "changedBy": {
             "$ref": "#/components/schemas/UserId"
@@ -4416,18 +4404,12 @@
             "$ref": "#/components/schemas/AgentAccountId"
           },
           "model": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "The model its agent runs on; \u0060null\u0060 for the harness\u0027s default."
+            "type": "string",
+            "description": "The model its agent runs on."
           },
           "thinking": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "How hard its agent thinks; \u0060null\u0060 for the harness\u0027s default."
+            "type": "string",
+            "description": "How hard its agent thinks."
           },
           "addedAt": {
             "type": "string",
@@ -5126,7 +5108,9 @@
         "required": [
           "provider",
           "harness",
-          "account"
+          "account",
+          "model",
+          "thinking"
         ],
         "type": "object",
         "properties": {
@@ -5140,16 +5124,10 @@
             "$ref": "#/components/schemas/AgentAccountId"
           },
           "model": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": "string"
           },
           "thinking": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": "string"
           },
           "repositories": {
             "type": [

@@ -24,13 +24,13 @@ namespace Bagatka.AiSloth.WebApi.Endpoints;
 
 internal static class ChatsEndpoints
 {
-    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account, string? Model = null, string? Thinking = null, IReadOnlyList<NookRepository>? Repositories = null, ChatId? CopyOf = null, int? Checkpoint = null);
+    internal sealed record StartChatRequest(string Provider, string Harness, AgentAccountId Account, string Model, string Thinking, IReadOnlyList<NookRepository>? Repositories = null, ChatId? CopyOf = null, int? Checkpoint = null);
 
-    internal sealed record AddPresetRequest(string Harness, AgentAccountId Account, string? Model = null, string? Thinking = null, string? Name = null);
+    internal sealed record AddPresetRequest(string Harness, AgentAccountId Account, string Model, string Thinking, string? Name = null);
 
     internal sealed record PresetNameRequest(string Name);
 
-    internal sealed record ChangeModelRequest(AgentAccountId Account, string? Model = null, string? Thinking = null);
+    internal sealed record ChangeModelRequest(AgentAccountId Account, string Model, string Thinking);
 
     internal sealed record PushRequest(IReadOnlyList<string>? Sources = null, string? Branch = null, bool PullRequest = false, string? Message = null);
 
@@ -111,9 +111,10 @@ internal static class ChatsEndpoints
     }
 
     /// <summary>
-    /// The models a chat's agent can run on with the harness and the agent account, newest first, for
-    /// <c>model</c> when starting a chat: those of the account's vendor that can call tools. Empty when
-    /// the harness runs on its own default model, or the vendor's models aren't listed yet.
+    /// The models a chat's agent can run on with the harness and the agent account, for <c>model</c>
+    /// when starting a chat: those of the account's vendor that can call tools, the ones the harness is
+    /// made for first, then in the vendor's order. A new chat starts on the first unless someone
+    /// chooses another.
     /// </summary>
     private static async Task<Results<Ok<IReadOnlyList<AgentModel>>, ProblemHttpResult>> ListModels(
         [FromRoute] Guid workspaceId,

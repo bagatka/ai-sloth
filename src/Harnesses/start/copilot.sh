@@ -7,4 +7,5 @@ case "$HARNESS_CREDENTIAL" in
   *) echo "GitHub Copilot doesn't take $HARNESS_CREDENTIAL." >&2; exit 64 ;;
 esac
 
-exec copilot --acp
+# The chat's model and how hard it reasons: none, minimal, low, medium, high, xhigh, or max.
+exec copilot --acp --model "$HARNESS_MODEL" --reasoning-effort "$HARNESS_THINKING"

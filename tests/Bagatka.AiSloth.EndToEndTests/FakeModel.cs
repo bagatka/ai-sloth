@@ -120,6 +120,7 @@ internal sealed class FakeModel : IAsyncDisposable
         app.MapPost("/v1/responses", model.ResponsesAsync);
         app.MapPost("/v1/chat/completions", model.ChatCompletionsAsync);
         app.MapGet("/v1/models", ListModels);
+        app.MapGet("/copilot/models", CopilotModels);
         await app.StartAsync();
         IServerAddressesFeature? addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
         if (addresses is null)
@@ -299,6 +300,44 @@ internal sealed class FakeModel : IAsyncDisposable
                 new JsonObject { ["slug"] = "codex-auto-review", ["display_name"] = "Auto review", ["visibility"] = "hide" }),
         };
         return Results.Text(catalog.ToJsonString(), "application/json");
+    }
+
+    // Copilot's list of a plan's models, as its API answers a plan's token from a known integration:
+    // two chat models in the picker, one the plan has turned off, and one for embeddings.
+    private static IResult CopilotModels(HttpContext context)
+    {
+        string? authorization = context.Request.Headers.Authorization.FirstOrDefault();
+        if (authorization?.StartsWith("Bearer github_pat_", StringComparison.Ordinal) != true || !context.Request.Headers.ContainsKey("Copilot-Integration-Id"))
+        {
+            return Results.Unauthorized();
+        }
+
+        JsonObject list = new JsonObject
+        {
+            ["data"] = new JsonArray(
+                CopilotModel("claude-opus-5.5", "Claude Opus 5.5", "chat", picker: true, policy: "enabled"),
+                CopilotModel("gpt-6.1-sol", "GPT-6.1 Sol", "chat", picker: true, policy: null),
+                CopilotModel("gpt-5-mini", "GPT-5 mini", "chat", picker: true, policy: "disabled"),
+                CopilotModel("text-embedding-3-small", "Embedding V3 small", "embeddings", picker: false, policy: null)),
+        };
+        return Results.Text(list.ToJsonString(), "application/json");
+    }
+
+    private static JsonObject CopilotModel(string id, string name, string type, bool picker, string? policy)
+    {
+        JsonObject model = new JsonObject
+        {
+            ["id"] = id,
+            ["name"] = name,
+            ["model_picker_enabled"] = picker,
+            ["capabilities"] = new JsonObject { ["type"] = type, ["supports"] = new JsonObject { ["tool_calls"] = string.Equals(type, "chat", StringComparison.Ordinal) } },
+        };
+        if (policy is not null)
+        {
+            model["policy"] = new JsonObject { ["state"] = policy };
+        }
+
+        return model;
     }
 
     // The vendors' lists of models, as each lists them: models that can call tools, one only for

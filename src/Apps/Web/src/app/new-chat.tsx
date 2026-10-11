@@ -34,10 +34,11 @@ import {
   ModelPicker,
   ThinkingPicker,
 } from "./model-picker"
-import { type Choice } from "./models"
+import { type Choice, type Chosen } from "./models"
 import {
   agentAccounts,
   harnesses as harnessesQuery,
+  models as modelsQuery,
   presets as presetsQuery,
   providers as providersQuery,
   repositories as repositoriesQuery,
@@ -63,6 +64,9 @@ type Setup = {
   provider: string
   repositories: readonly string[]
 }
+
+// A setup with its model and thinking level filled in: what a chat starts on.
+type Ready = Setup & Chosen
 
 export function NewChatPage() {
   const workspace = useCurrentWorkspace()
@@ -115,6 +119,14 @@ function NewChat({ workspace }: { workspace: Workspace }) {
   )
   const harness = offeredHarnesses.find((found) => found.id === setup?.harness)
   const agentName = harness?.name ?? "the agent"
+  // Nothing is left to anyone else: a model not chosen is the first the account lists for the agent,
+  // and a thinking level not chosen is the agent's default, both shown before the chat starts.
+  const listed = useQuery({
+    ...modelsQuery(workspace.id, setup?.harness ?? "", setup?.account ?? ""),
+    enabled: setup !== null && setup.model === null,
+  })
+  const firstModel = listed.data?.[0]?.id ?? null
+  const ready = readyOf(setup, harness, firstModel)
 
   // Another agent comes back to the account, model, and thinking last used with it, or its first
   // preset, or its first account on its own defaults.
@@ -147,7 +159,7 @@ function NewChat({ workspace }: { workspace: Workspace }) {
   // The drafts started for this page, one per setup it was written with, so writing on with the
   // same choices reuses the draft. A draft the host refused to start is forgotten, to try again.
   const drafts = React.useRef(new Map<string, Promise<ChatSummary>>())
-  function draftFor(of: Setup): Promise<ChatSummary> {
+  function draftFor(of: Ready): Promise<ChatSummary> {
     const key = JSON.stringify(of)
     let started = drafts.current.get(key)
     if (!started) {
@@ -173,7 +185,7 @@ function NewChat({ workspace }: { workspace: Workspace }) {
   }
 
   // Starts the chat's nook while there's something to send.
-  function prepare(of: Setup | null, text: string) {
+  function prepare(of: Ready | null, text: string) {
     if (of && text.trim()) {
       draftFor(of).catch(() => {
         // Sending says what went wrong.
@@ -187,11 +199,17 @@ function NewChat({ workspace }: { workspace: Workspace }) {
     }
     const next = { ...setup, ...change }
     setChosen(next)
-    prepare(next, draft)
+    // A choice still to be filled in starts its draft at the next keystroke, once its models are listed.
+    prepare(
+      next.model && next.thinking
+        ? { ...next, model: next.model, thinking: next.thinking }
+        : null,
+      draft
+    )
   }
 
   const send = useMutation({
-    mutationFn: async ({ text, of }: { text: string; of: Setup }) => {
+    mutationFn: async ({ text, of }: { text: string; of: Ready }) => {
       const chat = await draftFor(of)
       try {
         return { chat, sent: await sendFirst(chat.id, text) }
@@ -222,10 +240,10 @@ function NewChat({ workspace }: { workspace: Workspace }) {
 
   function submit() {
     const text = draft.trim()
-    if (!text || !setup || send.isPending) {
+    if (!text || !ready || send.isPending) {
       return
     }
-    send.mutate({ text, of: setup })
+    send.mutate({ text, of: ready })
   }
 
   const unusable = !loading && !setup
@@ -240,7 +258,7 @@ function NewChat({ workspace }: { workspace: Workspace }) {
           value={draft}
           onValueChange={(value) => {
             setDraft(value)
-            prepare(setup, value)
+            prepare(ready, value)
           }}
           onSubmit={submit}
           placeholder="Describe the task, or ask a question"
@@ -285,15 +303,19 @@ function NewChat({ workspace }: { workspace: Workspace }) {
                     <ModelPicker
                       workspaceId={workspace.id}
                       harness={harness}
-                      value={setup}
+                      value={ready ?? setup}
                       presets={[]}
                       onChange={chooseModel}
                     />
                     <ThinkingPicker
                       levels={harness.thinkingLevels}
-                      value={setup.thinking}
+                      value={setup.thinking ?? harness.defaultThinking}
                       onChange={(thinking) =>
-                        chooseModel({ ...setup, thinking })
+                        chooseModel({
+                          ...setup,
+                          model: ready?.model ?? setup.model,
+                          thinking,
+                        })
                       }
                     />
                   </>
@@ -313,18 +335,18 @@ function NewChat({ workspace }: { workspace: Workspace }) {
               type="submit"
               size="icon-sm"
               aria-label="Send"
-              disabled={!draft.trim() || !setup}
+              disabled={!draft.trim() || !ready}
               loading={send.isPending}
             >
               <ArrowUpIcon weight="bold" />
             </Button>
           }
         />
-        {setup && !loading && (
+        {ready && !loading && (
           <PresetShortcuts
             workspaceId={workspace.id}
             presets={offeredPresets}
-            setup={setup}
+            setup={ready}
             onPick={chooseModel}
           />
         )}
@@ -469,7 +491,7 @@ function PresetShortcuts({
 }: {
   workspaceId: string
   presets: readonly Preset[]
-  setup: Setup
+  setup: Ready
   onPick: (choice: Choice) => void
 }) {
   const queryClient = useQueryClient()
@@ -586,8 +608,21 @@ function PlacePicker({
   )
 }
 
+// The setup with its model and thinking level filled in, from the choices or else the first model
+// listed and the agent's default level; null while the model is still to be listed.
+function readyOf(
+  setup: Setup | null,
+  harness: Harness | undefined,
+  firstModel: string | null
+): Ready | null {
+  const model = setup?.model ?? firstModel
+  return setup && harness && model
+    ? { ...setup, model, thinking: setup.thinking ?? harness.defaultThinking }
+    : null
+}
+
 // The choices as they can be made now: each one kept while it's still offered, otherwise the first
-// preset, or the first agent on its default model. Null when there's no agent to run or nowhere to
+// preset, or the first agent with nothing chosen yet. Null when there's no agent to run or nowhere to
 // run it.
 function resolve(
   chosen: Setup | null,

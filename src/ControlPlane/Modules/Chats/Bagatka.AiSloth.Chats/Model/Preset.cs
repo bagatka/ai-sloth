@@ -1,6 +1,5 @@
 using System;
 using System.Globalization;
-using System.Linq;
 using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Chats.Contracts;
 using Bagatka.Foundation;
@@ -18,7 +17,7 @@ internal sealed class Preset
     public const int MaxPerPerson = 20;
 
     // Used by Save and by EF: parameter names match property names.
-    private Preset(PresetId id, UserId ownerId, string name, string harness, AgentAccountId agentAccountId, string? model, string? thinking, DateTimeOffset addedAt)
+    private Preset(PresetId id, UserId ownerId, string name, string harness, AgentAccountId agentAccountId, string model, string thinking, DateTimeOffset addedAt)
     {
         Id = id;
         OwnerId = ownerId;
@@ -40,16 +39,16 @@ internal sealed class Preset
 
     public AgentAccountId AgentAccountId { get; private set; }
 
-    public string? Model { get; private set; }
+    public string Model { get; private set; }
 
-    public string? Thinking { get; private set; }
+    public string Thinking { get; private set; }
 
     public DateTimeOffset AddedAt { get; private set; }
 
     // Without a name, it is named after its harness, model, and thinking level, cut to fit.
-    public static Result<Preset> Save(UserId ownerId, string? name, HarnessProfile harness, AgentAccountId account, string? model, string? thinking, TimeProvider time)
+    public static Result<Preset> Save(UserId ownerId, string? name, HarnessProfile harness, AgentAccountId account, string model, string thinking, TimeProvider time)
     {
-        string named = name ?? string.Join(" · ", new[] { harness.Name, model, thinking }.Where(part => part is not null));
+        string named = name ?? harness.Name + " · " + model + " · " + thinking;
         Result<string> checkedName = Checked(name is null && named.Length > MaxNameLength ? named[..MaxNameLength] : named);
         if (checkedName.Failed)
         {

@@ -73,6 +73,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Empty(remaining);
     }
 
+    // An own account serves its owner in every workspace; a plan is only ever someone's own, and a
+    // Copilot plan lists the chat models of Copilot's picker that the plan allows.
     private async Task OwnAccountsServeTheirOwnerInEveryWorkspaceAndPlansStayPersonalAsync()
     {
         WorkspaceSummary acme = await Api.ReadAsync<WorkspaceSummary>(_alice.SendPostAsync("/workspaces", new { name = "Acme" }), HttpStatusCode.Created);
@@ -84,6 +86,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         IReadOnlyList<AgentAccountSummary> inAcme = await ListAsync(_alice, acme.Id);
         IReadOnlyList<AgentAccountSummary> inPersonal = await ListAsync(_alice, personal.Id);
         IReadOnlyList<AgentAccountSummary> inBobs = await ListAsync(_bob, bobs.Id);
+        IReadOnlyList<AgentModel> copilot = await Api.ReadAsync<IReadOnlyList<AgentModel>>(
+            _alice.SendGetAsync(string.Create(CultureInfo.InvariantCulture, $"{Paths.Workspace(acme.Id)}/models?harness=copilot&account={own.Id.Value}")), HttpStatusCode.OK);
         await Api.ProblemAsync(_bob.DeleteAsync(new Uri(Paths.Account(own.Id), UriKind.Relative), Ct), HttpStatusCode.NotFound);
         Problem sharedPlan = await Api.ProblemAsync(
             _alice.SendPostAsync(Paths.Workspace(acme.Id) + "/agent-accounts", new { kind = "CopilotPlan", name = "Shared", secret = "github_pat_example" }), HttpStatusCode.BadRequest);
@@ -93,6 +97,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Contains(inAcme, found => found.Id == own.Id);
         Assert.Contains(inPersonal, found => found.Id == own.Id);
         Assert.DoesNotContain(inBobs, found => found.Id == own.Id);
+        Assert.Equal(["claude-opus-5.5", "gpt-6.1-sol"], copilot.Select(model => model.Id), StringComparer.Ordinal);
         Assert.True(sharedPlan.Errors?.ContainsKey("kind"));
         Assert.True(claudePlan.Errors?.ContainsKey("kind"));
     }
@@ -118,7 +123,7 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Matches("openrouter-api-key +Many vendors' models with one key +API key +Claude Code, pi", kinds);
         Assert.Matches(FakeModel.OpenRouterModel + " +OpenAI: GPT-6 Luna", models);
         Assert.DoesNotContain(FakeModel.OpenRouterClaude, models, StringComparison.Ordinal);
-        Assert.Matches("Luna +pi · " + FakeModel.OpenRouterModel + " · OpenRouter", sloth.Output);
+        Assert.Matches("Luna +pi · " + FakeModel.OpenRouterModel + " · medium · OpenRouter", sloth.Output);
     }
 
     // OpenAI's list of models holds every model its API serves; only those an agent can run on are
@@ -138,8 +143,8 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         ChatSummary switched = await Api.ReadAsync<ChatSummary>(
             _alice.SendPutAsync(Paths.Chat(codex) + "/model", new { account = workspace.Account, model = FakeModel.OpenAIModel, thinking = "high" }), HttpStatusCode.OK);
         JsonElement changed = await watch.NextAsync("model-changed");
-        Problem toOwn = await Api.ProblemAsync(_alice.SendPutAsync(Paths.Chat(codex) + "/model", new { account = own.Id }), HttpStatusCode.BadRequest);
-        Problem tooHard = await Api.ProblemAsync(_alice.SendPutAsync(Paths.Chat(codex) + "/model", new { account = workspace.Account, thinking = "max" }), HttpStatusCode.BadRequest);
+        Problem toOwn = await Api.ProblemAsync(_alice.SendPutAsync(Paths.Chat(codex) + "/model", new { account = own.Id, model = FakeModel.OpenAIModel, thinking = "high" }), HttpStatusCode.BadRequest);
+        Problem tooHard = await Api.ProblemAsync(_alice.SendPutAsync(Paths.Chat(codex) + "/model", new { account = workspace.Account, model = FakeModel.OpenAIModel, thinking = "max" }), HttpStatusCode.BadRequest);
         await workspace.SendAsync(codex, "say hello again");
         JsonElement restarted = await watch.NextAsync("agent-restarted");
         JsonElement second = await watch.NextAsync("turn-ended");
@@ -168,8 +173,6 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         IReadOnlyList<AgentModel> models = await Api.ReadAsync<IReadOnlyList<AgentModel>>(_alice.SendGetAsync(ModelsPath(workspace, "pi", key.Id)), HttpStatusCode.OK);
         IReadOnlyList<AgentModel> anthropic = await Api.ReadAsync<IReadOnlyList<AgentModel>>(_alice.SendGetAsync(ModelsPath(workspace, "claude-code", workspace.Account)), HttpStatusCode.OK);
         Problem codex = await Api.ProblemAsync(_alice.SendGetAsync(ModelsPath(workspace, "codex", key.Id)), HttpStatusCode.BadRequest);
-        Problem copilotModel = await Api.ProblemAsync(
-            _alice.SendPostAsync(workspace.Path + "/chats", new { provider = "docker", harness = "copilot", account = key.Id, model = FakeModel.OpenRouterModel }), HttpStatusCode.BadRequest);
 
         JsonElement[] ended = await Task.WhenAll(
             TurnAsync(workspace, "pi", key.Id, FakeModel.OpenRouterModel),
@@ -178,7 +181,6 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
         Assert.Equal([FakeModel.OpenRouterModel, FakeModel.OpenRouterClaude, FakeModel.OpenAIModel], models.Select(model => model.Id), StringComparer.Ordinal);
         Assert.Contains(anthropic, model => model is { Id: FakeModel.OpenRouterClaude, Name: "Anthropic: Claude Opus 5.5" });
         Assert.True(codex.Errors?.ContainsKey("account"));
-        Assert.True(copilotModel.Errors?.ContainsKey("model"));
         Assert.All(ended, turn => Assert.Equal("end_turn", turn.GetProperty("stopReason").GetString()));
         Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.OpenRouterModel + "\"", StringComparison.Ordinal) && body.Contains("\"messages\"", StringComparison.Ordinal));
         Assert.Contains(app.Model.Requests, body => body.Contains("\"model\":\"" + FakeModel.OpenRouterClaude + "\"", StringComparison.Ordinal));
@@ -194,21 +196,23 @@ public sealed class AgentAccountsJourney(ControlPlane app) : IDisposable
             _alice.SendPostAsync(workspace.Path + "/agent-accounts", new { kind = "OpenRouterApiKey", name = "OpenRouter", secret = FakeModel.OpenRouterKey }), HttpStatusCode.Created);
         string presets = workspace.Path + "/presets";
 
-        PresetSummary saved = await Api.ReadAsync<PresetSummary>(_alice.SendPostAsync(presets, new { harness = "pi", account = key.Id, model = FakeModel.OpenRouterModel }), HttpStatusCode.Created);
-        PresetSummary onDefault = await Api.ReadAsync<PresetSummary>(_alice.SendPostAsync(presets, new { harness = "claude-code", account = workspace.Account }), HttpStatusCode.Created);
-        Problem again = await Api.ProblemAsync(_alice.SendPostAsync(presets, new { harness = "pi", account = key.Id, model = FakeModel.OpenRouterModel }), HttpStatusCode.Conflict);
-        Problem codex = await Api.ProblemAsync(_alice.SendPostAsync(presets, new { harness = "codex", account = key.Id }), HttpStatusCode.BadRequest);
+        PresetSummary saved = await Api.ReadAsync<PresetSummary>(_alice.SendPostAsync(presets, new { harness = "pi", account = key.Id, model = FakeModel.OpenRouterModel, thinking = "medium" }), HttpStatusCode.Created);
+        PresetSummary claude = await Api.ReadAsync<PresetSummary>(_alice.SendPostAsync(presets, new { harness = "claude-code", account = workspace.Account, model = FakeModel.OpenRouterClaude, thinking = "xhigh", name = "Claude" }), HttpStatusCode.Created);
+        Problem modelless = await Api.ProblemAsync(_alice.SendPostAsync(presets, new { harness = "claude-code", account = workspace.Account, model = "", thinking = "high" }), HttpStatusCode.BadRequest);
+        Problem again = await Api.ProblemAsync(_alice.SendPostAsync(presets, new { harness = "pi", account = key.Id, model = FakeModel.OpenRouterModel, thinking = "medium" }), HttpStatusCode.Conflict);
+        Problem codex = await Api.ProblemAsync(_alice.SendPostAsync(presets, new { harness = "codex", account = key.Id, model = FakeModel.OpenAIModel, thinking = "medium" }), HttpStatusCode.BadRequest);
         PresetSummary renamed = await Api.ReadAsync<PresetSummary>(_alice.SendPutAsync(Paths.Preset(saved.Id) + "/name", new { name = "Luna" }), HttpStatusCode.OK);
         await Api.ProblemAsync(_bob.DeleteAsync(new Uri(Paths.Preset(saved.Id), UriKind.Relative), Ct), HttpStatusCode.NotFound);
         IReadOnlyList<PresetSummary> listed = await Api.ReadAsync<IReadOnlyList<PresetSummary>>(_alice.SendGetAsync(presets), HttpStatusCode.OK);
-        await Api.ExpectAsync(_alice.DeleteAsync(new Uri(Paths.Preset(onDefault.Id), UriKind.Relative), Ct), HttpStatusCode.NoContent);
+        await Api.ExpectAsync(_alice.DeleteAsync(new Uri(Paths.Preset(claude.Id), UriKind.Relative), Ct), HttpStatusCode.NoContent);
         IReadOnlyList<PresetSummary> left = await Api.ReadAsync<IReadOnlyList<PresetSummary>>(_alice.SendGetAsync(presets), HttpStatusCode.OK);
 
-        Assert.Equal("pi · " + FakeModel.OpenRouterModel, saved.Name);
-        Assert.Equal(("Claude Code", null), (onDefault.Name, onDefault.Model));
+        Assert.Equal("pi · " + FakeModel.OpenRouterModel + " · medium", saved.Name);
+        Assert.Equal(("Claude", FakeModel.OpenRouterClaude, "xhigh"), (claude.Name, claude.Model, claude.Thinking));
+        Assert.True(modelless.Errors?.ContainsKey("model"));
         Assert.Equal(ChatsErrors.PresetExists.Code, again.Code);
         Assert.True(codex.Errors?.ContainsKey("account"));
-        Assert.Equal(["Luna", "Claude Code"], listed.Select(preset => preset.Name), StringComparer.Ordinal);
+        Assert.Equal(["Luna", "Claude"], listed.Select(preset => preset.Name), StringComparer.Ordinal);
         Assert.Equal([renamed], left);
     }
 

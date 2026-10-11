@@ -46,16 +46,26 @@ internal sealed class TestWorkspace
         return new TestWorkspace(app, person, workspace.Id, added.Id);
     }
 
-    /// <summary>A chat in a nook of its own: with the repository, or a copy of another chat's files, and on the model, when given.</summary>
+    /// <summary>
+    /// A chat in a nook of its own: with the repository, or a copy of another chat's files, on the model
+    /// given or else <see cref="AnyModel"/>, thinking <see cref="AnyThinking"/>.
+    /// </summary>
     public async Task<ChatSummary> StartChatAsync(
         string harness = "claude-code", AgentAccountId? account = null, ChatId? copyOf = null, RepositoryId? repository = null, string provider = "docker", string? model = null)
     {
         AgentAccountId paying = account ?? Account;
+        string chosenModel = model ?? AnyModel;
         object body = repository is RepositoryId chosen
-            ? new { provider, harness, account = paying, model, copyOf, repositories = new[] { new { repository = chosen } } }
-            : new { provider, harness, account = paying, model, copyOf };
+            ? new { provider, harness, account = paying, model = chosenModel, thinking = AnyThinking, copyOf, repositories = new[] { new { repository = chosen } } }
+            : new { provider, harness, account = paying, model = chosenModel, thinking = AnyThinking, copyOf };
         return await Api.ReadAsync<ChatSummary>(Person.SendPostAsync(Path + "/chats", body), HttpStatusCode.Created);
     }
+
+    /// <summary>A model for chats whose model a test doesn't care about: the fake answers any.</summary>
+    public const string AnyModel = "claude-fake";
+
+    /// <summary>A thinking level every harness has, for chats whose level a test doesn't care about.</summary>
+    public const string AnyThinking = "medium";
 
     public async Task<ChatMessage> SendAsync(ChatSummary chat, string text)
     {

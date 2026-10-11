@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/tooltip"
 import { ApiError, answer, api, messageOf, type Schemas } from "../api"
 import { ModelPicker, ThinkingPicker } from "../model-picker"
-import { type Choice } from "../models"
+import { type Choice, type Chosen } from "../models"
 import { chat as chatQuery, presets as presetsQuery } from "../queries"
 import { chatStream } from "./chat-stream"
 import { useMessageScroller } from "@/components/ui/message-scroller"
@@ -101,11 +101,15 @@ export function Composer({
     scroller.scrollToEnd()
   }
 
-  const placeholder = proposing
-    ? `Propose a message; ${proposing} sends it on`
-    : working
-      ? `Steer ${agent} while it works`
-      : `Message ${agent}`
+  // A chat started before every chat had a model takes one before its next message.
+  const needsModel = chat.model === null
+  const placeholder = needsModel
+    ? `Choose ${agent}'s model to write`
+    : proposing
+      ? `Propose a message; ${proposing} sends it on`
+      : working
+        ? `Steer ${agent} while it works`
+        : `Message ${agent}`
 
   return (
     <div className="shrink-0 px-4 pb-4 md:px-5 md:pb-5">
@@ -155,7 +159,7 @@ export function Composer({
               type="submit"
               size="icon-sm"
               aria-label={working ? "Send to the running turn" : "Send"}
-              disabled={empty}
+              disabled={empty || needsModel}
               inert={stopShown}
               className={cn(
                 "absolute inset-0",
@@ -183,7 +187,7 @@ function ChatModel({
   const queryClient = useQueryClient()
   const presets = useQuery(presetsQuery(chat.workspaceId)).data ?? []
   const change = useMutation({
-    mutationFn: (choice: Choice) =>
+    mutationFn: (choice: Chosen) =>
       answer(
         api.PUT("/chats/{id}/model", {
           params: { path: { id: chat.id } },
@@ -210,6 +214,7 @@ function ChatModel({
     thinking: chat.thinking,
   }
 
+  const model = current.model
   return (
     <>
       <ModelPicker
@@ -220,11 +225,15 @@ function ChatModel({
         presets={presets}
         onChange={(choice) => change.mutate(choice)}
       />
-      <ThinkingPicker
-        levels={harness.thinkingLevels}
-        value={current.thinking}
-        onChange={(thinking) => change.mutate({ ...current, thinking })}
-      />
+      {model && (
+        <ThinkingPicker
+          levels={harness.thinkingLevels}
+          value={current.thinking ?? harness.defaultThinking}
+          onChange={(thinking) =>
+            change.mutate({ ...current, model, thinking })
+          }
+        />
+      )}
     </>
   )
 }

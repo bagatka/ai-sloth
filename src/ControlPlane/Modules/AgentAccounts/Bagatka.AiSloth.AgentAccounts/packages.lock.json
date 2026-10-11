@@ -93,6 +93,12 @@
           "Bagatka.Foundation": "[1.0.0, )"
         }
       },
+      "bagatka.sdk.github": {
+        "type": "Project",
+        "dependencies": {
+          "Bagatka.Foundation": "[1.0.0, )"
+        }
+      },
       "bagatka.sdk.openai": {
         "type": "Project",
         "dependencies": {

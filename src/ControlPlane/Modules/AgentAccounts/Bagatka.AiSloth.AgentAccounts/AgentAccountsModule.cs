@@ -2,6 +2,7 @@ using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.AgentAccounts.Data;
 using Bagatka.Foundation.Modules;
 using Bagatka.Sdk.Anthropic;
+using Bagatka.Sdk.GitHub;
 using Bagatka.Sdk.OpenAI;
 using Bagatka.Sdk.OpenRouter;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ public static class AgentAccountsModule
         services.AddChatGptSignInClient(settings.ChatGptSignIn);
         services.AddOpenAIModelsClient();
         services.AddAnthropicModelsClient();
+        services.AddCopilotModelsClient();
         services.AddOpenRouterClient(new OpenRouterSettings(settings.OpenRouterApi));
         services.AddModuleDbContext<AgentAccountsDbContext>(AgentAccountsDbContext.Schema);
         services.AddSingleton<IAgentAccountsApi, AgentAccountsApi>();

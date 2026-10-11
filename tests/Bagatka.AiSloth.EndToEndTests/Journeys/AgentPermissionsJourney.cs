@@ -115,9 +115,9 @@ public sealed class AgentPermissionsJourney(ControlPlane app) : IDisposable
         Page<NookSummary> before = await Api.ReadAsync<Page<NookSummary>>(_alice.SendGetAsync(acme.Path + "/nooks"), HttpStatusCode.OK);
 
         Problem wrongAccount = await Api.ProblemAsync(
-            _alice.SendPostAsync(acme.Path + "/chats", new { provider = "docker", harness = "copilot", account = acme.Account }), HttpStatusCode.BadRequest);
+            _alice.SendPostAsync(acme.Path + "/chats", new { provider = "docker", harness = "copilot", account = acme.Account, model = TestWorkspace.AnyModel, thinking = TestWorkspace.AnyThinking }), HttpStatusCode.BadRequest);
         Problem unknownHarness = await Api.ProblemAsync(
-            _alice.SendPostAsync(acme.Path + "/chats", new { provider = "docker", harness = "nowhere", account = acme.Account }), HttpStatusCode.BadRequest);
+            _alice.SendPostAsync(acme.Path + "/chats", new { provider = "docker", harness = "nowhere", account = acme.Account, model = TestWorkspace.AnyModel, thinking = TestWorkspace.AnyThinking }), HttpStatusCode.BadRequest);
         Page<NookSummary> after = await Api.ReadAsync<Page<NookSummary>>(_alice.SendGetAsync(acme.Path + "/nooks"), HttpStatusCode.OK);
 
         Assert.True(wrongAccount.Errors?.ContainsKey("account"));

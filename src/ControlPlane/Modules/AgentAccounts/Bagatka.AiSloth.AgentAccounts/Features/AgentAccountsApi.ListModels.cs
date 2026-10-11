@@ -7,6 +7,7 @@ using Bagatka.AiSloth.AgentAccounts.Contracts;
 using Bagatka.AiSloth.Workspaces.Contracts;
 using Bagatka.Foundation;
 using Bagatka.Sdk.Anthropic;
+using Bagatka.Sdk.GitHub;
 using Bagatka.Sdk.OpenAI;
 using Bagatka.Sdk.OpenRouter;
 
@@ -27,8 +28,13 @@ internal sealed partial class AgentAccountsApi
             return new Result<IReadOnlyList<AgentModel>>(used.Error);
         }
 
-        // Not handled: the models of Copilot and Claude plans, whose token goes to their harness; their
-        // agents start on its default model.
+        // A plan's token that goes to its harness lists the plan's own models.
+        if (used.Output.Access is HarnessToken token)
+        {
+            IReadOnlyList<AgentModel> planModels = await PlanModelsAsync(used.Output.Kind, token.Value, ct);
+            return new Result<IReadOnlyList<AgentModel>>(planModels);
+        }
+
         if (used.Output.Access is not ModelEndpoint endpoint)
         {
             return new Result<IReadOnlyList<AgentModel>>([]);
@@ -60,6 +66,26 @@ internal sealed partial class AgentAccountsApi
         return new Result<IReadOnlyList<AgentModel>>([.. openAIModels
             .OrderByDescending(model => model.Created)
             .Select(model => new AgentModel(model.Id, model.Id, RunsAgents(model.Id)))]);
+    }
+
+    // A Copilot plan's models are Copilot's to list. Not handled: a Claude plan's (off unless Anthropic
+    // allowed this host) are asked of Anthropic's API with the plan's sign-in token, which no test or
+    // plan here confirms.
+    private async Task<IReadOnlyList<AgentModel>> PlanModelsAsync(AgentAccountKind kind, string token, CancellationToken ct)
+    {
+        if (kind == AgentAccountKind.CopilotPlan)
+        {
+            IReadOnlyList<CopilotModel> offered = await copilot.ListModelsAsync(settings.CopilotApi, token, ct);
+            return [.. offered.Select(model => new AgentModel(model.Id, model.Name, model.UsesTools))];
+        }
+
+        Dictionary<string, string> signedIn = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Authorization"] = "Bearer " + token,
+            ["anthropic-beta"] = "oauth-2025-04-20",
+        };
+        IReadOnlyList<AnthropicModel> served = await anthropic.ListModelsAsync(new Uri("https://api.anthropic.com"), signedIn, ct);
+        return [.. served.Select(model => new AgentModel(model.Id, model.DisplayName, UsesTools: true))];
     }
 
     private static bool RunsAgents(string model)

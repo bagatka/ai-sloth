@@ -82,7 +82,7 @@ public sealed class FastStartJourney(ControlPlane app) : IDisposable
         await WriteAsync(first, "/work/app/.agents/resume", "#!/bin/sh\necho \"resume in $(pwd)\" >> /tmp/ran\n", "755");
 
         ChatSummary copy = await Api.ReadAsync<ChatSummary>(
-            Dev.SendPostAsync(Paths.Workspace(first.WorkspaceId) + "/chats", new { provider = "docker", harness = "claude-code", account = first.Account, copyOf = first.Id }), HttpStatusCode.Created);
+            Dev.SendPostAsync(Paths.Workspace(first.WorkspaceId) + "/chats", new { provider = "docker", harness = "claude-code", account = first.Account, model = TestWorkspace.AnyModel, thinking = TestWorkspace.AnyThinking, copyOf = first.Id }), HttpStatusCode.Created);
         await using ChatWatch watch = await ChatWatch.OpenAsync(Dev, copy);
         JsonElement started = await watch.NextAsync("setup-started");
         JsonElement ended = await watch.NextAsync("setup-ended");

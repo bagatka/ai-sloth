@@ -60,10 +60,9 @@ public interface IAgentAccountsApi
     /// <summary>
     /// The models the account's vendor offers, for choosing one per chat: OpenRouter's catalog without
     /// its batch variants, and the lists of Anthropic's and OpenAI's APIs at the account's endpoint,
-    /// asked with its credentials, newest first, and a ChatGPT plan's catalog in its own order. Copilot
-    /// and Claude plans list none yet; their agents start on
-    /// their harness's default model. Asks the vendor each time, which throws when it can't be
-    /// reached; try again later.
+    /// asked with its credentials, newest first; a ChatGPT plan's catalog in its own order; a Copilot
+    /// plan's chat models from Copilot's API; and a Claude plan's from Anthropic's. Asks the vendor each
+    /// time, which throws when it can't be reached; try again later.
     /// </summary>
     /// <returns>
     /// The models; <see cref="AgentAccountsErrors.SignInEnded"/>; or not found for anyone who may not

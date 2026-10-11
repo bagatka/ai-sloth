@@ -2941,8 +2941,8 @@ export interface components {
         AddPresetRequest: {
             harness: string;
             account: components["schemas"]["AgentAccountId"];
-            model?: null | string;
-            thinking?: null | string;
+            model: string;
+            thinking: string;
             name?: null | string;
         };
         AddRepositoryRequest: {
@@ -3053,8 +3053,8 @@ export interface components {
         };
         ChangeModelRequest: {
             account: components["schemas"]["AgentAccountId"];
-            model?: null | string;
-            thinking?: null | string;
+            model: string;
+            thinking: string;
         };
         /**
          * @description What happened in a chat. A message is sent, then either starts a turn, goes into the running
@@ -3116,10 +3116,13 @@ export interface components {
             working: boolean;
             /** @description The harness that runs its agent. */
             harness: string;
-            /** @description The model its agent runs on from its next turn; `null` for the harness's default. */
+            /**
+             * @description The model its agent runs on from its next turn; `null` only for a chat started before
+             *     every chat had one, which takes one (Task&lt;Result&lt;ChatSummary&gt;&gt; IChatsApi.ChangeModelAsync(Actor actor, ChangeModel command, CancellationToken ct)) before its next message.
+             */
             model: null | string;
-            /** @description How hard its agent thinks from its next turn; `null` for the harness's default. */
-            thinking: null | string;
+            /** @description How hard its agent thinks from its next turn. */
+            thinking: string;
             /** @description The agent account that pays for its work from its next turn. */
             account: components["schemas"]["AgentAccountId"];
             accountOwner: null | components["schemas"]["UserId"];
@@ -3294,11 +3297,10 @@ export interface components {
             name: string;
             /** @description The kinds of agent account it can run on. */
             accepts: components["schemas"]["AgentAccountKind"][];
-            /**
-             * @description How hard it can think, in its own words, such as `high`, lightest first; empty when it takes
-             *     none.
-             */
+            /** @description How hard it can think, in its own words, such as `high`, lightest first. */
             thinkingLevels: string[];
+            /** @description The level, one of its levels, a new chat thinks at unless someone chooses another. */
+            defaultThinking: string;
         };
         HostDiscovery: {
             name: string;
@@ -3413,8 +3415,8 @@ export interface components {
         };
         ModelChanged: {
             account: components["schemas"]["AgentAccountId"];
-            model: null | string;
-            thinking: null | string;
+            model: string;
+            thinking: string;
             changedBy: components["schemas"]["UserId"];
         };
         /**
@@ -3595,10 +3597,10 @@ export interface components {
             harness: string;
             /** @description The agent account that pays for its work. */
             account: components["schemas"]["AgentAccountId"];
-            /** @description The model its agent runs on; `null` for the harness's default. */
-            model: null | string;
-            /** @description How hard its agent thinks; `null` for the harness's default. */
-            thinking: null | string;
+            /** @description The model its agent runs on. */
+            model: string;
+            /** @description How hard its agent thinks. */
+            thinking: string;
             /**
              * Format: date-time
              * @description When it was saved.
@@ -3899,8 +3901,8 @@ export interface components {
             provider: string;
             harness: string;
             account: components["schemas"]["AgentAccountId"];
-            model?: null | string;
-            thinking?: null | string;
+            model: string;
+            thinking: string;
             repositories?: null | components["schemas"]["NookRepository"][];
             /** Format: uuid */
             copyOf?: string;

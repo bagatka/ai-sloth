@@ -59,7 +59,7 @@ public sealed class ChatJourney(ControlPlane app) : IDisposable
         int listed = await sloth.RunAsync("chat", "list");
 
         Assert.Equal(0, chatted);
-        Assert.Matches("^Chat [0-9a-f]{6} · Claude Code · Fake · cloud", chat);
+        Assert.Matches("^Chat [0-9a-f]{6} · Claude Code · " + FakeModel.OpenRouterClaude + " · high · Fake · cloud", chat);
         Assert.Contains("› You: Please write hello.txt for me\n  ▸ Write hello.txt\nDone.\n", chat, StringComparison.Ordinal);
         Assert.Contains("(files saved as checkpoint 1)", chat, StringComparison.Ordinal);
         Assert.Equal(0, listed);

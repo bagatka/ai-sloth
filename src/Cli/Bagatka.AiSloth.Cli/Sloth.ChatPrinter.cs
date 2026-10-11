@@ -96,9 +96,9 @@ internal sealed partial class Sloth
         // Another model or thinking level, from the next turn.
         private static string Switched(JsonElement body)
         {
-            string model = body.GetProperty("model").GetString() ?? "the agent's default model";
+            string? model = body.GetProperty("model").GetString();
             string? thinking = body.GetProperty("thinking").GetString();
-            return "  (switched to " + model + (thinking is null ? string.Empty : ", thinking " + thinking) + ", from the next turn)";
+            return "  (switched to " + model + ", thinking " + thinking + ", from the next turn)";
         }
 
         // The nook's setup: when it starts and ends.
