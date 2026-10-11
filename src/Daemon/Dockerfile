@@ -26,7 +26,7 @@ RUN dotnet publish src/Daemon/Bagatka.AiSloth.Daemon -c Release --no-restore -o 
 # pinned here, matching their start scripts in src/Harnesses/start, which each image installs as
 # `harness`: Chats starts every harness that way.
 FROM node:22-slim AS claude-code-install
-RUN npm install --global --prefix /opt/harness @agentclientprotocol/claude-agent-acp@0.85.1
+RUN npm install --global --prefix /opt/harness @agentclientprotocol/claude-agent-acp@0.89.1
 
 FROM node:22-slim AS codex-install
 RUN npm install --global --prefix /opt/harness @agentclientprotocol/codex-acp@2.1.1
