@@ -128,8 +128,24 @@ internal sealed class SandboxNetworks(DockerClient docker, string scope, IReadOn
 
     private async Task StartRouterAsync(SandboxKey key, CancellationToken ct)
     {
+        // Builds at the same time each move the tag to their own copy of the image, and Docker's
+        // containerd image store can forget a copy whose commit raced another's before any router uses
+        // it: the router then starts from the copy the tag names now. Each build moves the tag once, so
+        // this ends.
         string image = await RouterImageAsync(ct);
         Result<string> created = await docker.CreateContainerAsync(RouterName(key), RouterConfiguration(key, image), ct);
+        while (created.Failed && created.Error.Kind == ErrorKind.NotFound)
+        {
+            string current = await RouterImageAsync(ct);
+            if (string.Equals(current, image, StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            image = current;
+            created = await docker.CreateContainerAsync(RouterName(key), RouterConfiguration(key, image), ct);
+        }
+
         if (created.Failed && created.Error.Kind != ErrorKind.Conflict)
         {
             throw new InvalidOperationException(created.Error.Message);
@@ -157,9 +173,9 @@ internal sealed class SandboxNetworks(DockerClient docker, string scope, IReadOn
     // The routers' image's ID, built once per engine by committing a container that installed iptables
     // on Alpine, which takes the internet that once. Routers start from the ID, not the tag: sandboxes
     // created together on a new engine each build it, and while a commit moves the tag to its image,
-    // Docker's containerd image store has no image by that tag for a moment. Another tag's image goes
-    // once no router uses it.
-    // Not handled: such simultaneous builds leave a spare copy of the image, 15 MB.
+    // Docker's containerd image store has no image by that tag for a moment (StartRouterAsync). Another
+    // tag's image goes once no router uses it.
+    // Not handled: simultaneous builds can leave a spare copy of the image, 15 MB.
     private async Task<string> RouterImageAsync(CancellationToken ct)
     {
         ImageDetails? built = await docker.InspectImageAsync(RouterImage, ct);
