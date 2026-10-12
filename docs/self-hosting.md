@@ -350,6 +350,13 @@ Do this to give your host an address such as `aisloth.example.com`. Replace `<re
    --Parameters:custom-domain=<domain> --Parameters:custom-domain-certificate=<certificate name>
    ```
 
+The web app is at `/app/` on the host's address. To give it an address of its own, such as
+`app.example.com`, follow the same steps for that domain, and add these two settings instead:
+
+```sh
+--Parameters:app-domain=<domain> --Parameters:app-domain-certificate=<certificate name>
+```
+
 ### Optional: sign in with your company's accounts
 
 By default, people sign in to the host with codes. To sign them in with an OpenID Connect provider,
@@ -408,6 +415,7 @@ deploy again without a push, run the workflow in Actions, or run
    | Variable | Value |
    |---|---|
    | `CUSTOM_DOMAIN`, `CUSTOM_DOMAIN_CERTIFICATE` | Your domain and the name of its certificate |
+   | `APP_DOMAIN`, `APP_DOMAIN_CERTIFICATE` | The web app's own domain and the name of its certificate |
    | `ALLOW_CHATGPT_PLANS`, `ALLOW_CLAUDE_PLANS` | `false` if other people use your host: ChatGPT and Claude plans are for your own use |
    | `POSTHOG_HOST`, `POSTHOG_PROJECT_TOKEN` | Your PostHog project's host and project token |
 

@@ -105,12 +105,20 @@ if (builder.ExecutionContext.IsPublishMode)
         ? ReferenceExpression.Create($"{builder.AddParameter("postgres-connection-string", secret: true)}")
         : builder.AddAzurePostgresFlexibleServer("postgres").WithPasswordAuthentication().AddDatabase("aisloth").Resource.ConnectionStringExpression;
 
-    // A custom domain, such as app.example.com, comes with the name of its managed certificate.
+    // A custom domain for the API, such as api.example.com, comes with the name of its managed
+    // certificate, as does one for the web app, such as app.example.com, which is otherwise at /app/
+    // on the API's address.
     IResourceBuilder<ParameterResource>? customDomain = builder.Configuration["Parameters:custom-domain"] is { Length: > 0 }
         ? builder.AddParameter("custom-domain")
         : null;
     IResourceBuilder<ParameterResource>? customDomainCertificate = customDomain is not null
         ? builder.AddParameter("custom-domain-certificate")
+        : null;
+    IResourceBuilder<ParameterResource>? appDomain = builder.Configuration["Parameters:app-domain"] is { Length: > 0 }
+        ? builder.AddParameter("app-domain")
+        : null;
+    IResourceBuilder<ParameterResource>? appDomainCertificate = appDomain is not null
+        ? builder.AddParameter("app-domain-certificate")
         : null;
 
     // One public HTTPS address for the API, daemons, machines, and the model gateway: Container Apps'
@@ -194,7 +202,16 @@ if (builder.ExecutionContext.IsPublishMode)
             {
                 app.ConfigureCustomDomain(customDomain, customDomainCertificate!);
             }
+
+            if (appDomain is not null)
+            {
+                app.ConfigureCustomDomain(appDomain, appDomainCertificate!);
+            }
         });
+    if (appDomain is not null)
+    {
+        webApi.WithEnvironment("Host__AppUrl", ReferenceExpression.Create($"https://{appDomain}/"));
+    }
 
     publicUrl = customDomain is not null
         ? ReferenceExpression.Create($"https://{customDomain}")
