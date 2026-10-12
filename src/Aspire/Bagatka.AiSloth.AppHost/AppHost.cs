@@ -52,8 +52,12 @@ IResourceBuilder<ParameterResource> encryptionKey = builder.ExecutionContext.IsP
 string? postHogHost = builder.Configuration["Parameters:posthog-host"] is { Length: > 0 } givenPostHog ? givenPostHog : null;
 
 // People connect GitHub through the host's GitHub App, which `./host github-app http://localhost:5170`
-// makes: give github-app-client-id, -client-secret, and -slug as user secrets of this project.
-string? gitHubAppClientId = builder.Configuration["Parameters:github-app-client-id"];
+// makes: give github-app-client-id, -client-secret, and -slug as user secrets of this project, or as
+// deploy parameters. Its client secret is a secret parameter, as Container Apps keeps secrets.
+string? gitHubAppClientId = builder.Configuration["Parameters:github-app-client-id"] is { Length: > 0 } givenGitHubApp ? givenGitHubApp : null;
+IResourceBuilder<ParameterResource>? gitHubAppClientSecret = gitHubAppClientId is not null
+    ? builder.AddParameter("github-app-client-secret", secret: true)
+    : null;
 
 // The scope nooks run in, which the control plane owns: it deletes sandboxes there that no nook
 // records. Run here, each clone gets its own, generated once and kept in its user secrets, so
@@ -351,10 +355,13 @@ foreach (IResourceBuilder<IResourceWithEnvironment> mode in modes)
             if (gitHubAppClientId is not null)
             {
                 environment.EnvironmentVariables["Modules__Sources__GitHubApp__ClientId"] = gitHubAppClientId;
-                environment.EnvironmentVariables["Modules__Sources__GitHubApp__ClientSecret"] = builder.Configuration["Parameters:github-app-client-secret"] ?? string.Empty;
                 environment.EnvironmentVariables["Modules__Sources__GitHubApp__Slug"] = builder.Configuration["Parameters:github-app-slug"] ?? string.Empty;
             }
         });
+    if (gitHubAppClientSecret is not null)
+    {
+        mode.WithEnvironment("Modules__Sources__GitHubApp__ClientSecret", gitHubAppClientSecret);
+    }
 }
 
 using DistributedApplication app = builder.Build();

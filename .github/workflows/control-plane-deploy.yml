@@ -133,6 +133,9 @@ jobs:
           Parameters__custom-domain-certificate: ${{ vars.CUSTOM_DOMAIN_CERTIFICATE }}
           Parameters__app-domain: ${{ vars.APP_DOMAIN }}
           Parameters__app-domain-certificate: ${{ vars.APP_DOMAIN_CERTIFICATE }}
+          Parameters__github-app-client-id: ${{ vars.GH_APP_CLIENT_ID }}
+          Parameters__github-app-client-secret: ${{ secrets.GH_APP_CLIENT_SECRET }}
+          Parameters__github-app-slug: ${{ vars.GH_APP_SLUG }}
           Parameters__allow-chatgpt-plans: ${{ vars.ALLOW_CHATGPT_PLANS }}
           Parameters__allow-claude-plans: ${{ vars.ALLOW_CLAUDE_PLANS }}
           Parameters__posthog-host: ${{ vars.POSTHOG_HOST }}

@@ -409,6 +409,7 @@ deploy again without a push, run the workflow in Actions, or run
    | `AZURE_RESOURCE_GROUP`, `AZURE_LOCATION` | Your resource group and its region |
    | `ENCRYPTION_KEY` | Your key |
    | `POSTGRES_CONNECTION_STRING` | Optional: your own PostgreSQL server |
+   | `GH_APP_CLIENT_SECRET` | Optional: your GitHub App's client secret |
 
 4. Optional: add these variables to the environment:
 
@@ -416,6 +417,7 @@ deploy again without a push, run the workflow in Actions, or run
    |---|---|
    | `CUSTOM_DOMAIN`, `CUSTOM_DOMAIN_CERTIFICATE` | Your domain and the name of its certificate |
    | `APP_DOMAIN`, `APP_DOMAIN_CERTIFICATE` | The web app's own domain and the name of its certificate |
+   | `GH_APP_CLIENT_ID`, `GH_APP_SLUG` | Your GitHub App's client ID and slug ("Optional: connect GitHub") |
    | `ALLOW_CHATGPT_PLANS`, `ALLOW_CLAUDE_PLANS` | `false` if other people use your host: ChatGPT and Claude plans are for your own use |
    | `POSTHOG_HOST`, `POSTHOG_PROJECT_TOKEN` | Your PostHog project's host and project token |
 
