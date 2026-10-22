@@ -30,12 +30,10 @@ For Linux and Macs with Apple silicon; on Windows, in WSL. Then `sloth help`.
 
 ## Run it your way
 
-- **Hosted.** The easiest way: no servers, no Docker, nothing to maintain. We run it at
-  [aisloth.dev](https://aisloth.dev), in early beta.
-- **On your machines.** Connect a Linux box, a VPS or a Windows PC in WSL with `sloth machine`, and
-  agents run there, still isolated.
 - **Self-hosted.** Run all of AiSloth on a server or PC of yours with `./host up`, in minutes and
   with no keys to make, or in your Azure subscription: [docs/self-hosting.md](docs/self-hosting.md).
+- **On your machines.** Connect a Linux box, a VPS or a Windows PC in WSL with `sloth machine`, and
+  agents run there, still isolated.
 
 ## Built in the open
 
