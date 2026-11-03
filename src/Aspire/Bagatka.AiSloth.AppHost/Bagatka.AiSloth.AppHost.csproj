@@ -12,6 +12,8 @@
     <PackageReference Include="Aspire.Hosting.Azure.PostgreSQL" />
     <PackageReference Include="Aspire.Hosting.Azure.Storage" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <!-- Aspire's transitive 2.5.302 is vulnerable (GHSA-qhrr-8q5h-9q3h). -->
+    <PackageReference Include="MessagePack" />
   </ItemGroup>
 
   <ItemGroup>
